@@ -355,6 +355,29 @@ struct LineCell {
     right: bool,
 }
 
+/// State-border-ring color for a pane running a recognized agent, paired with
+/// its attention priority for tie-breaking on shared border cells. Reuses the
+/// sidebar's state color scheme (blocked/working/done/idle). `None` when rings
+/// are disabled, the pane has no recognized agent, or its state is unknown.
+fn pane_ring_color(
+    app: &AppState,
+    ws: &crate::workspace::Workspace,
+    pane_id: crate::layout::PaneId,
+) -> Option<(u8, Color)> {
+    let pane = ws.pane_state(pane_id)?;
+    let terminal = app.terminals.get(&pane.attached_terminal_id)?;
+    terminal
+        .effective_known_agent()
+        .or(terminal.detected_agent)?;
+    if terminal.state == crate::detect::AgentState::Unknown {
+        return None;
+    }
+    Some((
+        crate::workspace::attention_priority(terminal.state, pane.seen),
+        super::status::state_label_color(terminal.state, pane.seen, &app.palette),
+    ))
+}
+
 fn render_pane_borders(app: &AppState, ws: &crate::workspace::Workspace, frame: &mut Frame) {
     if !app.pane_borders
         || app
@@ -371,6 +394,19 @@ fn render_pane_borders(app: &AppState, ws: &crate::workspace::Workspace, frame: 
         add_pane_border_cells(&mut cells, info);
     }
     add_split_border_cells(app, &mut cells);
+
+    // Precompute state-ring colors once per pane. This only recolors glyphs that
+    // are already drawn, so it stays cheap over mosh (no extra redraws).
+    let ring_colors: std::collections::HashMap<crate::layout::PaneId, (u8, Color)> =
+        if app.state_border_rings {
+            app.view
+                .pane_infos
+                .iter()
+                .filter_map(|info| pane_ring_color(app, ws, info.id).map(|ring| (info.id, ring)))
+                .collect()
+        } else {
+            std::collections::HashMap::new()
+        };
 
     let buf = frame.buffer_mut();
     let area = buf.area;
@@ -393,8 +429,19 @@ fn render_pane_borders(app: &AppState, ws: &crate::workspace::Workspace, frame: 
         }
         let cell = &mut buf[(x, y)];
         cell.set_symbol(symbol);
+        // Focused pane keeps the accent highlight so the active pane is obvious;
+        // other panes get a state ring when one applies, else the dim default.
         let color = if focused {
             app.palette.accent
+        } else if !ring_colors.is_empty() {
+            app.view
+                .pane_infos
+                .iter()
+                .filter(|info| line_touches_pane(x, y, info, app.pane_gaps))
+                .filter_map(|info| ring_colors.get(&info.id).copied())
+                .max_by_key(|(priority, _)| *priority)
+                .map(|(_, ring_color)| ring_color)
+                .unwrap_or(app.palette.overlay0)
         } else {
             app.palette.overlay0
         };

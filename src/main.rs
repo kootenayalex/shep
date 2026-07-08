@@ -293,6 +293,9 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # Show detected/reported agent labels in split pane borders when no manual pane name is set.
 # show_agent_labels_on_pane_borders = false
 
+# Color pane borders by detected agent state (blocked/working/done) for panes running an agent.
+# state_border_rings = true
+
 # Hide the tab row when a workspace has exactly one tab.
 # New tabs can still be created with the configured keybinding.
 # hide_tab_bar_when_single_tab = false
