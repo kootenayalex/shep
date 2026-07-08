@@ -70,7 +70,10 @@ impl Tab {
     }
 }
 
-fn pane_attention_priority(state: AgentState, seen: bool) -> u8 {
+/// Attention priority used for blocked-first ordering across panes and
+/// workspaces. Higher sorts earlier: blocked, then done (idle+unseen), then
+/// working, then idle (seen), then unknown. Pure and unit-testable.
+pub(crate) fn attention_priority(state: AgentState, seen: bool) -> u8 {
     match (state, seen) {
         (AgentState::Blocked, _) => 4,
         (AgentState::Idle, false) => 3,
@@ -78,6 +81,10 @@ fn pane_attention_priority(state: AgentState, seen: bool) -> u8 {
         (AgentState::Idle, true) => 1,
         (AgentState::Unknown, _) => 0,
     }
+}
+
+fn pane_attention_priority(state: AgentState, seen: bool) -> u8 {
+    attention_priority(state, seen)
 }
 
 impl Workspace {
@@ -99,6 +106,20 @@ impl Workspace {
 
     pub fn has_working_pane(&self, terminals: &HashMap<TerminalId, TerminalState>) -> bool {
         self.tabs.iter().any(|tab| tab.has_working_pane(terminals))
+    }
+
+    /// Most-recent effective agent-state change across all panes in this
+    /// workspace, if any. The sidebar renders `now - this` as a short age hint.
+    pub fn last_agent_event_at(
+        &self,
+        terminals: &HashMap<TerminalId, TerminalState>,
+    ) -> Option<std::time::Instant> {
+        self.tabs
+            .iter()
+            .flat_map(|tab| tab.panes.values())
+            .filter_map(|pane| terminals.get(&pane.attached_terminal_id))
+            .filter_map(|terminal| terminal.last_agent_state_change_at)
+            .max()
     }
 
     pub fn pane_details(&self, terminals: &HashMap<TerminalId, TerminalState>) -> Vec<PaneDetail> {
@@ -131,6 +152,32 @@ mod tests {
 
     fn terminal_for_pane(ws: &Workspace, pane_id: PaneId) -> TerminalState {
         TerminalState::new(ws.terminal_id(pane_id).unwrap().clone(), "/tmp".into())
+    }
+
+    #[test]
+    fn attention_priority_orders_blocked_first_then_done_working_idle_unknown() {
+        // Strictly decreasing: blocked > done (idle+unseen) > working > idle > unknown.
+        assert!(
+            attention_priority(AgentState::Blocked, true)
+                > attention_priority(AgentState::Idle, false)
+        );
+        assert!(
+            attention_priority(AgentState::Idle, false)
+                > attention_priority(AgentState::Working, true)
+        );
+        assert!(
+            attention_priority(AgentState::Working, true)
+                > attention_priority(AgentState::Idle, true)
+        );
+        assert!(
+            attention_priority(AgentState::Idle, true)
+                > attention_priority(AgentState::Unknown, true)
+        );
+        // Blocked ignores seen.
+        assert_eq!(
+            attention_priority(AgentState::Blocked, true),
+            attention_priority(AgentState::Blocked, false)
+        );
     }
 
     #[test]

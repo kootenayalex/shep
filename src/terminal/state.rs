@@ -88,6 +88,9 @@ pub struct TerminalState {
     metadata_report_sequences: HashMap<String, u64>,
     pub state: AgentState,
     pub last_agent_state_change_seq: Option<u64>,
+    /// Wall-clock instant of the most recent effective agent-state change.
+    /// Server-side runtime fact; the sidebar renders it as a short "age" hint.
+    pub last_agent_state_change_at: Option<Instant>,
     pub revision: u64,
     pub launch_argv: Option<Vec<String>>,
     pub respawn_shell_on_exit: bool,
@@ -115,6 +118,7 @@ impl TerminalState {
             metadata_report_sequences: HashMap::new(),
             state: AgentState::Unknown,
             last_agent_state_change_seq: None,
+            last_agent_state_change_at: None,
             revision: 0,
             launch_argv: None,
             respawn_shell_on_exit: false,
@@ -1284,6 +1288,7 @@ impl TerminalState {
         self.stale_full_lifecycle_hook_sessions.clear();
         self.state = AgentState::Unknown;
         self.last_agent_state_change_seq = None;
+        self.last_agent_state_change_at = None;
         self.launch_argv = None;
         self.respawn_shell_on_exit = false;
         self.recent_agent_process_exit_at = None;

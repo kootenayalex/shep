@@ -207,6 +207,21 @@ fn format_agent_panel_primary_label(entry: &AgentPanelEntry, max_width: usize) -
     )
 }
 
+/// Format a duration since the last agent event as a compact age like "3s",
+/// "2m", "4h", or "2d". Pure and unit-testable.
+pub(crate) fn format_event_age(elapsed: std::time::Duration) -> String {
+    let secs = elapsed.as_secs();
+    if secs < 60 {
+        format!("{secs}s")
+    } else if secs < 3600 {
+        format!("{}m", secs / 60)
+    } else if secs < 86_400 {
+        format!("{}h", secs / 3600)
+    } else {
+        format!("{}d", secs / 86_400)
+    }
+}
+
 fn workspace_row_height(ws: &crate::workspace::Workspace) -> u16 {
     if ws.branch().is_some() {
         2
@@ -410,7 +425,57 @@ fn workspace_list_entries_inner(app: &AppState, force_expanded: bool) -> Vec<Wor
             }
         }
     }
-    entries
+    sort_workspace_blocks_blocked_first(app, entries)
+}
+
+/// Reorder the workspace list so blocked spaces surface first (then done,
+/// working, idle, unknown), while keeping each worktree group's parent+children
+/// block contiguous and preserving the original order within equal-priority
+/// blocks so the list does not thrash. Presentation-only client ordering.
+fn sort_workspace_blocks_blocked_first(
+    app: &AppState,
+    entries: Vec<WorkspaceListEntry>,
+) -> Vec<WorkspaceListEntry> {
+    // Partition the flat entry list into top-level blocks. A block begins at a
+    // non-indented entry and absorbs the indented children that follow it.
+    let mut blocks: Vec<Vec<WorkspaceListEntry>> = Vec::new();
+    for entry in entries {
+        match entry {
+            WorkspaceListEntry::Workspace {
+                indented: false, ..
+            } => blocks.push(vec![entry]),
+            WorkspaceListEntry::Workspace { indented: true, .. } => {
+                if let Some(block) = blocks.last_mut() {
+                    block.push(entry);
+                } else {
+                    blocks.push(vec![entry]);
+                }
+            }
+        }
+    }
+
+    // Priority of a block is the max attention across its member workspaces.
+    let block_priority = |block: &[WorkspaceListEntry]| -> u8 {
+        block
+            .iter()
+            .map(|entry| match entry {
+                WorkspaceListEntry::Workspace { ws_idx, .. } => app
+                    .workspaces
+                    .get(*ws_idx)
+                    .map(|ws| {
+                        let (state, seen) = ws.aggregate_state(&app.terminals);
+                        workspace_attention_priority(state, seen)
+                    })
+                    .unwrap_or(0),
+            })
+            .max()
+            .unwrap_or(0)
+    };
+
+    // Stable sort keeps within-group order and, for equal priority, the
+    // original block order (i.e. by workspace number).
+    blocks.sort_by_key(|block| std::cmp::Reverse(block_priority(block)));
+    blocks.into_iter().flatten().collect()
 }
 
 pub(crate) fn workspace_list_rect(area: Rect, split_ratio: f32) -> Rect {
@@ -931,12 +996,20 @@ fn render_workspace_list(
                     }
                     (!parts.is_empty()).then_some(parts)
                 });
-                let reserved = upstream_label
+                // Seconds-since-last-agent-event, rendered as a compact age hint
+                // trailing the branch (e.g. "main   2m"). Reading the clock in a
+                // pure render is fine; no state is mutated.
+                let age_label = ws.last_agent_event_at(&app.terminals).map(|at| {
+                    format_event_age(std::time::Instant::now().saturating_duration_since(at))
+                });
+                let upstream_reserved = upstream_label
                     .as_ref()
                     .map(|parts| {
                         parts.iter().map(|(label, _)| label.len()).sum::<usize>() + parts.len()
                     })
                     .unwrap_or(0);
+                let age_reserved = age_label.as_ref().map(|label| label.len() + 1).unwrap_or(0);
+                let reserved = upstream_reserved + age_reserved;
                 let max_branch_len = (card.rect.width as usize).saturating_sub(5 + reserved);
                 let branch_display = truncate_end(&branch, max_branch_len);
                 let branch_color = if selected || is_active {
@@ -957,6 +1030,13 @@ fn render_workspace_list(
                         }
                         spans.push(Span::styled(label, Style::default().fg(color)));
                     }
+                }
+                if let Some(age_label) = age_label {
+                    spans.push(Span::styled(" ", Style::default()));
+                    spans.push(Span::styled(
+                        age_label,
+                        Style::default().fg(p.overlay0).add_modifier(Modifier::DIM),
+                    ));
                 }
                 frame.render_widget(
                     Paragraph::new(Line::from(spans)),
@@ -1207,6 +1287,70 @@ mod tests {
 
         assert_eq!(toggle.x, area.x + area.width - 2);
         assert_eq!(toggle.y, area.y + area.height - 1);
+    }
+
+    fn workspace_visible_order(app: &AppState) -> Vec<usize> {
+        workspace_list_entries(app)
+            .into_iter()
+            .map(|entry| match entry {
+                WorkspaceListEntry::Workspace { ws_idx, .. } => ws_idx,
+            })
+            .collect()
+    }
+
+    fn set_pane_state(app: &mut AppState, ws_idx: usize, state: AgentState) {
+        let pane = app.workspaces[ws_idx].tabs[0].root_pane;
+        let terminal_id = app.workspaces[ws_idx].tabs[0].panes[&pane]
+            .attached_terminal_id
+            .clone();
+        let terminal = app.terminals.get_mut(&terminal_id).unwrap();
+        terminal.detected_agent = Some(Agent::Claude);
+        terminal.state = state;
+    }
+
+    #[test]
+    fn format_event_age_uses_compact_units() {
+        use std::time::Duration;
+        assert_eq!(format_event_age(Duration::from_secs(0)), "0s");
+        assert_eq!(format_event_age(Duration::from_secs(3)), "3s");
+        assert_eq!(format_event_age(Duration::from_secs(125)), "2m");
+        assert_eq!(format_event_age(Duration::from_secs(3 * 3600 + 5)), "3h");
+        assert_eq!(format_event_age(Duration::from_secs(2 * 86_400 + 60)), "2d");
+    }
+
+    #[test]
+    fn workspace_list_surfaces_blocked_space_first() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![
+            Workspace::test_new("one"),
+            Workspace::test_new("two"),
+            Workspace::test_new("three"),
+        ];
+        app.ensure_test_terminals();
+        set_pane_state(&mut app, 0, AgentState::Working);
+        set_pane_state(&mut app, 1, AgentState::Blocked);
+        set_pane_state(&mut app, 2, AgentState::Idle);
+
+        // Blocked (1) surfaces first, then working (0), then idle (2).
+        assert_eq!(workspace_visible_order(&app), vec![1, 0, 2]);
+    }
+
+    #[test]
+    fn workspace_list_ordering_is_stable_within_equal_priority() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![
+            Workspace::test_new("one"),
+            Workspace::test_new("two"),
+            Workspace::test_new("three"),
+        ];
+        app.ensure_test_terminals();
+        // All unknown -> equal priority -> original order preserved (no thrash).
+        assert_eq!(workspace_visible_order(&app), vec![0, 1, 2]);
+
+        // Two blocked spaces keep their relative order; both float above idle.
+        set_pane_state(&mut app, 0, AgentState::Blocked);
+        set_pane_state(&mut app, 2, AgentState::Blocked);
+        assert_eq!(workspace_visible_order(&app), vec![0, 2, 1]);
     }
 
     #[test]
