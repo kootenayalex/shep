@@ -257,6 +257,12 @@ impl App {
                     leave_navigate_mode(&mut self.state);
                 }
             }
+            NavigateAction::NextBlocked => {
+                if let Some((ws_idx, pane_id)) = self.state.next_blocked_pane() {
+                    self.focus_pane_internal_via_api(ws_idx, pane_id);
+                    leave_navigate_mode(&mut self.state);
+                }
+            }
             NavigateAction::NewTab => {
                 if self.state.active.is_some() {
                     if self.state.prompt_new_tab_name {
@@ -1257,6 +1263,7 @@ pub(crate) enum NavigateAction {
     NextWorkspace,
     PreviousAgent,
     NextAgent,
+    NextBlocked,
     NewTab,
     RenameTab,
     PreviousTab,
@@ -1300,6 +1307,7 @@ fn copy_mode_survives_prefix_action(action: NavigateAction) -> bool {
             | NavigateAction::NextWorkspace
             | NavigateAction::PreviousAgent
             | NavigateAction::NextAgent
+            | NavigateAction::NextBlocked
             | NavigateAction::PreviousTab
             | NavigateAction::NextTab
             | NavigateAction::FocusPaneLeft
@@ -1384,6 +1392,7 @@ fn action_for_key(
         (&kb.next_workspace, NavigateAction::NextWorkspace),
         (&kb.previous_agent, NavigateAction::PreviousAgent),
         (&kb.next_agent, NavigateAction::NextAgent),
+        (&kb.next_blocked, NavigateAction::NextBlocked),
         (&kb.new_tab, NavigateAction::NewTab),
         (&kb.rename_tab, NavigateAction::RenameTab),
         (&kb.previous_tab, NavigateAction::PreviousTab),
@@ -1540,6 +1549,11 @@ pub(super) fn execute_navigate_action_in_context(
         NavigateAction::NextAgent => {
             state.next_agent();
             leave_navigate_mode(state);
+        }
+        NavigateAction::NextBlocked => {
+            if state.jump_to_next_blocked() {
+                leave_navigate_mode(state);
+            }
         }
         NavigateAction::NewTab => {
             if state.active.is_some() {

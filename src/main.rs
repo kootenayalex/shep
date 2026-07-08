@@ -184,6 +184,7 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # next_workspace = ""     # optional, unset by default
 # previous_agent = ""     # optional, unset by default
 # next_agent = ""         # optional, unset by default
+# next_blocked = ""       # optional, unset by default; jumps to next blocked pane (e.g. "prefix+b" if you rebind toggle_sidebar)
 # focus_agent = ""        # optional indexed binding, e.g. "prefix+alt+1..9"
 # remote_image_paste = "ctrl+v" # only active in shep --remote; empty disables raw-key image paste
 # new_tab = "prefix+c"

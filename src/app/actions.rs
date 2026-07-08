@@ -1332,6 +1332,53 @@ impl AppState {
         self.focus_agent_entry(target_idx);
     }
 
+    /// All panes whose agent state is `blocked`, in a deterministic order:
+    /// workspace index, then tab vector order, then pane layout order. This is
+    /// the server-side traversal backing jump-to-next-blocked.
+    pub(crate) fn blocked_panes(&self) -> Vec<(usize, PaneId)> {
+        self.workspaces
+            .iter()
+            .enumerate()
+            .flat_map(|(ws_idx, ws)| {
+                ws.pane_details(&self.terminals)
+                    .into_iter()
+                    .filter(|detail| detail.state == AgentState::Blocked)
+                    .map(move |detail| (ws_idx, detail.pane_id))
+            })
+            .collect()
+    }
+
+    /// The next blocked pane to focus, cycling in deterministic order after the
+    /// currently focused pane (wrapping around). `None` when nothing is blocked.
+    pub(crate) fn next_blocked_pane(&self) -> Option<(usize, PaneId)> {
+        let blocked = self.blocked_panes();
+        if blocked.is_empty() {
+            return None;
+        }
+        let focused = self
+            .active
+            .and_then(|idx| self.workspaces.get(idx))
+            .and_then(crate::workspace::Workspace::focused_pane_id);
+        let current = focused.and_then(|pane| blocked.iter().position(|(_, id)| *id == pane));
+        let next_idx = match current {
+            Some(idx) => (idx + 1) % blocked.len(),
+            None => 0,
+        };
+        blocked.get(next_idx).copied()
+    }
+
+    #[cfg(test)]
+    pub fn jump_to_next_blocked(&mut self) -> bool {
+        let Some((ws_idx, pane_id)) = self.next_blocked_pane() else {
+            return false;
+        };
+        if self.active == Some(ws_idx) && self.workspaces[ws_idx].focused_pane_id() == Some(pane_id)
+        {
+            return true;
+        }
+        self.focus_pane_in_workspace(ws_idx, pane_id)
+    }
+
     pub(crate) fn ensure_agent_panel_entry_visible(&mut self, idx: usize) {
         if self.sidebar_collapsed {
             return;
@@ -3756,6 +3803,96 @@ mod tests {
         assert_eq!(state.active, Some(0));
         assert_eq!(state.workspaces[0].focused_pane_id(), Some(first_second));
         state.assert_invariants_for_test();
+    }
+
+    fn set_pane_agent_state_direct(
+        state: &mut AppState,
+        ws_idx: usize,
+        tab_idx: usize,
+        pane_id: PaneId,
+        agent_state: AgentState,
+    ) {
+        let terminal_id = state.workspaces[ws_idx].tabs[tab_idx]
+            .panes
+            .get(&pane_id)
+            .unwrap()
+            .attached_terminal_id
+            .clone();
+        let terminal = state.terminals.get_mut(&terminal_id).unwrap();
+        terminal.detected_agent = Some(Agent::Claude);
+        terminal.state = agent_state;
+    }
+
+    #[test]
+    fn next_blocked_pane_cycles_across_workspaces_and_wraps() {
+        let mut first = Workspace::test_new("one");
+        let first_root = first.tabs[0].root_pane;
+        let first_second = first.test_split(Direction::Horizontal);
+        first.tabs[0].layout.focus_pane(first_root);
+        let second = Workspace::test_new("two");
+        let second_root = second.tabs[0].root_pane;
+
+        let mut state = AppState::test_new();
+        state.workspaces = vec![first, second];
+        state.ensure_test_terminals();
+        state.active = Some(0);
+        state.selected = 0;
+        state.mode = Mode::Terminal;
+        set_pane_agent_state_direct(&mut state, 0, 0, first_root, AgentState::Idle);
+        set_pane_agent_state_direct(&mut state, 0, 0, first_second, AgentState::Blocked);
+        set_pane_agent_state_direct(&mut state, 1, 0, second_root, AgentState::Blocked);
+
+        // Focused pane (idle first_root) is not blocked, so jump to the first
+        // blocked pane in deterministic order.
+        assert_eq!(state.next_blocked_pane(), Some((0, first_second)));
+        assert!(state.jump_to_next_blocked());
+        assert_eq!(state.active, Some(0));
+        assert_eq!(state.workspaces[0].focused_pane_id(), Some(first_second));
+
+        // Advance to the next blocked pane in the other workspace.
+        assert_eq!(state.next_blocked_pane(), Some((1, second_root)));
+        assert!(state.jump_to_next_blocked());
+        assert_eq!(state.active, Some(1));
+        assert_eq!(state.workspaces[1].focused_pane_id(), Some(second_root));
+
+        // Wrap around back to the first blocked pane.
+        assert_eq!(state.next_blocked_pane(), Some((0, first_second)));
+        state.assert_invariants_for_test();
+    }
+
+    #[test]
+    fn next_blocked_pane_single_blocked_stays_put() {
+        let mut ws = Workspace::test_new("one");
+        let root = ws.tabs[0].root_pane;
+        ws.tabs[0].layout.focus_pane(root);
+
+        let mut state = AppState::test_new();
+        state.workspaces = vec![ws];
+        state.ensure_test_terminals();
+        state.active = Some(0);
+        state.selected = 0;
+        state.mode = Mode::Terminal;
+        set_pane_agent_state_direct(&mut state, 0, 0, root, AgentState::Blocked);
+
+        // The only blocked pane is already focused; it cycles back to itself.
+        assert_eq!(state.next_blocked_pane(), Some((0, root)));
+        assert!(state.jump_to_next_blocked());
+        assert_eq!(state.workspaces[0].focused_pane_id(), Some(root));
+    }
+
+    #[test]
+    fn next_blocked_pane_none_when_nothing_blocked() {
+        let ws = Workspace::test_new("one");
+        let root = ws.tabs[0].root_pane;
+
+        let mut state = AppState::test_new();
+        state.workspaces = vec![ws];
+        state.ensure_test_terminals();
+        state.active = Some(0);
+        set_pane_agent_state_direct(&mut state, 0, 0, root, AgentState::Working);
+
+        assert_eq!(state.next_blocked_pane(), None);
+        assert!(!state.jump_to_next_blocked());
     }
 
     #[test]
