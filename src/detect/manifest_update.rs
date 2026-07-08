@@ -13,8 +13,12 @@ use serde::{Deserialize, Serialize};
 use super::{agent_label, parse_agent_label, Agent};
 
 pub(crate) const MANIFEST_ENGINE_VERSION: u32 = 2;
-const DEFAULT_CATALOG_URL: &str = "https://herdr.dev/agent-detection/index.toml";
-const CATALOG_URL_ENV: &str = "HERDR_AGENT_DETECTION_MANIFEST_CATALOG_URL";
+// Remote catalog auto-update is disabled in this fork: shep has diverged from
+// the upstream herdr.dev manifest catalog, so there is no default remote URL.
+// The shipped/bundled manifests and local overrides remain the source of truth.
+// A catalog fetch only happens when an explicit URL is configured via the env
+// var below (used by tests and power users pointing at their own catalog).
+const CATALOG_URL_ENV: &str = "SHEP_AGENT_DETECTION_MANIFEST_CATALOG_URL";
 const MAX_FETCH_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone)]
@@ -200,7 +204,19 @@ pub(crate) struct ManifestUpdateOutput {
 }
 
 pub(crate) fn check_and_update() -> Result<ManifestUpdateOutput, String> {
-    check_and_update_from_url(&catalog_url())
+    let Some(url) = explicit_catalog_url() else {
+        // No configured catalog URL: remote auto-update is disabled in this fork.
+        // Record the check and keep the shipped/local manifests untouched.
+        let mut status = load_status();
+        status.last_check_unix = Some(now_unix());
+        status.last_result = Some("remote manifest auto-update disabled".to_string());
+        let _ = save_status(&status);
+        return Ok(ManifestUpdateOutput {
+            updated: Vec::new(),
+            status,
+        });
+    };
+    check_and_update_from_url(&url)
 }
 
 fn check_and_update_from_url(url: &str) -> Result<ManifestUpdateOutput, String> {
@@ -460,12 +476,13 @@ fn state_root() -> PathBuf {
     crate::config::state_dir().join("agent-detection")
 }
 
-fn catalog_url() -> String {
+/// Returns an explicitly configured catalog URL, or `None` when the remote
+/// auto-update is disabled (the default in this fork).
+fn explicit_catalog_url() -> Option<String> {
     std::env::var(CATALOG_URL_ENV)
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| DEFAULT_CATALOG_URL.to_string())
 }
 
 fn fetch_text(url: &str) -> Result<String, String> {
@@ -570,7 +587,7 @@ contains = ["{contains}"]
         let old_config = std::env::var_os("XDG_CONFIG_HOME");
         let old_state = std::env::var_os("XDG_STATE_HOME");
         let dir = std::env::temp_dir().join(format!(
-            "herdr-manifest-update-{name}-{}",
+            "shep-manifest-update-{name}-{}",
             std::process::id()
         ));
         let config_dir = dir.join("config");
@@ -636,7 +653,7 @@ contains = ["{contains}"]
         with_state_dir("auto-update-reloads-cache", || {
             let old_catalog_url = std::env::var_os(CATALOG_URL_ENV);
             let web_dir = std::env::temp_dir()
-                .join(format!("herdr-manifest-update-web-{}", std::process::id()));
+                .join(format!("shep-manifest-update-web-{}", std::process::id()));
             let _ = fs::remove_dir_all(&web_dir);
             fs::create_dir_all(&web_dir).unwrap();
             fs::write(

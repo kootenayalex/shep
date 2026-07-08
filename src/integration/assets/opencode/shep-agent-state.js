@@ -1,12 +1,12 @@
-// installed by herdr
-// managed by herdr; reinstalling or updating the integration overwrites this file.
+// installed by shep
+// managed by shep; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
-// HERDR_INTEGRATION_ID=opencode
-// HERDR_INTEGRATION_VERSION=8
+// SHEP_INTEGRATION_ID=opencode
+// SHEP_INTEGRATION_VERSION=8
 
 import net from "node:net";
 
-const SOURCE = "herdr:opencode";
+const SOURCE = "shep:opencode";
 const AGENT = "opencode";
 let reportSeq = Date.now() * 1000;
 
@@ -47,8 +47,8 @@ function stateFromSessionStatus(status) {
 }
 
 function request(method, params) {
-  const paneId = process.env.HERDR_PANE_ID;
-  const socketPath = process.env.HERDR_SOCKET_PATH;
+  const paneId = process.env.SHEP_PANE_ID;
+  const socketPath = process.env.SHEP_SOCKET_PATH;
 
   if (!paneId || !socketPath) {
     return Promise.resolve();
@@ -106,11 +106,11 @@ function reportState(state, sessionID) {
   return request("pane.report_agent", params);
 }
 
-export const HerdrAgentStatePlugin = async () => {
+export const ShepAgentStatePlugin = async () => {
   if (
-    process.env.HERDR_ENV !== "1" ||
-    !process.env.HERDR_SOCKET_PATH ||
-    !process.env.HERDR_PANE_ID
+    process.env.SHEP_ENV !== "1" ||
+    !process.env.SHEP_SOCKET_PATH ||
+    !process.env.SHEP_PANE_ID
   ) {
     return {};
   }
@@ -155,7 +155,7 @@ export const HerdrAgentStatePlugin = async () => {
       switch (type) {
         case "session.created":
           // A root session.created is a genuine new-session start (subagent
-          // creates are dropped above). Signal it so herdr replaces the pane's
+          // creates are dropped above). Signal it so shep replaces the pane's
           // prior session id instead of treating the change as cross-talk.
           await reportSession(sessionID, "new");
           break;

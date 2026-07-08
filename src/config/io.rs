@@ -20,9 +20,9 @@ const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
 
 pub fn app_dir_name() -> &'static str {
     if cfg!(debug_assertions) {
-        "herdr-dev"
+        "shep-dev"
     } else {
-        "herdr"
+        "shep"
     }
 }
 
@@ -31,6 +31,58 @@ pub fn config_dir() -> PathBuf {
         return PathBuf::from(dir).join(app_dir_name());
     }
     platform_config_dir()
+}
+
+/// Legacy (pre-rename) application directory name used by `herdr`.
+fn legacy_app_dir_name() -> &'static str {
+    if cfg!(debug_assertions) {
+        "herdr-dev"
+    } else {
+        "herdr"
+    }
+}
+
+/// One-time first-run migration: if shep has no config file at the default
+/// location yet, but a legacy `herdr` config file exists in the sibling
+/// directory, copy it over so users keep their settings after the rename.
+///
+/// Skipped when a config path override is set. Idempotent and best-effort:
+/// failures are logged and never block startup.
+pub fn maybe_import_legacy_config() {
+    if crate::env_compat::var(CONFIG_PATH_ENV_VAR).is_some() {
+        return;
+    }
+
+    let target = config_path();
+    if target.exists() {
+        return;
+    }
+
+    // config_dir() ends in the current app dir name (e.g. `shep`); swapping the
+    // final component for the legacy name yields the herdr config directory
+    // regardless of platform/XDG resolution.
+    let legacy = config_dir()
+        .with_file_name(legacy_app_dir_name())
+        .join("config.toml");
+    if !legacy.exists() {
+        return;
+    }
+
+    if let Some(parent) = target.parent() {
+        if let Err(err) = std::fs::create_dir_all(parent) {
+            warn!(err = %err, "failed to create shep config dir for legacy import");
+            return;
+        }
+    }
+
+    match std::fs::copy(&legacy, &target) {
+        Ok(_) => tracing::info!(
+            from = %legacy.display(),
+            to = %target.display(),
+            "imported legacy herdr config into shep config"
+        ),
+        Err(err) => warn!(err = %err, "failed to import legacy herdr config into shep config"),
+    }
 }
 
 pub fn state_dir() -> PathBuf {
@@ -147,7 +199,7 @@ pub(super) fn resolve_config_relative_path(path: &Path) -> PathBuf {
 }
 
 pub fn config_path() -> PathBuf {
-    if let Ok(path) = std::env::var(CONFIG_PATH_ENV_VAR) {
+    if let Some(path) = crate::env_compat::var(CONFIG_PATH_ENV_VAR) {
         return PathBuf::from(path);
     }
     config_dir().join("config.toml")
@@ -568,10 +620,10 @@ mod tests {
     #[test]
     fn remove_section_key_removes_matching_key_from_section() {
         let content =
-            "[ui.toast]\nenabled = true\ndelivery = \"herdr\"\n[ui.sound]\nenabled = true\n";
+            "[ui.toast]\nenabled = true\ndelivery = \"shep\"\n[ui.sound]\nenabled = true\n";
         let updated = remove_section_key(content, "ui.toast", "enabled");
         assert!(!updated.contains("[ui.toast]\nenabled = true"));
-        assert!(updated.contains("delivery = \"herdr\""));
+        assert!(updated.contains("delivery = \"shep\""));
         assert!(updated.contains("[ui.sound]\nenabled = true"));
     }
 
@@ -614,7 +666,7 @@ resume_agents_on_restore = true
 delivery = "system"
 
 [ui.toast]
-delivery = "herdr"
+delivery = "shep"
 "#,
         )
         .unwrap();
@@ -626,7 +678,7 @@ delivery = "herdr"
         assert!(loaded.invalid_sections.is_empty());
         assert_eq!(
             loaded.config.ui.toast.delivery,
-            super::super::ToastDelivery::Herdr
+            super::super::ToastDelivery::Shep
         );
     }
 
@@ -637,7 +689,7 @@ delivery = "herdr"
 plugin = []
 
 [ui.toast]
-delivery = "herdr"
+delivery = "shep"
 "#,
         )
         .unwrap();
@@ -645,7 +697,7 @@ delivery = "herdr"
         assert!(loaded.diagnostics.is_empty());
         assert_eq!(
             loaded.config.ui.toast.delivery,
-            super::super::ToastDelivery::Herdr
+            super::super::ToastDelivery::Shep
         );
     }
 
@@ -653,7 +705,7 @@ delivery = "herdr"
     fn startup_config_load_warns_about_unknown_top_level_sections() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let path = std::env::temp_dir().join(format!(
-            "herdr-config-unknown-section-{}.toml",
+            "shep-config-unknown-section-{}.toml",
             std::process::id()
         ));
         std::fs::write(

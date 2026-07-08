@@ -275,7 +275,7 @@ pub struct CustomCommandKeybind {
     pub description: Option<String>,
 }
 
-/// Parsed keybinds for Herdr actions.
+/// Parsed keybinds for Shep actions.
 #[derive(Debug, Clone)]
 pub struct NavigateKeybinds {
     pub workspace_up: ActionKeybinds,
@@ -286,7 +286,7 @@ pub struct NavigateKeybinds {
     pub pane_right: ActionKeybinds,
 }
 
-/// Parsed keybinds for Herdr actions.
+/// Parsed keybinds for Shep actions.
 #[derive(Debug, Clone)]
 pub struct Keybinds {
     pub navigate: NavigateKeybinds,

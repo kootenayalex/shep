@@ -294,7 +294,7 @@ impl App {
         {
             let previous_toast = self.state.toast.clone();
             for update in self.state.expire_agent_metadata_at(deadline, now) {
-                self.refresh_new_herdr_toast_context_for_update(&update, &previous_toast);
+                self.refresh_new_shep_toast_context_for_update(&update, &previous_toast);
                 self.emit_pane_state_update(&update);
             }
             self.sync_agent_metadata_deadline();
@@ -706,7 +706,7 @@ mod tests {
     #[test]
     fn git_refresh_deduplicates_workspaces_with_same_cache_key() {
         let repo =
-            std::env::temp_dir().join(format!("herdr-git-refresh-dedupe-{}", std::process::id()));
+            std::env::temp_dir().join(format!("shep-git-refresh-dedupe-{}", std::process::id()));
         let nested = repo.join("nested");
         let other = repo.join("other");
         std::fs::create_dir_all(&nested).expect("create nested dir");
@@ -760,7 +760,7 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel().1,
             crate::api::EventHub::default(),
         );
-        let cwd = std::env::temp_dir().join(format!("herdr-non-git-cwd-{}", std::process::id()));
+        let cwd = std::env::temp_dir().join(format!("shep-non-git-cwd-{}", std::process::id()));
         std::fs::create_dir_all(&cwd).expect("create temp cwd");
         let mut ws = Workspace::test_new("test");
         ws.identity_cwd = cwd.clone();
@@ -999,7 +999,7 @@ mod tests {
             .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: vec!["/bin/sh".into(), "-c".into(), "sleep 5".into()],
-            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+            dedupe_key: "shep:codex\0codex\0Id\0codex-session".into(),
         });
 
         assert!(
@@ -1053,7 +1053,7 @@ mod tests {
             .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: vec!["/bin/sh".into(), "-c".into(), "sleep 5".into()],
-            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+            dedupe_key: "shep:codex\0codex\0Id\0codex-session".into(),
         });
         app.pending_agent_resume_deadline = Some(Instant::now() - Duration::from_millis(1));
 

@@ -105,7 +105,7 @@ mod tests {
             .unwrap_or(0);
         std::env::temp_dir()
             .join(format!(
-                "herdr-registry-{name}-{}-{nanos}",
+                "shep-registry-{name}-{}-{nanos}",
                 std::process::id()
             ))
             .join("plugins.json")
@@ -116,9 +116,9 @@ mod tests {
             plugin_id: id.to_string(),
             name: "Test Plugin".to_string(),
             version: "0.1.0".to_string(),
-            min_herdr_version: crate::build_info::BASE_VERSION.to_string(),
+            min_shep_version: crate::build_info::BASE_VERSION.to_string(),
             description: None,
-            manifest_path: format!("/tmp/{id}/herdr-plugin.toml"),
+            manifest_path: format!("/tmp/{id}/shep-plugin.toml"),
             plugin_root: format!("/tmp/{id}"),
             enabled: true,
             platforms: None,
@@ -191,7 +191,7 @@ mod tests {
             subdir: Some("worktree-bootstrap".into()),
             requested_ref: Some("main".into()),
             resolved_commit: Some("abc123".into()),
-            managed_path: Some("/tmp/herdr/plugins/github/example.reload".into()),
+            managed_path: Some("/tmp/shep/plugins/github/example.reload".into()),
             installed_unix_ms: Some(42),
         };
 
@@ -200,9 +200,9 @@ mod tests {
                 plugin_id: "example.reload".to_string(),
                 name: "Fresh Name".to_string(),
                 version: "0.2.0".to_string(),
-                min_herdr_version: crate::build_info::BASE_VERSION.to_string(),
+                min_shep_version: crate::build_info::BASE_VERSION.to_string(),
                 description: Some("refreshed".to_string()),
-                manifest_path: "/tmp/example.reload/herdr-plugin.toml".to_string(),
+                manifest_path: "/tmp/example.reload/shep-plugin.toml".to_string(),
                 plugin_root: "/tmp/example.reload".to_string(),
                 enabled: true, // caller would pass stored enabled; fresh parse returns true
                 platforms: None,

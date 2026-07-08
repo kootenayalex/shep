@@ -685,7 +685,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!("herdr-{name}-{}-{nanos}", std::process::id()))
+        std::env::temp_dir().join(format!("shep-{name}-{}-{nanos}", std::process::id()))
     }
 
     fn canonical_path_string(path: &std::path::Path) -> String {
@@ -718,14 +718,14 @@ mod tests {
 
     fn write_manifest(root: &std::path::Path) -> std::path::PathBuf {
         std::fs::create_dir_all(root).unwrap();
-        let manifest = root.join("herdr-plugin.toml");
+        let manifest = root.join("shep-plugin.toml");
         std::fs::write(
             &manifest,
             r#"
 id = "example.worktree-bootstrap"
 name = "Worktree Bootstrap"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 description = "Prepare new worktrees"
 platforms = ["linux", "macos", "windows"]
 
@@ -760,7 +760,7 @@ action = "bootstrap"
 
     fn write_manifest_content(root: &std::path::Path, content: &str) -> std::path::PathBuf {
         std::fs::create_dir_all(root).unwrap();
-        let manifest = root.join("herdr-plugin.toml");
+        let manifest = root.join("shep-plugin.toml");
         std::fs::write(&manifest, content).unwrap();
         manifest
     }
@@ -794,7 +794,7 @@ action = "bootstrap"
 id = "example.config-dirs"
 name = "Config Dirs"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 "#,
         );
@@ -829,7 +829,7 @@ platforms = ["linux", "macos", "windows"]
 id = "example.legacy-config"
 name = "Legacy Config"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 "#,
         );
@@ -949,39 +949,39 @@ platforms = ["linux", "macos", "windows"]
     }
 
     #[test]
-    fn link_rejects_invalid_min_herdr_versions() {
+    fn link_rejects_invalid_min_shep_versions() {
         let cases = [
             (
-                "plugin-missing-min-herdr",
+                "plugin-missing-min-shep",
                 r#"
-id = "example.missing-min-herdr"
-name = "Missing Min Herdr"
+id = "example.missing-min-shep"
+name = "Missing Min Shep"
 version = "0.1.0"
 platforms = ["linux", "macos", "windows"]
 "#,
-                "invalid_plugin_min_herdr_version",
+                "invalid_plugin_min_shep_version",
             ),
             (
-                "plugin-invalid-min-herdr",
+                "plugin-invalid-min-shep",
                 r#"
-id = "example.invalid-min-herdr"
-name = "Invalid Min Herdr"
+id = "example.invalid-min-shep"
+name = "Invalid Min Shep"
 version = "0.1.0"
-min_herdr_version = "soon"
+min_shep_version = "soon"
 platforms = ["linux", "macos", "windows"]
 "#,
-                "invalid_plugin_min_herdr_version",
+                "invalid_plugin_min_shep_version",
             ),
             (
-                "plugin-future-min-herdr",
+                "plugin-future-min-shep",
                 r#"
-id = "example.future-min-herdr"
-name = "Future Min Herdr"
+id = "example.future-min-shep"
+name = "Future Min Shep"
 version = "0.1.0"
-min_herdr_version = "999.0.0"
+min_shep_version = "999.0.0"
 platforms = ["linux", "macos", "windows"]
 "#,
-                "plugin_requires_newer_herdr",
+                "plugin_requires_newer_shep",
             ),
         ];
 
@@ -1007,7 +1007,7 @@ platforms = ["linux", "macos", "windows"]
 id = "example.duplicate"
 name = "Duplicate"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -1036,7 +1036,7 @@ command = ["echo", "b"]
 id = "example.dotted-action"
 name = "Dotted Action"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -1060,7 +1060,7 @@ command = ["echo", "build"]
 id = "example.duplicate-pane"
 name = "Duplicate Pane"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[panes]]
@@ -1095,7 +1095,7 @@ command = ["echo", "b"]
     fn plugin_command_output_reader_caps_and_marks_truncation() {
         let output = read_capped_plugin_output("abcdef".as_bytes(), 3);
 
-        assert_eq!(output, "abc\n[herdr truncated plugin output after 3 bytes]");
+        assert_eq!(output, "abc\n[shep truncated plugin output after 3 bytes]");
     }
 
     #[test]
@@ -1176,13 +1176,13 @@ command = ["echo", "b"]
 id = "example.pane"
 name = "Pane Plugin"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[panes]]
 id = "board"
 title = "Plugin Board"
-command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \"$HERDR_PLUGIN_ID\" \"$HERDR_PLUGIN_ENTRYPOINT_ID\" \"$HERDR_WORKSPACE_ID\" \"$HERDR_PANE_ID\" \"$HERDR_BIN_PATH\" \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
+command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \"$SHEP_PLUGIN_ID\" \"$SHEP_PLUGIN_ENTRYPOINT_ID\" \"$SHEP_WORKSPACE_ID\" \"$SHEP_PANE_ID\" \"$SHEP_BIN_PATH\" \"$SHEP_PLUGIN_CONTEXT_JSON\" > {}"]
 "#,
                 capture.display()
             ),
@@ -1201,19 +1201,16 @@ command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \"$HERDR_
                 cwd: None,
                 focus: true,
                 env: std::collections::HashMap::from([
-                    ("HERDR_PLUGIN_ID".to_string(), "spoofed-plugin".to_string()),
+                    ("SHEP_PLUGIN_ID".to_string(), "spoofed-plugin".to_string()),
                     (
-                        "HERDR_PLUGIN_ENTRYPOINT_ID".to_string(),
+                        "SHEP_PLUGIN_ENTRYPOINT_ID".to_string(),
                         "spoofed-entrypoint".to_string(),
                     ),
                     (
-                        "HERDR_PLUGIN_CONTEXT_JSON".to_string(),
+                        "SHEP_PLUGIN_CONTEXT_JSON".to_string(),
                         "{\"spoofed\":true}".to_string(),
                     ),
-                    (
-                        "HERDR_BIN_PATH".to_string(),
-                        "/tmp/spoofed-herdr".to_string(),
-                    ),
+                    ("SHEP_BIN_PATH".to_string(), "/tmp/spoofed-shep".to_string()),
                 ]),
             }),
         });
@@ -1236,7 +1233,7 @@ command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \"$HERDR_
         assert_eq!(lines.next(), Some(plugin_pane.pane.workspace_id.as_str()));
         assert_eq!(lines.next(), Some(plugin_pane.pane.pane_id.as_str()));
         let bin_path = lines.next().expect("bin path");
-        assert_ne!(bin_path, "/tmp/spoofed-herdr");
+        assert_ne!(bin_path, "/tmp/spoofed-shep");
         assert_eq!(
             bin_path,
             std::env::current_exe()
@@ -1279,13 +1276,13 @@ command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \"$HERDR_
 id = "example.path-env"
 name = "Path Env"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[panes]]
 id = "board"
 title = "Plugin Board"
-command = ["sh", "-c", "printf '%s\n%s\n%s\n' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PLUGIN_CONFIG_DIR\" \"$HERDR_PLUGIN_STATE_DIR\" > {}"]
+command = ["sh", "-c", "printf '%s\n%s\n%s\n' \"$SHEP_PLUGIN_ROOT\" \"$SHEP_PLUGIN_CONFIG_DIR\" \"$SHEP_PLUGIN_STATE_DIR\" > {}"]
 "#,
                 capture.display()
             ),
@@ -1305,15 +1302,15 @@ command = ["sh", "-c", "printf '%s\n%s\n%s\n' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PL
                 focus: true,
                 env: std::collections::HashMap::from([
                     (
-                        "HERDR_PLUGIN_ROOT".to_string(),
+                        "SHEP_PLUGIN_ROOT".to_string(),
                         "/tmp/spoofed-root".to_string(),
                     ),
                     (
-                        "HERDR_PLUGIN_CONFIG_DIR".to_string(),
+                        "SHEP_PLUGIN_CONFIG_DIR".to_string(),
                         "/tmp/spoofed-config".to_string(),
                     ),
                     (
-                        "HERDR_PLUGIN_STATE_DIR".to_string(),
+                        "SHEP_PLUGIN_STATE_DIR".to_string(),
                         "/tmp/spoofed-state".to_string(),
                     ),
                 ]),
@@ -1381,7 +1378,7 @@ command = ["sh", "-c", "printf '%s\n%s\n%s\n' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PL
 id = "example.tab"
 name = "Tab Plugin"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[panes]]
@@ -1462,7 +1459,7 @@ command = ["sh", "-c", "sleep 1"]
 id = "example.split"
 name = "Split Plugin"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[panes]]
@@ -1539,7 +1536,7 @@ command = ["sh", "-c", "sleep 1"]
 id = "example.overlay"
 name = "Overlay Plugin"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[panes]]
@@ -1745,13 +1742,13 @@ command = ["sh", "-c", "sleep 1"]
 id = "example.runner"
 name = "Runner"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[actions]]
 id = "run"
 title = "Run"
-command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_ACTION_ID\""]
+command = ["sh", "-c", "printf '%s' \"$SHEP_PLUGIN_ACTION_ID\""]
 "#,
         );
         link_manifest(&mut app, &root);
@@ -1812,13 +1809,13 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_ACTION_ID\""]
 id = "example.action-paths"
 name = "Action Paths"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[actions]]
 id = "run"
 title = "Run"
-command = ["sh", "-c", "printf '%s\n%s\n%s' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PLUGIN_CONFIG_DIR\" \"$HERDR_PLUGIN_STATE_DIR\""]
+command = ["sh", "-c", "printf '%s\n%s\n%s' \"$SHEP_PLUGIN_ROOT\" \"$SHEP_PLUGIN_CONFIG_DIR\" \"$SHEP_PLUGIN_STATE_DIR\""]
 "#,
         );
         link_manifest(&mut app, &root);
@@ -1935,12 +1932,12 @@ command = ["sh", "-c", "printf '%s\n%s\n%s' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PLUG
 id = "example.event-context"
 name = "Event Context"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[events]]
 on = "worktree.created"
-command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
+command = ["sh", "-c", "printf '%s' \"$SHEP_PLUGIN_CONTEXT_JSON\" > {}"]
 "#,
                 capture.display()
             ),
@@ -2068,27 +2065,27 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
 
         app.state.workspaces[0].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr-issue".into(),
+            label: "shep".into(),
+            repo_root: "/repo/shep".into(),
+            checkout_path: "/repo/shep-issue".into(),
             is_linked_worktree: true,
         });
         let workspace = app.workspace_info(0);
         let worktree = crate::api::schema::WorktreeInfo {
-            path: "/repo/herdr-issue".into(),
+            path: "/repo/shep-issue".into(),
             branch: Some("worktree/issue".into()),
             is_bare: false,
             is_detached: false,
             is_prunable: false,
             is_linked_worktree: true,
             open_workspace_id: None,
-            label: "herdr".into(),
+            label: "shep".into(),
         };
         app.state.workspaces[0].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr-other".into(),
+            label: "shep".into(),
+            repo_root: "/repo/shep".into(),
+            checkout_path: "/repo/shep-other".into(),
             is_linked_worktree: true,
         });
         let changed_context = app.plugin_context_for_event(
@@ -2108,7 +2105,7 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
                 .worktree
                 .as_ref()
                 .map(|worktree| worktree.checkout_path.as_str()),
-            Some("/repo/herdr-issue")
+            Some("/repo/shep-issue")
         );
 
         app.state.workspaces.clear();
@@ -2133,7 +2130,7 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
                 .worktree
                 .as_ref()
                 .map(|worktree| worktree.checkout_path.as_str()),
-            Some("/repo/herdr-issue")
+            Some("/repo/shep-issue")
         );
     }
 
@@ -2153,13 +2150,13 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
 id = "example.links"
 name = "Links"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[actions]]
 id = "open"
 title = "Open link"
-command = ["sh", "-c", "printf '%s|%s' \"$HERDR_PLUGIN_LINK_HANDLER_ID\" \"$HERDR_PLUGIN_CLICKED_URL\""]
+command = ["sh", "-c", "printf '%s|%s' \"$SHEP_PLUGIN_LINK_HANDLER_ID\" \"$SHEP_PLUGIN_CLICKED_URL\""]
 
 [[link_handlers]]
 id = "github-issue"
@@ -2221,7 +2218,7 @@ action = "open"
 id = "example.link-order"
 name = "Link Order"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -2268,7 +2265,7 @@ action = "generic"
 id = "example.bad-links"
 name = "Bad Links"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -2311,7 +2308,7 @@ action = "open"
 id = "example.bad-link-action"
 name = "Bad Link Action"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -2352,9 +2349,9 @@ action = "missing"
         app.state.workspaces[0].custom_name = Some("Plugin Work".into());
         app.state.workspaces[0].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr-issue".into(),
+            label: "shep".into(),
+            repo_root: "/repo/shep".into(),
+            checkout_path: "/repo/shep-issue".into(),
             is_linked_worktree: true,
         });
         let pane_id = app.state.workspaces[0].tabs[0].root_pane;
@@ -2380,12 +2377,12 @@ action = "missing"
         // write a manifest with a "show" action in pane context
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
-            root.join("herdr-plugin.toml"),
+            root.join("shep-plugin.toml"),
             r#"
 id = "example.context"
 name = "Context"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 
 [[actions]]
 id = "show"
@@ -2431,9 +2428,9 @@ command = ["show-ctx"]
         assert_eq!(context.correlation_id.as_deref(), Some("invoke-context"));
         let worktree = context.worktree.as_ref().unwrap();
         assert_eq!(worktree.repo_key, "repo-key");
-        assert_eq!(worktree.repo_name, "herdr");
-        assert_eq!(worktree.repo_root, "/repo/herdr");
-        assert_eq!(worktree.checkout_path, "/repo/herdr-issue");
+        assert_eq!(worktree.repo_name, "shep");
+        assert_eq!(worktree.repo_root, "/repo/shep");
+        assert_eq!(worktree.checkout_path, "/repo/shep-issue");
         assert!(worktree.is_linked_worktree);
 
         let _ = std::fs::remove_dir_all(root);
@@ -2475,14 +2472,14 @@ command = ["show-ctx"]
 
     fn write_manifest_with_bad_event(root: &std::path::Path) -> std::path::PathBuf {
         std::fs::create_dir_all(root).unwrap();
-        let manifest = root.join("herdr-plugin.toml");
+        let manifest = root.join("shep-plugin.toml");
         std::fs::write(
             &manifest,
             r#"
 id = "example.bad-event"
 name = "Bad Event Plugin"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 
 [[events]]
 on = "worktree.craeted"
@@ -2761,12 +2758,12 @@ command = ["sh", "-c", "echo ok"]
         let root = unique_temp_path("plugin-platforms");
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
-            root.join("herdr-plugin.toml"),
+            root.join("shep-plugin.toml"),
             r#"
 id = "example.platforms"
 name = "Platforms"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[actions]]
@@ -2843,13 +2840,13 @@ command = ["run.bat"]
         };
 
         std::fs::write(
-            root.join("herdr-plugin.toml"),
+            root.join("shep-plugin.toml"),
             format!(
                 r#"
 id = "example.reject"
 name = "Reject"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 {excluded_platforms}
 
 [[actions]]
@@ -2908,13 +2905,13 @@ command = ["act"]
         };
 
         std::fs::write(
-            root.join("herdr-plugin.toml"),
+            root.join("shep-plugin.toml"),
             format!(
                 r#"
 id = "example.override"
 name = "Override"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -2960,12 +2957,12 @@ command = ["act"]
         let root = unique_temp_path("plugin-platform-undeclared");
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
-            root.join("herdr-plugin.toml"),
+            root.join("shep-plugin.toml"),
             r#"
 id = "example.nodecl"
 name = "No Decl"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 
 [[actions]]
 id = "act"
@@ -3018,12 +3015,12 @@ command = ["act"]
         let root = unique_temp_path("plugin-bad-platform");
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
-            root.join("herdr-plugin.toml"),
+            root.join("shep-plugin.toml"),
             r#"
 id = "example.badplatform"
 name = "Bad Platform"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "beos"]
 
 [[actions]]
@@ -3050,12 +3047,12 @@ command = ["act"]
         let root = unique_temp_path("plugin-platform-rt");
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
-            root.join("herdr-plugin.toml"),
+            root.join("shep-plugin.toml"),
             r#"
 id = "example.platform-rt"
 name = "Platform RT"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_shep_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[actions]]

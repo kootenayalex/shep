@@ -212,16 +212,16 @@ impl App {
             crate::api::SOCKET_PATH_ENV_VAR.to_string(),
             crate::api::socket_path().display().to_string(),
         ));
-        env.push(("HERDR_ENV".to_string(), "1".to_string()));
-        env.push(("HERDR_PLUGIN_ID".to_string(), plugin.plugin_id.clone()));
+        env.push(("SHEP_ENV".to_string(), "1".to_string()));
+        env.push(("SHEP_PLUGIN_ID".to_string(), plugin.plugin_id.clone()));
         env.push((
-            "HERDR_PLUGIN_ENTRYPOINT_ID".to_string(),
+            "SHEP_PLUGIN_ENTRYPOINT_ID".to_string(),
             entrypoint.to_string(),
         ));
-        env.push(("HERDR_PLUGIN_CONTEXT_JSON".to_string(), context_json));
+        env.push(("SHEP_PLUGIN_CONTEXT_JSON".to_string(), context_json));
         if let Ok(current_exe) = std::env::current_exe() {
             env.push((
-                "HERDR_BIN_PATH".to_string(),
+                "SHEP_BIN_PATH".to_string(),
                 current_exe.display().to_string(),
             ));
         }
@@ -306,13 +306,13 @@ fn plugin_pane_protected_env_key(key: &str) -> bool {
     matches!(
         key,
         crate::api::SOCKET_PATH_ENV_VAR
-            | "HERDR_ENV"
-            | "HERDR_PLUGIN_ID"
-            | "HERDR_PLUGIN_ROOT"
-            | "HERDR_PLUGIN_CONFIG_DIR"
-            | "HERDR_PLUGIN_STATE_DIR"
-            | "HERDR_PLUGIN_ENTRYPOINT_ID"
-            | "HERDR_PLUGIN_CONTEXT_JSON"
-            | "HERDR_BIN_PATH"
+            | "SHEP_ENV"
+            | "SHEP_PLUGIN_ID"
+            | "SHEP_PLUGIN_ROOT"
+            | "SHEP_PLUGIN_CONFIG_DIR"
+            | "SHEP_PLUGIN_STATE_DIR"
+            | "SHEP_PLUGIN_ENTRYPOINT_ID"
+            | "SHEP_PLUGIN_CONTEXT_JSON"
+            | "SHEP_BIN_PATH"
     )
 }

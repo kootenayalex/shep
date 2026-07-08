@@ -1,8 +1,8 @@
-# herdr
+# shep
 
 
 <p align="center">
-  <img src="assets/logo.png" alt="herdr" width="100" />
+  <img src="assets/logo.png" alt="shep" width="100" />
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@ https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
 
 - **every agent at a glance** — blocked, working, done. real terminal views, not a wrapped interpretation.
 - **detach, agents keep running** — reattach from any terminal, or over ssh. sessions survive restarts.
-- **agents can use herdr too** — a pure socket api: agents spawn panes, read output, wait on each other. [agent skill →](https://herdr.dev/docs/agent-skill/)
+- **agents can use shep too** — a pure socket api: agents spawn panes, read output, wait on each other. [agent skill →](https://herdr.dev/docs/agent-skill/)
 - **keyboard and mouse, both first-class** — tmux-style prefix keys *and* click, drag, split. pick per moment, not per tool.
 - **plugins** — extend panes and workflows. [browse the marketplace →](https://herdr.dev/plugins/)
 - **one rust binary, no electron** — runs in whatever terminal you already use.
@@ -39,15 +39,15 @@ https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
 curl -fsSL https://herdr.dev/install.sh | sh
 ```
 
-or `brew install herdr` · `mise use -g herdr` · windows beta: `powershell -ExecutionPolicy Bypass -c "irm https://herdr.dev/install.ps1 | iex"` · [binaries](https://github.com/ogulcancelik/herdr/releases)
+or `brew install shep` · `mise use -g shep` · windows beta: `powershell -ExecutionPolicy Bypass -c "irm https://herdr.dev/install.ps1 | iex"` · [binaries](https://github.com/ogulcancelik/herdr/releases)
 
 then start it where the work lives:
 
 ```bash
-herdr
+shep
 ```
 
-run your agents, split panes, walk away. `ctrl+b q` detaches, `herdr` reattaches. [quick start →](https://herdr.dev/docs/quick-start/)
+run your agents, split panes, walk away. `ctrl+b q` detaches, `shep` reattaches. [quick start →](https://herdr.dev/docs/quick-start/)
 
 ## docs
 
@@ -55,7 +55,7 @@ everything lives at [herdr.dev/docs](https://herdr.dev/docs/): [quick start](htt
 
 ## sponsors
 
-herdr is built full-time, in the open. sponsoring directly funds development, stability, and the path to a real agent runtime.
+shep is built full-time, in the open. sponsoring directly funds development, stability, and the path to a real agent runtime.
 
 ### gold
 
@@ -71,7 +71,7 @@ if you are an ai agent helping with this repository, read [`AGENTS.md`](./AGENTS
 
 ```bash
 git clone https://github.com/ogulcancelik/herdr
-cd herdr
+cd shep
 cargo build --release
 
 just test        # unit tests
@@ -80,7 +80,7 @@ just check       # formatting, tests, and maintenance checks
 
 ## license
 
-Herdr is dual-licensed:
+Shep is dual-licensed:
 
 1. Open source: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
 2. Commercial: commercial licenses are available for organizations that cannot comply with AGPL.

@@ -22,11 +22,11 @@ const REMOTE_SERVER_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(100
 const CURRENT_PROTOCOL: u32 = crate::protocol::PROTOCOL_VERSION;
 const STABLE_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/latest.json";
 const PREVIEW_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/preview.json";
-const REMOTE_BINARY_ENV_VAR: &str = "HERDR_REMOTE_BINARY";
+const REMOTE_BINARY_ENV_VAR: &str = "SHEP_REMOTE_BINARY";
 const SSH_CONTROL_SOCKET_NAME: &str = "ctl";
-pub(crate) const REATTACH_COMMAND_ENV_VAR: &str = "HERDR_REATTACH_COMMAND";
+pub(crate) const REATTACH_COMMAND_ENV_VAR: &str = "SHEP_REATTACH_COMMAND";
 
-pub(crate) const REMOTE_KEYBINDINGS_ENV_VAR: &str = "HERDR_REMOTE_KEYBINDINGS";
+pub(crate) const REMOTE_KEYBINDINGS_ENV_VAR: &str = "SHEP_REMOTE_KEYBINDINGS";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RemoteKeybindings {
@@ -158,7 +158,7 @@ pub(crate) fn run_remote(remote: RemoteLaunch) -> io::Result<()> {
     let local_socket = local_forward_socket_path(&remote.target, &session_name);
     let program = std::env::args()
         .next()
-        .unwrap_or_else(|| "herdr".to_string());
+        .unwrap_or_else(|| "shep".to_string());
     let reattach_command = reattach_command(
         &program,
         &remote.target,
@@ -171,10 +171,10 @@ pub(crate) fn run_remote(remote: RemoteLaunch) -> io::Result<()> {
         .remote
         .manage_ssh_config;
     let remote_ssh = RemoteSsh::new(remote.target.clone(), manage_ssh_config);
-    let prepared_remote = prepare_remote_herdr(&remote_ssh, remote.live_handoff)?;
+    let prepared_remote = prepare_remote_shep(&remote_ssh, remote.live_handoff)?;
     ensure_remote_server_ready(
         &remote_ssh,
-        &prepared_remote.remote_herdr,
+        &prepared_remote.remote_shep,
         prepared_remote.installed_or_replaced,
         prepared_remote.stop_after_install_approved,
         remote.live_handoff,
@@ -182,7 +182,7 @@ pub(crate) fn run_remote(remote: RemoteLaunch) -> io::Result<()> {
 
     let _bridge = SshStdioBridge::start(
         remote.target,
-        prepared_remote.remote_herdr,
+        prepared_remote.remote_shep,
         local_socket.clone(),
         session_name,
         remote_ssh.options(),
@@ -199,7 +199,7 @@ pub(crate) fn run_remote_client_bridge() -> io::Result<()> {
         io::Error::new(
             err.kind(),
             format!(
-                "failed to connect to remote Herdr client socket {}: {err}",
+                "failed to connect to remote Shep client socket {}: {err}",
                 socket_path.display()
             ),
         )
@@ -230,7 +230,7 @@ fn ensure_remote_server_running() -> io::Result<()> {
             return Ok(());
         }
         return Err(io::Error::other(
-            "remote herdr server must restart before this bridge can attach; rerun `herdr --remote` from an interactive terminal to approve stopping it",
+            "remote shep server must restart before this bridge can attach; rerun `shep --remote` from an interactive terminal to approve stopping it",
         ));
     }
 
@@ -285,15 +285,15 @@ impl RemotePlatform {
 }
 
 #[derive(Debug, Clone)]
-struct RemoteHerdr {
+struct RemoteShep {
     install_suffix: String,
     shell_path: String,
     platform: RemotePlatform,
 }
 
-impl RemoteHerdr {
+impl RemoteShep {
     fn for_platform(platform: RemotePlatform) -> Self {
-        let install_suffix = ".local/bin/herdr".to_string();
+        let install_suffix = ".local/bin/shep".to_string();
         let shell_path = format!("\"$HOME/{install_suffix}\"");
         Self {
             install_suffix,
@@ -426,8 +426,8 @@ struct RemoteReleaseAsset {
     sha256: Option<String>,
 }
 
-struct PreparedRemoteHerdr {
-    remote_herdr: RemoteHerdr,
+struct PreparedRemoteShep {
+    remote_shep: RemoteShep,
     installed_or_replaced: bool,
     stop_after_install_approved: bool,
 }
@@ -519,7 +519,7 @@ impl RemoteSsh {
         self.command().arg(command).output()
     }
 
-    fn install_herdr(&self, remote_herdr: &RemoteHerdr, source_path: &Path) -> io::Result<()> {
+    fn install_shep(&self, remote_shep: &RemoteShep, source_path: &Path) -> io::Result<()> {
         let script = format!(
             r#"dest="$HOME/{install_suffix}"
 dir="${{dest%/*}}"
@@ -529,7 +529,7 @@ cat > "$tmp"
 chmod 755 "$tmp"
 mv "$tmp" "$dest"
 "#,
-            install_suffix = remote_herdr.install_suffix
+            install_suffix = remote_shep.install_suffix
         );
 
         let mut child = self
@@ -623,28 +623,28 @@ impl InstallSource {
     }
 }
 
-fn prepare_remote_herdr(
+fn prepare_remote_shep(
     ssh: &RemoteSsh,
     live_handoff_enabled: bool,
-) -> io::Result<PreparedRemoteHerdr> {
+) -> io::Result<PreparedRemoteShep> {
     let platform = detect_remote_platform(ssh)?;
-    let remote_herdr = RemoteHerdr::for_platform(platform);
+    let remote_shep = RemoteShep::for_platform(platform);
     let override_binary = remote_binary_override_path()?;
-    let remote_binary_candidates = remote_binary_candidates(ssh, &remote_herdr)?;
+    let remote_binary_candidates = remote_binary_candidates(ssh, &remote_shep)?;
 
     if override_binary.is_none() {
         for candidate in &remote_binary_candidates {
             if remote_binary_matches(ssh, candidate).unwrap_or(false) {
-                return Ok(PreparedRemoteHerdr {
-                    remote_herdr: candidate.clone(),
+                return Ok(PreparedRemoteShep {
+                    remote_shep: candidate.clone(),
                     installed_or_replaced: false,
                     stop_after_install_approved: false,
                 });
             }
         }
-        if remote_binary_matches(ssh, &remote_herdr)? {
-            return Ok(PreparedRemoteHerdr {
-                remote_herdr,
+        if remote_binary_matches(ssh, &remote_shep)? {
+            return Ok(PreparedRemoteShep {
+                remote_shep,
                 installed_or_replaced: false,
                 stop_after_install_approved: false,
             });
@@ -652,38 +652,38 @@ fn prepare_remote_herdr(
     }
 
     let mut stop_after_install_approved = false;
-    if let Some(status_probe_herdr) = remote_binary_candidates.first().or_else(|| {
-        remote_binary_exists(ssh, &remote_herdr)
+    if let Some(status_probe_shep) = remote_binary_candidates.first().or_else(|| {
+        remote_binary_exists(ssh, &remote_shep)
             .ok()
-            .and_then(|exists| exists.then_some(&remote_herdr))
+            .and_then(|exists| exists.then_some(&remote_shep))
     }) {
         stop_after_install_approved = confirm_remote_install_with_running_server(
             ssh,
-            status_probe_herdr,
+            status_probe_shep,
             live_handoff_enabled,
         )?;
     }
     confirm_remote_install(
         ssh.target(),
-        &remote_herdr,
-        &install_source_description(&remote_herdr.platform, override_binary.as_deref()),
+        &remote_shep,
+        &install_source_description(&remote_shep.platform, override_binary.as_deref()),
     )?;
-    let source = resolve_install_source(&remote_herdr.platform, override_binary)?;
-    let install_result = ssh.install_herdr(&remote_herdr, &source.path);
+    let source = resolve_install_source(&remote_shep.platform, override_binary)?;
+    let install_result = ssh.install_shep(&remote_shep, &source.path);
     source.cleanup();
     install_result?;
 
-    if !remote_binary_matches(ssh, &remote_herdr)? {
+    if !remote_binary_matches(ssh, &remote_shep)? {
         return Err(io::Error::other(format!(
-            "installed remote herdr at {}, but it did not report version {}",
-            remote_herdr.shell_path,
+            "installed remote shep at {}, but it did not report version {}",
+            remote_shep.shell_path,
             current_version()
         )));
     }
     warn_if_remote_bin_not_on_path(ssh)?;
 
-    Ok(PreparedRemoteHerdr {
-        remote_herdr,
+    Ok(PreparedRemoteShep {
+        remote_shep,
         installed_or_replaced: true,
         stop_after_install_approved,
     })
@@ -710,29 +710,27 @@ fn detect_remote_platform(ssh: &RemoteSsh) -> io::Result<RemotePlatform> {
 
 fn remote_binary_candidates(
     ssh: &RemoteSsh,
-    remote_herdr: &RemoteHerdr,
-) -> io::Result<Vec<RemoteHerdr>> {
+    remote_shep: &RemoteShep,
+) -> io::Result<Vec<RemoteShep>> {
     let mut candidates = Vec::new();
 
-    if let Some(path_candidate) = remote_binary_on_path_any(ssh, remote_herdr)? {
+    if let Some(path_candidate) = remote_binary_on_path_any(ssh, remote_shep)? {
         push_if_new_remote_binary_candidate(&mut candidates, path_candidate);
     }
 
-    let output = ssh.sh_output(&known_remote_binary_candidate_script(
-        &remote_herdr.platform,
-    ))?;
+    let output = ssh.sh_output(&known_remote_binary_candidate_script(&remote_shep.platform))?;
     if !output.status.success() {
         return Err(command_failed("remote binary discovery failed", &output));
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    for candidate in remote_herdrs_from_path_discovery(remote_herdr, &stdout) {
+    for candidate in remote_sheps_from_path_discovery(remote_shep, &stdout) {
         push_if_new_remote_binary_candidate(&mut candidates, candidate);
     }
 
     Ok(candidates)
 }
 
-fn push_if_new_remote_binary_candidate(candidates: &mut Vec<RemoteHerdr>, candidate: RemoteHerdr) {
+fn push_if_new_remote_binary_candidate(candidates: &mut Vec<RemoteShep>, candidate: RemoteShep) {
     if !candidates
         .iter()
         .any(|existing| existing.shell_path == candidate.shell_path)
@@ -757,33 +755,33 @@ emit() {
     fi
 }
 if [ -n "$home" ]; then
-    emit "$home/.local/bin/herdr"
+    emit "$home/.local/bin/shep"
 fi
 "#,
     );
     if platform.os == "macos" {
         script.push_str(
-            r#"    emit "/opt/homebrew/bin/herdr"
-    emit "/usr/local/bin/herdr"
+            r#"    emit "/opt/homebrew/bin/shep"
+    emit "/usr/local/bin/shep"
 "#,
         );
     } else if platform.os == "linux" {
         script.push_str(
-            r#"    emit "/home/linuxbrew/.linuxbrew/bin/herdr"
+            r#"    emit "/home/linuxbrew/.linuxbrew/bin/shep"
 "#,
         );
     }
     script.push_str(
         r#"if [ -n "$home" ]; then
-    emit "$home/.local/share/mise/installs/herdr/$version/bin/herdr"
-    emit "$home/.local/share/mise/installs/github-ogulcancelik-herdr/$version/herdr"
-    emit "$home/.nix-profile/bin/herdr"
+    emit "$home/.local/share/mise/installs/shep/$version/bin/shep"
+    emit "$home/.local/share/mise/installs/github-ogulcancelik-shep/$version/shep"
+    emit "$home/.nix-profile/bin/shep"
 fi
 if [ -n "$user" ]; then
-    emit "/etc/profiles/per-user/$user/bin/herdr"
+    emit "/etc/profiles/per-user/$user/bin/shep"
 fi
-emit "/nix/var/nix/profiles/default/bin/herdr"
-emit "/run/current-system/sw/bin/herdr"
+emit "/nix/var/nix/profiles/default/bin/shep"
+emit "/run/current-system/sw/bin/shep"
 "#,
     );
 
@@ -792,34 +790,31 @@ emit "/run/current-system/sw/bin/herdr"
 
 fn remote_binary_on_path_any(
     ssh: &RemoteSsh,
-    remote_herdr: &RemoteHerdr,
-) -> io::Result<Option<RemoteHerdr>> {
-    let output = ssh.user_shell_output("command -v herdr")?;
+    remote_shep: &RemoteShep,
+) -> io::Result<Option<RemoteShep>> {
+    let output = ssh.user_shell_output("command -v shep")?;
     if !output.status.success() {
         return Ok(None);
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(remote_herdr_from_path_discovery(remote_herdr, &stdout))
+    Ok(remote_shep_from_path_discovery(remote_shep, &stdout))
 }
 
-fn remote_herdrs_from_path_discovery(remote_herdr: &RemoteHerdr, stdout: &str) -> Vec<RemoteHerdr> {
+fn remote_sheps_from_path_discovery(remote_shep: &RemoteShep, stdout: &str) -> Vec<RemoteShep> {
     stdout
         .lines()
-        .filter_map(|path| remote_herdr_from_path(remote_herdr, path))
+        .filter_map(|path| remote_shep_from_path(remote_shep, path))
         .collect()
 }
 
-fn remote_herdr_from_path_discovery(
-    remote_herdr: &RemoteHerdr,
-    stdout: &str,
-) -> Option<RemoteHerdr> {
+fn remote_shep_from_path_discovery(remote_shep: &RemoteShep, stdout: &str) -> Option<RemoteShep> {
     stdout
         .lines()
-        .find_map(|path| remote_herdr_from_path(remote_herdr, path))
+        .find_map(|path| remote_shep_from_path(remote_shep, path))
 }
 
-fn remote_herdr_from_path(remote_herdr: &RemoteHerdr, path: &str) -> Option<RemoteHerdr> {
+fn remote_shep_from_path(remote_shep: &RemoteShep, path: &str) -> Option<RemoteShep> {
     let path = path.trim();
     if !path.starts_with('/') {
         return None;
@@ -827,17 +822,17 @@ fn remote_herdr_from_path(remote_herdr: &RemoteHerdr, path: &str) -> Option<Remo
     if is_mise_shim_path(path) {
         return None;
     }
-    Some(remote_herdr.clone().with_shell_path(shell_quote(path)))
+    Some(remote_shep.clone().with_shell_path(shell_quote(path)))
 }
 
 fn is_mise_shim_path(path: &str) -> bool {
-    path.ends_with("/mise/shims/herdr")
+    path.ends_with("/mise/shims/shep")
 }
 
-fn remote_binary_matches(ssh: &RemoteSsh, remote_herdr: &RemoteHerdr) -> io::Result<bool> {
+fn remote_binary_matches(ssh: &RemoteSsh, remote_shep: &RemoteShep) -> io::Result<bool> {
     let command = format!(
         "test -x {0} && {0} --version && {0} status client --json",
-        remote_herdr.shell_path
+        remote_shep.shell_path
     );
     let output = ssh.sh_output(&command)?;
     if !output.status.success() {
@@ -848,14 +843,14 @@ fn remote_binary_matches(ssh: &RemoteSsh, remote_herdr: &RemoteHerdr) -> io::Res
     let mut lines = stdout.lines();
     let version = lines.next().unwrap_or_default().trim();
     let status = lines.next().unwrap_or_default();
-    Ok(version == format!("herdr {}", current_version())
+    Ok(version == format!("shep {}", current_version())
         && parse_client_status_json(status)
             .map(|status| status.protocol == CURRENT_PROTOCOL)
             .unwrap_or(false))
 }
 
-fn remote_binary_exists(ssh: &RemoteSsh, remote_herdr: &RemoteHerdr) -> io::Result<bool> {
-    let command = format!("test -x {}", remote_herdr.shell_path);
+fn remote_binary_exists(ssh: &RemoteSsh, remote_shep: &RemoteShep) -> io::Result<bool> {
+    let command = format!("test -x {}", remote_shep.shell_path);
     Ok(ssh.sh_output(&command)?.status.success())
 }
 
@@ -911,7 +906,7 @@ fn install_source_description_for(
     }
 
     if local_binary_can_seed_remote {
-        "the current local herdr binary".to_string()
+        "the current local shep binary".to_string()
     } else {
         format!(
             "the {} {} asset for {}",
@@ -978,12 +973,12 @@ enum RemoteInstallRunningServerPlan {
 
 fn ensure_remote_server_ready(
     ssh: &RemoteSsh,
-    remote_herdr: &RemoteHerdr,
+    remote_shep: &RemoteShep,
     remote_binary_changed: bool,
     stop_after_install_approved: bool,
     live_handoff_enabled: bool,
 ) -> io::Result<()> {
-    let status = remote_server_status(ssh, remote_herdr)?;
+    let status = remote_server_status(ssh, remote_shep)?;
     let RemoteServerStatus::Running {
         version,
         protocol,
@@ -1004,7 +999,7 @@ fn ensure_remote_server_ready(
     };
 
     if live_handoff_enabled && live_handoff {
-        match live_handoff_remote_server(ssh, remote_herdr) {
+        match live_handoff_remote_server(ssh, remote_shep) {
             Ok(()) => return Ok(()),
             Err(err) => {
                 eprintln!("remote live handoff failed: {err}");
@@ -1014,12 +1009,12 @@ fn ensure_remote_server_ready(
     }
 
     if stop_after_install_approved {
-        stop_remote_server(ssh, remote_herdr)?;
+        stop_remote_server(ssh, remote_shep)?;
         return Ok(());
     }
 
     if confirm_remote_server_stop(ssh.target(), version.as_deref(), protocol, reason)? {
-        stop_remote_server(ssh, remote_herdr)?;
+        stop_remote_server(ssh, remote_shep)?;
     }
     Ok(())
 }
@@ -1047,22 +1042,22 @@ fn remote_server_restart_reason(
 
 fn confirm_remote_install_with_running_server(
     ssh: &RemoteSsh,
-    remote_herdr: &RemoteHerdr,
+    remote_shep: &RemoteShep,
     live_handoff_enabled: bool,
 ) -> io::Result<bool> {
     let target = ssh.target();
-    let status = match remote_server_status(ssh, remote_herdr) {
+    let status = match remote_server_status(ssh, remote_shep) {
         Ok(status) => status,
         Err(err) => {
             if !io::stdin().is_terminal() {
                 return Err(io::Error::other(format!(
-                    "could not inspect the running remote herdr server on {target} before installing: {err}; run from an interactive terminal to approve updating the remote binary"
+                    "could not inspect the running remote shep server on {target} before installing: {err}; run from an interactive terminal to approve updating the remote binary"
                 )));
             }
             eprintln!(
-                "could not inspect the running remote herdr server on {target} before installing: {err}"
+                "could not inspect the running remote shep server on {target} before installing: {err}"
             );
-            eprint!("continue installing the remote herdr binary? [y/N] ");
+            eprint!("continue installing the remote shep binary? [y/N] ");
             io::stderr().flush()?;
 
             let mut answer = String::new();
@@ -1071,7 +1066,7 @@ fn confirm_remote_install_with_running_server(
             if answer != "y" && answer != "yes" {
                 return Err(io::Error::new(
                     io::ErrorKind::Interrupted,
-                    "remote herdr install cancelled",
+                    "remote shep install cancelled",
                 ));
             }
             return Ok(false);
@@ -1097,10 +1092,10 @@ fn confirm_remote_install_with_running_server(
 
     if plan == RemoteInstallRunningServerPlan::KeepRunning {
         if io::stdin().is_terminal() {
-            eprintln!("remote herdr server on {target} is already compatible:");
+            eprintln!("remote shep server on {target} is already compatible:");
             eprintln!("  server: v{}", version_label(version.as_deref()));
             eprintln!(
-                "Herdr will install {} without stopping the running remote server.",
+                "Shep will install {} without stopping the running remote server.",
                 current_version()
             );
         }
@@ -1112,7 +1107,7 @@ fn confirm_remote_install_with_running_server(
             RemoteInstallRunningServerPlan::LiveHandoff => return Ok(false),
             RemoteInstallRunningServerPlan::StopRequired(_) => {
                 return Err(io::Error::other(format!(
-                    "remote herdr server on {target} is running v{}; run from an interactive terminal to approve stopping it for the update",
+                    "remote shep server on {target} is running v{}; run from an interactive terminal to approve stopping it for the update",
                     version_label(version.as_deref())
                 )));
             }
@@ -1121,19 +1116,19 @@ fn confirm_remote_install_with_running_server(
     }
 
     if plan == RemoteInstallRunningServerPlan::LiveHandoff {
-        eprintln!("remote herdr server on {target} is currently running:");
+        eprintln!("remote shep server on {target} is currently running:");
         eprintln!("  server: v{}", version_label(version.as_deref()));
         eprintln!(
-            "Herdr will install {} and hand off live pane processes to the prepared server.",
+            "Shep will install {} and hand off live pane processes to the prepared server.",
             current_version()
         );
         return Ok(false);
     }
 
-    eprintln!("remote herdr server on {target} is currently running:");
+    eprintln!("remote shep server on {target} is currently running:");
     eprintln!("  server: v{}", version_label(version.as_deref()));
     eprintln!(
-        "To complete the remote update, Herdr must stop the running remote server after installing."
+        "To complete the remote update, Shep must stop the running remote server after installing."
     );
     eprintln!("This stops active remote pane processes, including shells, dev servers, and tests.");
     eprintln!();
@@ -1149,7 +1144,7 @@ fn confirm_remote_install_with_running_server(
     if answer != "y" && answer != "yes" {
         return Err(io::Error::new(
             io::ErrorKind::Interrupted,
-            "remote herdr install cancelled",
+            "remote shep install cancelled",
         ));
     }
 
@@ -1182,9 +1177,9 @@ fn remote_install_running_server_plan(
 
 fn remote_server_status(
     ssh: &RemoteSsh,
-    remote_herdr: &RemoteHerdr,
+    remote_shep: &RemoteShep,
 ) -> io::Result<RemoteServerStatus> {
-    let command = format!("{} status server --json", remote_herdr.shell_path);
+    let command = format!("{} status server --json", remote_shep.shell_path);
     let output = ssh.sh_output(&command)?;
     if !output.status.success() {
         return Err(command_failed("remote server status failed", &output));
@@ -1251,19 +1246,19 @@ fn confirm_remote_server_stop(
     if !io::stdin().is_terminal() {
         if reason == RemoteServerRestartReason::ProtocolMismatch {
             return Err(io::Error::other(format!(
-                "remote herdr server on {target} must stop before this client can attach; run from an interactive terminal to approve stopping it"
+                "remote shep server on {target} must stop before this client can attach; run from an interactive terminal to approve stopping it"
             )));
         }
 
         eprintln!(
-            "remote herdr server on {target} is still running v{}; it will use {} after it restarts.",
+            "remote shep server on {target} is still running v{}; it will use {} after it restarts.",
             version_label(version),
             current_version()
         );
         return Ok(false);
     }
 
-    eprintln!("remote herdr server on {target} is currently running:");
+    eprintln!("remote shep server on {target} is currently running:");
     eprintln!("  server: v{}", version_label(version));
     eprintln!("  prepared binary: {}", current_version());
     eprintln!();
@@ -1274,17 +1269,17 @@ fn confirm_remote_server_stop(
         }
         RemoteServerRestartReason::DaemonDetachMissing => {
             eprintln!(
-                "the remote server was started by a herdr build that may not survive SSH connection loss. restart it so network drops disconnect only this client."
+                "the remote server was started by a shep build that may not survive SSH connection loss. restart it so network drops disconnect only this client."
             );
         }
         RemoteServerRestartReason::BinaryUpdated => {
             eprintln!(
-                "the remote herdr binary was installed or replaced. restart the remote server so it uses the prepared binary."
+                "the remote shep binary was installed or replaced. restart the remote server so it uses the prepared binary."
             );
         }
         RemoteServerRestartReason::VersionMismatch => {
             eprintln!(
-                "the remote server is still running a different herdr version. restart it so it uses the prepared binary."
+                "the remote server is still running a different shep version. restart it so it uses the prepared binary."
             );
         }
     }
@@ -1309,18 +1304,18 @@ fn confirm_remote_server_stop(
     if reason == RemoteServerRestartReason::ProtocolMismatch {
         return Err(io::Error::new(
             io::ErrorKind::Interrupted,
-            "remote herdr server stop cancelled",
+            "remote shep server stop cancelled",
         ));
     }
 
     Ok(false)
 }
 
-fn live_handoff_remote_server(ssh: &RemoteSsh, remote_herdr: &RemoteHerdr) -> io::Result<()> {
+fn live_handoff_remote_server(ssh: &RemoteSsh, remote_shep: &RemoteShep) -> io::Result<()> {
     let command = format!(
         "{} server live-handoff --import-exe {} --expected-protocol {} --expected-version {}",
-        remote_herdr.shell_path,
-        remote_herdr.shell_path,
+        remote_shep.shell_path,
+        remote_shep.shell_path,
         CURRENT_PROTOCOL,
         current_version()
     );
@@ -1330,38 +1325,38 @@ fn live_handoff_remote_server(ssh: &RemoteSsh, remote_herdr: &RemoteHerdr) -> io
     }
 
     eprintln!(
-        "handed off the remote herdr server on {}; reconnecting to the prepared server.",
+        "handed off the remote shep server on {}; reconnecting to the prepared server.",
         ssh.target()
     );
     Ok(())
 }
 
-fn stop_remote_server(ssh: &RemoteSsh, remote_herdr: &RemoteHerdr) -> io::Result<()> {
-    let command = format!("{} server stop", remote_herdr.shell_path);
+fn stop_remote_server(ssh: &RemoteSsh, remote_shep: &RemoteShep) -> io::Result<()> {
+    let command = format!("{} server stop", remote_shep.shell_path);
     let output = ssh.sh_output(&command)?;
     if !output.status.success() {
         return Err(command_failed("remote server stop failed", &output));
     }
 
-    wait_for_remote_server_shutdown(ssh, remote_herdr)?;
+    wait_for_remote_server_shutdown(ssh, remote_shep)?;
     eprintln!(
-        "stopped the remote herdr server on {}; it will restart when the remote client bridge attaches.",
+        "stopped the remote shep server on {}; it will restart when the remote client bridge attaches.",
         ssh.target()
     );
     Ok(())
 }
 
-fn wait_for_remote_server_shutdown(ssh: &RemoteSsh, remote_herdr: &RemoteHerdr) -> io::Result<()> {
+fn wait_for_remote_server_shutdown(ssh: &RemoteSsh, remote_shep: &RemoteShep) -> io::Result<()> {
     let deadline = Instant::now() + REMOTE_SERVER_SHUTDOWN_CONFIRM_TIMEOUT;
     loop {
-        if remote_server_status(ssh, remote_herdr)? == RemoteServerStatus::NotRunning {
+        if remote_server_status(ssh, remote_shep)? == RemoteServerStatus::NotRunning {
             return Ok(());
         }
         if Instant::now() >= deadline {
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
-                    "shutdown was requested, but the old remote herdr server on {target} is still responding after {} seconds",
+                    "shutdown was requested, but the old remote shep server on {target} is still responding after {} seconds",
                     REMOTE_SERVER_SHUTDOWN_CONFIRM_TIMEOUT.as_secs(),
                     target = ssh.target()
                 ),
@@ -1376,7 +1371,7 @@ fn version_label(version: Option<&str>) -> &str {
 }
 
 fn warn_if_remote_bin_not_on_path(ssh: &RemoteSsh) -> io::Result<()> {
-    let output = ssh.user_shell_output("command -v herdr")?;
+    let output = ssh.user_shell_output("command -v shep")?;
     if output.status.success()
         && remote_shell_resolves_managed_install(&String::from_utf8_lossy(&output.stdout))
     {
@@ -1384,7 +1379,7 @@ fn warn_if_remote_bin_not_on_path(ssh: &RemoteSsh) -> io::Result<()> {
     }
 
     eprintln!(
-        "herdr: installed remote binary to ~/.local/bin/herdr, but the remote shell does not resolve `herdr` to that path"
+        "shep: installed remote binary to ~/.local/bin/shep, but the remote shell does not resolve `shep` to that path"
     );
     Ok(())
 }
@@ -1394,7 +1389,7 @@ fn remote_shell_resolves_managed_install(stdout: &str) -> bool {
         .lines()
         .next()
         .map(str::trim)
-        .is_some_and(|path| path.ends_with("/.local/bin/herdr"))
+        .is_some_and(|path| path.ends_with("/.local/bin/shep"))
 }
 
 fn download_release_asset(platform: &RemotePlatform) -> io::Result<InstallSource> {
@@ -1402,7 +1397,7 @@ fn download_release_asset(platform: &RemotePlatform) -> io::Result<InstallSource
     let asset = remote_release_asset(&asset_key)?;
 
     let dir = private_download_dir(&asset_key)?;
-    let path = dir.join("herdr.tmp");
+    let path = dir.join("shep.tmp");
     let status = Command::new("curl")
         .args(["-sfL", "--max-time", "120", "-o"])
         .arg(&path)
@@ -1462,7 +1457,7 @@ fn preview_assets_for_build<'a>(
     }
     let build = manifest.builds.get(build_id).ok_or_else(|| {
         io::Error::other(format!(
-            "preview manifest no longer includes build {build_id}; run `herdr update` locally or set {REMOTE_BINARY_ENV_VAR}=target/release/herdr"
+            "preview manifest no longer includes build {build_id}; run `shep update` locally or set {REMOTE_BINARY_ENV_VAR}=target/release/shep"
         ))
     })?;
     Ok((build.protocol, &build.assets))
@@ -1471,7 +1466,7 @@ fn preview_assets_for_build<'a>(
 fn remote_release_asset(asset_key: &str) -> io::Result<RemoteReleaseAsset> {
     if crate::build_info::is_preview() {
         let build_id = crate::build_info::build_id().ok_or_else(|| {
-            io::Error::other("preview client has no build id; set HERDR_REMOTE_BINARY or install Herdr on the remote manually")
+            io::Error::other("preview client has no build id; set SHEP_REMOTE_BINARY or install Shep on the remote manually")
         })?;
         let manifest_bytes = fetch_remote_manifest(PREVIEW_UPDATE_MANIFEST_URL)?;
         let manifest: RemotePreviewManifest =
@@ -1481,7 +1476,7 @@ fn remote_release_asset(asset_key: &str) -> io::Result<RemoteReleaseAsset> {
         let (protocol, assets) = preview_assets_for_build(&manifest, build_id)?;
         if protocol != CURRENT_PROTOCOL {
             return Err(io::Error::other(format!(
-                "preview manifest has build {build_id} protocol {protocol}, but this client needs protocol {CURRENT_PROTOCOL}; set {REMOTE_BINARY_ENV_VAR}=target/release/herdr or install a matching Herdr on the remote host manually"
+                "preview manifest has build {build_id} protocol {protocol}, but this client needs protocol {CURRENT_PROTOCOL}; set {REMOTE_BINARY_ENV_VAR}=target/release/shep or install a matching Shep on the remote host manually"
             )));
         }
         return assets.get(asset_key).map(remote_asset_info).ok_or_else(|| {
@@ -1497,14 +1492,14 @@ fn remote_release_asset(asset_key: &str) -> io::Result<RemoteReleaseAsset> {
         .map_err(|err| io::Error::other(format!("failed to parse update manifest JSON: {err}")))?;
     let release = manifest.release_for_version(&current_version).ok_or_else(|| {
         io::Error::other(format!(
-            "release manifest does not include herdr {current_version}; build herdr for {} or install it there manually",
+            "release manifest does not include shep {current_version}; build shep for {} or install it there manually",
             asset_key
         ))
     })?;
     if let Some(protocol) = release.protocol {
         if protocol != CURRENT_PROTOCOL {
             return Err(io::Error::other(format!(
-                "release manifest has herdr {current_version} protocol {protocol}, but this client needs protocol {CURRENT_PROTOCOL}; set {REMOTE_BINARY_ENV_VAR}=target/release/herdr or install a matching herdr on the remote host manually"
+                "release manifest has shep {current_version} protocol {protocol}, but this client needs protocol {CURRENT_PROTOCOL}; set {REMOTE_BINARY_ENV_VAR}=target/release/shep or install a matching shep on the remote host manually"
             )));
         }
     }
@@ -1514,7 +1509,7 @@ fn remote_release_asset(asset_key: &str) -> io::Result<RemoteReleaseAsset> {
         .map(remote_asset_info)
         .ok_or_else(|| {
             io::Error::other(format!(
-                "no {asset_key} binary in the release manifest for herdr {current_version}"
+                "no {asset_key} binary in the release manifest for shep {current_version}"
             ))
         })
 }
@@ -1523,7 +1518,7 @@ fn private_download_dir(asset_key: &str) -> io::Result<PathBuf> {
     let base = std::env::temp_dir();
     for attempt in 0..100 {
         let dir = base.join(format!(
-            "herdr-remote-{}-{}-{attempt}",
+            "shep-remote-{}-{}-{attempt}",
             std::process::id(),
             asset_key
         ));
@@ -1536,31 +1531,31 @@ fn private_download_dir(asset_key: &str) -> io::Result<PathBuf> {
 
     Err(io::Error::new(
         io::ErrorKind::AlreadyExists,
-        "failed to create private herdr remote download directory",
+        "failed to create private shep remote download directory",
     ))
 }
 
 fn confirm_remote_install(
     target: &str,
-    remote_herdr: &RemoteHerdr,
+    remote_shep: &RemoteShep,
     source_description: &str,
 ) -> io::Result<()> {
     if !io::stdin().is_terminal() {
         return Err(io::Error::other(format!(
-            "matching remote herdr {} is not installed at {}; run from an interactive terminal to approve installation",
+            "matching remote shep {} is not installed at {}; run from an interactive terminal to approve installation",
             current_version(),
-            remote_herdr.shell_path
+            remote_shep.shell_path
         )));
     }
 
     eprintln!(
-        "matching herdr {} is not installed on {target} for {}.",
+        "matching shep {} is not installed on {target} for {}.",
         current_version(),
-        remote_herdr.platform.asset_key()
+        remote_shep.platform.asset_key()
     );
     eprint!(
         "Install {} to {}? [Y/n] ",
-        source_description, remote_herdr.shell_path
+        source_description, remote_shep.shell_path
     );
     io::stderr().flush()?;
 
@@ -1570,15 +1565,15 @@ fn confirm_remote_install(
     if answer == "n" || answer == "no" {
         return Err(io::Error::new(
             io::ErrorKind::Interrupted,
-            "remote herdr installation cancelled",
+            "remote shep installation cancelled",
         ));
     }
 
     Ok(())
 }
 
-fn remote_bridge_command(remote_herdr: &RemoteHerdr, session_name: &str) -> String {
-    let mut command = format!("exec {}", remote_herdr.shell_path);
+fn remote_bridge_command(remote_shep: &RemoteShep, session_name: &str) -> String {
+    let mut command = format!("exec {}", remote_shep.shell_path);
     if session_name != crate::session::DEFAULT_SESSION_NAME {
         command.push_str(" --session ");
         command.push_str(&shell_quote(session_name));
@@ -1594,7 +1589,7 @@ fn reattach_command(
     keybindings: RemoteKeybindings,
     live_handoff: bool,
 ) -> String {
-    let program = if program.is_empty() { "herdr" } else { program };
+    let program = if program.is_empty() { "shep" } else { program };
     let mut command = format!("{} --remote {}", shell_quote(program), shell_quote(target));
     if keybindings != RemoteKeybindings::Local {
         command.push_str(" --remote-keybindings ");
@@ -1645,7 +1640,7 @@ struct SshStdioBridge {
 impl SshStdioBridge {
     fn start(
         target: String,
-        remote_herdr: RemoteHerdr,
+        remote_shep: RemoteShep,
         local_socket: PathBuf,
         session_name: String,
         ssh_options: Option<&ManagedSshOptions>,
@@ -1663,26 +1658,24 @@ impl SshStdioBridge {
                 match listener.accept() {
                     Ok((stream, _addr)) => {
                         if let Err(err) = stream.set_nonblocking(false) {
-                            eprintln!(
-                                "herdr: remote bridge failed to prepare client socket: {err}"
-                            );
+                            eprintln!("shep: remote bridge failed to prepare client socket: {err}");
                             continue;
                         }
                         if let Err(err) = bridge_connection(
                             stream,
                             &target,
-                            &remote_herdr,
+                            &remote_shep,
                             &session_name,
                             thread_ssh_options.as_ref(),
                         ) {
-                            eprintln!("herdr: remote bridge failed: {err}");
+                            eprintln!("shep: remote bridge failed: {err}");
                         }
                     }
                     Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
                         thread::sleep(BRIDGE_ACCEPT_POLL);
                     }
                     Err(err) => {
-                        eprintln!("herdr: remote bridge listener failed: {err}");
+                        eprintln!("shep: remote bridge listener failed: {err}");
                         break;
                     }
                 }
@@ -1712,7 +1705,7 @@ impl Drop for SshStdioBridge {
 ///
 /// Using a private directory created with fail-if-exists semantics — rather
 /// than a predictable file in the world-writable temp dir — stops a local user
-/// from pre-planting a symlink or world-writable file that herdr would write
+/// from pre-planting a symlink or world-writable file that shep would write
 /// and `ssh -F` would then read.
 fn private_ssh_config_dir() -> io::Result<PathBuf> {
     use std::os::unix::fs::DirBuilderExt;
@@ -1726,7 +1719,7 @@ fn private_ssh_config_dir() -> io::Result<PathBuf> {
     let mut last_error = None;
     for base in bases {
         for attempt in 0..100 {
-            let dir = base.join(format!("herdr-ssh-{}-{attempt}", std::process::id()));
+            let dir = base.join(format!("shep-ssh-{}-{attempt}", std::process::id()));
             if !fits_unix_socket_path(&dir.join(SSH_CONTROL_SOCKET_NAME)) {
                 continue;
             }
@@ -1744,7 +1737,7 @@ fn private_ssh_config_dir() -> io::Result<PathBuf> {
     Err(last_error.unwrap_or_else(|| {
         io::Error::new(
             io::ErrorKind::AlreadyExists,
-            "failed to create private herdr ssh config directory",
+            "failed to create private shep ssh config directory",
         )
     }))
 }
@@ -1752,7 +1745,7 @@ fn private_ssh_config_dir() -> io::Result<PathBuf> {
 /// Quotes a path for an ssh_config `Include` so a path containing spaces (or
 /// glob metacharacters) is treated as one literal token instead of being split
 /// or expanded by ssh — otherwise the user's config might not be Included and
-/// herdr's fallback would wrongly take effect.
+/// shep's fallback would wrongly take effect.
 fn ssh_config_quote(path: &str) -> String {
     format!("\"{path}\"")
 }
@@ -1762,7 +1755,7 @@ fn ssh_config_quote(path: &str) -> String {
 ///
 /// The file `Include`s the user's real ssh config first, so ssh's
 /// first-value-wins rule keeps any `ServerAlive*` the user set there (including
-/// an explicit `0` to disable it). Herdr's keepalive values apply only when
+/// an explicit `0` to disable it). Shep's keepalive values apply only when
 /// the user has none.
 fn write_managed_ssh_config() -> io::Result<ManagedSshConfig> {
     use std::os::unix::fs::OpenOptionsExt;
@@ -1805,7 +1798,7 @@ fn write_managed_ssh_config() -> io::Result<ManagedSshConfig> {
 fn bridge_connection(
     stream: UnixStream,
     target: &str,
-    remote_herdr: &RemoteHerdr,
+    remote_shep: &RemoteShep,
     session_name: &str,
     ssh_options: Option<&ManagedSshOptions>,
 ) -> io::Result<()> {
@@ -1814,7 +1807,7 @@ fn bridge_connection(
     command
         .arg("-T")
         .arg(target)
-        .arg(remote_bridge_command(remote_herdr, session_name));
+        .arg(remote_bridge_command(remote_shep, session_name));
     command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -1886,7 +1879,7 @@ fn run_client_process(
             crate::server::socket_paths::CLIENT_SOCKET_PATH_ENV_VAR,
             local_socket,
         )
-        .env("HERDR_RENDER_ENCODING", "terminal-ansi")
+        .env("SHEP_RENDER_ENCODING", "terminal-ansi")
         .env(REATTACH_COMMAND_ENV_VAR, reattach_command)
         .env(REMOTE_KEYBINDINGS_ENV_VAR, keybindings.as_str())
         .env_remove(crate::api::SOCKET_PATH_ENV_VAR)
@@ -1912,7 +1905,7 @@ fn local_forward_socket_path(target: &str, session_name: &str) -> PathBuf {
 
     let tmpdir = std::env::temp_dir();
     let readable = tmpdir.join(format!(
-        "herdr-remote-{pid}-{target_clean}-{session_clean}.sock"
+        "shep-remote-{pid}-{target_clean}-{session_clean}.sock"
     ));
     if fits_unix_socket_path(&readable) {
         return readable;
@@ -1926,7 +1919,7 @@ fn local_forward_socket_path(target: &str, session_name: &str) -> PathBuf {
     // the prefix is kept only for debuggability.
     let target_prefix: String = target_clean.chars().take(8).collect();
     let hash = short_socket_hash(target, session_name);
-    let short_name = format!("herdr-r-{pid}-{target_prefix}-{hash}.sock");
+    let short_name = format!("shep-r-{pid}-{target_prefix}-{hash}.sock");
     let short_in_tmp = tmpdir.join(&short_name);
     if fits_unix_socket_path(&short_in_tmp) {
         return short_in_tmp;
@@ -1976,16 +1969,16 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let socket = std::env::temp_dir().join(format!(
-            "herdr-bridge-permissions-test-{}.sock",
+            "shep-bridge-permissions-test-{}.sock",
             std::process::id()
         ));
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
         let bridge = SshStdioBridge::start(
             "example".to_string(),
-            remote_herdr,
+            remote_shep,
             socket.clone(),
             "default".to_string(),
             None,
@@ -2008,7 +2001,7 @@ mod tests {
         let control_path = managed_config.options.control_path.clone();
         let contents = std::fs::read_to_string(&path).expect("read keepalive config");
 
-        // herdr's fallback transport settings are present...
+        // shep's fallback transport settings are present...
         assert!(
             contents.contains("Host *"),
             "config should add a Host * fallback block: {contents}"
@@ -2037,7 +2030,7 @@ mod tests {
                 let fallback_at = contents.find("Host *").expect("fallback present");
                 assert!(
                     include_at < fallback_at,
-                    "user config must be Included before herdr's fallback: {contents}"
+                    "user config must be Included before shep's fallback: {contents}"
                 );
             }
         }
@@ -2119,13 +2112,13 @@ mod tests {
     #[test]
     fn extract_remote_args_removes_space_form() {
         let args = vec![
-            "herdr".into(),
+            "shep".into(),
             "--remote".into(),
             "dev".into(),
             "--help".into(),
         ];
         let (cleaned, remote) = extract_remote_args(&args).unwrap();
-        assert_eq!(cleaned, vec!["herdr", "--help"]);
+        assert_eq!(cleaned, vec!["shep", "--help"]);
         let remote = remote.unwrap();
         assert_eq!(remote.target, "dev");
         assert_eq!(remote.keybindings, RemoteKeybindings::Local);
@@ -2133,9 +2126,9 @@ mod tests {
 
     #[test]
     fn extract_remote_args_removes_equals_form() {
-        let args = vec!["herdr".into(), "--remote=user@host".into()];
+        let args = vec!["shep".into(), "--remote=user@host".into()];
         let (cleaned, remote) = extract_remote_args(&args).unwrap();
-        assert_eq!(cleaned, vec!["herdr"]);
+        assert_eq!(cleaned, vec!["shep"]);
         let remote = remote.unwrap();
         assert_eq!(remote.target, "user@host");
         assert_eq!(remote.keybindings, RemoteKeybindings::Local);
@@ -2144,13 +2137,13 @@ mod tests {
     #[test]
     fn extract_remote_args_accepts_remote_keybindings_server() {
         let args = vec![
-            "herdr".into(),
+            "shep".into(),
             "--remote".into(),
             "dev".into(),
             "--remote-keybindings=server".into(),
         ];
         let (cleaned, remote) = extract_remote_args(&args).unwrap();
-        assert_eq!(cleaned, vec!["herdr"]);
+        assert_eq!(cleaned, vec!["shep"]);
         let remote = remote.unwrap();
         assert_eq!(remote.target, "dev");
         assert_eq!(remote.keybindings, RemoteKeybindings::Server);
@@ -2159,23 +2152,23 @@ mod tests {
     #[test]
     fn extract_remote_args_accepts_remote_keybindings_space_form() {
         let args = vec![
-            "herdr".into(),
+            "shep".into(),
             "--remote=dev".into(),
             "--remote-keybindings".into(),
             "server".into(),
         ];
         let (cleaned, remote) = extract_remote_args(&args).unwrap();
-        assert_eq!(cleaned, vec!["herdr"]);
+        assert_eq!(cleaned, vec!["shep"]);
         assert_eq!(remote.unwrap().keybindings, RemoteKeybindings::Server);
     }
 
     #[test]
     fn extract_remote_args_accepts_explicit_handoff() {
-        let args = vec!["herdr".into(), "--remote=dev".into(), "--handoff".into()];
+        let args = vec!["shep".into(), "--remote=dev".into(), "--handoff".into()];
 
         let (cleaned, remote) = extract_remote_args(&args).unwrap();
 
-        assert_eq!(cleaned, vec!["herdr"]);
+        assert_eq!(cleaned, vec!["shep"]);
         let remote = remote.unwrap();
         assert_eq!(remote.target, "dev");
         assert!(remote.live_handoff);
@@ -2184,7 +2177,7 @@ mod tests {
     #[test]
     fn extract_remote_args_preserves_child_remote_options_after_separator() {
         let args = vec![
-            "herdr".into(),
+            "shep".into(),
             "agent".into(),
             "start".into(),
             "repro".into(),
@@ -2204,7 +2197,7 @@ mod tests {
 
     #[test]
     fn extract_remote_args_preserves_handoff_without_remote() {
-        let args = vec!["herdr".into(), "update".into(), "--handoff".into()];
+        let args = vec!["shep".into(), "update".into(), "--handoff".into()];
 
         let (cleaned, remote) = extract_remote_args(&args).unwrap();
 
@@ -2214,7 +2207,7 @@ mod tests {
 
     #[test]
     fn extract_remote_args_rejects_remote_keybindings_without_remote() {
-        let args = vec!["herdr".into(), "--remote-keybindings=server".into()];
+        let args = vec!["shep".into(), "--remote-keybindings=server".into()];
         let err = extract_remote_args(&args).unwrap_err();
         assert_eq!(err, "--remote-keybindings requires --remote");
     }
@@ -2222,7 +2215,7 @@ mod tests {
     #[test]
     fn extract_remote_args_rejects_duplicate_remote_keybindings() {
         let args = vec![
-            "herdr".into(),
+            "shep".into(),
             "--remote=dev".into(),
             "--remote-keybindings=local".into(),
             "--remote-keybindings=server".into(),
@@ -2233,32 +2226,28 @@ mod tests {
 
     #[test]
     fn extract_remote_args_requires_value() {
-        let args = vec!["herdr".into(), "--remote".into()];
+        let args = vec!["shep".into(), "--remote".into()];
         let err = extract_remote_args(&args).unwrap_err();
         assert_eq!(err, "missing value for --remote");
     }
 
     #[test]
     fn extract_remote_args_rejects_empty_value() {
-        let args = vec!["herdr".into(), "--remote=".into()];
+        let args = vec!["shep".into(), "--remote=".into()];
         let err = extract_remote_args(&args).unwrap_err();
         assert_eq!(err, "missing value for --remote");
     }
 
     #[test]
     fn extract_remote_args_rejects_duplicate_values() {
-        let args = vec![
-            "herdr".into(),
-            "--remote=dev".into(),
-            "--remote=prod".into(),
-        ];
+        let args = vec!["shep".into(), "--remote=dev".into(), "--remote=prod".into()];
         let err = extract_remote_args(&args).unwrap_err();
         assert_eq!(err, "--remote can only be specified once");
     }
 
     #[test]
     fn extract_remote_args_rejects_option_like_target() {
-        let args = vec!["herdr".into(), "--remote".into(), "-oProxyCommand=x".into()];
+        let args = vec!["shep".into(), "--remote".into(), "-oProxyCommand=x".into()];
         let err = extract_remote_args(&args).unwrap_err();
         assert_eq!(err, "--remote target must not start with '-'");
     }
@@ -2289,137 +2278,135 @@ mod tests {
     fn reattach_command_includes_remote_and_session() {
         assert_eq!(
             reattach_command(
-                "target/release/herdr",
+                "target/release/shep",
                 "user@host",
                 "work",
                 RemoteKeybindings::Local,
                 false,
             ),
-            "target/release/herdr --remote user@host --session work"
+            "target/release/shep --remote user@host --session work"
         );
         assert_eq!(
             reattach_command(
-                "herdr",
+                "shep",
                 "host name",
                 crate::session::DEFAULT_SESSION_NAME,
                 RemoteKeybindings::Local,
                 false,
             ),
-            "herdr --remote 'host name'"
+            "shep --remote 'host name'"
         );
         assert_eq!(
             reattach_command(
-                "herdr",
+                "shep",
                 "host",
                 crate::session::DEFAULT_SESSION_NAME,
                 RemoteKeybindings::Server,
                 false,
             ),
-            "herdr --remote host --remote-keybindings server"
+            "shep --remote host --remote-keybindings server"
         );
         assert_eq!(
             reattach_command(
-                "herdr",
+                "shep",
                 "host",
                 crate::session::DEFAULT_SESSION_NAME,
                 RemoteKeybindings::Local,
                 true,
             ),
-            "herdr --remote host --handoff"
+            "shep --remote host --handoff"
         );
     }
 
     #[test]
     fn remote_bridge_command_uses_installed_binary() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
         assert_eq!(
-            remote_bridge_command(&remote_herdr, crate::session::DEFAULT_SESSION_NAME),
-            "exec \"$HOME/.local/bin/herdr\" remote-client-bridge"
+            remote_bridge_command(&remote_shep, crate::session::DEFAULT_SESSION_NAME),
+            "exec \"$HOME/.local/bin/shep\" remote-client-bridge"
         );
     }
 
     #[test]
     fn remote_path_discovery_uses_path_binary() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
-        let remote_herdr = remote_herdr_from_path_discovery(&remote_herdr, "/usr/bin/herdr\n")
-            .expect("path binary");
+        let remote_shep =
+            remote_shep_from_path_discovery(&remote_shep, "/usr/bin/shep\n").expect("path binary");
 
         assert_eq!(
-            remote_bridge_command(&remote_herdr, crate::session::DEFAULT_SESSION_NAME),
-            "exec /usr/bin/herdr remote-client-bridge"
+            remote_bridge_command(&remote_shep, crate::session::DEFAULT_SESSION_NAME),
+            "exec /usr/bin/shep remote-client-bridge"
         );
     }
 
     #[test]
     fn remote_path_discovery_quotes_discovered_binary() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
-        let remote_herdr =
-            remote_herdr_from_path_discovery(&remote_herdr, "/opt/herdr bin/herdr\n")
-                .expect("path binary");
+        let remote_shep = remote_shep_from_path_discovery(&remote_shep, "/opt/shep bin/shep\n")
+            .expect("path binary");
 
         assert_eq!(
-            remote_bridge_command(&remote_herdr, crate::session::DEFAULT_SESSION_NAME),
-            "exec '/opt/herdr bin/herdr' remote-client-bridge"
+            remote_bridge_command(&remote_shep, crate::session::DEFAULT_SESSION_NAME),
+            "exec '/opt/shep bin/shep' remote-client-bridge"
         );
     }
 
     #[test]
     fn remote_path_discovery_uses_macos_path_binary() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "macos",
             arch: "aarch64",
         });
-        let remote_herdr =
-            remote_herdr_from_path_discovery(&remote_herdr, "/opt/homebrew/bin/herdr\n")
-                .expect("path binary");
+        let remote_shep = remote_shep_from_path_discovery(&remote_shep, "/opt/homebrew/bin/shep\n")
+            .expect("path binary");
 
         assert_eq!(
-            remote_bridge_command(&remote_herdr, crate::session::DEFAULT_SESSION_NAME),
-            "exec /opt/homebrew/bin/herdr remote-client-bridge"
+            remote_bridge_command(&remote_shep, crate::session::DEFAULT_SESSION_NAME),
+            "exec /opt/homebrew/bin/shep remote-client-bridge"
         );
-        assert_eq!(remote_herdr.platform.asset_key(), "macos-aarch64");
+        assert_eq!(remote_shep.platform.asset_key(), "macos-aarch64");
     }
 
     #[test]
     fn remote_path_discovery_reads_multiple_absolute_paths() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
-        let candidates = remote_herdrs_from_path_discovery(
-            &remote_herdr,
-            "/usr/bin/herdr\nbin/herdr\n /opt/herdr bin/herdr\n",
+        let candidates = remote_sheps_from_path_discovery(
+            &remote_shep,
+            "/usr/bin/shep\nbin/shep\n /opt/shep bin/shep\n",
         );
 
         assert_eq!(candidates.len(), 2);
-        assert_eq!(candidates[0].shell_path, "/usr/bin/herdr");
-        assert_eq!(candidates[1].shell_path, "'/opt/herdr bin/herdr'");
+        assert_eq!(candidates[0].shell_path, "/usr/bin/shep");
+        assert_eq!(candidates[1].shell_path, "'/opt/shep bin/shep'");
     }
 
     #[test]
     fn remote_path_discovery_ignores_mise_shims() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
-        let candidates = remote_herdrs_from_path_discovery(
-            &remote_herdr,
-            "/home/can/.local/share/mise/shims/herdr\n/home/can/.local/share/mise/installs/herdr/0.7.1/bin/herdr\n",
+        let candidates = remote_sheps_from_path_discovery(
+            &remote_shep,
+            "/home/can/.local/share/mise/shims/shep\n/home/can/.local/share/mise/installs/shep/0.7.1/bin/shep\n",
         );
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(
             candidates[0].shell_path,
-            "/home/can/.local/share/mise/installs/herdr/0.7.1/bin/herdr"
+            "/home/can/.local/share/mise/installs/shep/0.7.1/bin/shep"
         );
     }
 
@@ -2430,20 +2417,18 @@ mod tests {
             arch: "x86_64",
         });
 
-        assert!(script.contains("emit \"$home/.local/bin/herdr\""));
-        assert!(!script.contains("mise/shims/herdr"));
+        assert!(script.contains("emit \"$home/.local/bin/shep\""));
+        assert!(!script.contains("mise/shims/shep"));
         assert!(script.contains(&format!("version={}", shell_quote(&current_version()))));
-        assert!(
-            script.contains("emit \"$home/.local/share/mise/installs/herdr/$version/bin/herdr\"")
-        );
+        assert!(script.contains("emit \"$home/.local/share/mise/installs/shep/$version/bin/shep\""));
         assert!(script.contains(
-            "emit \"$home/.local/share/mise/installs/github-ogulcancelik-herdr/$version/herdr\""
+            "emit \"$home/.local/share/mise/installs/github-ogulcancelik-shep/$version/shep\""
         ));
-        assert!(script.contains("emit \"$home/.nix-profile/bin/herdr\""));
-        assert!(script.contains("emit \"/etc/profiles/per-user/$user/bin/herdr\""));
-        assert!(script.contains("emit \"/run/current-system/sw/bin/herdr\""));
-        assert!(script.contains("emit \"/home/linuxbrew/.linuxbrew/bin/herdr\""));
-        assert!(!script.contains("emit \"/opt/homebrew/bin/herdr\""));
+        assert!(script.contains("emit \"$home/.nix-profile/bin/shep\""));
+        assert!(script.contains("emit \"/etc/profiles/per-user/$user/bin/shep\""));
+        assert!(script.contains("emit \"/run/current-system/sw/bin/shep\""));
+        assert!(script.contains("emit \"/home/linuxbrew/.linuxbrew/bin/shep\""));
+        assert!(!script.contains("emit \"/opt/homebrew/bin/shep\""));
     }
 
     #[test]
@@ -2453,59 +2438,58 @@ mod tests {
             arch: "aarch64",
         });
 
-        assert!(script.contains("emit \"/opt/homebrew/bin/herdr\""));
-        assert!(script.contains("emit \"/usr/local/bin/herdr\""));
-        assert!(!script.contains("emit \"/home/linuxbrew/.linuxbrew/bin/herdr\""));
+        assert!(script.contains("emit \"/opt/homebrew/bin/shep\""));
+        assert!(script.contains("emit \"/usr/local/bin/shep\""));
+        assert!(!script.contains("emit \"/home/linuxbrew/.linuxbrew/bin/shep\""));
     }
 
     #[test]
     fn remote_path_discovery_quotes_single_quotes_in_discovered_binary() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
-        let remote_herdr =
-            remote_herdr_from_path_discovery(&remote_herdr, "/opt/herdr's/bin/herdr\n")
-                .expect("path binary");
+        let remote_shep = remote_shep_from_path_discovery(&remote_shep, "/opt/shep's/bin/shep\n")
+            .expect("path binary");
 
         assert_eq!(
-            remote_bridge_command(&remote_herdr, crate::session::DEFAULT_SESSION_NAME),
-            "exec '/opt/herdr'\\''s/bin/herdr' remote-client-bridge"
+            remote_bridge_command(&remote_shep, crate::session::DEFAULT_SESSION_NAME),
+            "exec '/opt/shep'\\''s/bin/shep' remote-client-bridge"
         );
     }
 
     #[test]
     fn remote_path_discovery_ignores_relative_paths() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
-        let remote_herdr = remote_herdr_from_path_discovery(&remote_herdr, "bin/herdr\n");
+        let remote_shep = remote_shep_from_path_discovery(&remote_shep, "bin/shep\n");
 
-        assert!(remote_herdr.is_none());
+        assert!(remote_shep.is_none());
     }
 
     #[test]
     fn remote_path_discovery_ignores_empty_output() {
-        let remote_herdr = RemoteHerdr::for_platform(RemotePlatform {
+        let remote_shep = RemoteShep::for_platform(RemotePlatform {
             os: "linux",
             arch: "x86_64",
         });
-        let remote_herdr = remote_herdr_from_path_discovery(&remote_herdr, "\n");
+        let remote_shep = remote_shep_from_path_discovery(&remote_shep, "\n");
 
-        assert!(remote_herdr.is_none());
+        assert!(remote_shep.is_none());
     }
 
     #[test]
     fn remote_shell_path_warning_accepts_managed_install() {
         assert!(remote_shell_resolves_managed_install(
-            "/home/can/.local/bin/herdr\n"
+            "/home/can/.local/bin/shep\n"
         ));
         assert!(remote_shell_resolves_managed_install(
-            "/Users/can/.local/bin/herdr\n"
+            "/Users/can/.local/bin/shep\n"
         ));
         assert!(!remote_shell_resolves_managed_install(
-            "/usr/local/bin/herdr\n"
+            "/usr/local/bin/shep\n"
         ));
         assert!(!remote_shell_resolves_managed_install(""));
     }
@@ -2513,7 +2497,7 @@ mod tests {
     #[test]
     fn parse_client_status_json_reads_protocol() {
         assert_eq!(
-            parse_client_status_json(r#"{"version":"x","protocol":8,"binary":"/bin/herdr"}"#)
+            parse_client_status_json(r#"{"version":"x","protocol":8,"binary":"/bin/shep"}"#)
                 .map(|status| status.protocol),
             Some(8)
         );
@@ -2872,8 +2856,8 @@ mod tests {
             arch: "aarch64",
         };
         assert_eq!(
-            install_source_description_for(&platform, Some(Path::new("/tmp/herdr-aarch64")), false),
-            "HERDR_REMOTE_BINARY (/tmp/herdr-aarch64)"
+            install_source_description_for(&platform, Some(Path::new("/tmp/shep-aarch64")), false),
+            "SHEP_REMOTE_BINARY (/tmp/shep-aarch64)"
         );
     }
 
@@ -2883,7 +2867,7 @@ mod tests {
 
         assert_eq!(
             install_source_description_for(&platform, None, true),
-            "the current local herdr binary"
+            "the current local shep binary"
         );
     }
 
@@ -2908,9 +2892,9 @@ mod tests {
             os: "linux",
             arch: "aarch64",
         };
-        let source = resolve_install_source(&platform, Some(PathBuf::from("/tmp/herdr-aarch64")))
+        let source = resolve_install_source(&platform, Some(PathBuf::from("/tmp/shep-aarch64")))
             .expect("override source");
-        assert_eq!(source.path, PathBuf::from("/tmp/herdr-aarch64"));
+        assert_eq!(source.path, PathBuf::from("/tmp/shep-aarch64"));
         assert!(source.temporary_dir.is_none());
     }
 
@@ -2936,7 +2920,7 @@ mod tests {
             .unwrap_or("")
             .to_string();
         assert!(
-            filename.starts_with("herdr-remote-"),
+            filename.starts_with("shep-remote-"),
             "expected readable name, got {filename}"
         );
         assert!(filename.contains("-dev-default."), "got {filename}");
@@ -2993,7 +2977,7 @@ mod tests {
         assert!(fits, "fallback path still overflows: {}", path.display());
         assert_eq!(parent.as_deref(), Some(Path::new("/tmp")));
         assert!(
-            filename.starts_with("herdr-r-"),
+            filename.starts_with("shep-r-"),
             "expected hashed fallback, got {filename}"
         );
     }
@@ -3001,12 +2985,12 @@ mod tests {
     #[test]
     fn install_source_cleanup_removes_temporary_directory() {
         let dir = std::env::temp_dir().join(format!(
-            "herdr-install-source-cleanup-test-{}",
+            "shep-install-source-cleanup-test-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir(&dir).expect("create temp dir");
-        let path = dir.join("herdr.tmp");
+        let path = dir.join("shep.tmp");
         fs::write(&path, b"test").expect("write temp file");
 
         InstallSource::temporary(path, dir.clone()).cleanup();

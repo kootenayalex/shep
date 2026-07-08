@@ -1,5 +1,5 @@
 [package]
-name = "herdr"
+name = "shep"
 version = "0.7.3"
 edition = "2021"
 build = "build.rs"
@@ -12,7 +12,7 @@ categories = ["command-line-utilities"]
 include = [
     "src/**/*",
     "assets/sounds/*",
-    "docs/next/api/herdr-api.schema.json",
+    "docs/next/api/shep-api.schema.json",
     "README.md",
     "LICENSE",
     "Cargo.toml",

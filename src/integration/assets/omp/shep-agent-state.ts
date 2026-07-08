@@ -1,19 +1,19 @@
-// installed by herdr
-// managed by herdr; reinstalling or updating the integration overwrites this file.
+// installed by shep
+// managed by shep; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
-// HERDR_INTEGRATION_ID=omp
-// HERDR_INTEGRATION_VERSION=4
+// SHEP_INTEGRATION_ID=omp
+// SHEP_INTEGRATION_VERSION=4
 // @ts-nocheck
 
 import { createConnection } from "node:net";
 
-const HERDR_ENV = process.env.HERDR_ENV;
-const socketPath = process.env.HERDR_SOCKET_PATH;
-const paneId = process.env.HERDR_PANE_ID;
-const source = "herdr:omp";
+const SHEP_ENV = process.env.SHEP_ENV;
+const socketPath = process.env.SHEP_SOCKET_PATH;
+const paneId = process.env.SHEP_PANE_ID;
+const source = "shep:omp";
 
 function enabled() {
-  return HERDR_ENV === "1" && !!socketPath && !!paneId;
+  return SHEP_ENV === "1" && !!socketPath && !!paneId;
 }
 
 let requestQueue = Promise.resolve();
@@ -58,8 +58,8 @@ type QueuedState = {
   seq: number;
 };
 
-const idleDebounceMs = parseDurationEnv("HERDR_OMP_IDLE_DEBOUNCE_MS", 250);
-const retryGraceMs = parseDurationEnv("HERDR_OMP_RETRY_GRACE_MS", 2500);
+const idleDebounceMs = parseDurationEnv("SHEP_OMP_IDLE_DEBOUNCE_MS", 250);
+const retryGraceMs = parseDurationEnv("SHEP_OMP_RETRY_GRACE_MS", 2500);
 const retryableErrorPattern =
   /overloaded|provider.?returned.?error|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|internal.?error|network.?error|connection.?error|connection.?refused|connection.?lost|websocket.?closed|websocket.?error|other side closed|fetch failed|upstream.?connect|reset before headers|socket hang up|ended without|http2 request did not get a response|timed? out|timeout|terminated|retry delay/i;
 let reportSeq = Date.now() * 1000;
@@ -173,7 +173,7 @@ function shouldReleaseOnSessionShutdown(event: any): boolean {
   // such as /reload, /new, /resume, and /fork. Those do not mean the pane's
   // agent process has exited, and releasing hook authority there can suppress
   // legitimate reports from the replacement runtime. Only a user/process quit
-  // should release Herdr's full-lifecycle authority.
+  // should release Shep's full-lifecycle authority.
   const reason = event?.reason;
   return reason === "quit";
 }
@@ -359,7 +359,7 @@ export default function (pi) {
     publishState();
   }
 
-  pi.events.on("herdr:blocked", (data) => {
+  pi.events.on("shep:blocked", (data) => {
     if (!rootSession) {
       return;
     }

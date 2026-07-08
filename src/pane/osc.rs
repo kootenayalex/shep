@@ -664,7 +664,7 @@ impl Default for OscDebugTracker {
 }
 
 fn osc_debug_enabled_from_env() -> bool {
-    std::env::var("HERDR_DEBUG_OSC_EVIDENCE")
+    std::env::var("SHEP_DEBUG_OSC_EVIDENCE")
         .map(|value| {
             matches!(
                 value.trim().to_ascii_lowercase().as_str(),
@@ -760,7 +760,7 @@ fn hex_value(byte: u8) -> Option<u8> {
 }
 
 /// Accepts `52;c;<base64>` and `52;;<base64>`.
-/// Queries (`?`) are rejected because herdr has no reply path.
+/// Queries (`?`) are rejected because shep has no reply path.
 /// The payload must decode as base64 before it is forwarded.
 fn parse_osc52_clipboard_write(body: &[u8]) -> Option<Vec<u8>> {
     use base64::Engine;
@@ -834,7 +834,7 @@ pub(super) fn maybe_filter_primary_screen_scrollback_clear<'a>(
     foreground_job: Option<&crate::platform::ForegroundJob>,
 ) -> Cow<'a, [u8]> {
     // Droid redraws its primary-screen TUI with CSI 3 J, which erases pane
-    // scrollback inside herdr. Keep the hack scoped to Droid on the primary
+    // scrollback inside shep. Keep the hack scoped to Droid on the primary
     // screen so normal terminal clear-history behavior still works elsewhere.
     if alternate_screen
         || !contains_scrollback_clear_sequence(bytes)
@@ -1035,13 +1035,13 @@ mod tests {
     fn cwd_osc_tracker_detects_split_osc7_sequence() {
         let mut tracker = CwdOscTracker::default();
 
-        tracker.observe(b"\x1b]7;file:///tmp/herdr%20repo");
+        tracker.observe(b"\x1b]7;file:///tmp/shep%20repo");
         assert_eq!(tracker.drain_latest(), None);
         tracker.observe(b"\x07");
 
         assert_eq!(
             tracker.drain_latest(),
-            Some(std::path::PathBuf::from("/tmp/herdr repo"))
+            Some(std::path::PathBuf::from("/tmp/shep repo"))
         );
     }
 
@@ -1049,16 +1049,16 @@ mod tests {
     fn cwd_osc_tracker_detects_windows_terminal_cwd_sequence() {
         let mut tracker = CwdOscTracker::default();
 
-        tracker.observe(b"\x1b]9;9;C:\\Users\\herdr\\src\\herdr\x1b\\");
+        tracker.observe(b"\x1b]9;9;C:\\Users\\shep\\src\\shep\x1b\\");
 
         assert_eq!(
             tracker.drain_latest(),
-            Some(std::path::PathBuf::from("C:\\Users\\herdr\\src\\herdr"))
+            Some(std::path::PathBuf::from("C:\\Users\\shep\\src\\shep"))
         );
     }
 
     // The quoted form is what Windows Terminal's documented shell integration
-    // snippet emits. Herdr's own injected prompt integration deliberately
+    // snippet emits. Shep's own injected prompt integration deliberately
     // emits the path unquoted; see WINDOWS_POWERSHELL_SHELL_INTEGRATION_COMMAND.
     #[test]
     fn cwd_osc_tracker_detects_quoted_powershell_prompt_cwd_sequence() {

@@ -1223,7 +1223,7 @@ pub struct ToastNotification {
     pub kind: ToastKind,
     pub title: String,
     pub context: String,
-    pub position: Option<crate::config::ToastHerdrPosition>,
+    pub position: Option<crate::config::ToastShepPosition>,
     pub target: Option<ToastTarget>,
 }
 
@@ -1362,7 +1362,7 @@ pub struct AppState {
     pub toast: Option<ToastNotification>,
     pub pending_agent_notifications: std::collections::HashMap<PaneId, PendingAgentNotification>,
     pub copy_feedback: Option<CopyFeedback>,
-    /// Last reported focus state for the outer terminal hosting herdr.
+    /// Last reported focus state for the outer terminal hosting shep.
     /// None means unsupported or not yet reported, which preserves active-pane suppression.
     pub outer_terminal_focus: Option<bool>,
     // Config
@@ -1381,7 +1381,7 @@ pub struct AppState {
     pub sidebar_section_split: f32,
     pub agent_panel_sort: AgentPanelSort,
     pub next_agent_state_change_seq: u64,
-    /// Capture mouse input for Herdr's own mouse UI. When false, Herdr only
+    /// Capture mouse input for Shep's own mouse UI. When false, Shep only
     /// captures mouse while the focused pane app requests mouse reporting.
     pub mouse_capture: bool,
     pub right_click_passthrough_modifiers: Option<KeyModifiers>,
@@ -1442,7 +1442,7 @@ pub struct AppState {
     pub agent_manifest_update_status: crate::detect::manifest_update::ManifestUpdateStatus,
     /// Result messages from the latest integration install action.
     pub integration_install_messages: Vec<String>,
-    /// Installed or linked plugins known to this running Herdr instance.
+    /// Installed or linked plugins known to this running Shep instance.
     pub(crate) installed_plugins: InstalledPluginRegistry,
     /// Pane ids opened through the plugin pane API.
     pub(crate) plugin_panes: std::collections::HashMap<PaneId, PluginPaneRecord>,
@@ -1681,7 +1681,7 @@ impl AppState {
             worktree_create: None,
             worktree_open: None,
             worktree_remove: None,
-            worktree_directory: std::path::PathBuf::from("/tmp/herdr-worktrees"),
+            worktree_directory: std::path::PathBuf::from("/tmp/shep-worktrees"),
             collapsed_space_keys: std::collections::HashSet::new(),
             request_complete_onboarding: false,
             name_input: String::new(),
@@ -1719,7 +1719,7 @@ impl AppState {
             selection_autoscroll: None,
             context_menu: None,
             update_available: None,
-            update_install_command: "herdr update".into(),
+            update_install_command: "shep update".into(),
             latest_release_notes_available: false,
             update_dismissed: false,
             config_diagnostic: None,

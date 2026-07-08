@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const originalEnvironment = {
-  HERDR_ENV: process.env.HERDR_ENV,
-  HERDR_PANE_ID: process.env.HERDR_PANE_ID,
-  HERDR_SOCKET_PATH: process.env.HERDR_SOCKET_PATH,
+  SHEP_ENV: process.env.SHEP_ENV,
+  SHEP_PANE_ID: process.env.SHEP_PANE_ID,
+  SHEP_SOCKET_PATH: process.env.SHEP_SOCKET_PATH,
 };
 
 let server: Server | undefined;
@@ -39,8 +39,8 @@ afterEach(async () => {
 });
 
 const integrations = [
-  { name: "Pi", modulePath: "./pi/herdr-agent-state.ts" },
-  { name: "Oh My Pi", modulePath: "./omp/herdr-agent-state.ts" },
+  { name: "Pi", modulePath: "./pi/shep-agent-state.ts" },
+  { name: "Oh My Pi", modulePath: "./omp/shep-agent-state.ts" },
 ] as const;
 
 function importFresh(modulePath: string) {
@@ -52,7 +52,7 @@ for (const integration of integrations) {
   test(`${integration.name} reload preserves working state when the agent is active`, async () => {
     const recordingSocketPath = join(
       tmpdir(),
-      `herdr-${integration.name.toLowerCase().replaceAll(" ", "-")}-${process.pid}.sock`,
+      `shep-${integration.name.toLowerCase().replaceAll(" ", "-")}-${process.pid}.sock`,
     );
     socketPath = recordingSocketPath;
     await rm(recordingSocketPath, { force: true });
@@ -77,9 +77,9 @@ for (const integration of integrations) {
       recordingServer.listen(recordingSocketPath, resolve);
     });
 
-    process.env.HERDR_ENV = "1";
-    process.env.HERDR_SOCKET_PATH = recordingSocketPath;
-    process.env.HERDR_PANE_ID = "test:p1";
+    process.env.SHEP_ENV = "1";
+    process.env.SHEP_SOCKET_PATH = recordingSocketPath;
+    process.env.SHEP_PANE_ID = "test:p1";
 
     type Handler = (event: unknown, context: unknown) => unknown;
     const handlers = new Map<string, Handler>();
@@ -134,7 +134,7 @@ for (const integration of integrations) {
 }
 
 test("Pi retries working state after an unanswered socket attempt", async () => {
-  const recordingSocketPath = join(tmpdir(), `herdr-pi-retry-${process.pid}.sock`);
+  const recordingSocketPath = join(tmpdir(), `shep-pi-retry-${process.pid}.sock`);
   socketPath = recordingSocketPath;
   await rm(recordingSocketPath, { force: true });
 
@@ -167,9 +167,9 @@ test("Pi retries working state after an unanswered socket attempt", async () => 
     recordingServer.listen(recordingSocketPath, resolve);
   });
 
-  process.env.HERDR_ENV = "1";
-  process.env.HERDR_SOCKET_PATH = recordingSocketPath;
-  process.env.HERDR_PANE_ID = "test:p1";
+  process.env.SHEP_ENV = "1";
+  process.env.SHEP_SOCKET_PATH = recordingSocketPath;
+  process.env.SHEP_PANE_ID = "test:p1";
 
   type Handler = (event: unknown, context: unknown) => unknown;
   const handlers = new Map<string, Handler>();
@@ -184,7 +184,7 @@ test("Pi retries working state after an unanswered socket attempt", async () => 
     },
   };
 
-  const { default: install } = await importFresh("./pi/herdr-agent-state.ts");
+  const { default: install } = await importFresh("./pi/shep-agent-state.ts");
   install(pi);
 
   const sessionStart = handlers.get("session_start");

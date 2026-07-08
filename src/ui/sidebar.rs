@@ -1332,7 +1332,7 @@ mod tests {
     #[tokio::test]
     async fn all_workspaces_agent_panel_entries_use_live_root_runtime_cwd_for_workspace_label() {
         let unique = format!(
-            "herdr-agent-panel-runtime-cwd-{}-{}",
+            "shep-agent-panel-runtime-cwd-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -1341,7 +1341,7 @@ mod tests {
         );
         let root = std::env::temp_dir().join(unique);
         let stale_cwd = root.join("issue-264-nix-support");
-        let live_cwd = root.join("herdr");
+        let live_cwd = root.join("shep");
         std::fs::create_dir_all(stale_cwd.join(".git")).unwrap();
         std::fs::create_dir_all(live_cwd.join(".git")).unwrap();
 
@@ -1393,7 +1393,7 @@ mod tests {
         }
         let _ = std::fs::remove_dir_all(root);
 
-        assert_eq!(primary_label, "herdr");
+        assert_eq!(primary_label, "shep");
     }
 
     #[test]
@@ -1470,7 +1470,7 @@ mod tests {
     #[test]
     fn grouped_child_label_uses_short_branch_for_auto_named_workspace() {
         assert_eq!(
-            grouped_child_display_label("herdr-issue", Some("worktree/issue-137"), false),
+            grouped_child_display_label("shep-issue", Some("worktree/issue-137"), false),
             "issue-137"
         );
     }
@@ -1509,8 +1509,8 @@ mod tests {
         if let Some(key) = key {
             ws.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
                 key: key.into(),
-                label: "herdr".into(),
-                repo_root: std::path::PathBuf::from("/repo/herdr"),
+                label: "shep".into(),
+                repo_root: std::path::PathBuf::from("/repo/shep"),
                 checkout_path: std::path::PathBuf::from(checkout_key),
                 is_linked_worktree: name != "main",
             });
@@ -1523,7 +1523,7 @@ mod tests {
         ws.cached_git_space = Some(crate::workspace::GitSpaceMetadata {
             key: key.into(),
             checkout_key: format!("/repo/{name}"),
-            label: "herdr".into(),
+            label: "shep".into(),
             repo_root: std::path::PathBuf::from(format!("/repo/{name}")),
             is_linked_worktree: false,
         });
@@ -1534,8 +1534,8 @@ mod tests {
     fn parent_workspace_row_stays_clickable_when_grouped() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
         ];
 
         let (cards, headers) = compute_workspace_list_areas(&app, Rect::new(0, 0, 30, 20));
@@ -1552,8 +1552,8 @@ mod tests {
     fn linked_only_worktree_members_do_not_form_parentless_group() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
-            workspace_with_worktree_space("review", Some("repo-key"), "/repo/herdr-review"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
+            workspace_with_worktree_space("review", Some("repo-key"), "/repo/shep-review"),
         ];
 
         let entries = workspace_list_entries(&app);
@@ -1577,9 +1577,9 @@ mod tests {
     fn compact_space_group_scroll_offset_can_start_inside_group() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
-            workspace_with_worktree_space("one", Some("repo-key"), "/repo/herdr-one"),
-            workspace_with_worktree_space("two", Some("repo-key"), "/repo/herdr-two"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
+            workspace_with_worktree_space("one", Some("repo-key"), "/repo/shep-one"),
+            workspace_with_worktree_space("two", Some("repo-key"), "/repo/shep-two"),
         ];
         let area = Rect::new(0, 0, 30, 20);
         app.workspace_scroll = normalized_workspace_scroll(&app, area, 2);
@@ -1595,8 +1595,8 @@ mod tests {
     fn workspace_scroll_metrics_count_display_entries_not_raw_workspaces() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
             Workspace::test_new("notes"),
         ];
         app.collapsed_space_keys.insert("repo-key".into());
@@ -1615,8 +1615,8 @@ mod tests {
     fn workspace_scroll_offset_applies_to_group_children() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
             Workspace::test_new("notes"),
         ];
         app.collapsed_space_keys.insert("repo-key".into());
@@ -1635,8 +1635,8 @@ mod tests {
     fn workspace_list_entries_group_multiple_workspaces_in_same_git_space() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
         ];
 
         assert_eq!(
@@ -1658,9 +1658,9 @@ mod tests {
     fn workspace_list_entries_group_non_contiguous_explicit_members() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
             workspace_with_git_space("normal", "other-key"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
         ];
 
         assert_eq!(
@@ -1709,9 +1709,9 @@ mod tests {
     fn workspace_list_entries_do_not_auto_attach_normal_git_workspace_to_group() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
             workspace_with_git_space("scratch", "repo-key"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
         ];
 
         assert_eq!(
@@ -1760,8 +1760,8 @@ mod tests {
     fn collapsed_group_hides_inactive_children_but_keeps_active_visible() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
         ];
         app.active = Some(1);
         app.mode = Mode::Terminal;
@@ -1796,8 +1796,8 @@ mod tests {
     fn collapsed_group_keeps_selected_child_visible_in_navigate_mode() {
         let mut app = AppState::test_new();
         app.workspaces = vec![
-            workspace_with_worktree_space("main", Some("repo-key"), "/repo/herdr"),
-            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/herdr-issue"),
+            workspace_with_worktree_space("main", Some("repo-key"), "/repo/shep"),
+            workspace_with_worktree_space("issue", Some("repo-key"), "/repo/shep-issue"),
         ];
         app.mode = Mode::Navigate;
         app.selected = 1;
