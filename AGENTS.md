@@ -1,8 +1,26 @@
-# herdr
+# shep
 
-Terminal based agent runtime for coding agents.
+Terminal ADE (agentic development environment) for coding agents — Alex's
+deliberately-diverged fork of [herdr](https://github.com/ogulcancelik/herdr)
+(upstream `ogulcancelik/herdr`, forked at 552aa8c / v0.7.3, AGPL-3.0).
 
-## Scope and Audience
+## Fork scope — read first
+
+- Roadmap and architecture: `docs/VISION.md`. macOS build gotchas (zig/Xcode 26
+  SDK, leaked `HERDR_*` test env): `docs/BUILD-macos.md`.
+- Trunk is `master`; land and push there (origin dual-pushes github + gitea).
+- Env contract is `SHEP_*` with legacy `HERDR_*` fallback via `src/env_compat.rs`
+  — read through it, dual-write to children, scrub BOTH prefixes in tests.
+- Binary self-update and remote manifest auto-update are disabled (no shep
+  release channel); don't re-enable against herdr.dev.
+- The upstream sections below marked maintainer-only, Local Can Machine, release
+  channels, and the external contributor guardrail are LEGACY UPSTREAM CONTEXT —
+  skip them. The Universal Project Rules, testing, detection, vendoring, and
+  code-convention sections still apply.
+- Commit style: lowercase conventional subjects (kept from upstream); session
+  trailers per Alex's harness conventions are fine here.
+
+## Scope and Audience (upstream, legacy)
 
 These instructions are layered.
 
