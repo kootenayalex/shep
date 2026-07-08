@@ -21,3 +21,6 @@ __pycache__/
 
 /.wrangler/
 **/.wrangler/
+!/docs/VISION.md
+!/docs/reference/
+!/docs/reference/**
