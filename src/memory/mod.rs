@@ -11,6 +11,7 @@
 
 pub(crate) mod bridges;
 pub(crate) mod core;
+pub(crate) mod history;
 pub(crate) mod reflect;
 
 use std::io;

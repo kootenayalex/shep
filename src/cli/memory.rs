@@ -50,6 +50,13 @@ enum Command {
     /// claude-code Stop-hook plumbing (reads hook JSON from stdin). Hidden from
     /// the main help; wired by `shep memory init`.
     ReflectHook,
+    /// Lifecycle-hook plumbing: record one hook payload (stdin JSON) into the
+    /// FTS5 history sidecar. Wired by `shep memory init`.
+    IngestEvent,
+    Search {
+        query: String,
+        limit: usize,
+    },
 }
 
 pub(super) fn run_memory_command(args: &[String]) -> std::io::Result<i32> {
@@ -129,6 +136,23 @@ fn parse(args: &[String]) -> Result<Option<Command>, String> {
             flags.expect_positionals(0)?;
             Ok(Some(Command::ReflectHook))
         }
+        "ingest-event" => {
+            let flags = Flags::parse(rest)?;
+            flags.reject_user("ingest-event")?;
+            flags.expect_positionals(0)?;
+            Ok(Some(Command::IngestEvent))
+        }
+        "search" => {
+            let flags = Flags::parse(rest)?;
+            flags.reject_user("search")?;
+            if flags.positionals.is_empty() {
+                return Err("search needs a query".to_string());
+            }
+            Ok(Some(Command::Search {
+                query: flags.positionals.join(" "),
+                limit: flags.limit.unwrap_or(20),
+            }))
+        }
         other => Err(format!("unknown memory subcommand: {other}")),
     }
 }
@@ -138,6 +162,7 @@ fn parse(args: &[String]) -> Result<Option<Command>, String> {
 struct Flags<'a> {
     user: bool,
     repo: Option<PathBuf>,
+    limit: Option<usize>,
     positionals: Vec<&'a str>,
 }
 
@@ -145,6 +170,7 @@ impl<'a> Flags<'a> {
     fn parse(args: &'a [String]) -> Result<Self, String> {
         let mut user = false;
         let mut repo = None;
+        let mut limit = None;
         let mut positionals = Vec::new();
         let mut index = 0;
         while index < args.len() {
@@ -160,6 +186,17 @@ impl<'a> Flags<'a> {
                     repo = Some(PathBuf::from(value));
                     index += 2;
                 }
+                "--limit" => {
+                    let value = args
+                        .get(index + 1)
+                        .ok_or_else(|| "missing value for --limit".to_string())?;
+                    limit = Some(
+                        value
+                            .parse::<usize>()
+                            .map_err(|_| format!("invalid --limit: {value}"))?,
+                    );
+                    index += 2;
+                }
                 flag if flag.starts_with("--") => {
                     return Err(format!("unknown option: {flag}"));
                 }
@@ -172,6 +209,7 @@ impl<'a> Flags<'a> {
         Ok(Flags {
             user,
             repo,
+            limit,
             positionals,
         })
     }
@@ -217,6 +255,82 @@ fn execute(command: Command) -> std::io::Result<i32> {
         Command::Status { repo } => status(repo),
         Command::Init { repo } => init(repo),
         Command::ReflectHook => Ok(memory::reflect::run_reflect_hook()),
+        Command::IngestEvent => Ok(memory::history::run_ingest_event()),
+        Command::Search { query, limit } => search(&query, limit),
+    }
+}
+
+/// `shep memory search`: substring hits from the two memory files, then FTS5
+/// hits from the session-history sidecar (most recent first).
+fn search(query: &str, limit: usize) -> std::io::Result<i32> {
+    let needle = query.to_lowercase();
+    let mut memory_hits = Vec::new();
+    let user_path = memory::user_memory_path();
+    if let Ok(doc) = memory::load_or_create(&user_path, MemoryKind::User) {
+        for entry in doc.entries() {
+            if entry.to_lowercase().contains(&needle) {
+                memory_hits.push(format!("user  {entry}"));
+            }
+        }
+    }
+    // Outside a repo there is simply no repo memory to scan.
+    if let Ok(root) = memory::resolve_repo_root(None) {
+        let repo_path = memory::repo_memory_path(&root);
+        if let Ok(doc) = memory::load_or_create(&repo_path, MemoryKind::Repo) {
+            for entry in doc.entries() {
+                if entry.to_lowercase().contains(&needle) {
+                    memory_hits.push(format!("repo  {entry}"));
+                }
+            }
+        }
+    }
+    if !memory_hits.is_empty() {
+        println!("memory entries:");
+        for hit in &memory_hits {
+            println!("  {hit}");
+        }
+    }
+
+    let db_path = memory::history::history_db_path();
+    let history_hits = if db_path.exists() {
+        let conn = memory::history::open_db(&db_path)?;
+        memory::history::search(&conn, query, limit)?
+    } else {
+        Vec::new()
+    };
+    if !history_hits.is_empty() {
+        println!("session history:");
+        for hit in &history_hits {
+            println!(
+                "  {}  [{} {}] {}",
+                format_age(hit.ts),
+                hit.kind,
+                &hit.session_id[..hit.session_id.len().min(8)],
+                hit.snippet.replace('\n', " ")
+            );
+        }
+    }
+
+    if memory_hits.is_empty() && history_hits.is_empty() {
+        println!("no matches for \"{query}\"");
+    }
+    Ok(0)
+}
+
+/// Compact age like `3m`, `2h`, `5d` from a unix timestamp; `now` for the
+/// future or the current minute.
+fn format_age(ts: i64) -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let seconds = now.saturating_sub(ts);
+    match seconds {
+        s if s < 60 => "now".to_string(),
+        s if s < 3_600 => format!("{}m", s / 60),
+        s if s < 86_400 => format!("{}h", s / 3_600),
+        s => format!("{}d", s / 86_400),
     }
 }
 
@@ -328,6 +442,7 @@ fn print_help() {
         "  shep memory remove \"<substring>\" [--user|--repo <path>]     remove by substring"
     );
     eprintln!("  shep memory status [--repo <path>]               usage for both files");
+    eprintln!("  shep memory search \"<query>\" [--limit <n>]        memory + session history");
     eprintln!("  shep memory init [--repo <path>]                 install agent bridges + files");
 }
 
@@ -466,6 +581,36 @@ mod tests {
     fn reflect_hook_rejects_flags_and_positionals() {
         assert!(parse(&args(&["reflect-hook", "--user"])).is_err());
         assert!(parse(&args(&["reflect-hook", "extra"])).is_err());
+    }
+
+    #[test]
+    fn ingest_event_parses_bare_only() {
+        assert_eq!(
+            parse(&args(&["ingest-event"])).unwrap(),
+            Some(Command::IngestEvent)
+        );
+        assert!(parse(&args(&["ingest-event", "extra"])).is_err());
+    }
+
+    #[test]
+    fn search_joins_positionals_and_takes_limit() {
+        assert_eq!(
+            parse(&args(&["search", "login", "flow"])).unwrap(),
+            Some(Command::Search {
+                query: "login flow".to_string(),
+                limit: 20,
+            })
+        );
+        assert_eq!(
+            parse(&args(&["search", "x", "--limit", "5"])).unwrap(),
+            Some(Command::Search {
+                query: "x".to_string(),
+                limit: 5,
+            })
+        );
+        assert!(parse(&args(&["search"])).is_err());
+        assert!(parse(&args(&["search", "x", "--limit", "nope"])).is_err());
+        assert!(parse(&args(&["search", "x", "--user"])).is_err());
     }
 
     #[test]
