@@ -759,6 +759,7 @@ pub enum Mode {
     RenameTab,
     RenamePane,
     RequestChanges,
+    QueuePrompt,
     NewLinkedWorktree,
     OpenExistingWorktree,
     ConfirmRemoveWorktree,
@@ -1196,6 +1197,7 @@ impl ContextMenuState {
                 "Split right",
                 "Split down",
                 "Zoom",
+                "Queue prompt...",
                 "Close pane",
             ],
             ContextMenuKind::Pane {
@@ -1208,6 +1210,7 @@ impl ContextMenuState {
                 "Split right",
                 "Split down",
                 "Zoom",
+                "Queue prompt...",
                 "Close pane",
             ],
             ContextMenuKind::Pane {
@@ -1220,6 +1223,7 @@ impl ContextMenuState {
                 "Split right",
                 "Split down",
                 "Zoom",
+                "Queue prompt...",
                 "Close pane",
             ],
             ContextMenuKind::Pane {
@@ -1231,6 +1235,7 @@ impl ContextMenuState {
                 "Split right",
                 "Split down",
                 "Zoom",
+                "Queue prompt...",
                 "Close pane",
             ],
         }
@@ -1459,6 +1464,11 @@ pub struct AppState {
     pub sound: SoundConfig,
     pub local_sound_playback: bool,
     pub toast_config: ToastConfig,
+    /// Queued pane input (M5 tab-to-queue): text held while an agent is busy,
+    /// flushed verbatim on its next transition to idle.
+    pub queued_pane_input: std::collections::HashMap<PaneId, Vec<String>>,
+    /// Target pane for the queue-prompt modal.
+    pub queue_prompt_target: Option<(usize, PaneId)>,
     /// Server-owned task-queue policy (`[tasks]`).
     pub tasks_config: crate::config::TasksConfig,
     /// Server-owned exec-bridge notification policy (`[notifications]`).
@@ -1774,6 +1784,8 @@ impl AppState {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             tasks_config: Default::default(),
+            queued_pane_input: std::collections::HashMap::new(),
+            queue_prompt_target: None,
             copy_feedback: None,
             outer_terminal_focus: None,
             prefix_code: KeyCode::Char('b'),

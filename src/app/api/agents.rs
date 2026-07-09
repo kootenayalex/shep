@@ -1,5 +1,3 @@
-use bytes::Bytes;
-
 use crate::api::schema::{
     AgentRenameParams, AgentSendParams, AgentStartParams, AgentTarget, PaneReadResult, ReadFormat,
     ReadSource, ResponseResult,
@@ -184,11 +182,19 @@ impl App {
             Ok(resolved) => resolved,
             Err(err) => return encode_error_body(id, self.agent_target_error_body(err)),
         };
-        let Some(runtime) = self.lookup_runtime_sender(resolved.ws_idx, resolved.pane_id) else {
+        if self
+            .lookup_runtime_sender(resolved.ws_idx, resolved.pane_id)
+            .is_none()
+        {
             return agent_not_found(id, &params.target);
-        };
-        if let Err(err) = runtime.try_send_bytes(Bytes::from(params.text)) {
-            return encode_error(id, "agent_send_failed", err.to_string());
+        }
+        if let Err(err) = self.send_or_queue_pane_text(
+            resolved.ws_idx,
+            resolved.pane_id,
+            params.text,
+            params.queue,
+        ) {
+            return encode_error(id, "agent_send_failed", err);
         }
 
         encode_success(id, ResponseResult::Ok {})

@@ -1196,6 +1196,10 @@
         },
         "AgentSendParams": {
           "properties": {
+            "queue": {
+              "description": "Queue instead of interrupting: when the agent is working or blocked,\nhold the text and deliver it on the next transition to idle.",
+              "type": "boolean"
+            },
             "target": {
               "type": "string"
             },

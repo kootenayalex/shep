@@ -135,6 +135,73 @@ impl crate::app::App {
         }
     }
 
+    /// Send `text` into a pane now, or queue it until the agent next goes
+    /// idle when `queue` is set and the agent is working/blocked (M5
+    /// tab-to-queue). Queued text is delivered verbatim.
+    pub(crate) fn send_or_queue_pane_text(
+        &mut self,
+        ws_idx: usize,
+        pane_id: crate::layout::PaneId,
+        text: String,
+        queue: bool,
+    ) -> Result<(), String> {
+        use crate::detect::AgentState;
+        let busy = queue
+            && self
+                .state
+                .workspaces
+                .get(ws_idx)
+                .and_then(|ws| ws.pane_state(pane_id))
+                .and_then(|pane| self.state.terminals.get(&pane.attached_terminal_id))
+                .is_some_and(|terminal| {
+                    matches!(terminal.state, AgentState::Working | AgentState::Blocked)
+                });
+        if busy {
+            self.state
+                .queued_pane_input
+                .entry(pane_id)
+                .or_default()
+                .push(text);
+            return Ok(());
+        }
+        let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
+            return Err("pane has no runtime".to_string());
+        };
+        runtime
+            .try_send_bytes(Bytes::from(text))
+            .map_err(|err| err.to_string())
+    }
+
+    /// Flush any input queued for `pane_id` (called on its transition to
+    /// idle). Returns how many messages were delivered.
+    pub(crate) fn flush_queued_pane_input(&mut self, pane_id: crate::layout::PaneId) -> usize {
+        let Some(queued) = self.state.queued_pane_input.remove(&pane_id) else {
+            return 0;
+        };
+        let Some(ws_idx) = self
+            .state
+            .workspaces
+            .iter()
+            .position(|ws| ws.tabs.iter().any(|tab| tab.panes.contains_key(&pane_id)))
+        else {
+            return 0;
+        };
+        let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
+            return 0;
+        };
+        let mut delivered = 0;
+        for text in queued {
+            match runtime.try_send_bytes(Bytes::from(text)) {
+                Ok(()) => delivered += 1,
+                Err(err) => {
+                    tracing::warn!(err = %err, "queued input delivery failed");
+                    break;
+                }
+            }
+        }
+        delivered
+    }
+
     fn ship_toast(&mut self, ok: bool, context: String) {
         use crate::app::state::{ToastKind, ToastNotification};
         self.state.toast = Some(ToastNotification {

@@ -589,6 +589,8 @@ impl App {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             tasks_config: config.tasks.clone(),
+            queued_pane_input: std::collections::HashMap::new(),
+            queue_prompt_target: None,
             copy_feedback: None,
             outer_terminal_focus: None,
             prefix_code,
@@ -1668,7 +1670,11 @@ impl App {
             Mode::Copy => {
                 self.handle_copy_mode_key(key);
             }
-            Mode::RenameWorkspace | Mode::RenameTab | Mode::RenamePane | Mode::RequestChanges => {
+            Mode::RenameWorkspace
+            | Mode::RenameTab
+            | Mode::RenamePane
+            | Mode::RequestChanges
+            | Mode::QueuePrompt => {
                 self.handle_rename_key_via_api(key_event);
             }
             Mode::NewLinkedWorktree => {

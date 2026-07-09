@@ -1315,6 +1315,13 @@ impl HeadlessServer {
         if prev_state == new_state {
             return;
         }
+        // Tab-to-queue (M5): deliver input queued while the agent was busy.
+        if new_state == AgentState::Idle {
+            let delivered = self.app.flush_queued_pane_input(pane_id);
+            if delivered > 0 {
+                tracing::info!(delivered, "flushed queued pane input");
+            }
+        }
         let db_path = crate::tasks::tasks_db_path();
         let has_store = db_path.exists();
         let finished = prev_state == AgentState::Working && new_state == AgentState::Idle;

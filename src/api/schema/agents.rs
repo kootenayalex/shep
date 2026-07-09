@@ -20,6 +20,10 @@ pub struct AgentReadParams {
 pub struct AgentSendParams {
     pub target: String,
     pub text: String,
+    /// Queue instead of interrupting: when the agent is working or blocked,
+    /// hold the text and deliver it on the next transition to idle.
+    #[serde(default, skip_serializing_if = "crate::api::schema::is_false")]
+    pub queue: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

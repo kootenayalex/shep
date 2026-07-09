@@ -331,6 +331,19 @@ pub(super) fn open_request_changes(state: &mut AppState, ws_idx: usize) {
     state.mode = Mode::RequestChanges;
 }
 
+/// Open the queue-prompt modal for a pane (M5 tab-to-queue).
+pub(super) fn open_queue_prompt(
+    state: &mut AppState,
+    ws_idx: usize,
+    pane_id: crate::layout::PaneId,
+) {
+    state.queue_prompt_target = Some((ws_idx, pane_id));
+    state.rename_pane_target = None;
+    state.name_input = String::new();
+    state.name_input_replace_on_type = false;
+    state.mode = Mode::QueuePrompt;
+}
+
 pub(super) fn open_rename_active_tab(state: &mut AppState, replace_on_type: bool) {
     state.creating_new_tab = false;
     state.requested_new_tab_name = None;
@@ -963,6 +976,20 @@ impl App {
                 }
                 return;
             }
+            Mode::QueuePrompt => {
+                let text = self.state.name_input.trim().to_string();
+                let target = self.state.queue_prompt_target.take();
+                cancel_rename_modal(&mut self.state);
+                if let (Some((ws_idx, pane_id)), false) = (target, text.is_empty()) {
+                    // `\r` submits in agent CLIs.
+                    if let Err(err) =
+                        self.send_or_queue_pane_text(ws_idx, pane_id, format!("{text}\r"), true)
+                    {
+                        tracing::warn!(err = %err, "queue prompt failed");
+                    }
+                }
+                return;
+            }
             Mode::RenameWorkspace if !self.state.workspaces.is_empty() && !new_name.is_empty() => {
                 let workspace_id = self.public_workspace_id(self.state.selected);
                 self.runtime_workspace_rename(
@@ -1222,6 +1249,14 @@ impl App {
             }
             (ContextMenuKind::Pane { pane_id, .. }, Some("Rename pane")) => {
                 open_rename_pane(&mut self.state, pane_id);
+            }
+            (
+                ContextMenuKind::Pane {
+                    ws_idx, pane_id, ..
+                },
+                Some("Queue prompt..."),
+            ) => {
+                open_queue_prompt(&mut self.state, ws_idx, pane_id);
             }
             (
                 ContextMenuKind::Pane {

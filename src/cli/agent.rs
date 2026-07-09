@@ -561,8 +561,12 @@ fn agent_rename(args: &[String]) -> std::io::Result<i32> {
 }
 
 fn agent_send(args: &[String]) -> std::io::Result<i32> {
+    let (queue, args) = match args.first().map(String::as_str) {
+        Some("--queue") => (true, &args[1..]),
+        _ => (false, args),
+    };
     if args.len() < 2 {
-        eprintln!("usage: shep agent send <target> <text>");
+        eprintln!("usage: shep agent send [--queue] <target> <text>");
         return Ok(2);
     }
 
@@ -571,6 +575,7 @@ fn agent_send(args: &[String]) -> std::io::Result<i32> {
         method: Method::AgentSend(AgentSendParams {
             target: args[0].clone(),
             text: args[1..].join(" "),
+            queue,
         }),
     })?)
 }
