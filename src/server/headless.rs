@@ -766,6 +766,12 @@ impl HeadlessServer {
             crate::render_prof::event("full_render_cause.deferred_worktree_submit");
         }
 
+        if let Some(ws_idx) = self.app.state.request_review_workspace.take() {
+            self.app.open_review_pager(ws_idx);
+            needs_render = true;
+            crate::render_prof::event("full_render_cause.deferred_review_pane");
+        }
+
         if self.app.state.request_reload_config {
             self.app.state.request_reload_config = false;
             self.reload_server_config(true);

@@ -197,7 +197,13 @@ impl AppState {
     }
 
     pub(crate) fn global_menu_labels(&self) -> Vec<&'static str> {
-        let mut labels = vec!["session board", "settings", "keybinds", "reload config"];
+        let mut labels = vec![
+            "session board",
+            "review diff",
+            "settings",
+            "keybinds",
+            "reload config",
+        ];
         if self.update_available.is_some() {
             labels.push("update ready");
         } else if self.latest_release_notes_available {
@@ -526,7 +532,7 @@ mod tests {
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 3,
+            menu.y + 4,
         ));
 
         assert_eq!(app.state.mode, Mode::KeybindHelp);
@@ -546,7 +552,7 @@ mod tests {
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 2,
+            menu.y + 3,
         ));
 
         assert_eq!(app.state.mode, Mode::Settings);
@@ -566,7 +572,7 @@ mod tests {
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 4,
+            menu.y + 5,
         ));
 
         assert!(app.state.request_reload_config);
@@ -590,6 +596,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
+                "review diff",
                 "settings",
                 "keybinds",
                 "reload config",
@@ -616,6 +623,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
+                "review diff",
                 "settings",
                 "keybinds",
                 "reload config",
@@ -627,7 +635,7 @@ mod tests {
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 5,
+            menu.y + 6,
         ));
 
         assert!(app.state.detach_requested);
@@ -644,6 +652,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
+                "review diff",
                 "settings",
                 "keybinds",
                 "reload config",

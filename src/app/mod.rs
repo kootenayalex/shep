@@ -11,6 +11,7 @@ mod api;
 mod api_helpers;
 mod config_io;
 mod creation;
+mod review;
 mod ids;
 mod input;
 mod runtime;
@@ -522,6 +523,7 @@ impl App {
             request_submit_worktree_open: false,
             request_submit_worktree_remove: false,
             request_reload_config: false,
+            request_review_workspace: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
             creating_new_tab: false,
@@ -984,6 +986,11 @@ impl App {
             if self.state.request_reload_config {
                 self.state.request_reload_config = false;
                 self.reload_config();
+                needs_render = true;
+            }
+
+            if let Some(ws_idx) = self.state.request_review_workspace.take() {
+                self.open_review_pager(ws_idx);
                 needs_render = true;
             }
 
