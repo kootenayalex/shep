@@ -38,6 +38,10 @@ pub struct WorkspaceInfo {
     pub tab_count: usize,
     pub active_tab_id: String,
     pub agent_status: AgentStatus,
+    /// Repo shep-memory usage percent (`shep memory status`); absent outside a
+    /// git repo or before a memory file exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_usage_percent: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worktree: Option<WorkspaceWorktreeInfo>,
 }

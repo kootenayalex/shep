@@ -13,6 +13,9 @@ deliberately-diverged fork of [herdr](https://github.com/ogulcancelik/herdr)
   — read through it, dual-write to children, scrub BOTH prefixes in tests.
 - Binary self-update and remote manifest auto-update are disabled (no shep
   release channel); don't re-enable against herdr.dev.
+- Windows is unsupported in this fork (unix-only; bundled sqlite can't
+  cross-compile to windows-msvc). `just windows-lint` exists but is not part
+  of `just check`.
 - The upstream sections below marked maintainer-only, Local Can Machine, release
   channels, and the external contributor guardrail are LEGACY UPSTREAM CONTEXT —
   skip them. The Universal Project Rules, testing, detection, vendoring, and

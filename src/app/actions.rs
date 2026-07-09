@@ -2516,6 +2516,10 @@ impl AppState {
                 ws.cached_git_space = result.space;
                 changed = true;
             }
+            if ws.cached_memory_usage_percent != result.memory_usage_percent {
+                ws.cached_memory_usage_percent = result.memory_usage_percent;
+                changed = true;
+            }
         }
         changed
     }
@@ -3658,6 +3662,7 @@ mod tests {
                 branch: Some("main".into()),
                 ahead_behind: Some((2, 1)),
                 space: None,
+                memory_usage_percent: None,
             }],
         );
 
@@ -3684,6 +3689,7 @@ mod tests {
                 branch: Some("main".into()),
                 ahead_behind: Some((0, 1)),
                 space: None,
+                memory_usage_percent: None,
             }],
         );
 
@@ -3709,6 +3715,7 @@ mod tests {
                 branch: None,
                 ahead_behind: None,
                 space: None,
+                memory_usage_percent: None,
             }],
         );
 
@@ -3740,6 +3747,7 @@ mod tests {
                     repo_root: "/other/repo".into(),
                     is_linked_worktree: false,
                 }),
+                memory_usage_percent: None,
             }],
         );
 

@@ -46,6 +46,9 @@ pub struct WorkspaceGitStatus {
     pub branch: Option<String>,
     pub ahead_behind: Option<(usize, usize)>,
     pub space: Option<GitSpaceMetadata>,
+    /// Repo shep-memory usage percent, refreshed alongside git status (it is a
+    /// per-repo file fact keyed on the same resolved cwd).
+    pub memory_usage_percent: Option<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,12 +64,14 @@ impl WorkspaceGitStatusSnapshot {
         workspace_id: String,
         resolved_identity_cwd: PathBuf,
     ) -> WorkspaceGitStatus {
+        let memory_usage_percent = crate::memory::repo_usage_percent(&resolved_identity_cwd);
         WorkspaceGitStatus {
             workspace_id,
             resolved_identity_cwd,
             branch: self.branch,
             ahead_behind: self.ahead_behind,
             space: self.space,
+            memory_usage_percent,
         }
     }
 }
@@ -156,6 +161,9 @@ pub struct Workspace {
     pub(crate) cached_git_ahead_behind: Option<(usize, usize)>,
     /// Cached derived Git repo metadata for worktree actions and status display.
     pub(crate) cached_git_space: Option<GitSpaceMetadata>,
+    /// Cached shep repo-memory usage percent (`<repo>/.shep/memory/MEMORY.md`
+    /// against its cap); refreshed with the git status metadata.
+    pub(crate) cached_memory_usage_percent: Option<u8>,
     /// Explicit Shep-managed worktree grouping provenance.
     pub worktree_space: Option<WorktreeSpaceMembership>,
     /// Public pane numbers within this workspace. Closed pane numbers are not reused.
@@ -216,6 +224,7 @@ impl Workspace {
             cached_git_branch: git_branch(&identity_cwd),
             cached_git_ahead_behind: None,
             cached_git_space: git_space_metadata(&identity_cwd),
+            cached_memory_usage_percent: crate::memory::repo_usage_percent(&identity_cwd),
             worktree_space: None,
             public_pane_numbers,
             next_public_pane_number: 2,
@@ -397,6 +406,7 @@ impl Workspace {
                 cached_git_branch: git_branch(&initial_cwd),
                 cached_git_ahead_behind: None,
                 cached_git_space: None,
+                cached_memory_usage_percent: crate::memory::repo_usage_percent(&initial_cwd),
                 worktree_space: None,
                 public_pane_numbers,
                 next_public_pane_number: 2,
@@ -1074,6 +1084,12 @@ impl Workspace {
         self.cached_git_branch.clone()
     }
 
+    /// Cached repo shep-memory usage percent (None outside a repo or before a
+    /// memory file exists).
+    pub fn memory_usage_percent(&self) -> Option<u8> {
+        self.cached_memory_usage_percent
+    }
+
     pub fn git_ahead_behind(&self) -> Option<(usize, usize)> {
         self.cached_git_ahead_behind
     }
@@ -1092,6 +1108,8 @@ impl Workspace {
         self.cached_git_branch = cwd.as_deref().and_then(git_branch);
         self.cached_git_ahead_behind = cwd.as_deref().and_then(git_ahead_behind);
         self.cached_git_space = cwd.as_deref().and_then(git_space_metadata);
+        self.cached_memory_usage_percent =
+            cwd.as_deref().and_then(crate::memory::repo_usage_percent);
     }
 
     pub fn git_status_snapshot_for_cwd_with_cache(
@@ -1208,6 +1226,7 @@ impl Workspace {
             cached_git_branch: git_branch(&identity_cwd),
             cached_git_ahead_behind: None,
             cached_git_space: None,
+            cached_memory_usage_percent: crate::memory::repo_usage_percent(&identity_cwd),
             worktree_space: None,
             public_pane_numbers,
             next_public_pane_number: 2,

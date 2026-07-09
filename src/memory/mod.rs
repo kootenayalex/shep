@@ -110,6 +110,16 @@ pub(crate) fn resolve_repo_root(explicit: Option<&Path>) -> io::Result<PathBuf> 
     })
 }
 
+/// Percent of the repo-memory cap in use for the repo enclosing `cwd`. `None`
+/// outside a git repo or before any memory file exists (nothing to nudge
+/// about). Cheap: one small-file read; safe to call from refresh jobs.
+pub(crate) fn repo_usage_percent(cwd: &Path) -> Option<u8> {
+    let root = enclosing_git_repo(cwd)?;
+    let raw = std::fs::read_to_string(repo_memory_path(&root)).ok()?;
+    let doc = MemoryDoc::parse(&raw);
+    Some(doc.usage(REPO_CAP).percent().min(u8::MAX as u32) as u8)
+}
+
 /// Load a memory file, creating it from its template on first use. The template
 /// header is written once; entry content accrues under the cap thereafter.
 pub(crate) fn load_or_create(path: &Path, kind: MemoryKind) -> io::Result<MemoryDoc> {
@@ -240,6 +250,25 @@ mod tests {
             enclosing_git_repo(&sub).and_then(|p| p.canonicalize().ok()),
             dir.canonicalize().ok()
         );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn repo_usage_percent_reads_enclosing_repo_memory() {
+        let dir = temp_dir("usage-pct");
+        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        // No memory file yet: nothing to report.
+        assert_eq!(repo_usage_percent(&dir), None);
+
+        let path = repo_memory_path(&dir);
+        let mut doc = load_or_create(&path, MemoryKind::Repo).unwrap();
+        doc.add(&"x".repeat(REPO_CAP / 2), REPO_CAP).unwrap();
+        write_doc(&path, &doc).unwrap();
+        assert_eq!(repo_usage_percent(&dir), Some(50));
+        // Works from a subdirectory too (uses the enclosing repo).
+        let sub = dir.join("nested");
+        std::fs::create_dir_all(&sub).unwrap();
+        assert_eq!(repo_usage_percent(&sub), Some(50));
         std::fs::remove_dir_all(&dir).ok();
     }
 

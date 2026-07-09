@@ -992,6 +992,16 @@
             "label": {
               "type": "string"
             },
+            "memory_usage_percent": {
+              "description": "Repo shep-memory usage percent (`shep memory status`); absent outside a\ngit repo or before a memory file exists.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "number": {
               "format": "uint",
               "minimum": 0,
@@ -8752,6 +8762,16 @@
             },
             "label": {
               "type": "string"
+            },
+            "memory_usage_percent": {
+              "description": "Repo shep-memory usage percent (`shep memory status`); absent outside a\ngit repo or before a memory file exists.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "number": {
               "format": "uint",

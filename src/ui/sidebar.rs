@@ -1011,7 +1011,17 @@ fn render_workspace_list(
                     })
                     .unwrap_or(0);
                 let age_reserved = age_label.as_ref().map(|label| label.len() + 1).unwrap_or(0);
-                let reserved = upstream_reserved + age_reserved;
+                // Memory-pressure nudge: only when the repo's shep memory file
+                // is >=80% of its cap, i.e. agents should consolidate soon.
+                let memory_label = ws
+                    .memory_usage_percent()
+                    .filter(|percent| *percent >= 80)
+                    .map(|percent| format!("mem {percent}%"));
+                let memory_reserved = memory_label
+                    .as_ref()
+                    .map(|label| label.len() + 1)
+                    .unwrap_or(0);
+                let reserved = upstream_reserved + age_reserved + memory_reserved;
                 let max_branch_len = (card.rect.width as usize).saturating_sub(5 + reserved);
                 let branch_display = truncate_end(&branch, max_branch_len);
                 let branch_color = if selected || is_active {
@@ -1039,6 +1049,10 @@ fn render_workspace_list(
                         age_label,
                         Style::default().fg(p.overlay0).add_modifier(Modifier::DIM),
                     ));
+                }
+                if let Some(memory_label) = memory_label {
+                    spans.push(Span::styled(" ", Style::default()));
+                    spans.push(Span::styled(memory_label, Style::default().fg(p.yellow)));
                 }
                 frame.render_widget(
                     Paragraph::new(Line::from(spans)),

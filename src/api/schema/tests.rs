@@ -596,6 +596,7 @@ fn worktree_request_and_response_round_trip() {
                 tab_count: 1,
                 active_tab_id: "w_1:1".into(),
                 agent_status: AgentStatus::Unknown,
+                memory_usage_percent: None,
                 worktree: Some(WorkspaceWorktreeInfo {
                     repo_key: "/repo/shep/.git".into(),
                     repo_name: "shep".into(),
@@ -679,6 +680,7 @@ fn worktree_lifecycle_events_round_trip() {
         tab_count: 1,
         active_tab_id: "w_2:1".into(),
         agent_status: AgentStatus::Unknown,
+        memory_usage_percent: None,
         worktree: Some(WorkspaceWorktreeInfo {
             repo_key: "/repo/shep/.git".into(),
             repo_name: "shep".into(),

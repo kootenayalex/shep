@@ -22,13 +22,15 @@ ci filter='all()': lint
     just integration-assets-test
     just plugin-marketplace-test
 
-# Run Windows target lint from Unix/macOS to catch cfg(windows) compile and clippy failures before CI
+# Run Windows target lint from Unix/macOS to catch cfg(windows) compile and clippy failures before CI.
+# NOT part of `check` in this fork: shep targets unix only (no windows releases),
+# and bundled sqlite (rusqlite) cannot cross-compile to windows-msvc from macOS.
 windows-lint:
     rustup target add x86_64-pc-windows-msvc
     LIBGHOSTTY_VT_SIMD=false cargo clippy --bin shep --locked --target x86_64-pc-windows-msvc -- -D warnings
 
-# Check formatting + run unit tests + Windows target lint + maintenance script tests
-check: ci windows-lint
+# Check formatting + run unit tests + maintenance script tests
+check: ci
     python3 -m unittest scripts.test_agent_detection_manifest_check scripts.test_changelog scripts.test_docs_translation_parity scripts.test_preview scripts.test_vendor_libghostty_vt scripts.test_vendor_portable_pty
     @echo "docs reminder: if this changes user-facing behavior, make sure the relevant release docs are updated or called out before release."
 

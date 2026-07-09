@@ -252,7 +252,9 @@ pub(crate) fn merge_claude_hooks(content: &str, shep_bin: &str) -> io::Result<St
             .entry(event.to_string())
             .or_insert_with(|| Value::Array(Vec::new()))
             .as_array_mut()
-            .ok_or_else(|| io::Error::other(format!("claude hooks.{event} must be a JSON array")))?;
+            .ok_or_else(|| {
+                io::Error::other(format!("claude hooks.{event} must be a JSON array"))
+            })?;
         for command in commands {
             if !hook_command_present(groups, command) {
                 groups.push(serde_json::json!({
