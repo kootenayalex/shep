@@ -47,6 +47,9 @@ enum Command {
     Init {
         repo: Option<PathBuf>,
     },
+    /// claude-code Stop-hook plumbing (reads hook JSON from stdin). Hidden from
+    /// the main help; wired by `shep memory init`.
+    ReflectHook,
 }
 
 pub(super) fn run_memory_command(args: &[String]) -> std::io::Result<i32> {
@@ -117,6 +120,14 @@ fn parse(args: &[String]) -> Result<Option<Command>, String> {
             flags.reject_user("init")?;
             flags.expect_positionals(0)?;
             Ok(Some(Command::Init { repo: flags.repo }))
+        }
+        "reflect-hook" => {
+            // Hook plumbing: reads the Stop payload from stdin, takes no flags or
+            // positionals. Anything else is a wiring mistake we surface.
+            let flags = Flags::parse(rest)?;
+            flags.reject_user("reflect-hook")?;
+            flags.expect_positionals(0)?;
+            Ok(Some(Command::ReflectHook))
         }
         other => Err(format!("unknown memory subcommand: {other}")),
     }
@@ -205,6 +216,7 @@ fn execute(command: Command) -> std::io::Result<i32> {
         Command::Remove { target, substring } => mutate(target, |doc, _cap| doc.remove(&substring)),
         Command::Status { repo } => status(repo),
         Command::Init { repo } => init(repo),
+        Command::ReflectHook => Ok(memory::reflect::run_reflect_hook()),
     }
 }
 
@@ -440,6 +452,20 @@ mod tests {
     #[test]
     fn missing_repo_value_errors() {
         assert!(parse(&args(&["show", "--repo"])).is_err());
+    }
+
+    #[test]
+    fn reflect_hook_parses_with_no_args() {
+        assert_eq!(
+            parse(&args(&["reflect-hook"])).unwrap(),
+            Some(Command::ReflectHook)
+        );
+    }
+
+    #[test]
+    fn reflect_hook_rejects_flags_and_positionals() {
+        assert!(parse(&args(&["reflect-hook", "--user"])).is_err());
+        assert!(parse(&args(&["reflect-hook", "extra"])).is_err());
     }
 
     #[test]
