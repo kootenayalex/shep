@@ -65,6 +65,9 @@ pub struct AgentInfo {
     pub custom_status: Option<String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub state_labels: HashMap<String, String>,
+    /// Best-effort context-window percentage extracted from the agent screen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_percent: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_session: Option<AgentSessionInfo>,
     pub workspace_id: String,

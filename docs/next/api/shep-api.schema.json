@@ -5265,6 +5265,16 @@
             "agent_status": {
               "$ref": "#/schemas/success_response/$defs/AgentStatus"
             },
+            "context_percent": {
+              "description": "Best-effort context-window percentage extracted from the agent screen.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "custom_status": {
               "type": [
                 "string",

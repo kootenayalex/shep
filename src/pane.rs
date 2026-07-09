@@ -181,6 +181,28 @@ async fn publish_state_changed_event(
     }
 }
 
+// Emitted only by the unix screen-detection task.
+#[cfg(unix)]
+async fn publish_context_reported_event(
+    state_events: mpsc::Sender<AppEvent>,
+    pane_id: PaneId,
+    context_percent: Option<u8>,
+) {
+    if let Err(e) = state_events
+        .send(AppEvent::AgentContextReported {
+            pane_id,
+            context_percent,
+        })
+        .await
+    {
+        warn!(
+            pane = pane_id.raw(),
+            err = %e,
+            "failed to deliver AgentContextReported event"
+        );
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct AgentDetectionPublishUpdate {
     state: AgentState,
@@ -579,6 +601,7 @@ fn spawn_basic_detection_task(
         let mut last_screen_scan_detection_content_seq = None;
         let mut agent_startup_grace_until = None;
         let mut pending_idle = PendingIdleConfirmation::default();
+        let mut last_context_percent: Option<u8> = None;
 
         loop {
             let sleep_duration = if pending_idle.active() {
@@ -607,6 +630,7 @@ fn spawn_basic_detection_task(
                     last_screen_scan_detection_content_seq = None;
                     agent_startup_grace_until = None;
                     pending_idle.clear();
+                    last_context_percent = None;
                 }
             }
 
@@ -793,6 +817,17 @@ fn spawn_basic_detection_task(
 
             let osc_title = terminal.agent_osc_title();
             let osc_progress = terminal.agent_osc_progress();
+
+            // Best-effort context-window meter, decoupled from state publishing:
+            // emit only when the extracted percentage changes.
+            let context_percent =
+                crate::detect::extract_context_percent(agent, &content, &osc_title, &osc_progress);
+            if context_percent != last_context_percent {
+                last_context_percent = context_percent;
+                publish_context_reported_event(state_events.clone(), pane_id, context_percent)
+                    .await;
+            }
+
             let Some(screen_detection) = detection_update_for_publish_with_osc(
                 agent,
                 &content,

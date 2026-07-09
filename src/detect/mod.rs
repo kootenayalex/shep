@@ -241,6 +241,28 @@ pub fn should_skip_state_update(agent: Option<Agent>, screen_content: &str) -> b
     agent.is_some_and(|agent| manifest::should_skip_state_update(agent, screen_content))
 }
 
+/// Best-effort context-window percentage for the pane, using the agent's
+/// manifest value-extractors over screen + OSC content. `None` when no agent or
+/// no extractor matches.
+// Called only from the unix-only screen-detection task; unused on Windows.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub fn extract_context_percent(
+    agent: Option<Agent>,
+    screen_content: &str,
+    osc_title: &str,
+    osc_progress: &str,
+) -> Option<u8> {
+    let agent = agent?;
+    manifest::extract_percent(
+        agent,
+        manifest::DetectionInput {
+            screen: screen_content,
+            osc_title,
+            osc_progress,
+        },
+    )
+}
+
 pub(crate) fn full_lifecycle_hook_authority(source: &str, agent_label: &str) -> bool {
     matches!(
         (source, agent_label),

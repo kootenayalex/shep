@@ -712,3 +712,145 @@ fn codex_osc_working_beats_weak_blocker_screen() {
         Some("osc_title_working")
     );
 }
+
+fn extractor_input(screen: &str) -> DetectionInput<'_> {
+    DetectionInput {
+        screen,
+        osc_title: "",
+        osc_progress: "",
+    }
+}
+
+#[test]
+fn manifest_without_extractors_parses_and_yields_no_percent() {
+    // Backwards compatibility: manifests predating value-extractors must parse.
+    let manifest = parse_manifest(&local_manifest("idle", "ready")).unwrap();
+    let extractors = compile_extractors(&manifest).unwrap();
+    assert!(extractors.is_empty());
+    assert_eq!(
+        extract_percent_from(&extractors, extractor_input("Context left: 42%")),
+        None
+    );
+}
+
+#[test]
+fn extractor_captures_context_percent_from_region() {
+    let toml = r#"
+id = "codex"
+
+[[rules]]
+id = "idle"
+state = "idle"
+contains = ["ready"]
+
+[[extractors]]
+id = "ctx"
+region = "whole_recent"
+regex = 'auto-compact:\s*(\d{1,3})%'
+capture = 1
+"#;
+    let manifest = parse_manifest(toml).unwrap();
+    let extractors = compile_extractors(&manifest).unwrap();
+    assert_eq!(
+        extract_percent_from(
+            &extractors,
+            extractor_input("Context left until auto-compact: 34%\n> ")
+        ),
+        Some(34)
+    );
+    // No match on unrelated screens.
+    assert_eq!(
+        extract_percent_from(&extractors, extractor_input("just some output\n")),
+        None
+    );
+}
+
+#[test]
+fn extractor_clamps_values_above_one_hundred() {
+    let toml = r#"
+id = "codex"
+
+[[rules]]
+id = "idle"
+state = "idle"
+contains = ["ready"]
+
+[[extractors]]
+id = "ctx"
+regex = '(\d+)%'
+"#;
+    let manifest = parse_manifest(toml).unwrap();
+    let extractors = compile_extractors(&manifest).unwrap();
+    assert_eq!(
+        extract_percent_from(&extractors, extractor_input("weird 250% value")),
+        Some(100)
+    );
+}
+
+#[test]
+fn extractor_defaults_capture_group_to_one() {
+    let toml = r#"
+id = "codex"
+
+[[rules]]
+id = "idle"
+state = "idle"
+contains = ["ready"]
+
+[[extractors]]
+id = "ctx"
+regex = 'ctx (\d+)%'
+"#;
+    let manifest = parse_manifest(toml).unwrap();
+    let extractors = compile_extractors(&manifest).unwrap();
+    assert_eq!(
+        extract_percent_from(&extractors, extractor_input("ctx 7%")),
+        Some(7)
+    );
+}
+
+#[test]
+fn extractor_missing_capture_group_is_rejected() {
+    let toml = r#"
+id = "codex"
+
+[[rules]]
+id = "idle"
+state = "idle"
+contains = ["ready"]
+
+[[extractors]]
+id = "ctx"
+regex = 'no group here'
+"#;
+    let err = parse_manifest(toml).unwrap_err();
+    assert!(err.contains("capture group"), "unexpected error: {err}");
+}
+
+#[test]
+fn extractor_empty_id_is_rejected() {
+    let toml = r#"
+id = "codex"
+
+[[rules]]
+id = "idle"
+state = "idle"
+contains = ["ready"]
+
+[[extractors]]
+id = ""
+regex = '(\d+)%'
+"#;
+    let err = parse_manifest(toml).unwrap_err();
+    assert!(err.contains("extractor id"), "unexpected error: {err}");
+}
+
+#[test]
+fn bundled_claude_manifest_extracts_context_percent() {
+    // Guards the shipped best-guess claude rule against the documented string.
+    let percent = extract_percent(
+        Agent::Claude,
+        extractor_input("Context left until auto-compact: 18%"),
+    );
+    assert_eq!(percent, Some(18));
+}

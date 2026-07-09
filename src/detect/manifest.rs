@@ -124,6 +124,10 @@ pub struct RuleEvidence {
 struct LoadedManifest {
     manifest: AgentManifest,
     compiled_rules: Vec<CompiledRule>,
+    // Read only by `extract_percent`, whose sole consumer is the unix-only
+    // screen-detection task; unused on the Windows binary.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    compiled_extractors: Vec<CompiledExtractor>,
     source: ManifestSource,
     warning: Option<String>,
     cached_remote_version: Option<String>,
@@ -147,6 +151,40 @@ pub(crate) struct AgentManifest {
     aliases: Vec<String>,
     #[serde(default)]
     rules: Vec<ManifestRule>,
+    /// Optional numeric value-extractors (e.g. context-remaining %). Backwards
+    /// compatible: manifests without `[[extractors]]` parse unchanged.
+    #[serde(default)]
+    extractors: Vec<ManifestExtractor>,
+}
+
+/// A value-extractor rule: captures a numeric percentage (0–100) from a screen
+/// region using a regex capture group. Surfaced as `context_percent`.
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct ManifestExtractor {
+    id: String,
+    #[serde(default = "default_region")]
+    region: String,
+    /// Regex with at least one capture group; `capture` selects which group
+    /// holds the numeric value.
+    regex: String,
+    /// 1-based capture group index holding the number. Default: 1.
+    #[serde(default = "default_capture_group")]
+    capture: usize,
+}
+
+// Fields are read only through `extract_percent`, whose sole consumer is the
+// unix-only screen-detection task; unused on the Windows binary.
+#[cfg_attr(not(unix), allow(dead_code))]
+#[derive(Debug, Clone)]
+struct CompiledExtractor {
+    region: String,
+    regex: Regex,
+    capture: usize,
+}
+
+fn default_capture_group() -> usize {
+    1
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -670,9 +708,11 @@ fn loaded_manifest(
     local_override_shadowing_remote: bool,
 ) -> Result<LoadedManifest, String> {
     let compiled_rules = compile_manifest(&manifest)?;
+    let compiled_extractors = compile_extractors(&manifest)?;
     Ok(LoadedManifest {
         manifest,
         compiled_rules,
+        compiled_extractors,
         source,
         warning,
         cached_remote_version,
@@ -925,6 +965,49 @@ fn validate_manifest(manifest: &AgentManifest) -> Result<(), String> {
             .map_err(|err| format!("rule {} has invalid matcher gates: {err}", rule.id))?;
     }
 
+    if manifest.extractors.len() > MAX_EXTRACTORS_PER_MANIFEST {
+        return Err(format!(
+            "manifest contains {} extractors, max is {MAX_EXTRACTORS_PER_MANIFEST}",
+            manifest.extractors.len()
+        ));
+    }
+    for extractor in &manifest.extractors {
+        validate_extractor(extractor)?;
+    }
+
+    Ok(())
+}
+
+const MAX_EXTRACTORS_PER_MANIFEST: usize = 16;
+
+fn validate_extractor(extractor: &ManifestExtractor) -> Result<(), String> {
+    if extractor.id.trim().is_empty() {
+        return Err("manifest extractor id must not be empty".to_string());
+    }
+    if extractor.capture == 0 {
+        return Err(format!(
+            "extractor {} capture must be a 1-based group index",
+            extractor.id
+        ));
+    }
+    if extractor.regex.chars().count() > MAX_MATCHER_CHARS {
+        return Err(format!(
+            "extractor {} regex exceeds max length {MAX_MATCHER_CHARS}",
+            extractor.id
+        ));
+    }
+    validate_region_name(&extractor.region)
+        .map_err(|err| format!("extractor {} uses invalid region: {err}", extractor.id))?;
+    let compiled = Regex::new(&extractor.regex)
+        .map_err(|err| format!("extractor {} has invalid regex: {err}", extractor.id))?;
+    if extractor.capture >= compiled.captures_len() {
+        return Err(format!(
+            "extractor {} references capture group {} but the regex has {} group(s)",
+            extractor.id,
+            extractor.capture,
+            compiled.captures_len().saturating_sub(1)
+        ));
+    }
     Ok(())
 }
 
@@ -1126,6 +1209,52 @@ fn compile_manifest(manifest: &AgentManifest) -> Result<Vec<CompiledRule>, Strin
                 .map_err(|err| format!("rule {} could not be compiled: {err}", rule.id))
         })
         .collect()
+}
+
+fn compile_extractors(manifest: &AgentManifest) -> Result<Vec<CompiledExtractor>, String> {
+    manifest
+        .extractors
+        .iter()
+        .map(|extractor| {
+            Regex::new(&extractor.regex)
+                .map(|regex| CompiledExtractor {
+                    region: extractor.region.clone(),
+                    regex,
+                    capture: extractor.capture,
+                })
+                .map_err(|err| format!("extractor {} could not be compiled: {err}", extractor.id))
+        })
+        .collect()
+}
+
+/// Extract a best-effort context-window percentage (0–100) for `agent` from the
+/// current screen using the manifest's value-extractors. Returns the first
+/// extractor that matches, or `None`. Cheap and decoupled — reads only the
+/// snapshot, like the rest of detection.
+// Consumed by the unix-only screen-detection task (and unit tests); the Windows
+// binary has no detection task, so it is unused there.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub fn extract_percent(agent: Agent, input: DetectionInput<'_>) -> Option<u8> {
+    let loaded = load_manifest(agent)?;
+    extract_percent_from(&loaded.compiled_extractors, input)
+}
+
+// Only reached via `extract_percent`; unused on the Windows binary.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn extract_percent_from(extractors: &[CompiledExtractor], input: DetectionInput<'_>) -> Option<u8> {
+    for extractor in extractors {
+        let text = region(input, &extractor.region);
+        let Some(captures) = extractor.regex.captures(text) else {
+            continue;
+        };
+        let Some(value) = captures.get(extractor.capture) else {
+            continue;
+        };
+        if let Ok(parsed) = value.as_str().trim().parse::<u32>() {
+            return Some(parsed.min(100) as u8);
+        }
+    }
+    None
 }
 
 fn compile_gate(gate: &ManifestGate) -> Result<CompiledGate, String> {

@@ -2600,6 +2600,20 @@ impl AppState {
                 })
                 .into_iter()
                 .collect(),
+            AppEvent::AgentContextReported {
+                pane_id,
+                context_percent,
+            } => {
+                if let Some(terminal_id) = self.workspaces.iter().find_map(|ws| {
+                    ws.pane_state(pane_id)
+                        .map(|pane| pane.attached_terminal_id.clone())
+                }) {
+                    if let Some(terminal) = self.terminals.get_mut(&terminal_id) {
+                        terminal.set_context_percent(context_percent);
+                    }
+                }
+                Vec::new()
+            }
             AppEvent::HookStateReported {
                 pane_id,
                 source,

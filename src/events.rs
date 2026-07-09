@@ -66,6 +66,15 @@ pub enum AppEvent {
         process_exited: bool,
         observed_at: Instant,
     },
+    /// Best-effort context-window percentage extracted from a pane's screen.
+    /// Decoupled from state changes: it never drives notifications, only the
+    /// `context_percent` runtime fact. Emitted only by the unix screen-detection
+    /// task, so it is never constructed on the Windows binary.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    AgentContextReported {
+        pane_id: PaneId,
+        context_percent: Option<u8>,
+    },
     /// Hook-authoritative agent state was reported for a pane.
     HookStateReported {
         pane_id: PaneId,

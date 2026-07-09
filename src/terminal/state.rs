@@ -87,6 +87,10 @@ pub struct TerminalState {
     stale_full_lifecycle_hook_sessions: HashMap<String, Vec<StaleFullLifecycleHookSession>>,
     metadata_report_sequences: HashMap<String, u64>,
     pub state: AgentState,
+    /// Best-effort context-window percentage extracted from the agent's screen
+    /// via a manifest value-extractor (e.g. claude's context-remaining %).
+    /// Neutral runtime fact; `None` when the agent exposes no such value.
+    pub context_percent: Option<u8>,
     pub last_agent_state_change_seq: Option<u64>,
     /// Wall-clock instant of the most recent effective agent-state change.
     /// Server-side runtime fact; the sidebar renders it as a short "age" hint.
@@ -117,6 +121,7 @@ impl TerminalState {
             stale_full_lifecycle_hook_sessions: HashMap::new(),
             metadata_report_sequences: HashMap::new(),
             state: AgentState::Unknown,
+            context_percent: None,
             last_agent_state_change_seq: None,
             last_agent_state_change_at: None,
             revision: 0,
@@ -125,6 +130,16 @@ impl TerminalState {
             recent_agent_process_exit_at: None,
             pending_agent_resume_plan: None,
         }
+    }
+
+    /// Update the best-effort context-window percentage. Returns whether the
+    /// value changed. Ephemeral runtime fact — not part of session persistence.
+    pub fn set_context_percent(&mut self, percent: Option<u8>) -> bool {
+        if self.context_percent == percent {
+            return false;
+        }
+        self.context_percent = percent;
+        true
     }
 
     pub fn with_launch_argv(mut self, argv: Vec<String>) -> Self {

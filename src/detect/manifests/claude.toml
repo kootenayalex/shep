@@ -145,3 +145,14 @@ state = "idle"
 priority = 250
 region = "osc_progress"
 regex = ['^4;0']
+
+# Context-window meter (best-effort). Claude Code prints its remaining-context
+# hint as e.g. "Context left until auto-compact: 34%" near the prompt box. The
+# exact wording drifts across releases; this captures the percent from any line
+# mentioning context and a NN% figure. Tune via the manifest hot-reload loop if
+# the live string differs.
+[[extractors]]
+id = "context_remaining"
+region = "whole_recent"
+regex = '(?i)context[^\n%]*?(\d{1,3})\s*%'
+capture = 1

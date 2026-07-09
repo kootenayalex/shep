@@ -20,6 +20,7 @@ pub struct PaneDetail {
     pub last_agent_state_change_seq: Option<u64>,
     pub custom_status: Option<String>,
     pub state_labels: HashMap<String, String>,
+    pub context_percent: Option<u8>,
 }
 
 impl Tab {
@@ -64,6 +65,7 @@ impl Tab {
                     last_agent_state_change_seq: terminal.last_agent_state_change_seq,
                     custom_status: presentation.custom_status,
                     state_labels: presentation.state_labels,
+                    context_percent: terminal.context_percent,
                 })
             })
             .collect()

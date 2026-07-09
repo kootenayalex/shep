@@ -80,6 +80,7 @@ pub(crate) struct BoardCard {
     pub status: Option<String>,
     pub state: AgentState,
     pub seen: bool,
+    pub context_percent: Option<u8>,
     sort_seq: Option<u64>,
 }
 
@@ -137,6 +138,7 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             status: entry.custom_status,
             state: entry.state,
             seen: entry.seen,
+            context_percent: entry.context_percent,
             sort_seq: entry.last_agent_state_change_seq,
         });
     }
@@ -540,12 +542,22 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     };
     let dim = Style::default().fg(p.overlay0);
 
-    // Line 1: marker · dot · agent label … location.
+    // Line 1: marker · dot · agent label · context% … location.
     let head = format!("{marker}{dot} ");
     let loc_width = card.location.chars().count();
+    let percent = card
+        .context_percent
+        .map(|percent| format!("{percent}%"))
+        .unwrap_or_default();
+    let percent_reserved = if percent.is_empty() {
+        0
+    } else {
+        percent.chars().count() + 1
+    };
     let agent_budget = width
         .saturating_sub(head.chars().count())
         .saturating_sub(loc_width)
+        .saturating_sub(percent_reserved)
         .saturating_sub(1);
     let mut line1 = vec![
         Span::styled(marker.to_string(), marker_style),
@@ -553,6 +565,9 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         Span::raw(" "),
         Span::styled(truncate_end(&card.agent_label, agent_budget), agent_style),
     ];
+    if !percent.is_empty() {
+        line1.push(Span::styled(format!(" {percent}"), dim));
+    }
     if !card.location.is_empty() {
         line1.push(Span::styled(format!(" {}", card.location), dim));
     }

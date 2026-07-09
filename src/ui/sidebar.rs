@@ -29,6 +29,7 @@ pub(crate) struct AgentPanelEntry {
     pub last_agent_state_change_seq: Option<u64>,
     pub custom_status: Option<String>,
     pub state_labels: std::collections::HashMap<String, String>,
+    pub context_percent: Option<u8>,
 }
 
 fn sidebar_section_heights(total_h: u16, split_ratio: f32) -> (u16, u16) {
@@ -137,6 +138,7 @@ fn agent_panel_entries_with_runtimes(
                     last_agent_state_change_seq: detail.last_agent_state_change_seq,
                     custom_status: detail.custom_status,
                     state_labels: detail.state_labels,
+                    context_percent: detail.context_percent,
                 })
         })
         .collect();
@@ -1194,6 +1196,10 @@ fn render_agent_detail(
             status_spans.push(Span::styled(" · ", agent_style));
             status_spans.push(Span::styled(custom_status.clone(), agent_style));
         }
+        if let Some(percent) = detail.context_percent {
+            status_spans.push(Span::styled(" · ", agent_style));
+            status_spans.push(Span::styled(format!("{percent}%"), agent_style));
+        }
         frame.render_widget(
             Paragraph::new(Line::from(status_spans)).style(row_style),
             Rect::new(body.x, row_y, body.width, 1),
@@ -1581,6 +1587,7 @@ mod tests {
             last_agent_state_change_seq: None,
             custom_status: None,
             state_labels: std::collections::HashMap::new(),
+            context_percent: None,
         };
 
         let label = format_agent_panel_primary_label(&entry, 18);
