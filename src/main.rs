@@ -74,6 +74,7 @@ mod ipc;
 mod kitty_graphics;
 mod layout;
 mod logging;
+mod memory;
 mod pane;
 mod persist;
 mod platform;
