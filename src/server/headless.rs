@@ -37,11 +37,13 @@ use bytes::Bytes;
 use crate::api;
 use crate::app;
 use crate::config;
+use crate::detect::AgentState;
 use crate::events::AppEvent;
 use crate::ipc::{
     bind_local_listener, remove_socket_file_if_owned, socket_file_identity, LocalListener,
     SocketFileIdentity,
 };
+use crate::layout::PaneId;
 use crate::protocol::{
     self, AttachScrollDirection, AttachScrollSource, FrameData, ServerMessage, MAX_FRAME_SIZE,
     MAX_GRAPHICS_FRAME_SIZE,
@@ -57,7 +59,8 @@ use crate::server::clients::{
 };
 use crate::server::keybindings::{app_keybindings, apply_keybindings};
 use crate::server::notifications::{
-    should_forward_toast_to_clients, toast_message_from_state_change, toast_notify_kind,
+    notify_exec_decision, should_forward_toast_to_clients, toast_message_from_state_change,
+    toast_notify_kind, NotifyExecDecision,
 };
 use crate::server::socket_paths::{
     client_socket_path, prepare_socket_path, restrict_socket_permissions,
@@ -231,6 +234,66 @@ pub struct HeadlessServer {
     server_event_rx: mpsc::Receiver<ServerEvent>,
     /// Sender for server events (cloned for each client thread).
     server_event_tx: mpsc::Sender<ServerEvent>,
+    /// Last exec-bridge state fired per pane, for the "one exec per pane per
+    /// state-transition" debounce.
+    notify_exec_fired: HashMap<PaneId, AgentState>,
+}
+
+#[derive(Debug, Default)]
+struct NotifyExecContext {
+    agent: Option<String>,
+    workspace: Option<String>,
+    message: Option<String>,
+}
+
+/// Spawn the exec-bridge command detached, passing transition context through
+/// `SHEP_NOTIFY_*` env vars. Never blocks the caller: a short-lived reaper
+/// thread waits on the child so it does not become a zombie.
+fn spawn_notify_exec(
+    command: &str,
+    pane_id: PaneId,
+    state: AgentState,
+    context: NotifyExecContext,
+) {
+    let mut cmd = notify_exec_command(command);
+    cmd.env(
+        "SHEP_NOTIFY_STATE",
+        crate::detect::manifest::agent_state_label(state),
+    );
+    cmd.env("SHEP_NOTIFY_AGENT", context.agent.unwrap_or_default());
+    cmd.env(
+        "SHEP_NOTIFY_WORKSPACE",
+        context.workspace.unwrap_or_default(),
+    );
+    cmd.env("SHEP_NOTIFY_PANE_ID", pane_id.raw().to_string());
+    cmd.env("SHEP_NOTIFY_MESSAGE", context.message.unwrap_or_default());
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    match cmd.spawn() {
+        Ok(mut child) => {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
+        Err(err) => {
+            warn!(err = %err, command, "notifications.exec failed to spawn");
+        }
+    }
+}
+
+#[cfg(unix)]
+fn notify_exec_command(command: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new("sh");
+    cmd.arg("-c").arg(command);
+    cmd
+}
+
+#[cfg(windows)]
+fn notify_exec_command(command: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new("cmd");
+    cmd.arg("/C").arg(command);
+    cmd
 }
 
 fn apply_terminal_attach_scroll(
@@ -414,6 +477,7 @@ impl HeadlessServer {
             should_quit,
             server_event_rx,
             server_event_tx,
+            notify_exec_fired: HashMap::new(),
         })
     }
 
@@ -1202,6 +1266,65 @@ impl HeadlessServer {
         )
     }
 
+    /// Run the `[notifications]` exec-bridge for an effective agent-state
+    /// transition. Debounced to at most one exec per pane per state-transition.
+    /// Server-side shared behavior — never blocks the event loop (spawn-and-forget).
+    fn maybe_fire_notify_exec(
+        &mut self,
+        pane_id: PaneId,
+        prev_state: AgentState,
+        new_state: AgentState,
+    ) {
+        let decision = notify_exec_decision(
+            &self.app.state.notifications,
+            self.notify_exec_fired.get(&pane_id).copied(),
+            prev_state,
+            new_state,
+        );
+        match decision {
+            NotifyExecDecision::Skip { clear_debounce } => {
+                if clear_debounce {
+                    self.notify_exec_fired.remove(&pane_id);
+                }
+            }
+            NotifyExecDecision::Fire => {
+                self.notify_exec_fired.insert(pane_id, new_state);
+                let Some(exec) = self.app.state.notifications.exec.clone() else {
+                    return;
+                };
+                let context = self.notify_exec_context(pane_id);
+                spawn_notify_exec(&exec, pane_id, new_state, context);
+            }
+        }
+    }
+
+    /// Gather the (agent, workspace, message) context passed to the exec-bridge
+    /// command as `SHEP_NOTIFY_*` env vars.
+    fn notify_exec_context(&self, pane_id: PaneId) -> NotifyExecContext {
+        for ws in &self.app.state.workspaces {
+            for tab in &ws.tabs {
+                let Some(pane) = tab.panes.get(&pane_id) else {
+                    continue;
+                };
+                let terminal = self.app.state.terminals.get(&pane.attached_terminal_id);
+                let agent = terminal
+                    .and_then(|terminal| terminal.effective_agent_label())
+                    .map(str::to_string);
+                let workspace = Some(
+                    ws.display_name_from(&self.app.state.terminals, &self.app.terminal_runtimes),
+                );
+                let message =
+                    terminal.and_then(|terminal| terminal.effective_presentation().custom_status);
+                return NotifyExecContext {
+                    agent,
+                    workspace,
+                    message,
+                };
+            }
+        }
+        NotifyExecContext::default()
+    }
+
     fn promote_client_to_foreground(&mut self, client_id: u64) -> bool {
         let stamp = self.allocate_activity_stamp();
         let Some(client) = self.clients.get_mut(&client_id) else {
@@ -1885,6 +2008,10 @@ impl HeadlessServer {
                 let next_state = self.pane_effective_state(pane_id_val);
                 let next_agent_label = self.pane_effective_agent_label(pane_id_val);
 
+                // Exec-bridge: fire the user's notification command on an
+                // effective transition that passes the `notify_on` filter.
+                self.maybe_fire_notify_exec(pane_id_val, prev_state, next_state);
+
                 if self.app.state.toast_config.delay_seconds == 0
                     && self.app.state.sound.allows(agent_val)
                 {
@@ -1976,6 +2103,10 @@ impl HeadlessServer {
 
                 let next_state = self.pane_effective_state(pane_id_val);
                 let next_agent_label = self.pane_effective_agent_label(pane_id_val);
+
+                // Exec-bridge: fire the user's notification command on an
+                // effective transition that passes the `notify_on` filter.
+                self.maybe_fire_notify_exec(pane_id_val, prev_state, next_state);
 
                 if self.app.state.toast_config.delay_seconds == 0
                     && self.app.state.sound.allows(agent_val)
@@ -3049,6 +3180,9 @@ impl HeadlessServer {
                     );
                 }
             }
+
+            // Exec-bridge for state changes that landed during an API request.
+            self.maybe_fire_notify_exec(*pane_id, *prev_state, new_state);
         }
 
         if !skip_default_workspace && latest_app_client(&self.clients).is_some() {
@@ -4217,6 +4351,7 @@ mod tests {
             should_quit,
             server_event_rx,
             server_event_tx,
+            notify_exec_fired: HashMap::new(),
         }
     }
 

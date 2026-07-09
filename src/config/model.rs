@@ -300,6 +300,7 @@ pub struct Config {
     pub advanced: AdvancedConfig,
     pub experimental: ExperimentalConfig,
     pub remote: RemoteConfig,
+    pub notifications: NotificationsConfig,
 }
 
 #[derive(Debug)]
@@ -885,6 +886,67 @@ impl Default for RemoteConfig {
         Self {
             manage_ssh_config: true,
         }
+    }
+}
+
+/// An agent state that the exec-bridge notification filter can match on.
+/// Neutral runtime naming — mirrors `crate::detect::AgentState`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NotifyState {
+    Idle,
+    Working,
+    Blocked,
+    Unknown,
+}
+
+impl NotifyState {
+    fn matches(self, state: crate::detect::AgentState) -> bool {
+        use crate::detect::AgentState;
+        matches!(
+            (self, state),
+            (Self::Idle, AgentState::Idle)
+                | (Self::Working, AgentState::Working)
+                | (Self::Blocked, AgentState::Blocked)
+                | (Self::Unknown, AgentState::Unknown)
+        )
+    }
+}
+
+/// `[notifications]` config: the omnara-style "notify only when blocked" filter
+/// plus a user-configurable exec-bridge hook (voicebox / KDE Connect / ntfy).
+///
+/// Scope: `notify_on` governs the new exec-bridge channel only. Existing
+/// toast/sound notification behavior is intentionally left unchanged so this
+/// preserves upstream behavior exactly; the exec-bridge is a net-new interrupt
+/// channel and defaults to blocked-only so shep only pages Alex when an agent
+/// actually needs him.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct NotificationsConfig {
+    /// Agent states whose effective transitions fire the exec-bridge.
+    /// Empty list = fire on every effective state change (i.e. the maximal,
+    /// no-filter behavior). Default: `["blocked"]`.
+    pub notify_on: Vec<NotifyState>,
+    /// Shell command run detached when a transition passes `notify_on`.
+    /// Context is passed via `SHEP_NOTIFY_*` env vars. Unset = no exec.
+    pub exec: Option<String>,
+}
+
+impl Default for NotificationsConfig {
+    fn default() -> Self {
+        Self {
+            notify_on: vec![NotifyState::Blocked],
+            exec: None,
+        }
+    }
+}
+
+impl NotificationsConfig {
+    /// Whether an effective transition into `state` passes the `notify_on`
+    /// filter. An empty `notify_on` list matches every state.
+    pub fn should_notify(&self, state: crate::detect::AgentState) -> bool {
+        self.notify_on.is_empty() || self.notify_on.iter().any(|allowed| allowed.matches(state))
     }
 }
 
@@ -1674,6 +1736,64 @@ switch_ascii_input_source_in_prefix = true
         assert!(config.experimental.kitty_graphics);
         assert!(config.experimental.pane_history);
         assert!(config.experimental.switch_ascii_input_source_in_prefix);
+    }
+
+    #[test]
+    fn notifications_defaults_to_blocked_only_and_no_exec() {
+        let config = Config::default();
+        assert_eq!(config.notifications.notify_on, vec![NotifyState::Blocked]);
+        assert!(config.notifications.exec.is_none());
+        assert!(config
+            .notifications
+            .should_notify(crate::detect::AgentState::Blocked));
+        assert!(!config
+            .notifications
+            .should_notify(crate::detect::AgentState::Idle));
+        assert!(!config
+            .notifications
+            .should_notify(crate::detect::AgentState::Working));
+    }
+
+    #[test]
+    fn notifications_empty_notify_on_matches_every_state() {
+        let toml = r#"
+[notifications]
+notify_on = []
+exec = "voicebox-say"
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(config.notifications.notify_on.is_empty());
+        assert_eq!(config.notifications.exec.as_deref(), Some("voicebox-say"));
+        for state in [
+            crate::detect::AgentState::Idle,
+            crate::detect::AgentState::Working,
+            crate::detect::AgentState::Blocked,
+            crate::detect::AgentState::Unknown,
+        ] {
+            assert!(config.notifications.should_notify(state));
+        }
+    }
+
+    #[test]
+    fn notifications_parses_multiple_states() {
+        let toml = r#"
+[notifications]
+notify_on = ["blocked", "idle"]
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert_eq!(
+            config.notifications.notify_on,
+            vec![NotifyState::Blocked, NotifyState::Idle]
+        );
+        assert!(config
+            .notifications
+            .should_notify(crate::detect::AgentState::Idle));
+        assert!(config
+            .notifications
+            .should_notify(crate::detect::AgentState::Blocked));
+        assert!(!config
+            .notifications
+            .should_notify(crate::detect::AgentState::Working));
     }
 
     #[test]

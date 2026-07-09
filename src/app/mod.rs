@@ -629,6 +629,7 @@ impl App {
             sound: config.ui.sound.clone(),
             local_sound_playback: true,
             toast_config: config.ui.toast.clone(),
+            notifications: config.notifications.clone(),
             keybinds: config.keybinds(),
             spinner_tick: 0,
             palette: theme_palette,
@@ -1397,6 +1398,10 @@ impl App {
                 self.state.sound = config.ui.sound.clone();
                 self.state.toast_config = config.ui.toast.clone();
             }
+        }
+
+        if !invalid_section("notifications") {
+            self.state.notifications = config.notifications.clone();
         }
 
         if !invalid_section("experimental") {

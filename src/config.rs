@@ -19,9 +19,9 @@ pub use self::{
     },
     model::{
         validated_sidebar_bounds, AgentPanelSortConfig, Config, ConfigReloadReport,
-        ConfigReloadStatus, HostCursorModeConfig, NewTerminalCwdConfig, ShellModeConfig,
-        SidebarCollapsedModeConfig, ToastClipboardPosition, ToastConfig, ToastDelivery,
-        ToastShepPosition, UpdateChannelConfig, MAX_TOAST_DELAY_SECONDS,
+        ConfigReloadStatus, HostCursorModeConfig, NewTerminalCwdConfig, NotificationsConfig,
+        ShellModeConfig, SidebarCollapsedModeConfig, ToastClipboardPosition, ToastConfig,
+        ToastDelivery, ToastShepPosition, UpdateChannelConfig, MAX_TOAST_DELAY_SECONDS,
     },
     sound::SoundConfig,
     theme::{parse_color, CustomThemeColors, ThemeConfig},
@@ -29,6 +29,10 @@ pub use self::{
 
 pub(crate) use self::io::upsert_top_level_bool;
 pub(crate) use self::keybinds::parse_key_combo;
+// Part of the public `NotificationsConfig` surface; currently only named by
+// exec-bridge tests in other modules, so allow it to be otherwise unused.
+#[allow(unused_imports)]
+pub use self::model::NotifyState;
 
 pub const CONFIG_PATH_ENV_VAR: &str = "SHEP_CONFIG_PATH";
 pub const DEFAULT_SCROLLBACK_LIMIT_BYTES: usize = 10_000_000;

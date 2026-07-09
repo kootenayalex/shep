@@ -56,6 +56,48 @@ pub(crate) fn toast_message_from_state_change(
         })
 }
 
+/// Outcome of evaluating an effective agent-state transition against the
+/// exec-bridge `[notifications]` policy. Pure so it is unit-testable without a
+/// running server or spawned process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NotifyExecDecision {
+    /// Do not fire. `clear_debounce` asks the caller to forget any remembered
+    /// fire for this pane so a later re-entry into a notify state fires again.
+    Skip { clear_debounce: bool },
+    /// Fire the exec-bridge and remember `new` as this pane's last fired state.
+    Fire,
+}
+
+/// Decide whether an effective transition `prev -> new` should fire the
+/// exec-bridge. `last_fired` is the state most recently fired for this pane (or
+/// `None`). Debounce contract: at most one exec per pane per state-transition —
+/// no repeat fire while the pane stays in the same notify state.
+pub(crate) fn notify_exec_decision(
+    notifications: &config::NotificationsConfig,
+    last_fired: Option<AgentState>,
+    prev: AgentState,
+    new: AgentState,
+) -> NotifyExecDecision {
+    if prev == new {
+        return NotifyExecDecision::Skip {
+            clear_debounce: false,
+        };
+    }
+    if !notifications.should_notify(new) {
+        // The pane left the notify set; forget the last fire so the next entry
+        // into a notify state is treated as a fresh transition.
+        return NotifyExecDecision::Skip {
+            clear_debounce: true,
+        };
+    }
+    if last_fired == Some(new) {
+        return NotifyExecDecision::Skip {
+            clear_debounce: false,
+        };
+    }
+    NotifyExecDecision::Fire
+}
+
 fn toast_event_text(kind: app::state::ToastKind) -> &'static str {
     match kind {
         app::state::ToastKind::NeedsAttention => "needs attention",
@@ -72,6 +114,88 @@ mod tests {
     use crate::detect::Agent;
     #[cfg(unix)]
     use crate::terminal::TerminalState;
+
+    use super::{notify_exec_decision, NotifyExecDecision};
+    use crate::config::{NotificationsConfig, NotifyState};
+    use crate::detect::AgentState;
+
+    fn notify_on(states: &[NotifyState]) -> NotificationsConfig {
+        NotificationsConfig {
+            notify_on: states.to_vec(),
+            exec: None,
+        }
+    }
+
+    #[test]
+    fn notify_exec_skips_when_state_unchanged() {
+        let config = notify_on(&[NotifyState::Blocked]);
+        assert_eq!(
+            notify_exec_decision(&config, None, AgentState::Blocked, AgentState::Blocked),
+            NotifyExecDecision::Skip {
+                clear_debounce: false
+            }
+        );
+    }
+
+    #[test]
+    fn notify_exec_fires_on_transition_into_blocked() {
+        let config = notify_on(&[NotifyState::Blocked]);
+        assert_eq!(
+            notify_exec_decision(&config, None, AgentState::Working, AgentState::Blocked),
+            NotifyExecDecision::Fire
+        );
+    }
+
+    #[test]
+    fn notify_exec_does_not_refire_while_state_stays_blocked() {
+        let config = notify_on(&[NotifyState::Blocked]);
+        // Already fired for blocked; a redundant blocked report must not re-fire.
+        assert_eq!(
+            notify_exec_decision(
+                &config,
+                Some(AgentState::Blocked),
+                AgentState::Working,
+                AgentState::Blocked,
+            ),
+            NotifyExecDecision::Skip {
+                clear_debounce: false
+            }
+        );
+    }
+
+    #[test]
+    fn notify_exec_clears_debounce_when_leaving_notify_set() {
+        let config = notify_on(&[NotifyState::Blocked]);
+        assert_eq!(
+            notify_exec_decision(
+                &config,
+                Some(AgentState::Blocked),
+                AgentState::Blocked,
+                AgentState::Working,
+            ),
+            NotifyExecDecision::Skip {
+                clear_debounce: true
+            }
+        );
+    }
+
+    #[test]
+    fn notify_exec_empty_filter_fires_on_every_transition() {
+        let config = notify_on(&[]);
+        assert_eq!(
+            notify_exec_decision(&config, None, AgentState::Blocked, AgentState::Working),
+            NotifyExecDecision::Fire
+        );
+        assert_eq!(
+            notify_exec_decision(
+                &config,
+                Some(AgentState::Working),
+                AgentState::Working,
+                AgentState::Idle,
+            ),
+            NotifyExecDecision::Fire
+        );
+    }
 
     #[cfg(unix)]
     fn init_repo(path: &std::path::Path) {
