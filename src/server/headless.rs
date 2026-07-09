@@ -237,6 +237,8 @@ pub struct HeadlessServer {
     /// Last exec-bridge state fired per pane, for the "one exec per pane per
     /// state-transition" debounce.
     notify_exec_fired: HashMap<PaneId, AgentState>,
+    /// Keeps the M4 filesystem watchers alive for the server's lifetime.
+    _fs_watchers: Option<notify::RecommendedWatcher>,
 }
 
 #[derive(Debug, Default)]
@@ -478,6 +480,23 @@ impl HeadlessServer {
             server_event_rx,
             server_event_tx,
             notify_exec_fired: HashMap::new(),
+            _fs_watchers: {
+                let path = super::watchers::watchers_config_path();
+                match std::fs::read_to_string(&path) {
+                    Ok(raw) => {
+                        let (entries, diagnostics) = super::watchers::parse_watchers_config(&raw);
+                        for diagnostic in diagnostics {
+                            tracing::warn!("{diagnostic}");
+                        }
+                        super::watchers::spawn_watchers(entries)
+                    }
+                    Err(err) if err.kind() == io::ErrorKind::NotFound => None,
+                    Err(err) => {
+                        tracing::warn!(err = %err, "cannot read watchers.toml");
+                        None
+                    }
+                }
+            },
         })
     }
 
@@ -4438,6 +4457,7 @@ mod tests {
             server_event_rx,
             server_event_tx,
             notify_exec_fired: HashMap::new(),
+            _fs_watchers: None,
         }
     }
 
