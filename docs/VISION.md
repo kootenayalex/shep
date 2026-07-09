@@ -92,3 +92,27 @@ Architect+delegate: this plan is the architecture; execution runs as **Opus 4.8 
 4. M2: fresh claude session sees memory in context (ask it "what do you know about me"); `shep memory add` past cap → error; stop a session → reflection turn fires exactly once.
 5. M3: dirty worktree → review overlay shows diff + stats; ship merges + cleans up; request-changes lands in the origin session's input.
 6. M4: `shep task add` → auto-dispatch on idle → completion flips board state; watcher file-drop enqueues.
+
+## Status — 2026-07-09
+
+M0–M4 are landed and green (`just check`, ~2,650 tests). From M5, tab-to-queue
+is landed (`shep agent send --queue`, pane "Queue prompt..." menu).
+
+**Model routing (M5.1) is config, not code**: `[tasks]` launch commands are
+free-form shell, so local-model dispatch is
+
+```toml
+[tasks]
+claude_command = "ANTHROPIC_BASE_URL=http://127.0.0.1:7860/mlx/v1 claude"
+```
+
+(odysseus-mlx gateway). Per-task model choice = a second config profile or an
+inline env prefix; a first-class model bar remains open.
+
+**Deferred** (open, in rough value order):
+- dispatch-review to a second agent (M3 stretch)
+- board task/review columns (board currently shows agent states only)
+- approach comparison (two worktrees side-by-side)
+- session recording (asciinema)
+- native width-adaptive diff widget (review currently uses a pager pane)
+- queued-input indicator in sidebar/board
