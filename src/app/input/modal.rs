@@ -695,6 +695,14 @@ pub(super) fn apply_context_menu_action(
             state.request_open_existing_worktree = Some(ws_idx);
             leave_modal(state);
         }
+        (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Review diff")) => {
+            state.request_review_workspace = Some(ws_idx);
+            leave_modal(state);
+        }
+        (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Ship worktree...")) => {
+            state.request_ship_worktree = Some(ws_idx);
+            leave_modal(state);
+        }
         (
             ContextMenuKind::GitWorkspace {
                 ws_idx, collapsed, ..
@@ -1108,6 +1116,14 @@ impl App {
             }
             (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Open worktree...")) => {
                 self.state.request_open_existing_worktree = Some(ws_idx);
+                leave_modal(&mut self.state);
+            }
+            (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Review diff")) => {
+                self.state.request_review_workspace = Some(ws_idx);
+                leave_modal(&mut self.state);
+            }
+            (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Ship worktree...")) => {
+                self.state.request_ship_worktree = Some(ws_idx);
                 leave_modal(&mut self.state);
             }
             (

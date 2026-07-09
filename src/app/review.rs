@@ -73,6 +73,110 @@ impl crate::app::App {
     }
 }
 
+impl crate::app::App {
+    /// Ship a linked-worktree workspace: merge its branch into the base
+    /// checkout's branch, then hand cleanup to the existing worktree-remove
+    /// confirmation flow. Refuses (with a toast, never losing work) when
+    /// either checkout is dirty, the branch is detached, or the merge
+    /// conflicts — a conflicted merge is aborted in the base checkout.
+    /// The merge is a fast local git operation; it runs synchronously.
+    pub(crate) fn ship_worktree(&mut self, ws_idx: usize) {
+        let Some(ws) = self.state.workspaces.get(ws_idx) else {
+            return;
+        };
+        let Some(space) = ws
+            .worktree_space()
+            .filter(|space| space.is_linked_worktree)
+            .cloned()
+        else {
+            self.ship_toast(false, "not a linked-worktree workspace".to_string());
+            return;
+        };
+        match ship_merge(&space) {
+            Ok(message) => {
+                self.ship_toast(true, message);
+                // Auto-cleanup via the existing removal flow (confirmation
+                // dialog, async removal, workspace close).
+                self.state.request_remove_linked_worktree = Some(ws_idx);
+            }
+            Err(message) => self.ship_toast(false, message),
+        }
+    }
+
+    fn ship_toast(&mut self, ok: bool, context: String) {
+        use crate::app::state::{ToastKind, ToastNotification};
+        self.state.toast = Some(ToastNotification {
+            kind: if ok {
+                ToastKind::Finished
+            } else {
+                ToastKind::NeedsAttention
+            },
+            title: if ok { "shipped" } else { "ship failed" }.to_string(),
+            context,
+            position: None,
+            target: None,
+        });
+    }
+}
+
+/// The merge half of ship, separated from workspace state for testing against
+/// real temp repos. Returns a human summary on success.
+pub(crate) fn ship_merge(space: &WorktreeSpaceMembership) -> Result<String, String> {
+    if !git_status_clean(&space.checkout_path)? {
+        return Err("worktree has uncommitted changes — commit or stash first".to_string());
+    }
+    let branch = git_stdout(&space.checkout_path, &["rev-parse", "--abbrev-ref", "HEAD"])
+        .ok_or_else(|| "cannot resolve the worktree branch".to_string())?;
+    if branch == "HEAD" {
+        return Err("worktree is on a detached HEAD".to_string());
+    }
+    let base = git_stdout(&space.repo_root, &["rev-parse", "--abbrev-ref", "HEAD"])
+        .ok_or_else(|| "cannot resolve the base checkout branch".to_string())?;
+    if base == branch {
+        return Err(format!("worktree is already on the base branch {base}"));
+    }
+    if !git_status_clean(&space.repo_root)? {
+        return Err(format!(
+            "base checkout ({base}) has uncommitted changes — commit or stash first"
+        ));
+    }
+    if let Err(err) = git_run(&space.repo_root, &["merge", "--no-edit", &branch]) {
+        // Leave the base checkout the way we found it.
+        let _ = git_run(&space.repo_root, &["merge", "--abort"]);
+        return Err(format!("merge of {branch} into {base} failed: {err}"));
+    }
+    Ok(format!("merged {branch} into {base}"))
+}
+
+/// Whether `git status --porcelain` is empty in `dir`.
+fn git_status_clean(dir: &Path) -> Result<bool, String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["status", "--porcelain", "--untracked-files=no"])
+        .output()
+        .map_err(|err| err.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(output.stdout.is_empty())
+}
+
+/// Run a git command in `dir`, mapping failure to its stderr.
+fn git_run(dir: &Path, args: &[&str]) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .map_err(|err| err.to_string())?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
 /// What `git diff` is run against. Linked worktrees review the whole branch
 /// (merge-base with the base checkout's current branch) plus uncommitted work;
 /// everything else reviews the working tree against `HEAD`. Any git failure
@@ -226,6 +330,69 @@ mod tests {
             git_stdout(&checkout, &["rev-parse", "HEAD"]).unwrap(),
             "merge-base must trail the feature commit"
         );
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    fn worktree_fixture(tag: &str) -> (PathBuf, WorktreeSpaceMembership) {
+        let base = temp_dir(tag);
+        let repo = base.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        run_git(&repo, &["init", "-b", "main"]);
+        std::fs::write(repo.join("a.txt"), "one\n").unwrap();
+        run_git(&repo, &["add", "."]);
+        run_git(&repo, &["commit", "-m", "one"]);
+        let checkout = base.join("wt");
+        run_git(
+            &repo,
+            &["worktree", "add", "-b", "feature", checkout.to_str().unwrap()],
+        );
+        std::fs::write(checkout.join("b.txt"), "two\n").unwrap();
+        run_git(&checkout, &["add", "."]);
+        run_git(&checkout, &["commit", "-m", "two"]);
+        let membership = WorktreeSpaceMembership {
+            key: "k".into(),
+            label: "feature".into(),
+            repo_root: repo,
+            checkout_path: checkout,
+            is_linked_worktree: true,
+        };
+        (base, membership)
+    }
+
+    #[test]
+    fn ship_merge_fast_forwards_clean_worktree() {
+        let (base, membership) = worktree_fixture("ship-ok");
+        let message = ship_merge(&membership).unwrap();
+        assert_eq!(message, "merged feature into main");
+        // The base checkout now contains the worktree commit.
+        assert!(membership.repo_root.join("b.txt").exists());
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn ship_merge_refuses_dirty_worktree() {
+        let (base, membership) = worktree_fixture("ship-dirty");
+        std::fs::write(membership.checkout_path.join("b.txt"), "edited\n").unwrap();
+        let err = ship_merge(&membership).unwrap_err();
+        assert!(err.contains("uncommitted"), "{err}");
+        assert!(
+            !membership.repo_root.join("b.txt").exists(),
+            "merge must not have happened"
+        );
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn ship_merge_aborts_on_conflict_and_reports() {
+        let (base, membership) = worktree_fixture("ship-conflict");
+        // Conflicting change on main.
+        std::fs::write(membership.repo_root.join("b.txt"), "main-side\n").unwrap();
+        run_git(&membership.repo_root, &["add", "."]);
+        run_git(&membership.repo_root, &["commit", "-m", "conflict"]);
+        let err = ship_merge(&membership).unwrap_err();
+        assert!(err.contains("failed"), "{err}");
+        // Base checkout left clean (merge aborted).
+        assert!(git_status_clean(&membership.repo_root).unwrap());
         std::fs::remove_dir_all(&base).ok();
     }
 

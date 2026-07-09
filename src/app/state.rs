@@ -1138,11 +1138,17 @@ impl ContextMenuState {
                 is_linked_worktree: false,
                 has_worktree_children: false,
                 ..
-            } => &["Rename", "Close", "New worktree", "Open worktree..."],
+            } => &["Rename", "Close", "Review diff", "New worktree", "Open worktree..."],
             ContextMenuKind::GitWorkspace {
                 is_linked_worktree: true,
                 ..
-            } => &["Rename", "Close", "Delete worktree checkout..."],
+            } => &[
+                "Rename",
+                "Close",
+                "Review diff",
+                "Ship worktree...",
+                "Delete worktree checkout...",
+            ],
             ContextMenuKind::GitWorkspace {
                 is_linked_worktree: false,
                 has_worktree_children: true,
@@ -1336,6 +1342,9 @@ pub struct AppState {
     /// Workspace index whose review pager should open; drained by the App/
     /// headless loops (pane creation cannot happen from AppState input code).
     pub request_review_workspace: Option<usize>,
+    /// Workspace index to ship (merge linked-worktree branch into its base);
+    /// drained by the App/headless loops.
+    pub request_ship_worktree: Option<usize>,
     /// Set when the headless server should ask attached clients to reload
     /// their client-local sound config from disk.
     pub request_client_config_reload: bool,
@@ -1697,6 +1706,7 @@ impl AppState {
             request_submit_worktree_remove: false,
             request_reload_config: false,
             request_review_workspace: None,
+            request_ship_worktree: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
             creating_new_tab: false,
@@ -2271,7 +2281,13 @@ mod tests {
 
         assert_eq!(
             menu.items(),
-            &["Rename", "Close", "Delete worktree checkout..."]
+            &[
+                "Rename",
+                "Close",
+                "Review diff",
+                "Ship worktree...",
+                "Delete worktree checkout...",
+            ]
         );
     }
 
@@ -2291,7 +2307,7 @@ mod tests {
 
         assert_eq!(
             menu.items(),
-            &["Rename", "Close", "New worktree", "Open worktree..."]
+            &["Rename", "Close", "Review diff", "New worktree", "Open worktree..."]
         );
     }
 

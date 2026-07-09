@@ -524,6 +524,7 @@ impl App {
             request_submit_worktree_remove: false,
             request_reload_config: false,
             request_review_workspace: None,
+            request_ship_worktree: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
             creating_new_tab: false,
@@ -991,6 +992,11 @@ impl App {
 
             if let Some(ws_idx) = self.state.request_review_workspace.take() {
                 self.open_review_pager(ws_idx);
+                needs_render = true;
+            }
+
+            if let Some(ws_idx) = self.state.request_ship_worktree.take() {
+                self.ship_worktree(ws_idx);
                 needs_render = true;
             }
 
