@@ -301,6 +301,7 @@ pub struct Config {
     pub experimental: ExperimentalConfig,
     pub remote: RemoteConfig,
     pub notifications: NotificationsConfig,
+    pub tasks: TasksConfig,
 }
 
 #[derive(Debug)]
@@ -947,6 +948,40 @@ impl NotificationsConfig {
     /// filter. An empty `notify_on` list matches every state.
     pub fn should_notify(&self, state: crate::detect::AgentState) -> bool {
         self.notify_on.is_empty() || self.notify_on.iter().any(|allowed| allowed.matches(state))
+    }
+}
+
+/// `[tasks]` — the M4 task queue. Auto-dispatch is opt-in; launch commands are
+/// overridable so permission flags / model choices stay the user's call.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct TasksConfig {
+    /// Dispatch the next queued task automatically when an agent transitions
+    /// to idle or done. Default: false.
+    pub auto_dispatch: bool,
+    /// Launch command for claude tasks; the prompt is appended as one quoted
+    /// shell argument.
+    pub claude_command: String,
+    /// Launch command for opencode tasks.
+    pub opencode_command: String,
+}
+
+impl Default for TasksConfig {
+    fn default() -> Self {
+        Self {
+            auto_dispatch: false,
+            claude_command: "claude".to_string(),
+            opencode_command: "opencode --prompt".to_string(),
+        }
+    }
+}
+
+impl TasksConfig {
+    pub fn runtime_command(&self, runtime: crate::tasks::TaskRuntime) -> &str {
+        match runtime {
+            crate::tasks::TaskRuntime::Claude => &self.claude_command,
+            crate::tasks::TaskRuntime::Opencode => &self.opencode_command,
+        }
     }
 }
 

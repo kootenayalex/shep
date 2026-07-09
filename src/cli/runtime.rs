@@ -13,6 +13,12 @@ fn print_method_response(id: &'static str, method: Method) -> std::io::Result<i3
     })?)
 }
 
+pub(super) fn task_dispatch(
+    params: crate::api::schema::TaskDispatchParams,
+) -> std::io::Result<i32> {
+    print_method_response("cli:task:dispatch", Method::TaskDispatch(params))
+}
+
 pub(super) fn workspace_list() -> std::io::Result<i32> {
     print_method_response(
         "cli:workspace:list",

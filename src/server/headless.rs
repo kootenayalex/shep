@@ -1281,6 +1281,78 @@ impl HeadlessServer {
     /// Run the `[notifications]` exec-bridge for an effective agent-state
     /// transition. Debounced to at most one exec per pane per state-transition.
     /// Server-side shared behavior — never blocks the event loop (spawn-and-forget).
+    /// Task-queue reactions to an effective agent-state transition (M4):
+    /// track the dispatched task's state through its workspace, flip the
+    /// workspace to needs_review when its task finishes, and auto-dispatch the
+    /// next queued task when capacity frees up (opt-in via `[tasks]
+    /// auto_dispatch`). Fail-quiet: a missing/broken store must never disturb
+    /// the session loop.
+    fn maybe_task_transition(
+        &mut self,
+        pane_id: PaneId,
+        prev_state: AgentState,
+        new_state: AgentState,
+    ) {
+        if prev_state == new_state {
+            return;
+        }
+        let db_path = crate::tasks::tasks_db_path();
+        let has_store = db_path.exists();
+        let finished = prev_state == AgentState::Working && new_state == AgentState::Idle;
+
+        if has_store {
+            let Ok(conn) = crate::tasks::open_store(&db_path) else {
+                return;
+            };
+            // Track the task dispatched into this pane's workspace.
+            let ws_id = self
+                .app
+                .state
+                .workspaces
+                .iter()
+                .find(|ws| ws.tabs.iter().any(|tab| tab.panes.contains_key(&pane_id)))
+                .map(|ws| ws.id.clone());
+            if let Some(ws_id) = ws_id {
+                if let Ok(Some(task)) = crate::tasks::task_for_workspace(&conn, &ws_id) {
+                    let next = match new_state {
+                        AgentState::Blocked => Some(crate::tasks::TaskState::Blocked),
+                        AgentState::Working => Some(crate::tasks::TaskState::Running),
+                        AgentState::Idle if finished => Some(crate::tasks::TaskState::Done),
+                        _ => None,
+                    };
+                    if let Some(next) = next.filter(|next| *next != task.state) {
+                        let now = crate::tasks::unix_now();
+                        if let Err(err) =
+                            crate::tasks::set_task_state(&conn, task.id, next, None, now)
+                        {
+                            tracing::warn!(err = %err, task_id = task.id, "task state update failed");
+                        }
+                        if next == crate::tasks::TaskState::Done {
+                            if let Some(ws) = self
+                                .app
+                                .state
+                                .workspaces
+                                .iter_mut()
+                                .find(|ws| ws.id == ws_id)
+                            {
+                                ws.review_state = crate::api::schema::ReviewState::NeedsReview;
+                            }
+                        }
+                    }
+                }
+            }
+            // Capacity freed: dispatch the next queued task if enabled.
+            if finished && self.app.state.tasks_config.auto_dispatch {
+                if let Ok(Some(_)) = crate::tasks::next_todo(&conn) {
+                    drop(conn);
+                    if let Err(err) = self.app.dispatch_task(None) {
+                        tracing::warn!(err = %err, "auto-dispatch failed");
+                    }
+                }
+            }
+        }
+    }
+
     fn maybe_fire_notify_exec(
         &mut self,
         pane_id: PaneId,
@@ -2023,6 +2095,7 @@ impl HeadlessServer {
                 // Exec-bridge: fire the user's notification command on an
                 // effective transition that passes the `notify_on` filter.
                 self.maybe_fire_notify_exec(pane_id_val, prev_state, next_state);
+                self.maybe_task_transition(pane_id_val, prev_state, next_state);
 
                 if self.app.state.toast_config.delay_seconds == 0
                     && self.app.state.sound.allows(agent_val)
@@ -2119,6 +2192,7 @@ impl HeadlessServer {
                 // Exec-bridge: fire the user's notification command on an
                 // effective transition that passes the `notify_on` filter.
                 self.maybe_fire_notify_exec(pane_id_val, prev_state, next_state);
+                self.maybe_task_transition(pane_id_val, prev_state, next_state);
 
                 if self.app.state.toast_config.delay_seconds == 0
                     && self.app.state.sound.allows(agent_val)

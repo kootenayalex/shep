@@ -1459,6 +1459,8 @@ pub struct AppState {
     pub sound: SoundConfig,
     pub local_sound_playback: bool,
     pub toast_config: ToastConfig,
+    /// Server-owned task-queue policy (`[tasks]`).
+    pub tasks_config: crate::config::TasksConfig,
     /// Server-owned exec-bridge notification policy (`[notifications]`).
     /// Governs the exec-bridge only; toast/sound policy is unchanged.
     pub notifications: NotificationsConfig,
@@ -1771,6 +1773,7 @@ impl AppState {
             config_diagnostic: None,
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
+            tasks_config: Default::default(),
             copy_feedback: None,
             outer_terminal_focus: None,
             prefix_code: KeyCode::Char('b'),

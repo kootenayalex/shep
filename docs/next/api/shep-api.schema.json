@@ -3540,6 +3540,19 @@
           ],
           "type": "object"
         },
+        "TaskDispatchParams": {
+          "properties": {
+            "task_id": {
+              "description": "Task to dispatch; omitted = oldest queued task.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
         "ToastShepPosition": {
           "enum": [
             "top-left",
@@ -4028,6 +4041,22 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/WorkspaceSetReviewStateParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "task.dispatch",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/TaskDispatchParams"
             }
           },
           "required": [
@@ -7708,6 +7737,27 @@
               "required": [
                 "type",
                 "workspace"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "task_id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": {
+                  "const": "task_dispatched",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "task_id",
+                "workspace_id"
               ],
               "type": "object"
             },

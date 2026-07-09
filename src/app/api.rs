@@ -908,6 +908,7 @@ impl App {
             Method::WorkspaceSetReviewState(params) => {
                 return self.handle_workspace_set_review_state(request.id, params)
             }
+            Method::TaskDispatch(params) => return self.handle_task_dispatch(request.id, params),
             Method::WorkspaceMove(params) => {
                 return self.handle_workspace_move(request.id, params);
             }

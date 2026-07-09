@@ -18,6 +18,7 @@ mod runtime;
 mod runtime_mutations;
 mod session;
 pub mod state;
+mod tasks;
 mod terminal_targets;
 mod theme_sync;
 mod worktrees;
@@ -587,6 +588,7 @@ impl App {
             config_diagnostic,
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
+            tasks_config: config.tasks.clone(),
             copy_feedback: None,
             outer_terminal_focus: None,
             prefix_code,
@@ -1415,6 +1417,7 @@ impl App {
 
         if !invalid_section("notifications") {
             self.state.notifications = config.notifications.clone();
+            self.state.tasks_config = config.tasks.clone();
         }
 
         if !invalid_section("experimental") {
