@@ -252,6 +252,29 @@ impl App {
             return true;
         }
 
+        if self.state.mode == Mode::Board {
+            match mouse.kind {
+                MouseEventKind::Moved => {
+                    if let Some(pane) =
+                        crate::ui::board::pane_at(&self.state, mouse.column, mouse.row)
+                    {
+                        self.state.board.selected = Some(pane);
+                    }
+                }
+                MouseEventKind::Down(MouseButton::Left) => {
+                    if let Some((ws_idx, pane_id)) =
+                        crate::ui::board::card_at(&self.state, mouse.column, mouse.row)
+                    {
+                        self.state.board.selected = Some(pane_id);
+                        self.focus_pane_internal_via_api(ws_idx, pane_id);
+                    }
+                    leave_modal(&mut self.state);
+                }
+                _ => {}
+            }
+            return true;
+        }
+
         false
     }
 }

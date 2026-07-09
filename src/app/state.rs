@@ -766,6 +766,7 @@ pub enum Mode {
     GlobalMenu,
     KeybindHelp,
     Navigator,
+    Board,
 }
 
 impl Mode {
@@ -791,8 +792,20 @@ impl Mode {
                 | Mode::ContextMenu
                 | Mode::GlobalMenu
                 | Mode::KeybindHelp
+                | Mode::Board
         )
     }
+}
+
+/// Client-side state for the session board overlay (M1b). Pure TUI presentation
+/// state per the runtime/client boundary guardrail: the selected card is
+/// identified by its pane so it stays stable as board ordering recomputes, and
+/// nothing here is serialized into shared session/server state.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct BoardState {
+    /// Currently selected card, identified by its pane. `None` when the board is
+    /// empty or before a selection is established.
+    pub selected: Option<PaneId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1339,6 +1352,7 @@ pub struct AppState {
     pub product_announcement: Option<ProductAnnouncementState>,
     pub keybind_help: KeybindHelpState,
     pub navigator: NavigatorState,
+    pub(crate) board: BoardState,
     pub copy_mode: Option<CopyModeState>,
     pub workspace_scroll: usize,
     pub agent_panel_scroll: usize,
@@ -1691,6 +1705,7 @@ impl AppState {
             product_announcement: None,
             keybind_help: KeybindHelpState { scroll: 0 },
             navigator: NavigatorState::default(),
+            board: BoardState::default(),
             copy_mode: None,
             workspace_scroll: 0,
             agent_panel_scroll: 0,

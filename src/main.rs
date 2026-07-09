@@ -185,6 +185,7 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # previous_agent = ""     # optional, unset by default
 # next_agent = ""         # optional, unset by default
 # next_blocked = ""       # optional, unset by default; jumps to next blocked pane (e.g. "prefix+b" if you rebind toggle_sidebar)
+# board = ""              # optional, unset by default; opens the session board overlay (e.g. "prefix+space"); also in the global menu
 # focus_agent = ""        # optional indexed binding, e.g. "prefix+alt+1..9"
 # remote_image_paste = "ctrl+v" # only active in shep --remote; empty disables raw-key image paste
 # new_tab = "prefix+c"

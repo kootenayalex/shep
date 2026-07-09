@@ -5,6 +5,7 @@ use ratatui::{
     Frame,
 };
 
+pub(crate) mod board;
 mod dialogs;
 mod keybind_help;
 mod menus;
@@ -21,6 +22,7 @@ mod tabs;
 mod text;
 mod widgets;
 
+use self::board::render_board_overlay;
 use self::dialogs::{
     render_confirm_close_overlay, render_new_linked_worktree_overlay,
     render_open_existing_worktree_overlay, render_remove_worktree_overlay, render_rename_overlay,
@@ -449,6 +451,7 @@ pub fn render_with_runtime_registry(
         Mode::GlobalMenu => render_global_launcher_menu(app, frame),
         Mode::KeybindHelp => render_keybind_help_overlay(app, frame),
         Mode::Navigator => render_navigator_overlay(app, terminal_runtimes, frame),
+        Mode::Board => render_board_overlay(app, frame),
         Mode::Terminal => {}
     }
 }

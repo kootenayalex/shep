@@ -548,6 +548,7 @@ impl App {
             }),
             keybind_help: state::KeybindHelpState { scroll: 0 },
             navigator: state::NavigatorState::default(),
+            board: state::BoardState::default(),
             copy_mode: None,
             workspace_scroll: 0,
             agent_panel_scroll: 0,
@@ -1639,6 +1640,9 @@ impl App {
             }
             Mode::Navigate => {
                 self.handle_navigate_key(key);
+            }
+            Mode::Board => {
+                self.handle_board_key(key.as_key_event());
             }
             Mode::Copy => {
                 self.handle_copy_mode_key(key);
