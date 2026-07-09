@@ -9,6 +9,7 @@
 //! each agent at these files live in [`bridges`]. This module holds the paths,
 //! templates, and the thin file load/create/write layer.
 
+pub(crate) mod bridges;
 pub(crate) mod core;
 
 use std::io;

@@ -44,6 +44,9 @@ enum Command {
     Status {
         repo: Option<PathBuf>,
     },
+    Init {
+        repo: Option<PathBuf>,
+    },
 }
 
 pub(super) fn run_memory_command(args: &[String]) -> std::io::Result<i32> {
@@ -108,6 +111,12 @@ fn parse(args: &[String]) -> Result<Option<Command>, String> {
             flags.reject_user("status")?;
             flags.expect_positionals(0)?;
             Ok(Some(Command::Status { repo: flags.repo }))
+        }
+        "init" => {
+            let flags = Flags::parse(rest)?;
+            flags.reject_user("init")?;
+            flags.expect_positionals(0)?;
+            Ok(Some(Command::Init { repo: flags.repo }))
         }
         other => Err(format!("unknown memory subcommand: {other}")),
     }
@@ -195,6 +204,7 @@ fn execute(command: Command) -> std::io::Result<i32> {
         }
         Command::Remove { target, substring } => mutate(target, |doc, _cap| doc.remove(&substring)),
         Command::Status { repo } => status(repo),
+        Command::Init { repo } => init(repo),
     }
 }
 
@@ -277,6 +287,24 @@ fn status(repo: Option<PathBuf>) -> std::io::Result<i32> {
     Ok(0)
 }
 
+fn init(repo: Option<PathBuf>) -> std::io::Result<i32> {
+    let root = memory::resolve_repo_root(repo.as_deref())?;
+    let paths = memory::bridges::resolve_bridge_paths(&root)?;
+    match memory::bridges::install_bridges(&paths) {
+        Ok(messages) => {
+            println!("installed shep memory bridges for {}:", root.display());
+            for message in messages {
+                println!("  {message}");
+            }
+            Ok(0)
+        }
+        Err(err) => {
+            eprintln!("{err}");
+            Ok(1)
+        }
+    }
+}
+
 fn print_help() {
     eprintln!("shep memory commands (local file ops, no server needed):");
     eprintln!("  shep memory show [--user] [--repo <path>]        print memory (both if no flag)");
@@ -288,6 +316,7 @@ fn print_help() {
         "  shep memory remove \"<substring>\" [--user|--repo <path>]     remove by substring"
     );
     eprintln!("  shep memory status [--repo <path>]               usage for both files");
+    eprintln!("  shep memory init [--repo <path>]                 install agent bridges + files");
 }
 
 #[cfg(test)]
