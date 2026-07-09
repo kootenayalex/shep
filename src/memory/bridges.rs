@@ -6,7 +6,10 @@
 //!
 //! Bridges installed (see [`install_bridges`]):
 //! 1. claude-code, per-repo — `autoMemoryDirectory` → `<repo>/.shep/memory` in
-//!    `<repo>/.claude/settings.json` (JSON merge, preserves other keys).
+//!    `<repo>/.claude/settings.json` (JSON merge, preserves other keys), plus
+//!    lifecycle hooks in the same file: `Stop` → `shep memory reflect-hook`
+//!    (one forced memory-review turn) and SessionStart/UserPromptSubmit/Stop/
+//!    SessionEnd → `shep memory ingest-event` (FTS5 history sidecar).
 //! 2. claude-code, global — a marked block in `~/.claude/CLAUDE.md` importing
 //!    `@~/.config/shep/memory/USER.md`.
 //! 3. opencode, per-repo — `.shep/memory/MEMORY.md` appended to `instructions`
@@ -44,6 +47,9 @@ pub(crate) struct BridgePaths {
     pub claude_user_import: String,
     pub claude_global_md: PathBuf,
     pub opencode_global_json: PathBuf,
+    /// How hook commands invoke shep (absolute exe path when resolvable, so
+    /// hooks work regardless of the agent pane's PATH).
+    pub shep_invocation: String,
 }
 
 /// Resolve bridge targets from the environment for a live install.
@@ -59,7 +65,22 @@ pub(crate) fn resolve_bridge_paths(repo_root: &Path) -> io::Result<BridgePaths> 
         opencode_global_json: opencode_config_dir(&home)
             .join("opencode")
             .join("opencode.json"),
+        shep_invocation: shep_invocation(),
     })
+}
+
+/// The command prefix hooks use to run shep: the current executable's absolute
+/// path (shell-quoted if it contains whitespace), falling back to plain `shep`.
+fn shep_invocation() -> String {
+    let Ok(exe) = std::env::current_exe() else {
+        return "shep".to_string();
+    };
+    let path = exe.display().to_string();
+    if path.chars().any(char::is_whitespace) {
+        format!("\"{path}\"")
+    } else {
+        path
+    }
 }
 
 /// Install (or refresh) all bridges. Idempotent: re-running produces the same
@@ -76,11 +97,11 @@ pub(crate) fn install_bridges(paths: &BridgePaths) -> io::Result<Vec<String>> {
         paths.repo_memory.display()
     ));
 
-    // 1. claude-code per-repo: autoMemoryDirectory JSON merge.
+    // 1. claude-code per-repo: autoMemoryDirectory + lifecycle hooks, one merge.
     let claude_settings = paths.repo_root.join(".claude").join("settings.json");
     let auto_memory_dir = super::repo_memory_dir(&paths.repo_root);
     update_json_file(&claude_settings, |content| {
-        merge_json_object_keys(
+        let merged = merge_json_object_keys(
             content,
             &[
                 (
@@ -89,9 +110,13 @@ pub(crate) fn install_bridges(paths: &BridgePaths) -> io::Result<Vec<String>> {
                 ),
                 ("autoMemoryEnabled", Value::Bool(true)),
             ],
-        )
+        )?;
+        merge_claude_hooks(&merged, &paths.shep_invocation)
     })?;
-    messages.push(format!("claude settings: {}", claude_settings.display()));
+    messages.push(format!(
+        "claude settings (auto-memory + hooks): {}",
+        claude_settings.display()
+    ));
 
     // 2. claude-code global: marked @import block in ~/.claude/CLAUDE.md.
     update_text_file(&paths.claude_global_md, |content| {
@@ -197,6 +222,60 @@ pub(crate) fn merge_json_object_keys(content: &str, keys: &[(&str, Value)]) -> i
         root.insert((*key).to_string(), value.clone());
     }
     Ok(serialize_json_object(&root))
+}
+
+/// Merge shep's lifecycle-hook commands into a claude `settings.json`:
+/// `Stop` gets `<shep> memory reflect-hook` + `<shep> memory ingest-event`;
+/// SessionStart/UserPromptSubmit/SessionEnd get ingest-event. Existing user
+/// hooks (any matcher group whose commands are not ours) are preserved
+/// untouched, and re-running is a no-op — presence is keyed on the exact
+/// command string.
+pub(crate) fn merge_claude_hooks(content: &str, shep_bin: &str) -> io::Result<String> {
+    let ingest = format!("{shep_bin} memory ingest-event");
+    let reflect = format!("{shep_bin} memory reflect-hook");
+    let events = [
+        ("SessionStart", vec![ingest.as_str()]),
+        ("UserPromptSubmit", vec![ingest.as_str()]),
+        ("Stop", vec![ingest.as_str(), reflect.as_str()]),
+        ("SessionEnd", vec![ingest.as_str()]),
+    ];
+
+    let mut root = parse_json_object(content)?;
+    let hooks = root
+        .entry("hooks".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    let hooks_map = hooks
+        .as_object_mut()
+        .ok_or_else(|| io::Error::other("claude `hooks` must be a JSON object"))?;
+    for (event, commands) in events {
+        let groups = hooks_map
+            .entry(event.to_string())
+            .or_insert_with(|| Value::Array(Vec::new()))
+            .as_array_mut()
+            .ok_or_else(|| io::Error::other(format!("claude hooks.{event} must be a JSON array")))?;
+        for command in commands {
+            if !hook_command_present(groups, command) {
+                groups.push(serde_json::json!({
+                    "hooks": [{"type": "command", "command": command}]
+                }));
+            }
+        }
+    }
+    Ok(serialize_json_object(&root))
+}
+
+/// Whether any matcher group already carries `command`.
+fn hook_command_present(groups: &[Value], command: &str) -> bool {
+    groups.iter().any(|group| {
+        group
+            .get("hooks")
+            .and_then(Value::as_array)
+            .is_some_and(|hooks| {
+                hooks
+                    .iter()
+                    .any(|hook| hook.get("command").and_then(Value::as_str) == Some(command))
+            })
+    })
 }
 
 /// Append `entry` to the `instructions` array (creating it and a `$schema` when
@@ -341,6 +420,52 @@ mod tests {
     }
 
     #[test]
+    fn merge_claude_hooks_installs_all_events_from_empty() {
+        let out = merge_claude_hooks("", "shep").unwrap();
+        let value: Value = serde_json::from_str(&out).unwrap();
+        for event in ["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"] {
+            assert!(
+                hook_command_present(
+                    value["hooks"][event].as_array().unwrap(),
+                    "shep memory ingest-event"
+                ),
+                "{event} missing ingest hook"
+            );
+        }
+        assert!(hook_command_present(
+            value["hooks"]["Stop"].as_array().unwrap(),
+            "shep memory reflect-hook"
+        ));
+        // Correct claude hooks shape: matcher group wrapping a command entry.
+        assert_eq!(
+            value["hooks"]["SessionEnd"][0]["hooks"][0]["type"],
+            "command"
+        );
+    }
+
+    #[test]
+    fn merge_claude_hooks_is_idempotent_and_preserves_user_hooks() {
+        let existing = r#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"my-bell.sh"}]}]},"model":"opus"}"#;
+        let once = merge_claude_hooks(existing, "shep").unwrap();
+        let twice = merge_claude_hooks(&once, "shep").unwrap();
+        assert_eq!(once, twice, "second merge must be a no-op");
+        let value: Value = serde_json::from_str(&twice).unwrap();
+        let stop = value["hooks"]["Stop"].as_array().unwrap();
+        // User's hook first, ours appended, nothing duplicated.
+        assert!(hook_command_present(stop, "my-bell.sh"));
+        assert!(hook_command_present(stop, "shep memory reflect-hook"));
+        assert!(hook_command_present(stop, "shep memory ingest-event"));
+        assert_eq!(stop.len(), 3);
+        assert_eq!(value["model"], "opus");
+    }
+
+    #[test]
+    fn merge_claude_hooks_rejects_malformed_hooks() {
+        assert!(merge_claude_hooks(r#"{"hooks":[]}"#, "shep").is_err());
+        assert!(merge_claude_hooks(r#"{"hooks":{"Stop":{}}}"#, "shep").is_err());
+    }
+
+    #[test]
     fn merge_opencode_instructions_appends_once_and_preserves() {
         let content = r#"{"instructions":["AGENTS.md"],"theme":"dark"}"#;
         let once = merge_opencode_instructions(content, ".shep/memory/MEMORY.md").unwrap();
@@ -409,6 +534,7 @@ mod tests {
             claude_user_import: "@~/.config/shep/memory/USER.md".to_string(),
             claude_global_md: base.join("home/.claude/CLAUDE.md"),
             opencode_global_json: base.join("home/.config/opencode/opencode.json"),
+            shep_invocation: "shep".to_string(),
         };
 
         let first = install_bridges(&paths).unwrap();
@@ -431,6 +557,15 @@ mod tests {
                 .into_owned()
         );
         assert_eq!(claude["autoMemoryEnabled"], true);
+        // Lifecycle hooks installed alongside auto-memory.
+        assert!(hook_command_present(
+            claude["hooks"]["Stop"].as_array().unwrap(),
+            "shep memory reflect-hook"
+        ));
+        assert!(hook_command_present(
+            claude["hooks"]["UserPromptSubmit"].as_array().unwrap(),
+            "shep memory ingest-event"
+        ));
 
         // opencode per-repo instructions preserved + appended once.
         let opencode: Value =
@@ -476,6 +611,7 @@ mod tests {
             claude_user_import: "@/x/USER.md".to_string(),
             claude_global_md: base.join("home/.claude/CLAUDE.md"),
             opencode_global_json: base.join("home/.config/opencode/opencode.json"),
+            shep_invocation: "shep".to_string(),
         };
         let messages = install_bridges(&paths).unwrap();
         assert!(!messages.iter().any(|m| m.contains("git exclude")));
