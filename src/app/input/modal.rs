@@ -321,6 +321,16 @@ pub(super) fn open_rename_workspace(
     state.mode = Mode::RenameWorkspace;
 }
 
+/// Open the request-changes prompt for `ws_idx`: free-text feedback that will
+/// be typed into the workspace's agent pane and flips its review state.
+pub(super) fn open_request_changes(state: &mut AppState, ws_idx: usize) {
+    state.selected = ws_idx;
+    state.rename_pane_target = None;
+    state.name_input = String::new();
+    state.name_input_replace_on_type = false;
+    state.mode = Mode::RequestChanges;
+}
+
 pub(super) fn open_rename_active_tab(state: &mut AppState, replace_on_type: bool) {
     state.creating_new_tab = false;
     state.requested_new_tab_name = None;
@@ -703,6 +713,15 @@ pub(super) fn apply_context_menu_action(
             state.request_ship_worktree = Some(ws_idx);
             leave_modal(state);
         }
+        (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Request changes...")) => {
+            open_request_changes(state, ws_idx);
+        }
+        (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Mark approved")) => {
+            if let Some(ws) = state.workspaces.get_mut(ws_idx) {
+                ws.review_state = crate::api::schema::ReviewState::Approved;
+            }
+            leave_modal(state);
+        }
         (
             ContextMenuKind::GitWorkspace {
                 ws_idx, collapsed, ..
@@ -935,6 +954,15 @@ impl App {
         };
 
         match self.state.mode {
+            Mode::RequestChanges => {
+                let feedback = self.state.name_input.trim().to_string();
+                let ws_idx = self.state.selected;
+                cancel_rename_modal(&mut self.state);
+                if !feedback.is_empty() {
+                    self.send_review_feedback(ws_idx, feedback);
+                }
+                return;
+            }
             Mode::RenameWorkspace if !self.state.workspaces.is_empty() && !new_name.is_empty() => {
                 let workspace_id = self.public_workspace_id(self.state.selected);
                 self.runtime_workspace_rename(
@@ -1124,6 +1152,15 @@ impl App {
             }
             (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Ship worktree...")) => {
                 self.state.request_ship_worktree = Some(ws_idx);
+                leave_modal(&mut self.state);
+            }
+            (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Request changes...")) => {
+                open_request_changes(&mut self.state, ws_idx);
+            }
+            (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Mark approved")) => {
+                if let Some(ws) = self.state.workspaces.get_mut(ws_idx) {
+                    ws.review_state = crate::api::schema::ReviewState::Approved;
+                }
                 leave_modal(&mut self.state);
             }
             (

@@ -905,6 +905,9 @@ impl App {
             Method::WorkspaceRename(params) => {
                 return self.handle_workspace_rename(request.id, params);
             }
+            Method::WorkspaceSetReviewState(params) => {
+                return self.handle_workspace_set_review_state(request.id, params)
+            }
             Method::WorkspaceMove(params) => {
                 return self.handle_workspace_move(request.id, params);
             }

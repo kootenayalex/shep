@@ -103,6 +103,38 @@ impl crate::app::App {
         }
     }
 
+    /// Route review feedback to the workspace's agent: type it into the first
+    /// pane with a detected agent (fallback: the focused pane) and submit with
+    /// Enter, then mark the workspace `changes_requested`.
+    pub(crate) fn send_review_feedback(&mut self, ws_idx: usize, feedback: String) {
+        let Some(ws) = self.state.workspaces.get_mut(ws_idx) else {
+            return;
+        };
+        ws.review_state = crate::api::schema::ReviewState::ChangesRequested;
+        let target_pane = ws
+            .tabs
+            .iter()
+            .flat_map(|tab| tab.panes.iter())
+            .find(|(_, pane)| {
+                self.state
+                    .terminals
+                    .get(&pane.attached_terminal_id)
+                    .is_some_and(|terminal| terminal.detected_agent.is_some())
+            })
+            .map(|(pane_id, _)| *pane_id)
+            .or_else(|| ws.focused_pane_id());
+        let Some(pane_id) = target_pane else {
+            return;
+        };
+        let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
+            return;
+        };
+        // `\r` is Enter at the pty layer: agent CLIs submit on it.
+        if let Err(err) = runtime.try_send_bytes(Bytes::from(format!("{feedback}\r"))) {
+            tracing::warn!(err = %err, "failed to send review feedback");
+        }
+    }
+
     fn ship_toast(&mut self, ok: bool, context: String) {
         use crate::app::state::{ToastKind, ToastNotification};
         self.state.toast = Some(ToastNotification {
@@ -186,10 +218,8 @@ pub(crate) fn review_diff_target(cwd: &Path, worktree: Option<&WorktreeSpaceMemb
     let Some(space) = worktree.filter(|space| space.is_linked_worktree) else {
         return head();
     };
-    let Some(base_branch) = git_stdout(
-        &space.repo_root,
-        &["rev-parse", "--abbrev-ref", "HEAD"],
-    ) else {
+    let Some(base_branch) = git_stdout(&space.repo_root, &["rev-parse", "--abbrev-ref", "HEAD"])
+    else {
         return head();
     };
     git_stdout(cwd, &["merge-base", &base_branch, "HEAD"]).unwrap_or_else(head)
@@ -308,7 +338,13 @@ mod tests {
         let checkout = base.join("wt");
         run_git(
             &repo,
-            &["worktree", "add", "-b", "feature", checkout.to_str().unwrap()],
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "feature",
+                checkout.to_str().unwrap(),
+            ],
         );
         // Advance the feature branch so merge-base != HEAD of the worktree.
         std::fs::write(checkout.join("b.txt"), "two\n").unwrap();
@@ -344,7 +380,13 @@ mod tests {
         let checkout = base.join("wt");
         run_git(
             &repo,
-            &["worktree", "add", "-b", "feature", checkout.to_str().unwrap()],
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "feature",
+                checkout.to_str().unwrap(),
+            ],
         );
         std::fs::write(checkout.join("b.txt"), "two\n").unwrap();
         run_git(&checkout, &["add", "."]);

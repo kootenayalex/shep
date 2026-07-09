@@ -980,6 +980,20 @@ fn render_workspace_list(
         } else {
             line1.push(Span::styled(label, name_style));
         }
+        // Review-state badge (M3): compact glyph after the name.
+        {
+            use crate::api::schema::ReviewState;
+            let badge = match ws.review_state {
+                ReviewState::None => None,
+                ReviewState::NeedsReview => Some(("\u{25c6}", p.yellow)),
+                ReviewState::ChangesRequested => Some(("\u{21ba}", p.red)),
+                ReviewState::Approved => Some(("\u{2713}", p.green)),
+            };
+            if let Some((glyph, color)) = badge {
+                line1.push(Span::styled(" ", Style::default()));
+                line1.push(Span::styled(glyph, Style::default().fg(color)));
+            }
+        }
 
         frame.render_widget(
             Paragraph::new(Line::from(line1)),

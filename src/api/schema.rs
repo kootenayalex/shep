@@ -73,6 +73,8 @@ pub enum Method {
     WorkspaceFocus(WorkspaceTarget),
     #[serde(rename = "workspace.rename")]
     WorkspaceRename(WorkspaceRenameParams),
+    #[serde(rename = "workspace.set_review_state")]
+    WorkspaceSetReviewState(WorkspaceSetReviewStateParams),
     #[serde(rename = "workspace.move")]
     WorkspaceMove(WorkspaceMoveParams),
     #[serde(rename = "workspace.close")]

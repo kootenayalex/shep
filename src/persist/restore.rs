@@ -413,6 +413,7 @@ fn restore_workspace(
             cached_git_ahead_behind: None,
             cached_git_space: crate::workspace::git_space_metadata(&snap.identity_cwd),
             cached_memory_usage_percent: crate::memory::repo_usage_percent(&snap.identity_cwd),
+            review_state: Default::default(),
             worktree_space,
             public_pane_numbers,
             next_public_pane_number,

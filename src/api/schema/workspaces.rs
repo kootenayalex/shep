@@ -28,6 +28,27 @@ pub struct WorkspaceMoveParams {
     pub insert_index: usize,
 }
 
+/// Human review lifecycle for a workspace's changes (M3). A shared runtime
+/// fact: agents mark `needs_review` when they finish; the review flow moves it
+/// to `approved` or `changes_requested`.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewState {
+    #[default]
+    None,
+    NeedsReview,
+    ChangesRequested,
+    Approved,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct WorkspaceSetReviewStateParams {
+    pub workspace_id: String,
+    pub review_state: ReviewState,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct WorkspaceInfo {
     pub workspace_id: String,
@@ -42,6 +63,8 @@ pub struct WorkspaceInfo {
     /// git repo or before a memory file exists.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory_usage_percent: Option<u8>,
+    #[serde(default)]
+    pub review_state: ReviewState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worktree: Option<WorkspaceWorktreeInfo>,
 }

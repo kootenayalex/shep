@@ -450,6 +450,7 @@ impl App {
             }),
             agent_status: pane_agent_status(agg_state, seen),
             memory_usage_percent: ws.memory_usage_percent(),
+            review_state: ws.review_state,
             worktree: ws
                 .worktree_space()
                 .map(|space| crate::api::schema::WorkspaceWorktreeInfo {

@@ -164,6 +164,8 @@ pub struct Workspace {
     /// Cached shep repo-memory usage percent (`<repo>/.shep/memory/MEMORY.md`
     /// against its cap); refreshed with the git status metadata.
     pub(crate) cached_memory_usage_percent: Option<u8>,
+    /// Review lifecycle for this workspace's changes (shared runtime fact).
+    pub review_state: crate::api::schema::ReviewState,
     /// Explicit Shep-managed worktree grouping provenance.
     pub worktree_space: Option<WorktreeSpaceMembership>,
     /// Public pane numbers within this workspace. Closed pane numbers are not reused.
@@ -225,6 +227,7 @@ impl Workspace {
             cached_git_ahead_behind: None,
             cached_git_space: git_space_metadata(&identity_cwd),
             cached_memory_usage_percent: crate::memory::repo_usage_percent(&identity_cwd),
+            review_state: Default::default(),
             worktree_space: None,
             public_pane_numbers,
             next_public_pane_number: 2,
@@ -407,6 +410,7 @@ impl Workspace {
                 cached_git_ahead_behind: None,
                 cached_git_space: None,
                 cached_memory_usage_percent: crate::memory::repo_usage_percent(&initial_cwd),
+                review_state: Default::default(),
                 worktree_space: None,
                 public_pane_numbers,
                 next_public_pane_number: 2,
@@ -1227,6 +1231,7 @@ impl Workspace {
             cached_git_ahead_behind: None,
             cached_git_space: None,
             cached_memory_usage_percent: crate::memory::repo_usage_percent(&identity_cwd),
+            review_state: Default::default(),
             worktree_space: None,
             public_pane_numbers,
             next_public_pane_number: 2,

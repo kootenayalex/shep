@@ -758,6 +758,7 @@ pub enum Mode {
     RenameWorkspace,
     RenameTab,
     RenamePane,
+    RequestChanges,
     NewLinkedWorktree,
     OpenExistingWorktree,
     ConfirmRemoveWorktree,
@@ -1138,7 +1139,15 @@ impl ContextMenuState {
                 is_linked_worktree: false,
                 has_worktree_children: false,
                 ..
-            } => &["Rename", "Close", "Review diff", "New worktree", "Open worktree..."],
+            } => &[
+                "Rename",
+                "Close",
+                "Review diff",
+                "Request changes...",
+                "Mark approved",
+                "New worktree",
+                "Open worktree...",
+            ],
             ContextMenuKind::GitWorkspace {
                 is_linked_worktree: true,
                 ..
@@ -1146,6 +1155,8 @@ impl ContextMenuState {
                 "Rename",
                 "Close",
                 "Review diff",
+                "Request changes...",
+                "Mark approved",
                 "Ship worktree...",
                 "Delete worktree checkout...",
             ],
@@ -2285,6 +2296,8 @@ mod tests {
                 "Rename",
                 "Close",
                 "Review diff",
+                "Request changes...",
+                "Mark approved",
                 "Ship worktree...",
                 "Delete worktree checkout...",
             ]
@@ -2307,7 +2320,15 @@ mod tests {
 
         assert_eq!(
             menu.items(),
-            &["Rename", "Close", "Review diff", "New worktree", "Open worktree..."]
+            &[
+                "Rename",
+                "Close",
+                "Review diff",
+                "Request changes...",
+                "Mark approved",
+                "New worktree",
+                "Open worktree...",
+            ]
         );
     }
 

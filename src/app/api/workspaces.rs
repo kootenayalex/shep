@@ -188,6 +188,18 @@ impl App {
         encode_success(id, ResponseResult::Ok {})
     }
 
+    pub(super) fn handle_workspace_set_review_state(
+        &mut self,
+        id: String,
+        params: crate::api::schema::WorkspaceSetReviewStateParams,
+    ) -> String {
+        let Some(ws_idx) = self.parse_workspace_id(&params.workspace_id) else {
+            return workspace_not_found(id, &params.workspace_id);
+        };
+        self.state.workspaces[ws_idx].review_state = params.review_state;
+        encode_success(id, ResponseResult::Ok {})
+    }
+
     fn workspace_list_info(&self) -> Vec<crate::api::schema::WorkspaceInfo> {
         self.state
             .workspaces

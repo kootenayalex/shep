@@ -320,6 +320,7 @@ fn api_method_name(method: &Method) -> &'static str {
         Method::WorkspaceGet(_) => "workspace.get",
         Method::WorkspaceFocus(_) => "workspace.focus",
         Method::WorkspaceRename(_) => "workspace.rename",
+        Method::WorkspaceSetReviewState(_) => "workspace.set_review_state",
         Method::WorkspaceMove(_) => "workspace.move",
         Method::WorkspaceClose(_) => "workspace.close",
         Method::WorktreeList(_) => "worktree.list",

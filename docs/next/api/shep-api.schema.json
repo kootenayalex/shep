@@ -932,6 +932,16 @@
           ],
           "type": "object"
         },
+        "ReviewState": {
+          "description": "Human review lifecycle for a workspace's changes (M3). A shared runtime\nfact: agents mark `needs_review` when they finish; the review flow moves it\nto `approved` or `changes_requested`.",
+          "enum": [
+            "none",
+            "needs_review",
+            "changes_requested",
+            "approved"
+          ],
+          "type": "string"
+        },
         "SplitDirection": {
           "enum": [
             "right",
@@ -1011,6 +1021,10 @@
               "format": "uint",
               "minimum": 0,
               "type": "integer"
+            },
+            "review_state": {
+              "$ref": "#/schemas/event/$defs/ReviewState",
+              "default": "none"
             },
             "tab_count": {
               "format": "uint",
@@ -3063,6 +3077,16 @@
           ],
           "type": "string"
         },
+        "ReviewState": {
+          "description": "Human review lifecycle for a workspace's changes (M3). A shared runtime\nfact: agents mark `needs_review` when they finish; the review flow moves it\nto `approved` or `changes_requested`.",
+          "enum": [
+            "none",
+            "needs_review",
+            "changes_requested",
+            "approved"
+          ],
+          "type": "string"
+        },
         "ServerLiveHandoffParams": {
           "properties": {
             "expected_protocol": {
@@ -3584,6 +3608,21 @@
           ],
           "type": "object"
         },
+        "WorkspaceSetReviewStateParams": {
+          "properties": {
+            "review_state": {
+              "$ref": "#/schemas/request/$defs/ReviewState"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id",
+            "review_state"
+          ],
+          "type": "object"
+        },
         "WorkspaceTarget": {
           "properties": {
             "workspace_id": {
@@ -3973,6 +4012,22 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/WorkspaceRenameParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "workspace.set_review_state",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/WorkspaceSetReviewStateParams"
             }
           },
           "required": [
@@ -8618,6 +8673,16 @@
             }
           ]
         },
+        "ReviewState": {
+          "description": "Human review lifecycle for a workspace's changes (M3). A shared runtime\nfact: agents mark `needs_review` when they finish; the review flow moves it\nto `approved` or `changes_requested`.",
+          "enum": [
+            "none",
+            "needs_review",
+            "changes_requested",
+            "approved"
+          ],
+          "type": "string"
+        },
         "ServerCapabilities": {
           "properties": {
             "detached_server_daemon": {
@@ -8782,6 +8847,10 @@
               "format": "uint",
               "minimum": 0,
               "type": "integer"
+            },
+            "review_state": {
+              "$ref": "#/schemas/success_response/$defs/ReviewState",
+              "default": "none"
             },
             "tab_count": {
               "format": "uint",

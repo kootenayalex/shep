@@ -11,9 +11,9 @@ mod api;
 mod api_helpers;
 mod config_io;
 mod creation;
-mod review;
 mod ids;
 mod input;
+mod review;
 mod runtime;
 mod runtime_mutations;
 mod session;
@@ -1665,7 +1665,7 @@ impl App {
             Mode::Copy => {
                 self.handle_copy_mode_key(key);
             }
-            Mode::RenameWorkspace | Mode::RenameTab | Mode::RenamePane => {
+            Mode::RenameWorkspace | Mode::RenameTab | Mode::RenamePane | Mode::RequestChanges => {
                 self.handle_rename_key_via_api(key_event);
             }
             Mode::NewLinkedWorktree => {
