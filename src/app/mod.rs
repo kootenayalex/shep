@@ -1419,6 +1419,9 @@ impl App {
 
         if !invalid_section("notifications") {
             self.state.notifications = config.notifications.clone();
+        }
+
+        if !invalid_section("tasks") {
             self.state.tasks_config = config.tasks.clone();
         }
 
@@ -2566,7 +2569,7 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(
             &path,
-            "[terminal]\ndefault_shell = \"nu\"\nshell_mode = \"non_login\"\nnew_cwd = \"home\"\n[keys]\nnew_workspace = \"prefix+m\"\nprefix = \"ctrl+a\"\n[update]\nversion_check = false\nmanifest_check = false\n[ui]\nagent_panel_scope = \"current\"\nagent_panel_sort = \"priority\"\nredraw_on_focus_gained = false\nright_click_passthrough_modifier = \"ctrl\"\n[ui.toast]\ndelivery = \"shep\"\n[experimental]\nswitch_ascii_input_source_in_prefix = true\n",
+            "[terminal]\ndefault_shell = \"nu\"\nshell_mode = \"non_login\"\nnew_cwd = \"home\"\n[keys]\nnew_workspace = \"prefix+m\"\nprefix = \"ctrl+a\"\n[update]\nversion_check = false\nmanifest_check = false\n[ui]\nagent_panel_scope = \"current\"\nagent_panel_sort = \"priority\"\nredraw_on_focus_gained = false\nright_click_passthrough_modifier = \"ctrl\"\n[ui.toast]\ndelivery = \"shep\"\n[experimental]\nswitch_ascii_input_source_in_prefix = true\n[notifications]\nnotify_on = [\"idle\"]\nexec = \"notify.sh\"\n[tasks]\nauto_dispatch = true\nclaude_command = \"claude --custom\"\n",
         )
         .unwrap();
         std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
@@ -2609,6 +2612,11 @@ mod tests {
         assert!(app.next_auto_update_check.is_none());
         assert!(app.next_agent_manifest_update_check.is_none());
         assert!(app.state.switch_ascii_input_source_in_prefix);
+        // Live reload must carry the shep sections (regression: they were
+        // missing from load_live_config's section list and silently reset).
+        assert_eq!(app.state.notifications.exec.as_deref(), Some("notify.sh"));
+        assert!(app.state.tasks_config.auto_dispatch);
+        assert_eq!(app.state.tasks_config.claude_command, "claude --custom");
         assert!(app.state.config_diagnostic.is_none());
         let toast = app.state.toast.as_ref().unwrap();
         assert_eq!(toast.kind, crate::app::state::ToastKind::UpdateInstalled);

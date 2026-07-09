@@ -10,7 +10,9 @@ const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
     "keys",
     "onboarding",
     "remote",
+    "notifications",
     "session",
+    "tasks",
     "terminal",
     "theme",
     "ui",
@@ -342,6 +344,22 @@ fn load_live_config_from_str(content: &str) -> Result<LoadedConfig, Vec<String>>
         &mut diagnostics,
         &mut invalid_sections,
         |section| config.remote = section,
+    );
+    load_live_section(
+        table,
+        "notifications",
+        "notifications config",
+        &mut diagnostics,
+        &mut invalid_sections,
+        |section| config.notifications = section,
+    );
+    load_live_section(
+        table,
+        "tasks",
+        "tasks config",
+        &mut diagnostics,
+        &mut invalid_sections,
+        |section| config.tasks = section,
     );
 
     Ok(LoadedConfig {
