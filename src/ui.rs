@@ -6,6 +6,7 @@ use ratatui::{
 };
 
 pub(crate) mod board;
+mod chrome;
 mod dialogs;
 mod keybind_help;
 mod menus;
@@ -215,6 +216,24 @@ fn compute_view_internal(
         return;
     }
 
+    // Desktop window chrome: reserve the top row for the titlebar and the
+    // bottom row for the persistent hint bar before any other geometry, so
+    // every child rect (sidebar, tabs, panes, toasts) shifts consistently.
+    let (titlebar_rect, area) = if app.titlebar && area.height > 2 {
+        let [titlebar_rect, rest] =
+            Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(area);
+        (titlebar_rect, rest)
+    } else {
+        (Rect::default(), area)
+    };
+    let (area, hint_bar_rect) = if app.hint_bar && area.height > 2 {
+        let [rest, hint_bar_rect] =
+            Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(area);
+        (rest, hint_bar_rect)
+    } else {
+        (area, Rect::default())
+    };
+
     let sidebar_w = if app.sidebar_collapsed {
         match app.sidebar_collapsed_mode {
             crate::config::SidebarCollapsedModeConfig::Compact => COLLAPSED_WIDTH,
@@ -305,6 +324,8 @@ fn compute_view_internal(
 
     app.view = crate::app::ViewState {
         layout: ViewLayout::Desktop,
+        titlebar_rect,
+        hint_bar_rect,
         sidebar_rect: sidebar_area,
         workspace_card_areas,
         tab_bar_rect,
@@ -375,6 +396,8 @@ fn compute_mobile_view(
 
     app.view = crate::app::ViewState {
         layout: ViewLayout::Mobile,
+        titlebar_rect: Rect::default(),
+        hint_bar_rect: Rect::default(),
         sidebar_rect: Rect::default(),
         workspace_card_areas: Vec::new(),
         tab_bar_rect: Rect::default(),
@@ -406,6 +429,22 @@ pub fn render_with_runtime_registry(
     let sidebar_area = app.view.sidebar_rect;
     let tab_bar_area = app.view.tab_bar_rect;
     let terminal_area = app.view.terminal_area;
+    // Mode overlays that live on the bottom row render into the reserved hint
+    // bar row when it exists, and fall back to the terminal area's last row.
+    let bottom_bar_area = if app.view.hint_bar_rect.height > 0 {
+        app.view.hint_bar_rect
+    } else {
+        terminal_area
+    };
+
+    if app.view.layout != ViewLayout::Mobile {
+        if app.view.titlebar_rect.height > 0 {
+            chrome::render_titlebar(app, terminal_runtimes, frame, app.view.titlebar_rect);
+        }
+        if app.view.hint_bar_rect.height > 0 {
+            chrome::render_hint_bar(app, frame, app.view.hint_bar_rect);
+        }
+    }
 
     if app.view.layout == ViewLayout::Mobile {
         render_mobile_header(app, terminal_runtimes, frame, app.view.mobile_header_rect);
@@ -431,10 +470,10 @@ pub fn render_with_runtime_registry(
         Mode::Navigate if app.view.layout == ViewLayout::Mobile => {
             render_mobile_panel(app, terminal_runtimes, frame, frame.area())
         }
-        Mode::Navigate => render_navigate_overlay(app, frame, terminal_area),
-        Mode::Prefix => render_prefix_overlay(app, frame, terminal_area),
-        Mode::Copy => render_copy_mode_overlay(app, frame, terminal_area),
-        Mode::Resize => render_resize_overlay(app, frame, terminal_area),
+        Mode::Navigate => render_navigate_overlay(app, frame, bottom_bar_area),
+        Mode::Prefix => render_prefix_overlay(app, frame, bottom_bar_area),
+        Mode::Copy => render_copy_mode_overlay(app, frame, bottom_bar_area),
+        Mode::Resize => render_resize_overlay(app, frame, bottom_bar_area),
         Mode::ConfirmClose => render_confirm_close_overlay(app, frame, terminal_area),
         Mode::ContextMenu => {
             render_context_menu(app, frame);
@@ -728,6 +767,153 @@ mod tests {
 
         assert_eq!(app.view.toast_hit_area.x, 0);
         assert_eq!(app.view.toast_hit_area.y, 1);
+    }
+
+    #[test]
+    fn titlebar_and_hint_bar_reserve_rows_and_shift_geometry() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("one")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.titlebar = true;
+        app.hint_bar = true;
+
+        compute_view(&mut app, Rect::new(0, 0, 100, 24));
+
+        assert_eq!(app.view.layout, ViewLayout::Desktop);
+        assert_eq!(app.view.titlebar_rect, Rect::new(0, 0, 100, 1));
+        assert_eq!(app.view.hint_bar_rect, Rect::new(0, 23, 100, 1));
+        assert_eq!(app.view.sidebar_rect.y, 1);
+        assert_eq!(app.view.sidebar_rect.height, 22);
+        assert_eq!(app.view.tab_bar_rect.y, 1);
+        assert_eq!(app.view.terminal_area.y + app.view.terminal_area.height, 23);
+    }
+
+    #[test]
+    fn chrome_off_keeps_full_frame_geometry() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("one")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+
+        compute_view(&mut app, Rect::new(0, 0, 100, 24));
+
+        assert_eq!(app.view.titlebar_rect, Rect::default());
+        assert_eq!(app.view.hint_bar_rect, Rect::default());
+        assert_eq!(app.view.sidebar_rect.y, 0);
+        assert_eq!(app.view.sidebar_rect.height, 24);
+        assert_eq!(app.view.terminal_area.y + app.view.terminal_area.height, 24);
+    }
+
+    #[test]
+    fn chrome_rows_skip_when_frame_too_short() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("one")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.titlebar = true;
+        app.hint_bar = true;
+
+        compute_view(&mut app, Rect::new(0, 0, 100, 2));
+
+        assert_eq!(app.view.titlebar_rect, Rect::default());
+        assert_eq!(app.view.hint_bar_rect, Rect::default());
+    }
+
+    #[test]
+    fn toast_rect_stays_above_hint_bar() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("one")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.titlebar = true;
+        app.hint_bar = true;
+        app.toast = Some(crate::app::state::ToastNotification {
+            kind: crate::app::state::ToastKind::Finished,
+            title: "pi finished".into(),
+            context: "one".into(),
+            position: None,
+            target: None,
+        });
+
+        compute_view(&mut app, Rect::new(0, 0, 100, 24));
+
+        let toast_bottom = app.view.toast_hit_area.y + app.view.toast_hit_area.height;
+        assert!(
+            toast_bottom <= 23,
+            "toast overlaps hint bar: {toast_bottom}"
+        );
+    }
+
+    #[test]
+    fn hint_bar_renders_prefix_and_hints_from_keybinds() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("one")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.titlebar = true;
+        app.hint_bar = true;
+        compute_view(&mut app, Rect::new(0, 0, 100, 24));
+
+        let mut terminal = Terminal::new(TestBackend::new(100, 24)).expect("test terminal");
+        terminal
+            .draw(|frame| render(&app, frame))
+            .expect("draw chrome");
+
+        let row = buffer_row_text(terminal.backend().buffer(), Rect::new(0, 0, 100, 24), 23);
+        let prefix = crate::config::format_key_combo((app.prefix_code, app.prefix_mods));
+        assert!(row.contains(&prefix), "missing prefix chord in {row:?}");
+        assert!(row.contains("prefix"), "missing prefix label in {row:?}");
+        assert!(row.contains("spaces"), "missing spaces hint in {row:?}");
+        assert!(row.contains("detach"), "missing detach hint in {row:?}");
+    }
+
+    #[test]
+    fn titlebar_renders_brand_and_active_context() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("one")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.titlebar = true;
+        compute_view(&mut app, Rect::new(0, 0, 100, 24));
+
+        let mut terminal = Terminal::new(TestBackend::new(100, 24)).expect("test terminal");
+        terminal
+            .draw(|frame| render(&app, frame))
+            .expect("draw chrome");
+
+        let row = buffer_row_text(terminal.backend().buffer(), Rect::new(0, 0, 100, 24), 0);
+        assert!(row.contains("shep"), "missing brand in {row:?}");
+        assert!(row.contains("one"), "missing workspace context in {row:?}");
+    }
+
+    #[test]
+    fn prefix_overlay_renders_into_hint_bar_row() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("one")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Prefix;
+        app.titlebar = true;
+        app.hint_bar = true;
+        compute_view(&mut app, Rect::new(0, 0, 100, 24));
+
+        let mut terminal = Terminal::new(TestBackend::new(100, 24)).expect("test terminal");
+        terminal
+            .draw(|frame| render(&app, frame))
+            .expect("draw chrome");
+
+        let row = buffer_row_text(terminal.backend().buffer(), Rect::new(0, 0, 100, 24), 23);
+        assert!(
+            row.contains("PREFIX"),
+            "prefix mode not on hint row: {row:?}"
+        );
     }
 
     #[test]

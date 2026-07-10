@@ -754,6 +754,8 @@ pub enum ViewLayout {
 
 pub struct ViewState {
     pub layout: ViewLayout,
+    pub titlebar_rect: Rect,
+    pub hint_bar_rect: Rect,
     pub sidebar_rect: Rect,
     pub workspace_card_areas: Vec<WorkspaceCardArea>,
     pub tab_bar_rect: Rect,
@@ -1463,6 +1465,8 @@ pub struct AppState {
     pub show_agent_labels_on_pane_borders: bool,
     pub state_border_rings: bool,
     pub hide_tab_bar_when_single_tab: bool,
+    pub titlebar: bool,
+    pub hint_bar: bool,
     pub pane_history_persistence: bool,
     /// Expose the focused pane's cursor anchor to the outer terminal even when
     /// the pane requested `?25l`. See `[experimental] reveal_hidden_cursor_for_cjk_ime`.
@@ -1780,6 +1784,8 @@ impl AppState {
             mobile_switcher_scroll: 0,
             view: ViewState {
                 layout: ViewLayout::Desktop,
+                titlebar_rect: Rect::default(),
+                hint_bar_rect: Rect::default(),
                 sidebar_rect: Rect::default(),
                 workspace_card_areas: Vec::new(),
                 tab_bar_rect: Rect::default(),
@@ -1838,6 +1844,8 @@ impl AppState {
             show_agent_labels_on_pane_borders: false,
             state_border_rings: true,
             hide_tab_bar_when_single_tab: false,
+            titlebar: false,
+            hint_bar: false,
             pane_history_persistence: false,
             reveal_hidden_cursor_for_cjk_ime: false,
             cjk_ime_agent_filter_configured: false,

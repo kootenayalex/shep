@@ -561,6 +561,8 @@ impl App {
             mobile_switcher_scroll: 0,
             view: state::ViewState {
                 layout: state::ViewLayout::Desktop,
+                titlebar_rect: Rect::default(),
+                hint_bar_rect: Rect::default(),
                 sidebar_rect: Rect::default(),
                 workspace_card_areas: Vec::new(),
                 tab_bar_rect: Rect::default(),
@@ -619,6 +621,8 @@ impl App {
             show_agent_labels_on_pane_borders: config.ui.show_agent_labels_on_pane_borders,
             state_border_rings: config.ui.state_border_rings,
             hide_tab_bar_when_single_tab: config.ui.hide_tab_bar_when_single_tab,
+            titlebar: config.ui.titlebar,
+            hint_bar: config.ui.hint_bar,
             pane_history_persistence: config.experimental.pane_history,
             reveal_hidden_cursor_for_cjk_ime: config.experimental.reveal_hidden_cursor_for_cjk_ime,
             cjk_ime_agent_filter_configured: !config.experimental.cjk_ime_agents.is_empty(),
@@ -1405,6 +1409,8 @@ impl App {
                     config.ui.show_agent_labels_on_pane_borders;
                 self.state.state_border_rings = config.ui.state_border_rings;
                 self.state.hide_tab_bar_when_single_tab = config.ui.hide_tab_bar_when_single_tab;
+                self.state.titlebar = config.ui.titlebar;
+                self.state.hint_bar = config.ui.hint_bar;
                 self.state.agent_panel_sort =
                     agent_panel_sort_from_config(config.ui.agent_panel_sort);
                 self.state.agent_panel_scroll = 0;

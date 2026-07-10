@@ -612,6 +612,10 @@ fn app_for_mouse_test() -> App {
     app.state.mode = Mode::Terminal;
     app.state.update_available = None;
     app.state.latest_release_notes_available = false;
+    // Mouse-routing tests pin a chrome-less 20-row frame; window-chrome
+    // routing has its own dedicated tests.
+    app.state.titlebar = false;
+    app.state.hint_bar = false;
     app.state.view.sidebar_rect = ratatui::layout::Rect::new(0, 0, 26, 20);
     app.state.view.terminal_area = ratatui::layout::Rect::new(26, 0, 80, 20);
     app

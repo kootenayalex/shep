@@ -1069,6 +1069,30 @@ mod tests {
     }
 
     #[test]
+    fn clicking_workspace_works_with_window_chrome_enabled() {
+        let mut app = app_for_mouse_test();
+        app.state.titlebar = true;
+        app.state.hint_bar = true;
+        app.state.workspaces = vec![Workspace::test_new("a"), Workspace::test_new("b")];
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        crate::ui::compute_view(&mut app.state, Rect::new(0, 0, 106, 22));
+
+        // Chrome shifts everything down one row; card rects must follow.
+        assert!(app.state.view.workspace_card_areas[0].rect.y >= 1);
+        let target_row = app.state.view.workspace_card_areas[1].rect.y;
+
+        app.handle_mouse(mouse(
+            MouseEventKind::Down(MouseButton::Left),
+            2,
+            target_row,
+        ));
+        app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 2, target_row));
+        assert_eq!(app.state.active, Some(1));
+        assert_eq!(app.state.selected, 1);
+    }
+
+    #[test]
     fn clicking_worktree_parent_row_focuses_workspace_without_toggling() {
         let mut app = app_for_mouse_test();
         app.state.workspaces = vec![Workspace::test_new("main"), Workspace::test_new("issue")];

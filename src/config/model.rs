@@ -828,6 +828,10 @@ pub struct UiConfig {
     pub state_border_rings: bool,
     /// Hide the tab row when the workspace has one tab. Default: false.
     pub hide_tab_bar_when_single_tab: bool,
+    /// Show the full-width titlebar at the top of the desktop layout. Default: true.
+    pub titlebar: bool,
+    /// Show the persistent key-hint bar at the bottom of the desktop layout. Default: true.
+    pub hint_bar: bool,
     /// Agent sidebar ordering. Saved values are "spaces" or "priority". Default: "spaces".
     pub agent_panel_sort: AgentPanelSortConfig,
     /// Accent color for highlights, borders, and navigation UI.
@@ -1119,6 +1123,8 @@ impl Default for UiConfig {
             show_agent_labels_on_pane_borders: false,
             state_border_rings: true,
             hide_tab_bar_when_single_tab: false,
+            titlebar: true,
+            hint_bar: true,
             agent_panel_sort: AgentPanelSortConfig::Spaces,
             accent: "cyan".into(),
             toast: ToastConfig::default(),
@@ -1347,6 +1353,22 @@ hide_tab_bar_when_single_tab = true
         assert!(config.ui.show_agent_labels_on_pane_borders);
         assert!(!config.ui.state_border_rings);
         assert!(config.ui.hide_tab_bar_when_single_tab);
+    }
+
+    #[test]
+    fn window_chrome_defaults_and_parse() {
+        let default_config = Config::default();
+        assert!(default_config.ui.titlebar);
+        assert!(default_config.ui.hint_bar);
+
+        let toml = r#"
+[ui]
+titlebar = false
+hint_bar = false
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(!config.ui.titlebar);
+        assert!(!config.ui.hint_bar);
     }
 
     #[test]

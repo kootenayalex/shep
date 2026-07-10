@@ -303,6 +303,14 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # New tabs can still be created with the configured keybinding.
 # hide_tab_bar_when_single_tab = false
 
+# Show the full-width titlebar at the top of the desktop layout
+# (brand, active workspace · tab, update/blocked attention slot).
+# titlebar = true
+
+# Show the persistent key-hint bar at the bottom of the desktop layout.
+# Hints are derived from your keybindings; mode overlays share this row.
+# hint_bar = true
+
 # Agent panel ordering: "spaces" (grouped by space) or "priority" (attention queue).
 # "workspaces" is accepted as an alias for "spaces".
 # agent_panel_sort = "spaces"
