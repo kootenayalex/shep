@@ -210,7 +210,7 @@ impl crate::app::App {
             } else {
                 ToastKind::NeedsAttention
             },
-            title: if ok { "shipped" } else { "ship failed" }.to_string(),
+            title: if ok { "✓ shipped" } else { "ship failed" }.to_string(),
             context,
             position: None,
             target: None,

@@ -294,7 +294,8 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # pane_gaps = true
 
 # Show detected/reported agent labels in split pane borders when no manual pane name is set.
-# show_agent_labels_on_pane_borders = false
+# The label carries the agent state (e.g. "claude · working") in the ring color.
+# show_agent_labels_on_pane_borders = true
 
 # Color pane borders by detected agent state (blocked/working/done) for panes running an agent.
 # state_border_rings = true

@@ -95,10 +95,11 @@ pub(super) fn render_toast_notification(
     let toast_area = toast_notification_rect(area, toast, offset_for_warning, position);
 
     frame.render_widget(Clear, toast_area);
+    // Severity owns the whole card border (common region), not just the dot.
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(ratatui::symbols::border::ROUNDED)
-        .border_style(Style::default().fg(p.overlay0))
+        .border_style(Style::default().fg(dot_color))
         .style(Style::default().bg(p.panel_bg));
     let inner = block.inner(toast_area);
     frame.render_widget(block, toast_area);

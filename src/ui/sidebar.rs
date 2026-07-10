@@ -934,6 +934,13 @@ fn render_workspace_list(
                     buf[(x, y)].set_style(Style::default().bg(bg));
                 }
             }
+            // Selection edge marker (matches the board's card marker); it
+            // replaces the leading pad cell so row content never shifts.
+            if selected && row_y < list_bottom {
+                buf[(card.rect.x, row_y)]
+                    .set_symbol("▌")
+                    .set_style(Style::default().fg(p.accent).bg(bg));
+            }
         }
 
         let name_style = if selected || is_active || is_dragged {

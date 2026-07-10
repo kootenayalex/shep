@@ -528,6 +528,14 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     }
     let p = &app.palette;
     let width = rect.width as usize;
+    if selected {
+        let buf = frame.buffer_mut();
+        for y in rect.top()..rect.bottom() {
+            for x in rect.left()..rect.right() {
+                buf[(x, y)].set_style(Style::default().bg(p.surface0));
+            }
+        }
+    }
     let (dot, dot_style) = state_dot(card.state, card.seen, p);
     let marker = if selected { "▌" } else { " " };
     let marker_style = if selected {

@@ -579,9 +579,9 @@ fn render_pane_border_titles(app: &AppState, ws: &crate::workspace::Workspace, f
         if !info.borders.contains(Borders::TOP) || info.rect.width <= 4 {
             continue;
         }
-        let Some(title) = ws
-            .pane_state(info.id)
-            .and_then(|pane| app.terminals.get(&pane.attached_terminal_id))
+        let pane = ws.pane_state(info.id);
+        let terminal = pane.and_then(|pane| app.terminals.get(&pane.attached_terminal_id));
+        let Some(title) = terminal
             .and_then(|terminal| terminal.border_label(app.show_agent_labels_on_pane_borders))
             .and_then(|label| pane_border_title(&label, info.rect.width, info.is_focused))
         else {
@@ -610,6 +610,7 @@ fn render_pane_border_titles(app: &AppState, ws: &crate::workspace::Workspace, f
         if info.is_focused {
             style = style.add_modifier(Modifier::BOLD);
         }
+        let title_width = title.chars().count();
         buf.set_stringn(
             start_x,
             y,
@@ -617,6 +618,31 @@ fn render_pane_border_titles(app: &AppState, ws: &crate::workspace::Workspace, f
             end_x.saturating_sub(start_x) as usize,
             style,
         );
+
+        // State suffix in the ring color, same recognized-agent condition as
+        // pane_ring_color, so the border label reads `agent · state`.
+        let (Some(pane), Some(terminal)) = (pane, terminal) else {
+            continue;
+        };
+        let recognized = terminal
+            .effective_known_agent()
+            .or(terminal.detected_agent)
+            .is_some();
+        if !recognized || terminal.state == crate::detect::AgentState::Unknown {
+            continue;
+        }
+        let suffix_x = start_x.saturating_add(u16::try_from(title_width).unwrap_or(u16::MAX));
+        let max = end_x.saturating_sub(suffix_x) as usize;
+        if max == 0 {
+            continue;
+        }
+        let state = super::status::state_label(terminal.state, pane.seen);
+        let suffix_style = Style::default().fg(super::status::state_label_color(
+            terminal.state,
+            pane.seen,
+            &app.palette,
+        ));
+        buf.set_stringn(suffix_x, y, format!("· {state} "), max, suffix_style);
     }
 }
 

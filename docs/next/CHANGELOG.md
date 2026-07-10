@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added
+- Added a new `shep` built-in theme (warm graphite + copper) and made it the default when `[theme] name` is unset.
+- Added a full-width desktop titlebar showing the active workspace and tab plus an update/blocked attention slot (`ui.titlebar`, default on).
+- Added a persistent bottom key-hint bar derived from the live keybindings; prefix/copy/resize/navigate overlays now share its row (`ui.hint_bar`, default on).
+
+### Changed
+- Panel, modal, toast, and pane borders now use rounded corners.
+- Agent labels on split-pane borders are on by default and carry the agent state (e.g. `claude · working`) in the state-ring color (`ui.show_agent_labels_on_pane_borders`, now default true).
+- Toast borders now use the severity color instead of a neutral border.
+- Warning-tier indicators (git behind, changes-requested badge, memory pressure) moved from red/yellow to the peach token, reserving red for blocked and destructive actions.
+- The session board highlights the selected card with a background fill, and the sidebar marks the selected workspace with an edge marker.
+- Shipping a worktree now confirms with a `✓ shipped` toast.
+
 ## [0.7.3] - 2026-07-08
 
 ### Fixed

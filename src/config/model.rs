@@ -821,7 +821,7 @@ pub struct UiConfig {
     pub pane_borders: bool,
     /// Keep split panes visually separated instead of sharing divider borders. Default: true.
     pub pane_gaps: bool,
-    /// Show agent labels in split pane borders when no manual pane label is set. Default: false.
+    /// Show agent labels in split pane borders when no manual pane label is set. Default: true.
     pub show_agent_labels_on_pane_borders: bool,
     /// Color pane borders by the detected agent state (blocked/working/done) for
     /// panes running a recognized agent. Default: true.
@@ -1120,7 +1120,7 @@ impl Default for UiConfig {
             prompt_new_tab_name: true,
             pane_borders: true,
             pane_gaps: true,
-            show_agent_labels_on_pane_borders: false,
+            show_agent_labels_on_pane_borders: true,
             state_border_rings: true,
             hide_tab_bar_when_single_tab: false,
             titlebar: true,
@@ -1335,7 +1335,7 @@ agent_panel_scope = "current"
         let default_config = Config::default();
         assert!(default_config.ui.pane_borders);
         assert!(default_config.ui.pane_gaps);
-        assert!(!default_config.ui.show_agent_labels_on_pane_borders);
+        assert!(default_config.ui.show_agent_labels_on_pane_borders);
         assert!(default_config.ui.state_border_rings);
         assert!(!default_config.ui.hide_tab_bar_when_single_tab);
 
@@ -1343,14 +1343,14 @@ agent_panel_scope = "current"
 [ui]
 pane_borders = false
 pane_gaps = true
-show_agent_labels_on_pane_borders = true
+show_agent_labels_on_pane_borders = false
 state_border_rings = false
 hide_tab_bar_when_single_tab = true
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         assert!(!config.ui.pane_borders);
         assert!(config.ui.pane_gaps);
-        assert!(config.ui.show_agent_labels_on_pane_borders);
+        assert!(!config.ui.show_agent_labels_on_pane_borders);
         assert!(!config.ui.state_border_rings);
         assert!(config.ui.hide_tab_bar_when_single_tab);
     }
