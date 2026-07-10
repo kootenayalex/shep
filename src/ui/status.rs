@@ -97,6 +97,7 @@ pub(super) fn render_toast_notification(
     frame.render_widget(Clear, toast_area);
     let block = Block::default()
         .borders(Borders::ALL)
+        .border_set(ratatui::symbols::border::ROUNDED)
         .border_style(Style::default().fg(p.overlay0))
         .style(Style::default().bg(p.panel_bg));
     let inner = block.inner(toast_area);
@@ -144,6 +145,7 @@ pub(super) fn render_copy_feedback(
     frame.render_widget(Clear, feedback_area);
     let block = Block::default()
         .borders(Borders::ALL)
+        .border_set(ratatui::symbols::border::ROUNDED)
         .border_style(Style::default().fg(p.green))
         .style(Style::default().bg(p.panel_bg));
     let inner = block.inner(feedback_area);

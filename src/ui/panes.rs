@@ -633,10 +633,10 @@ fn line_cell_symbol(line: LineCell) -> &'static str {
         (false, false, true, true) | (false, false, true, false) | (false, false, false, true) => {
             "─"
         }
-        (false, true, false, true) => "┌",
-        (false, true, true, false) => "┐",
-        (true, false, false, true) => "└",
-        (true, false, true, false) => "┘",
+        (false, true, false, true) => "╭",
+        (false, true, true, false) => "╮",
+        (true, false, false, true) => "╰",
+        (true, false, true, false) => "╯",
         _ => "",
     }
 }
@@ -821,6 +821,7 @@ fn render_empty(app: &AppState, frame: &mut Frame, area: Rect) {
         Paragraph::new(lines).block(
             Block::default()
                 .borders(Borders::ALL)
+                .border_set(ratatui::symbols::border::ROUNDED)
                 .border_style(Style::default().fg(p.surface_dim)),
         ),
         area,

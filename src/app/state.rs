@@ -117,6 +117,28 @@ impl Palette {
         }
     }
 
+    /// Shep — the fork's brand theme (warm graphite + copper). Default.
+    pub fn shep() -> Self {
+        Self {
+            accent: Color::Rgb(224, 154, 85), // copper
+            panel_bg: Color::Rgb(29, 24, 19),
+            surface0: Color::Rgb(46, 39, 32),
+            surface1: Color::Rgb(58, 49, 40),
+            surface_dim: Color::Rgb(36, 30, 23),
+            overlay0: Color::Rgb(140, 130, 120),
+            overlay1: Color::Rgb(169, 159, 146),
+            text: Color::Rgb(236, 230, 223),
+            subtext0: Color::Rgb(200, 191, 180),
+            mauve: Color::Rgb(162, 148, 238),
+            green: Color::Rgb(79, 180, 119),
+            yellow: Color::Rgb(215, 162, 63),
+            red: Color::Rgb(230, 106, 94),
+            blue: Color::Rgb(107, 166, 204),
+            teal: Color::Rgb(99, 193, 176),
+            peach: Color::Rgb(230, 166, 94),
+        }
+    }
+
     /// Catppuccin Latte — the light Catppuccin flavor.
     pub fn catppuccin_latte() -> Self {
         Self {
@@ -494,6 +516,7 @@ impl Palette {
     /// Resolve a theme by name. Returns None for unknown names.
     pub fn from_name(name: &str) -> Option<Self> {
         match name.to_lowercase().replace([' ', '_'], "-").as_str() {
+            "shep" => Some(Self::shep()),
             "catppuccin" | "catppuccin-mocha" => Some(Self::catppuccin()),
             "catppuccin-latte" | "latte" | "light" => Some(Self::catppuccin_latte()),
             "terminal" => Some(Self::terminal()),
@@ -950,6 +973,7 @@ impl ExperimentSetting {
 
 /// All built-in theme names in display order.
 pub const THEME_NAMES: &[&str] = &[
+    "shep",
     "catppuccin",
     "catppuccin-latte",
     "terminal",

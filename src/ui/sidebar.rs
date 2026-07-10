@@ -986,7 +986,7 @@ fn render_workspace_list(
             let badge = match ws.review_state {
                 ReviewState::None => None,
                 ReviewState::NeedsReview => Some(("\u{25c6}", p.yellow)),
-                ReviewState::ChangesRequested => Some(("\u{21ba}", p.red)),
+                ReviewState::ChangesRequested => Some(("\u{21ba}", p.peach)),
                 ReviewState::Approved => Some(("\u{2713}", p.green)),
             };
             if let Some((glyph, color)) = badge {
@@ -1008,7 +1008,7 @@ fn render_workspace_list(
                         parts.push((format!("↑{}", ahead), p.green));
                     }
                     if behind > 0 {
-                        parts.push((format!("↓{}", behind), p.red));
+                        parts.push((format!("↓{}", behind), p.peach));
                     }
                     (!parts.is_empty()).then_some(parts)
                 });
@@ -1066,7 +1066,7 @@ fn render_workspace_list(
                 }
                 if let Some(memory_label) = memory_label {
                     spans.push(Span::styled(" ", Style::default()));
-                    spans.push(Span::styled(memory_label, Style::default().fg(p.yellow)));
+                    spans.push(Span::styled(memory_label, Style::default().fg(p.peach)));
                 }
                 frame.render_widget(
                     Paragraph::new(Line::from(spans)),

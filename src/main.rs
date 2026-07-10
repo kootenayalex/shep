@@ -113,10 +113,10 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # onboarding = true
 
 [theme]
-# Built-in themes: catppuccin, terminal, tokyo-night, dracula, nord,
-#                  gruvbox, one-dark, solarized, kanagawa, rose-pine,
-#                  vesper
-# name = "catppuccin"
+# Built-in themes: shep, catppuccin, terminal, tokyo-night, dracula,
+#                  nord, gruvbox, one-dark, solarized, kanagawa,
+#                  rose-pine, vesper
+# name = "shep"
 
 # Follow host terminal light/dark appearance and switch Shep UI themes.
 # Existing manual behavior is unchanged unless this is true.
