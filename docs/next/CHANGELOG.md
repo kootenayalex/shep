@@ -7,6 +7,7 @@
 - Added a full-width desktop titlebar showing the active workspace and tab plus an update/blocked attention slot (`ui.titlebar`, default on).
 - Added a persistent bottom key-hint bar derived from the live keybindings; prefix/copy/resize/navigate overlays now share its row (`ui.hint_bar`, default on).
 - Sidebar workspace rows and session-board cards now show a `⇥N` badge while prompts are queued for a busy agent (tab-to-queue), so pending input is visible at a glance.
+- Added `shep bridge`: an authenticated WebSocket relay over the JSON API socket for companion clients (see docs/ANDROID-COMPANION.md), with `shep bridge pair` printing the app pairing values.
 
 ### Changed
 - Panel, modal, toast, and pane borders now use rounded corners.
