@@ -43,6 +43,7 @@ unicode-width = "0.2"
 schemars = { version = "1.2.1", features = ["derive"] }
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 notify = "8.2.0"
+tungstenite = "0.24"
 
 [patch.crates-io]
 portable-pty = { path = "vendor/portable-pty" }
