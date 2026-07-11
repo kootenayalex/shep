@@ -562,10 +562,18 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     } else {
         percent.chars().count() + 1
     };
+    // Queued-input badge (M5 tab-to-queue): prompts waiting for idle.
+    let queued = app.queued_input_count_for_pane(card.pane_id);
+    let queued_label = (queued > 0).then(|| format!("\u{21e5}{queued}"));
+    let queued_reserved = queued_label
+        .as_ref()
+        .map(|label| label.chars().count() + 1)
+        .unwrap_or(0);
     let agent_budget = width
         .saturating_sub(head.chars().count())
         .saturating_sub(loc_width)
         .saturating_sub(percent_reserved)
+        .saturating_sub(queued_reserved)
         .saturating_sub(1);
     let mut line1 = vec![
         Span::styled(marker.to_string(), marker_style),
@@ -573,6 +581,12 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         Span::raw(" "),
         Span::styled(truncate_end(&card.agent_label, agent_budget), agent_style),
     ];
+    if let Some(queued_label) = &queued_label {
+        line1.push(Span::styled(
+            format!(" {queued_label}"),
+            Style::default().fg(p.teal),
+        ));
+    }
     if !percent.is_empty() {
         line1.push(Span::styled(format!(" {percent}"), dim));
     }
@@ -852,6 +866,30 @@ mod tests {
         assert_eq!(enter_target(&state, Some(panes[2])), Some((1, panes[2])));
         assert_eq!(enter_target(&state, None), None);
         assert_eq!(enter_target(&state, Some(PaneId::from_raw(9999))), None);
+    }
+
+    #[test]
+    fn card_shows_queued_input_badge() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let (mut state, panes) = board_state();
+        state
+            .queued_pane_input
+            .insert(panes[0], vec!["one".into(), "two".into()]);
+        let model = board_model(&state);
+        let card = &model.columns[0][0];
+        assert_eq!(card.pane_id, panes[0]);
+
+        let mut terminal = Terminal::new(TestBackend::new(40, 4)).expect("test terminal");
+        terminal
+            .draw(|frame| render_card(&state, frame, Rect::new(0, 0, 40, 3), card, false))
+            .expect("card should render");
+
+        let buffer = terminal.backend().buffer();
+        let row: String = (0..40).map(|x| buffer[(x, 0)].symbol()).collect();
+        assert!(
+            row.contains("\u{21e5}2"),
+            "queued badge should render: {row:?}"
+        );
     }
 
     #[test]

@@ -115,4 +115,6 @@ inline env prefix; a first-class model bar remains open.
 - approach comparison (two worktrees side-by-side)
 - session recording (asciinema)
 - native width-adaptive diff widget (review currently uses a pager pane)
-- queued-input indicator in sidebar/board
+
+Landed 2026-07-11: queued-input indicator (`⇥N` teal badge on sidebar rows
+and board cards).

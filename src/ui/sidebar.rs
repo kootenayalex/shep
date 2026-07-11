@@ -1001,6 +1001,17 @@ fn render_workspace_list(
                 line1.push(Span::styled(glyph, Style::default().fg(color)));
             }
         }
+        // Queued-input badge (M5 tab-to-queue): prompts waiting for idle.
+        {
+            let queued = app.queued_input_count_for_workspace(i);
+            if queued > 0 {
+                line1.push(Span::styled(" ", Style::default()));
+                line1.push(Span::styled(
+                    format!("\u{21e5}{queued}"),
+                    Style::default().fg(p.teal),
+                ));
+            }
+        }
 
         frame.render_widget(
             Paragraph::new(Line::from(line1)),
@@ -1684,6 +1695,39 @@ mod tests {
                 render_workspace_list(&app, &runtimes, frame, Rect::new(0, 0, 15, 6), false)
             })
             .expect("workspace list should render");
+    }
+
+    #[test]
+    fn workspace_row_shows_queued_input_badge() {
+        let mut app = crate::app::state::AppState::test_new();
+        let ws = Workspace::test_new("repo");
+        let root = ws.tabs[0].root_pane;
+        app.workspaces = vec![ws];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.queued_pane_input
+            .insert(root, vec!["one".into(), "two".into()]);
+        app.view.workspace_card_areas = vec![crate::app::state::WorkspaceCardArea {
+            ws_idx: 0,
+            rect: Rect::new(0, 1, 20, 2),
+            indented: false,
+        }];
+
+        let mut terminal = Terminal::new(TestBackend::new(20, 6)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        terminal
+            .draw(|frame| {
+                render_workspace_list(&app, &runtimes, frame, Rect::new(0, 0, 20, 6), false)
+            })
+            .expect("workspace list should render");
+
+        let buffer = terminal.backend().buffer();
+        let row: String = (0..20).map(|x| buffer[(x, 1)].symbol()).collect();
+        assert!(
+            row.contains("\u{21e5}2"),
+            "queued badge should render: {row:?}"
+        );
     }
 
     fn workspace_with_worktree_space(

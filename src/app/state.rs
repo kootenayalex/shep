@@ -1565,6 +1565,26 @@ impl AppState {
         self.show_agent_labels_on_pane_borders
     }
 
+    /// Prompts queued for `pane_id` (M5 tab-to-queue), still waiting on idle.
+    pub fn queued_input_count_for_pane(&self, pane_id: PaneId) -> usize {
+        self.queued_pane_input
+            .get(&pane_id)
+            .map(|queued| queued.len())
+            .unwrap_or(0)
+    }
+
+    /// Total queued prompts across every pane of the workspace at `ws_idx`.
+    pub fn queued_input_count_for_workspace(&self, ws_idx: usize) -> usize {
+        let Some(ws) = self.workspaces.get(ws_idx) else {
+            return 0;
+        };
+        self.queued_pane_input
+            .iter()
+            .filter(|(pane_id, _)| ws.pane_state(**pane_id).is_some())
+            .map(|(_, queued)| queued.len())
+            .sum()
+    }
+
     pub fn pane_history_persistence_enabled(&self) -> bool {
         self.pane_history_persistence
     }
@@ -2377,6 +2397,28 @@ mod tests {
                 "Open worktree...",
             ]
         );
+    }
+
+    #[test]
+    fn queued_input_counts_only_cover_the_owning_workspace() {
+        let mut state = AppState::test_new();
+        let first = crate::workspace::Workspace::test_new("one");
+        let second = crate::workspace::Workspace::test_new("two");
+        let first_pane = first.tabs[0].root_pane;
+        let second_pane = second.tabs[0].root_pane;
+        state.workspaces = vec![first, second];
+        state
+            .queued_pane_input
+            .insert(first_pane, vec!["a".into(), "b".into()]);
+        state
+            .queued_pane_input
+            .insert(second_pane, vec!["c".into()]);
+
+        assert_eq!(state.queued_input_count_for_pane(first_pane), 2);
+        assert_eq!(state.queued_input_count_for_pane(second_pane), 1);
+        assert_eq!(state.queued_input_count_for_workspace(0), 2);
+        assert_eq!(state.queued_input_count_for_workspace(1), 1);
+        assert_eq!(state.queued_input_count_for_workspace(2), 0);
     }
 
     #[test]
