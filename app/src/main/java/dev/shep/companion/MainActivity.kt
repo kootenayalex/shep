@@ -92,7 +92,9 @@ fun ShepApp(prefs: android.content.SharedPreferences) {
     fun connect(url: String, token: String, onDone: (String?) -> Unit) {
         scope.launch {
             val fresh = BridgeClient(url, token)
-            val error = withContext(Dispatchers.IO) { fresh.connect() }
+            val error = withContext(Dispatchers.IO) {
+                runCatching { fresh.connect() }.getOrElse { it.message ?: "connection failed" }
+            }
             if (error == null) {
                 prefs.edit().putString("url", url).putString("token", token).apply()
                 client?.close()
@@ -176,6 +178,10 @@ fun PairingScreen(
             onValueChange = { url = it },
             label = { Text("Bridge URL") },
             singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                autoCorrectEnabled = false,
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))
@@ -184,6 +190,10 @@ fun PairingScreen(
             onValueChange = { token = it },
             label = { Text("Token") },
             singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                autoCorrectEnabled = false,
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
@@ -201,7 +211,7 @@ fun PairingScreen(
             onClick = {
                 busy = true
                 error = null
-                onConnect(url.trim(), token.trim()) { failure ->
+                onConnect(url.trim(), token.filterNot { it.isWhitespace() }) { failure ->
                     busy = false
                     error = failure
                 }

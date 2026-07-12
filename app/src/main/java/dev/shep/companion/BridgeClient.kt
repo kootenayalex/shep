@@ -44,10 +44,18 @@ class BridgeClient(private val url: String, private val token: String) {
     fun connect(timeoutSeconds: Long = 8): String? {
         val helloLatch = CountDownLatch(1)
         var failure: String? = null
-        val request = Request.Builder()
-            .url(url)
-            .header("Authorization", "Bearer $token")
-            .build()
+        // Hand-typed URLs crash Request.Builder (bad scheme, stray spaces,
+        // keyboard autocapitalization) — normalize, then report instead of
+        // throwing.
+        val normalized = normalizeUrl(url)
+        val request = try {
+            Request.Builder()
+                .url(normalized)
+                .header("Authorization", "Bearer $token")
+                .build()
+        } catch (e: IllegalArgumentException) {
+            return "invalid URL: $normalized"
+        }
         socket = http.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val frame = runCatching { JSONObject(text) }.getOrNull() ?: return
@@ -162,3 +170,15 @@ class BridgeClient(private val url: String, private val token: String) {
 }
 
 class BridgeException(message: String) : Exception(message)
+
+/** Forgiving pairing input: trim, lowercase the scheme, default to ws://. */
+fun normalizeUrl(raw: String): String {
+    var url = raw.trim().replace(" ", "")
+    val schemeEnd = url.indexOf("://")
+    url = if (schemeEnd > 0) {
+        url.take(schemeEnd).lowercase() + url.substring(schemeEnd)
+    } else {
+        "ws://$url"
+    }
+    return url
+}
