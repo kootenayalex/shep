@@ -1,9 +1,12 @@
 # Shep Android Companion — Plan
 
-Status: PLAN (2026-07-10, not started). Feature parity with the desktop ADE,
-re-shaped for a phone: small screen, thumb navigation, interrupted attention.
-Same NN/g psychology contract as the desktop-feel pass
-(`.local/prd/desktop-feel-pass.md`).
+Status: A0–A3 BUILT (2026-07-14). A0–A2 shipped + tails closed (bottom-nav
+shell, event-driven home, filter chips, ANSI pane render, QR pairing, version
+gating). A3 notifications implemented and server-verified end-to-end; the final
+locked-screen gate needs the ntfy distributor app on the S22 (Alex's manual
+step). A4–A6 not started. Feature parity with the desktop ADE, re-shaped for a
+phone: small screen, thumb navigation, interrupted attention. Same NN/g
+psychology contract as the desktop-feel pass (`.local/prd/desktop-feel-pass.md`).
 
 ## Positioning — the cockpit in your pocket
 
@@ -128,9 +131,21 @@ shep server (macmini)
   read-only ANSI renderer of the observe stream), quick-keys row
   (y/n/enter/esc/arrows via `terminal session control`), prompt composer with
   queue-on-busy. Gate: answer a real claude permission prompt from the phone.
-- **A3 — notifications.** ntfy self-hosted + UnifiedPush; actionable
-  notifications (Approve/Deny/Open) that send the mapped keys through the
-  bridge; deep links. Gate: lock-screen approve, app never opened.
+- **A3 — notifications. BUILT 2026-07-14.** ntfy self-hosted (Docker + tailscale
+  sidecar at `https://ntfy.tail58187b.ts.net`, deploy in
+  `shep-android/deploy/ntfy/`) as the UnifiedPush distributor. Server: the phone
+  registers its endpoint over the bridge (`push.register`, handled bridge-locally
+  → `<config>/push-endpoints.json`, no protocol bump); `[notifications] exec =
+  "shep bridge notify-push"` POSTs the transition context to each endpoint
+  (`SHEP_NTFY_PUBLISH_BASE` keeps the publish on loopback since shep + ntfy are
+  co-located). App: UnifiedPush `MessagingReceiver` renders an actionable
+  notification whose Approve/Deny fire `pane.send_keys` (y/n) over a short-lived
+  bridge connection, and whose tap deep-links `shep://pane?pane=…`. Verified
+  live: register→persist→exec→notify-push→ntfy publish; app installs/launches,
+  fires the POST_NOTIFICATIONS prompt, and the distributor-detection path runs on
+  the AVD. Gate (lock-screen approve, app never opened) pending the ntfy app on a
+  real device — Alex installs ntfy (F-Droid), points it at the ntfy server, then
+  installs the APK + pairs.
 - **A4 — tasks + memory.** Full `task` and `memory` parity (add/list/cancel/
   dispatch; show/add/replace/remove/search + cap meter). Gate: dispatch a
   worktree task from the phone, watch it flip the board state.
@@ -151,10 +166,9 @@ macmini server, never a mock (mock-pg lesson generalized).
 
 ## Risks / open questions
 
-- **VT rendering on Android** — Termux terminal-view is GPLv3 and heavyweight;
-  a read-only ANSI-to-AnnotatedString renderer may cover v1 (observe-only) with
-  control keys not needing local echo. Decide at A2 start; wrong choice is
-  contained to one module.
+- **VT rendering on Android** — RESOLVED (2026-07-12): shipped the read-only
+  ANSI-to-AnnotatedString renderer (`AnsiRender.kt`), not Termux terminal-view.
+  Observe-only v1, so control keys need no local echo; contained to one module.
 - **Battery vs immediacy** — no persistent background socket; ntfy wake-ups
   only. If ntfy latency disappoints, revisit with a foreground-service toggle
   ("on shift" mode), never a silent always-on drain.
