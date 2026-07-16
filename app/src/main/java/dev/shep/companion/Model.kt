@@ -12,6 +12,12 @@ data class AgentRow(
     val status: String,
     val contextPercent: Int?,
     val reviewState: String,
+    // Meta surfaced from the snapshot. Branch/±/age are NOT in session.snapshot
+    // (git status is a separate event stream) — that meta needs an API extension.
+    val customStatus: String?,
+    val worktreeRepo: String?,
+    val isWorktree: Boolean,
+    val memoryPercent: Int?,
 )
 
 /** Sort weight: blocked demands attention first, then done (unseen), working, idle. */
@@ -27,12 +33,21 @@ fun parseSnapshot(result: JSONObject): List<AgentRow> {
     val snapshot = result.optJSONObject("snapshot") ?: return emptyList()
     val workspaceLabels = mutableMapOf<String, String>()
     val reviewStates = mutableMapOf<String, String>()
+    val memoryPercents = mutableMapOf<String, Int>()
+    val worktreeRepos = mutableMapOf<String, String>()
+    val worktreeLinked = mutableMapOf<String, Boolean>()
     val workspaces = snapshot.optJSONArray("workspaces")
     if (workspaces != null) {
         for (i in 0 until workspaces.length()) {
             val ws = workspaces.getJSONObject(i)
-            workspaceLabels[ws.getString("workspace_id")] = ws.optString("label")
-            reviewStates[ws.getString("workspace_id")] = ws.optString("review_state", "none")
+            val id = ws.getString("workspace_id")
+            workspaceLabels[id] = ws.optString("label")
+            reviewStates[id] = ws.optString("review_state", "none")
+            if (ws.has("memory_usage_percent")) memoryPercents[id] = ws.getInt("memory_usage_percent")
+            ws.optJSONObject("worktree")?.let { wt ->
+                worktreeRepos[id] = wt.optString("repo_name")
+                worktreeLinked[id] = wt.optBoolean("is_linked_worktree")
+            }
         }
     }
     val agents = snapshot.optJSONArray("agents") ?: return emptyList()
@@ -52,6 +67,10 @@ fun parseSnapshot(result: JSONObject): List<AgentRow> {
                 status = agent.optString("agent_status", "unknown"),
                 contextPercent = if (agent.has("context_percent")) agent.getInt("context_percent") else null,
                 reviewState = reviewStates[workspaceId] ?: "none",
+                customStatus = agent.optString("custom_status").ifEmpty { null },
+                worktreeRepo = worktreeRepos[workspaceId],
+                isWorktree = worktreeLinked[workspaceId] ?: false,
+                memoryPercent = memoryPercents[workspaceId],
             )
         )
     }

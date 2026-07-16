@@ -36,6 +36,8 @@ class BridgeClient(private val url: String, private val token: String) {
     @Volatile private var socket: WebSocket? = null
     @Volatile var serverVersion: String? = null
         private set
+    @Volatile var serverProtocol: Int? = null
+        private set
     @Volatile var onDisconnect: ((String?) -> Unit)? = null
 
     val isOpen: Boolean get() = open.get()
@@ -60,7 +62,9 @@ class BridgeClient(private val url: String, private val token: String) {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val frame = runCatching { JSONObject(text) }.getOrNull() ?: return
                 if (frame.has("hello")) {
-                    serverVersion = frame.getJSONObject("hello").optString("server_version")
+                    val hello = frame.getJSONObject("hello")
+                    serverVersion = hello.optString("server_version")
+                    serverProtocol = if (hello.has("protocol")) hello.getInt("protocol") else null
                     open.set(true)
                     helloLatch.countDown()
                     return
