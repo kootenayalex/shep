@@ -134,6 +134,9 @@ fun ShepApp(
     var client by remember { mutableStateOf<BridgeClient?>(null) }
     var paired by remember { mutableStateOf(false) }
     var connectError by remember { mutableStateOf<String?>(null) }
+    // True while the first auto-connect with a saved pairing is in flight —
+    // shows a connecting spinner instead of flashing the manual pairing form.
+    var firstConnect by remember { mutableStateOf(prefs.getString("token", null) != null) }
     // Bumped by a dropped socket to kick the reconnect loop below.
     var reconnectSignal by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -192,6 +195,7 @@ fun ShepApp(
         if (prefs.getString("token", null) != null) {
             val error = establish()
             if (error == null) paired = true else connectError = error
+            firstConnect = false
         }
     }
 
@@ -215,12 +219,16 @@ fun ShepApp(
 
     Surface(Modifier.fillMaxSize().statusBarsPadding(), color = ShepColors.bg) {
         if (!paired) {
-            PairingScreen(
-                initialUrl = prefs.getString("url", "") ?: "",
-                initialToken = prefs.getString("token", "") ?: "",
-                lastError = connectError,
-                onConnect = { url, token, onDone -> pairAndConnect(url, token, onDone) },
-            )
+            if (firstConnect && connectError == null) {
+                ReconnectingScreen(null, label = "connecting…")
+            } else {
+                PairingScreen(
+                    initialUrl = prefs.getString("url", "") ?: "",
+                    initialToken = prefs.getString("token", "") ?: "",
+                    lastError = connectError,
+                    onConnect = { url, token, onDone -> pairAndConnect(url, token, onDone) },
+                )
+            }
         } else {
             val active = client
             if (active == null) {
@@ -245,12 +253,12 @@ fun ShepApp(
 
 /** Shown while the reconnect loop re-establishes a dropped socket. */
 @Composable
-fun ReconnectingScreen(error: String?) {
+fun ReconnectingScreen(error: String?, label: String = "reconnecting…") {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = ShepColors.copper)
             Spacer(Modifier.height(16.dp))
-            Text("reconnecting…", color = ShepColors.subtext)
+            Text(label, color = ShepColors.subtext)
             error?.let {
                 Spacer(Modifier.height(6.dp))
                 Text(it, color = ShepColors.peach, fontSize = 12.sp)
