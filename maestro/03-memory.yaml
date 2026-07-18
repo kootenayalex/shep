@@ -1,0 +1,10 @@
+# A6 E2E — Memory tab: cap meter + add-entry sheet.
+appId: dev.shep.companion
+---
+- launchApp
+- tapOn: "memory"
+- assertVisible: "\\+ add"
+- tapOn: "\\+ add"
+- assertVisible: "add entry"
+- back
+- assertVisible: "agents"

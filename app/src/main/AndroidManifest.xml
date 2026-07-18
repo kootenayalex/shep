@@ -28,7 +28,31 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="shep" android:host="pane" />
             </intent-filter>
+            <!-- A6: launcher shortcut + widget deep-link into Tasks/add. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="shep" android:host="tasks" />
+            </intent-filter>
+            <!-- A6: static launcher shortcuts (res/xml/shortcuts.xml). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- A6 home-screen widget: blocked count + top blocked agent. -->
+        <receiver
+            android:name=".ShepWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="dev.shep.companion.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_blocked_info" />
+        </receiver>
 
         <!-- UnifiedPush delivery: wakes the app (closed) when shep pages it. -->
         <receiver

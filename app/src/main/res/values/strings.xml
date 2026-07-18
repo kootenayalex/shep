@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Blocked agents at a glance — count plus the agent that needs you first.</string>
+    <string name="shortcut_new_task">New task</string>
+    <string name="shortcut_new_task_long">Queue a new shep task</string>
+</resources>

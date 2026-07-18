@@ -1,0 +1,10 @@
+# A6 E2E — the shep://tasks/new deep link (what the launcher shortcut fires)
+# opens the Tasks tab with the add sheet already up.
+appId: dev.shep.companion
+---
+- openLink: "shep://tasks/new"
+- assertVisible: "new task"
+- assertVisible: "queue task"
+- back
+- tapOn: "agents"
+- assertVisible: "attention.*"

@@ -85,6 +85,8 @@ class PushReceiver : MessagingReceiver() {
         val paneId = json.optString("pane_id")
         val body = json.optString("message").ifEmpty { "needs your attention" }
         showAgentNotification(context, state, agent, workspace, paneId, body)
+        // A6: a push means the blocked set just changed — repaint the widget.
+        ShepWidgetProvider.refreshAll(context)
     }
 }
 

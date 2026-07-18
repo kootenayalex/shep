@@ -1,0 +1,8 @@
+# A6 E2E — tablet two-pane layout (run on a wide AVD, e.g. workmayt_tablet_api35).
+# The agents list and the detail placeholder must be visible at the same time.
+appId: dev.shep.companion
+---
+- launchApp
+- assertVisible: "agents"
+- assertVisible: "select an agent"
+- assertVisible: "attention.*"

@@ -66,10 +66,13 @@ fun statusColor(status: String): Color = when (status) {
 class MainActivity : ComponentActivity() {
     // Pane id from a `shep://pane?pane=…` notification tap; consumed by NavShell.
     private val deepLinkPane = mutableStateOf<String?>(null)
+    // A6: `shep://tasks/new` (launcher shortcut / widget) → Tasks tab, add sheet.
+    private val deepLinkNewTask = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deepLinkPane.value = paneFromIntent(intent)
+        deepLinkNewTask.value = newTaskFromIntent(intent)
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
@@ -86,6 +89,8 @@ class MainActivity : ComponentActivity() {
                     getSharedPreferences("shep", Context.MODE_PRIVATE),
                     deepLinkPane = deepLinkPane.value,
                     onDeepLinkConsumed = { deepLinkPane.value = null },
+                    newTask = deepLinkNewTask.value,
+                    onNewTaskConsumed = { deepLinkNewTask.value = false },
                 )
             }
         }
@@ -95,12 +100,18 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         paneFromIntent(intent)?.let { deepLinkPane.value = it }
+        if (newTaskFromIntent(intent)) deepLinkNewTask.value = true
     }
 
     private fun paneFromIntent(intent: Intent?): String? {
         val data = intent?.data ?: return null
         if (data.scheme != "shep" || data.host != "pane") return null
         return data.getQueryParameter("pane")?.takeIf { it.isNotBlank() }
+    }
+
+    private fun newTaskFromIntent(intent: Intent?): Boolean {
+        val data = intent?.data ?: return false
+        return data.scheme == "shep" && data.host == "tasks" && data.pathSegments.firstOrNull() == "new"
     }
 }
 
@@ -117,6 +128,8 @@ fun ShepApp(
     prefs: android.content.SharedPreferences,
     deepLinkPane: String? = null,
     onDeepLinkConsumed: () -> Unit = {},
+    newTask: Boolean = false,
+    onNewTaskConsumed: () -> Unit = {},
 ) {
     var client by remember { mutableStateOf<BridgeClient?>(null) }
     var paired by remember { mutableStateOf(false) }
@@ -217,6 +230,8 @@ fun ShepApp(
                     client = active,
                     deepLinkPane = deepLinkPane,
                     onDeepLinkConsumed = onDeepLinkConsumed,
+                    newTask = newTask,
+                    onNewTaskConsumed = onNewTaskConsumed,
                     onUnpair = {
                         paired = false
                         active.close()
@@ -246,8 +261,10 @@ fun ReconnectingScreen(error: String?) {
 
 /**
  * The paired experience: a bottom-nav Scaffold over the four destinations, with
- * the pane view pushed as a full-screen detail over the Agents tab. A3 deep-links
- * route here by setting the tab + selecting a pane.
+ * the pane view pushed as a full-screen detail over the Agents tab on phones, or
+ * docked side-by-side on iPad-class widths (A6 two-pane). A3 deep-links route
+ * here by setting the tab + selecting a pane; the A6 `shep://tasks/new`
+ * deep-link opens the Tasks tab with the add sheet already up.
  */
 @Composable
 fun NavShell(
@@ -255,9 +272,13 @@ fun NavShell(
     onUnpair: () -> Unit,
     deepLinkPane: String? = null,
     onDeepLinkConsumed: () -> Unit = {},
+    newTask: Boolean = false,
+    onNewTaskConsumed: () -> Unit = {},
 ) {
     var tab by remember { mutableStateOf(Tab.Agents) }
     var paneDetail by remember { mutableStateOf<AgentRow?>(null) }
+    // Hoisted from TasksScreen so the new-task deep-link can pre-open the sheet.
+    var tasksShowAdd by remember { mutableStateOf(false) }
 
     // A notification tap (shep://pane?pane=…) resolves the pane id to its row via
     // a one-shot snapshot and pushes the pane detail; falls back to the Agents
@@ -272,48 +293,93 @@ fun NavShell(
         onDeepLinkConsumed()
     }
 
-    val detail = paneDetail
-    if (detail != null) {
-        BackHandler { paneDetail = null }
-        PaneScreen(client, detail, onBack = { paneDetail = null })
-        return
+    // Launcher shortcut / widget (shep://tasks/new): Tasks tab, sheet open.
+    LaunchedEffect(newTask) {
+        if (newTask) {
+            tab = Tab.Tasks
+            tasksShowAdd = true
+            onNewTaskConsumed()
+        }
     }
 
-    Scaffold(
-        containerColor = ShepColors.bg,
-        bottomBar = {
-            NavigationBar(
-                containerColor = ShepColors.surface,
-                modifier = Modifier.navigationBarsPadding(),
-            ) {
-                Tab.entries.forEach { entry ->
-                    NavigationBarItem(
-                        selected = tab == entry,
-                        onClick = { tab = entry },
-                        icon = { Text(entry.glyph, fontSize = 18.sp) },
-                        label = { Text(entry.label, fontSize = 11.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = ShepColors.copper,
-                            selectedTextColor = ShepColors.copper,
-                            unselectedIconColor = ShepColors.subtext,
-                            unselectedTextColor = ShepColors.subtext,
-                            indicatorColor = ShepColors.surfaceHigh,
-                        ),
-                    )
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // iPad-class width: list and detail stay visible side-by-side (spatial
+        // memory — no full-screen push). Phone: the detail pushes over, as before.
+        val wide = maxWidth >= 720.dp
+        val detail = paneDetail
+
+        if (detail != null && !wide) {
+            BackHandler { paneDetail = null }
+            PaneScreen(client, detail, onBack = { paneDetail = null })
+            return@BoxWithConstraints
+        }
+
+        Scaffold(
+            containerColor = ShepColors.bg,
+            bottomBar = {
+                NavigationBar(
+                    containerColor = ShepColors.surface,
+                    modifier = Modifier.navigationBarsPadding(),
+                ) {
+                    Tab.entries.forEach { entry ->
+                        NavigationBarItem(
+                            selected = tab == entry,
+                            onClick = { tab = entry },
+                            icon = { Text(entry.glyph, fontSize = 18.sp) },
+                            label = { Text(entry.label, fontSize = 11.sp) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = ShepColors.copper,
+                                selectedTextColor = ShepColors.copper,
+                                unselectedIconColor = ShepColors.subtext,
+                                unselectedTextColor = ShepColors.subtext,
+                                indicatorColor = ShepColors.surfaceHigh,
+                            ),
+                        )
+                    }
                 }
-            }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (tab) {
-                Tab.Agents -> HomeScreen(
-                    client = client,
-                    onOpenPane = { paneDetail = it },
-                    onUnpair = onUnpair,
-                )
-                Tab.Tasks -> TasksScreen(client)
-                Tab.Memory -> MemoryScreen(client)
-                Tab.Shep -> ShepScreen()
+            },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                if (wide && tab == Tab.Agents) {
+                    Row(Modifier.fillMaxSize()) {
+                        Box(Modifier.weight(1f)) {
+                            HomeScreen(
+                                client = client,
+                                onOpenPane = { paneDetail = it },
+                                onUnpair = onUnpair,
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .weight(1.3f)
+                                .fillMaxHeight()
+                                .background(ShepColors.bg),
+                        ) {
+                            if (detail != null) {
+                                PaneScreen(client, detail, onBack = { paneDetail = null })
+                            } else {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("select an agent", color = ShepColors.subtext)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    when (tab) {
+                        Tab.Agents -> HomeScreen(
+                            client = client,
+                            onOpenPane = { paneDetail = it },
+                            onUnpair = onUnpair,
+                        )
+                        Tab.Tasks -> TasksScreen(
+                            client = client,
+                            showAdd = tasksShowAdd,
+                            onShowAddChange = { tasksShowAdd = it },
+                        )
+                        Tab.Memory -> MemoryScreen(client)
+                        Tab.Shep -> ShepScreen()
+                    }
+                }
             }
         }
     }
@@ -370,14 +436,18 @@ fun taskStateColor(state: String): Color = when (state) {
 /**
  * Tasks tab (A4): the queue with states, an add-task sheet (repo/runtime/
  * worktree), cancel, and dispatch-now. Polls `task.list` so a dispatched task
- * visibly flips todo → running → done — the A4 gate.
+ * visibly flips todo → running → done — the A4 gate. `showAdd` is hoisted so
+ * the A6 `shep://tasks/new` deep-link can pre-open the sheet from NavShell.
  */
 @Composable
-fun TasksScreen(client: BridgeClient) {
+fun TasksScreen(
+    client: BridgeClient,
+    showAdd: Boolean = false,
+    onShowAddChange: (Boolean) -> Unit = {},
+) {
     var tasks by remember { mutableStateOf<List<TaskRow>>(emptyList()) }
     var status by remember { mutableStateOf("loading") }
     var notice by remember { mutableStateOf<String?>(null) }
-    var showAdd by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     suspend fun refresh() {
@@ -419,7 +489,7 @@ fun TasksScreen(client: BridgeClient) {
                 color = ShepColors.copper,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable { showAdd = true },
+                modifier = Modifier.clickable { onShowAddChange(true) },
             )
         }
         notice?.let {
@@ -458,9 +528,9 @@ fun TasksScreen(client: BridgeClient) {
     if (showAdd) {
         AddTaskSheet(
             knownRepos = knownRepos,
-            onDismiss = { showAdd = false },
+            onDismiss = { onShowAddChange(false) },
             onSubmit = { prompt, repo, runtime, worktree ->
-                showAdd = false
+                onShowAddChange(false)
                 act(
                     "queued task",
                     "task.add",
@@ -537,10 +607,55 @@ fun AddTaskSheet(
     var repo by remember { mutableStateOf(knownRepos.firstOrNull() ?: "") }
     var runtime by remember { mutableStateOf("claude") }
     var worktree by remember { mutableStateOf(false) }
+    var voiceError by remember { mutableStateOf<String?>(null) }
+
+    // A6 voice add-task: the system recognizer app does the recording, so we
+    // need no RECORD_AUDIO permission; absent recognizer just reports inline.
+    val voiceLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val said = result.data
+            ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+        if (!said.isNullOrBlank()) {
+            prompt = if (prompt.isBlank()) said else "${prompt.trimEnd()} $said"
+            voiceError = null
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ShepColors.surface) {
         Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
-            Text("new task", color = ShepColors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("new task", color = ShepColors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "voice",
+                    color = ShepColors.copper,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(ShepColors.surfaceHigh)
+                        .clickable {
+                            voiceError = null
+                            runCatching {
+                                voiceLauncher.launch(
+                                    Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                        .putExtra(
+                                            android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                            android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                                        )
+                                        .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "describe the task")
+                                )
+                            }.onFailure { voiceError = "no speech recognizer on this device" }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+            voiceError?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, color = ShepColors.peach, fontSize = 12.sp)
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = prompt,
