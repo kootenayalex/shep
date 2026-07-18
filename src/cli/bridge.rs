@@ -251,11 +251,20 @@ fn handle_client_frame(
         let _ = out_tx.send(channel_error(ch, "frame missing req"));
         return;
     };
-    // Push registration lives on the bridge, not the JSON API: the endpoint is a
-    // companion-only fact (the phone's UnifiedPush URL) and handling it here keeps
-    // it out of the herdr API contract / protocol version. Everything else proxies.
+    // Some methods are handled on the bridge itself rather than proxied to the
+    // JSON API. Push registration is a companion-only fact (the phone's
+    // UnifiedPush URL); task add/list/cancel and memory show/add/replace/remove
+    // are local file operations on `<state>/tasks.db` and the memory files —
+    // exactly what the `shep task`/`shep memory` CLIs do, so exposing them here
+    // (not as new API methods) keeps them out of the herdr API contract /
+    // protocol version. `task.dispatch` is NOT local: it must spawn a pane, so
+    // it proxies through to the server like everything else.
     if let Some(method) = request.get("method").and_then(|m| m.as_str()) {
-        if let Some(outcome) = push::handle_local_method(method, request.get("params")) {
+        let params = request.get("params");
+        let local = push::handle_local_method(method, params)
+            .or_else(|| task_local::handle_local_method(method, params))
+            .or_else(|| memory_local::handle_local_method(method, params));
+        if let Some(outcome) = local {
             let line = match outcome {
                 Ok(result) => serde_json::json!({"result": result}),
                 Err(message) => serde_json::json!({"error": {"message": message}}),
@@ -693,6 +702,256 @@ mod push {
                 resolve_publish_url("not-a-url", Some("http://127.0.0.1:2587")),
                 "not-a-url"
             );
+        }
+    }
+}
+
+/// Bridge-local task queue methods (`task.list`/`task.add`/`task.cancel`).
+///
+/// These mirror the `shep task` CLI: add/list/cancel are direct operations on
+/// the local `<state>/tasks.db` (they work server-up-or-not), so the bridge —
+/// which runs on the same box — performs them itself rather than inventing new
+/// JSON API methods. `task.dispatch` is deliberately absent here: dispatching
+/// must spawn a pane, which only the server can do, so it proxies through the
+/// existing `task.dispatch` API method.
+mod task_local {
+    use crate::tasks::{self, TaskRecord, TaskRuntime};
+    use serde_json::{json, Value};
+
+    pub(super) fn handle_local_method(
+        method: &str,
+        params: Option<&Value>,
+    ) -> Option<Result<Value, String>> {
+        match method {
+            "task.list" => Some(list()),
+            "task.add" => Some(add(params)),
+            "task.cancel" => Some(cancel(params)),
+            _ => None,
+        }
+    }
+
+    fn open() -> Result<rusqlite::Connection, String> {
+        tasks::open_store(&tasks::tasks_db_path()).map_err(|err| err.to_string())
+    }
+
+    fn record_json(task: &TaskRecord) -> Value {
+        json!({
+            "id": task.id,
+            "prompt": task.prompt,
+            "repo": task.repo.display().to_string(),
+            "runtime": task.runtime.as_str(),
+            "use_worktree": task.use_worktree,
+            "state": task.state.as_str(),
+            "workspace_id": task.workspace_id,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at,
+        })
+    }
+
+    fn list() -> Result<Value, String> {
+        let db = tasks::tasks_db_path();
+        if !db.exists() {
+            return Ok(json!({ "tasks": [] }));
+        }
+        let conn = open()?;
+        let records = tasks::list_tasks(&conn).map_err(|err| err.to_string())?;
+        let tasks: Vec<Value> = records.iter().map(record_json).collect();
+        Ok(json!({ "tasks": tasks }))
+    }
+
+    fn add(params: Option<&Value>) -> Result<Value, String> {
+        let params = params.ok_or("missing params")?;
+        let prompt = params
+            .get("prompt")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if prompt.is_empty() {
+            return Err("missing prompt".to_string());
+        }
+        // The phone has no cwd to infer a repo from, so `repo` is required and
+        // must resolve to a git repo root (same rule as `shep task add --repo`).
+        let repo_path = params
+            .get("repo")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or("missing repo (path to a git repository)")?;
+        let repo = crate::memory::resolve_repo_root(Some(std::path::Path::new(repo_path)))
+            .map_err(|err| err.to_string())?;
+        let runtime = match params.get("runtime").and_then(|value| value.as_str()) {
+            Some(raw) => TaskRuntime::parse(raw)
+                .ok_or_else(|| format!("invalid runtime {raw} (claude|opencode)"))?,
+            None => TaskRuntime::Claude,
+        };
+        let use_worktree = params
+            .get("worktree")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        let conn = open()?;
+        let id = tasks::add_task(
+            &conn,
+            &prompt,
+            &repo,
+            runtime,
+            use_worktree,
+            tasks::unix_now(),
+        )
+        .map_err(|err| err.to_string())?;
+        Ok(json!({ "id": id, "use_worktree": use_worktree }))
+    }
+
+    fn cancel(params: Option<&Value>) -> Result<Value, String> {
+        let id = params
+            .and_then(|params| params.get("id"))
+            .and_then(|value| value.as_i64())
+            .ok_or("missing id")?;
+        let conn = open()?;
+        let cancelled =
+            tasks::cancel_task(&conn, id, tasks::unix_now()).map_err(|err| err.to_string())?;
+        Ok(json!({ "cancelled": cancelled }))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn only_owns_task_add_list_cancel() {
+            assert!(handle_local_method("task.dispatch", None).is_none());
+            assert!(handle_local_method("session.snapshot", None).is_none());
+            assert!(handle_local_method("task.list", None).is_some());
+        }
+
+        #[test]
+        fn add_requires_prompt_and_repo() {
+            let missing_prompt = json!({ "repo": "/tmp" });
+            assert!(add(Some(&missing_prompt)).is_err());
+            let missing_repo = json!({ "prompt": "do a thing" });
+            assert!(add(Some(&missing_repo)).is_err());
+        }
+
+        #[test]
+        fn cancel_requires_id() {
+            assert!(cancel(Some(&json!({}))).is_err());
+        }
+    }
+}
+
+/// Bridge-local shared-memory methods (`memory.show`/`add`/`replace`/`remove`).
+///
+/// Mirrors `shep memory`: operations on the plain-markdown memory files
+/// (`~/.config/shep/memory/USER.md` and `<repo>/.shep/memory/MEMORY.md`). The
+/// optional `repo` param selects the per-repo file; absent it targets the user
+/// profile. Search (`shep memory search`) is over a separate FTS history db and
+/// is intentionally not exposed here yet.
+mod memory_local {
+    use crate::memory::{self, MemoryDoc, MemoryKind};
+    use serde_json::{json, Value};
+    use std::path::{Path, PathBuf};
+
+    pub(super) fn handle_local_method(
+        method: &str,
+        params: Option<&Value>,
+    ) -> Option<Result<Value, String>> {
+        match method {
+            "memory.show" => Some(show(params)),
+            "memory.add" => Some(add(params)),
+            "memory.replace" => Some(replace(params)),
+            "memory.remove" => Some(remove(params)),
+            _ => None,
+        }
+    }
+
+    fn target(params: Option<&Value>) -> Result<(PathBuf, MemoryKind), String> {
+        let repo = params
+            .and_then(|params| params.get("repo"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        match repo {
+            Some(path) => {
+                let root = memory::resolve_repo_root(Some(Path::new(path)))
+                    .map_err(|err| err.to_string())?;
+                Ok((memory::repo_memory_path(&root), MemoryKind::Repo))
+            }
+            None => Ok((memory::user_memory_path(), MemoryKind::User)),
+        }
+    }
+
+    fn load(params: Option<&Value>) -> Result<(PathBuf, MemoryKind, MemoryDoc), String> {
+        let (path, kind) = target(params)?;
+        let doc = memory::load_or_create(&path, kind).map_err(|err| err.to_string())?;
+        Ok((path, kind, doc))
+    }
+
+    fn show_json(kind: MemoryKind, doc: &MemoryDoc) -> Value {
+        let usage = doc.usage(kind.cap());
+        json!({
+            "kind": kind.label(),
+            "entries": doc.entries(),
+            "used": usage.used,
+            "cap": usage.cap,
+            "percent": usage.percent(),
+            "count": usage.entries,
+        })
+    }
+
+    fn field(params: Option<&Value>, key: &str) -> String {
+        params
+            .and_then(|params| params.get(key))
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .to_string()
+    }
+
+    fn show(params: Option<&Value>) -> Result<Value, String> {
+        let (_path, kind, doc) = load(params)?;
+        Ok(show_json(kind, &doc))
+    }
+
+    fn add(params: Option<&Value>) -> Result<Value, String> {
+        let text = field(params, "text");
+        let (path, kind, mut doc) = load(params)?;
+        doc.add(&text, kind.cap()).map_err(|err| err.to_string())?;
+        memory::write_doc(&path, &doc).map_err(|err| err.to_string())?;
+        Ok(show_json(kind, &doc))
+    }
+
+    fn replace(params: Option<&Value>) -> Result<Value, String> {
+        let find = field(params, "find");
+        let text = field(params, "text");
+        let (path, kind, mut doc) = load(params)?;
+        doc.replace(&find, &text, kind.cap())
+            .map_err(|err| err.to_string())?;
+        memory::write_doc(&path, &doc).map_err(|err| err.to_string())?;
+        Ok(show_json(kind, &doc))
+    }
+
+    fn remove(params: Option<&Value>) -> Result<Value, String> {
+        let find = field(params, "find");
+        let (path, kind, mut doc) = load(params)?;
+        doc.remove(&find).map_err(|err| err.to_string())?;
+        memory::write_doc(&path, &doc).map_err(|err| err.to_string())?;
+        Ok(show_json(kind, &doc))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn only_owns_memory_methods() {
+            assert!(handle_local_method("memory.search", None).is_none());
+            assert!(handle_local_method("session.snapshot", None).is_none());
+            assert!(handle_local_method("memory.show", None).is_some());
+        }
+
+        #[test]
+        fn absent_repo_targets_user_profile() {
+            let (_path, kind) = target(None).unwrap();
+            assert_eq!(kind, MemoryKind::User);
         }
     }
 }

@@ -77,6 +77,10 @@ pub enum Method {
     WorkspaceRename(WorkspaceRenameParams),
     #[serde(rename = "workspace.set_review_state")]
     WorkspaceSetReviewState(WorkspaceSetReviewStateParams),
+    #[serde(rename = "workspace.diff")]
+    WorkspaceDiff(WorkspaceTarget),
+    #[serde(rename = "workspace.ship")]
+    WorkspaceShip(WorkspaceTarget),
     #[serde(rename = "task.dispatch")]
     TaskDispatch(TaskDispatchParams),
     #[serde(rename = "workspace.move")]

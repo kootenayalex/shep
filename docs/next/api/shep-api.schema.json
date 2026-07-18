@@ -4056,6 +4056,38 @@
         {
           "properties": {
             "method": {
+              "const": "workspace.diff",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/WorkspaceTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "workspace.ship",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/WorkspaceTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
               "const": "task.dispatch",
               "type": "string"
             },
@@ -7762,6 +7794,58 @@
                 "type",
                 "task_id",
                 "workspace_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "diff": {
+                  "type": "string"
+                },
+                "stat": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "workspace_diff",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "workspace_id",
+                "target",
+                "stat",
+                "diff"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "workspace_shipped",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "type": "string"
+                },
+                "worktree_path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "workspace_id",
+                "message",
+                "worktree_path"
               ],
               "type": "object"
             },

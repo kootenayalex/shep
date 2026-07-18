@@ -58,6 +58,17 @@ pub enum ResponseResult {
         task_id: i64,
         workspace_id: String,
     },
+    WorkspaceDiff {
+        workspace_id: String,
+        target: String,
+        stat: String,
+        diff: String,
+    },
+    WorkspaceShipped {
+        workspace_id: String,
+        message: String,
+        worktree_path: String,
+    },
     WorkspaceCreated {
         workspace: WorkspaceInfo,
         tab: TabInfo,

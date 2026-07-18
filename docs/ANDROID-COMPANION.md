@@ -1,10 +1,12 @@
 # Shep Android Companion — Plan
 
-Status: A0–A3 BUILT (2026-07-14). A0–A2 shipped + tails closed (bottom-nav
+Status: A0–A4 BUILT (A4 2026-07-17). A0–A2 shipped + tails closed (bottom-nav
 shell, event-driven home, filter chips, ANSI pane render, QR pairing, version
 gating). A3 notifications implemented and server-verified end-to-end; the final
 locked-screen gate needs the ntfy distributor app on the S22 (Alex's manual
-step). A4–A6 not started. Feature parity with the desktop ADE, re-shaped for a
+step). A4 tasks + memory tabs built and live-verified over the bridge. A5 review &
+ship built (workspace.diff/ship JSON API methods + review screen). A6 not
+started. Feature parity with the desktop ADE, re-shaped for a
 phone: small screen, thumb navigation, interrupted attention. Same NN/g
 psychology contract as the desktop-feel pass (`.local/prd/desktop-feel-pass.md`).
 
@@ -146,12 +148,37 @@ shep server (macmini)
   the AVD. Gate (lock-screen approve, app never opened) pending the ntfy app on a
   real device — Alex installs ntfy (F-Droid), points it at the ntfy server, then
   installs the APK + pairs.
-- **A4 — tasks + memory.** Full `task` and `memory` parity (add/list/cancel/
-  dispatch; show/add/replace/remove/search + cap meter). Gate: dispatch a
-  worktree task from the phone, watch it flip the board state.
-- **A5 — review & ship.** Diff screen, request-changes sheet, ship flow with
-  `✓ shipped`. Gate: full lifecycle (task → review → request changes → ship)
-  phone-only.
+- **A4 — tasks + memory. BUILT 2026-07-17.** Bridge-local `task.list/add/cancel`
+  and `memory.show/add/replace/remove` (direct ops on `<state>/tasks.db` and the
+  memory files — same as the CLIs, no new API method / protocol bump, mirroring
+  the `push.register` precedent); `task.dispatch` still proxies to the server
+  since only it can spawn a pane. App: **Tasks tab** (queue with state colors,
+  add-task sheet with repo picker + runtime + worktree toggle, cancel,
+  dispatch-now; polls so a dispatched task visibly flips todo→running→done) and
+  **Memory tab** (USER profile entries, cap meter with the >80% consolidate
+  nudge, add/edit/remove). Memory `search` (over the FTS history db) and repo-
+  scoped memory browsing are deferred. Verified live over the real bridge:
+  task.add/list/cancel + memory CRUD against real state, `just check` green, and
+  the AVD renders both tabs + the add-task sheet from live bridge data. Gate
+  (dispatch → board flip) uses the pre-existing `task.dispatch` server method.
+- **A5 — review & ship. BUILT 2026-07-17.** Two new **JSON API** methods
+  (server-owned git/worktree state → guardrail-correct as API methods, not
+  bridge-local): `workspace.diff` (reuses the review-pager diff target;
+  returns target ref + `--stat` + capped unified diff) and `workspace.ship`
+  (reuses `ship_merge` — merge the worktree branch into its base, refusing on
+  dirty/detached/conflict without losing work). Schema artifact regenerated;
+  no protocol bump. Request-changes needs no new method: `agent.send` the
+  feedback into the agent pane + the existing `workspace.set_review_state`.
+  App: a **Review screen** off the pane view (Agents → pane → review) showing
+  the colorized diff, a request-changes bottom sheet, and a Ship button (linked
+  worktrees only) behind a loss-aversion-honest confirm → `workspace.ship` then
+  `worktree.remove` cleanup. Verified: `workspace.diff` live end-to-end over a
+  throwaway bridge (real diff text on the wire); `ship_merge` + handler wiring
+  unit-tested; a client-triggerable server **panic** (out-of-range
+  `parse_workspace_id` index) found via live testing, fixed, and regression-
+  tested; `just check` 2684 green. Not smoke-rendered on the AVD (reaching the
+  Review screen needs a live pane + a debug-server re-pair; blocked by AVD
+  keyboard/SELinux automation friction, not a code issue).
 - **A6 — polish.** Home-screen widget (blocked count + top blocked agent),
   app shortcuts ("New task"), voice add-task, tablet two-pane layout (S22 vs
   iPad-class widths), Maestro E2E on the AVD + S22 (text anchors, per

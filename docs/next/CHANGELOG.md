@@ -9,6 +9,8 @@
 - Sidebar workspace rows and session-board cards now show a `⇥N` badge while prompts are queued for a busy agent (tab-to-queue), so pending input is visible at a glance.
 - Added `shep bridge`: an authenticated WebSocket relay over the JSON API socket for companion clients (see docs/ANDROID-COMPANION.md), with `shep bridge pair` printing the app pairing values.
 - `shep bridge pair` now also renders a scannable QR of the `shep://pair` payload; the companion app can pair by camera instead of hand-typing.
+- Added Android companion review & ship (A5): new `workspace.diff` (target ref + `--stat` + capped unified diff) and `workspace.ship` (merge a linked worktree's branch into its base, refusing on dirty/detached/conflict) JSON API methods, so the companion can review a diff, request changes (feedback into the agent pane + `workspace.set_review_state`), and ship — then clean up with `worktree.remove`.
+- Added Android companion tasks + memory (A4): the bridge handles `task.list`/`task.add`/`task.cancel` and `memory.show`/`add`/`replace`/`remove` locally (direct operations on `<state>/tasks.db` and the memory files, like the `shep task`/`shep memory` CLIs — no new API method or protocol bump), so the companion's Tasks and Memory tabs work over the same relay. `task.dispatch` still proxies to the server, which spawns the pane.
 - Added Android companion push (A3): the bridge handles `push.register` locally (persisting companion push endpoints to `<config>/push-endpoints.json`), and `shep bridge notify-push` — wired via `[notifications] exec` — POSTs the blocked-transition context to each endpoint's ntfy topic so the phone can page you with lock-screen Approve/Deny. `SHEP_NTFY_PUBLISH_BASE` rewrites the publish target to a co-located broker.
 
 ### Changed

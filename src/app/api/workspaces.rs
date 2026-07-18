@@ -217,6 +217,70 @@ impl App {
         }
     }
 
+    /// `workspace.diff` — the review diff for a workspace as text (target ref,
+    /// `--stat` summary, unified diff). Read-only; the same target logic as the
+    /// TUI review pager, for phone clients that render the diff themselves.
+    pub(super) fn handle_workspace_diff(&mut self, id: String, target: WorkspaceTarget) -> String {
+        let Some(ws_idx) = self.parse_workspace_id(&target.workspace_id) else {
+            return workspace_not_found(id, &target.workspace_id);
+        };
+        // parse_workspace_id's numeric fallbacks can return an out-of-range
+        // index, so guard before indexing (avoid a client-triggered panic).
+        let Some(ws) = self.state.workspaces.get(ws_idx) else {
+            return workspace_not_found(id, &target.workspace_id);
+        };
+        let cwd = ws
+            .resolved_identity_cwd_from(&self.state.terminals, &self.terminal_runtimes)
+            .unwrap_or_else(|| ws.identity_cwd.clone());
+        let (diff_target, stat, diff) =
+            crate::app::review::workspace_review_diff(&cwd, ws.worktree_space());
+        encode_success(
+            id,
+            ResponseResult::WorkspaceDiff {
+                workspace_id: target.workspace_id,
+                target: diff_target,
+                stat,
+                diff,
+            },
+        )
+    }
+
+    /// `workspace.ship` — merge a linked worktree's branch into the base
+    /// checkout (the synchronous `ship_merge`; refuses on dirty/detached/
+    /// conflict without losing work). Cleanup (removing the worktree) is the
+    /// caller's follow-up `worktree.remove`, mirroring the TUI's ship-then-
+    /// remove flow.
+    pub(super) fn handle_workspace_ship(&mut self, id: String, target: WorkspaceTarget) -> String {
+        let Some(ws_idx) = self.parse_workspace_id(&target.workspace_id) else {
+            return workspace_not_found(id, &target.workspace_id);
+        };
+        let Some(ws) = self.state.workspaces.get(ws_idx) else {
+            return workspace_not_found(id, &target.workspace_id);
+        };
+        let Some(space) = ws
+            .worktree_space()
+            .filter(|space| space.is_linked_worktree)
+            .cloned()
+        else {
+            return encode_error(
+                id,
+                "not_a_worktree",
+                "workspace is not a linked worktree".to_string(),
+            );
+        };
+        match crate::app::review::ship_merge(&space) {
+            Ok(message) => encode_success(
+                id,
+                ResponseResult::WorkspaceShipped {
+                    workspace_id: target.workspace_id,
+                    message,
+                    worktree_path: space.checkout_path.display().to_string(),
+                },
+            ),
+            Err(message) => encode_error(id, "ship_failed", message),
+        }
+    }
+
     fn workspace_list_info(&self) -> Vec<crate::api::schema::WorkspaceInfo> {
         self.state
             .workspaces
@@ -456,5 +520,99 @@ mod tests {
         };
         assert_eq!(workspaces[0].workspace_id, moved_id);
         assert!(event_hub.events_after(0).is_empty());
+    }
+
+    fn app_with_one_workspace() -> App {
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &Config::default(),
+            true,
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+        );
+        app.state.workspaces = vec![Workspace::test_new("spaces")];
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.ensure_test_terminals();
+        app
+    }
+
+    #[tokio::test]
+    async fn workspace_diff_returns_a_diff_result() {
+        let mut app = app_with_one_workspace();
+        let ws_id = app.state.workspaces[0].id.clone();
+        let response = app.handle_workspace_diff(
+            "d".into(),
+            WorkspaceTarget {
+                workspace_id: ws_id.clone(),
+            },
+        );
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        let ResponseResult::WorkspaceDiff {
+            workspace_id,
+            target,
+            ..
+        } = success.result
+        else {
+            panic!("expected workspace diff");
+        };
+        assert_eq!(workspace_id, ws_id);
+        // A non-worktree workspace reviews against HEAD.
+        assert_eq!(target, "HEAD");
+    }
+
+    #[tokio::test]
+    async fn workspace_diff_unknown_id_errors() {
+        let mut app = app_with_one_workspace();
+        let response = app.handle_workspace_diff(
+            "d".into(),
+            WorkspaceTarget {
+                workspace_id: "nope".into(),
+            },
+        );
+        assert!(response.contains("workspace_not_found"), "{response}");
+    }
+
+    #[tokio::test]
+    async fn workspace_diff_out_of_range_index_does_not_panic() {
+        // Regression: parse_workspace_id("w_1") yields Some(0) via its numeric
+        // fallback, but an empty/short workspace list must error, not panic.
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &Config::default(),
+            true,
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+        );
+        app.state.workspaces.clear();
+        let response = app.handle_workspace_diff(
+            "d".into(),
+            WorkspaceTarget {
+                workspace_id: "w_1".into(),
+            },
+        );
+        assert!(response.contains("workspace_not_found"), "{response}");
+        let response = app.handle_workspace_ship(
+            "s".into(),
+            WorkspaceTarget {
+                workspace_id: "w_1".into(),
+            },
+        );
+        assert!(response.contains("workspace_not_found"), "{response}");
+    }
+
+    #[tokio::test]
+    async fn workspace_ship_non_worktree_errors() {
+        let mut app = app_with_one_workspace();
+        let ws_id = app.state.workspaces[0].id.clone();
+        let response = app.handle_workspace_ship(
+            "s".into(),
+            WorkspaceTarget {
+                workspace_id: ws_id,
+            },
+        );
+        assert!(response.contains("not_a_worktree"), "{response}");
     }
 }

@@ -292,6 +292,47 @@ pub(crate) fn review_diff_target(cwd: &Path, worktree: Option<&WorktreeSpaceMemb
     git_stdout(cwd, &["merge-base", &base_branch, "HEAD"]).unwrap_or_else(head)
 }
 
+/// The review diff for a workspace as text, for non-pager clients (the Android
+/// companion's `workspace.diff`): the resolved target ref, the `--stat` summary,
+/// and the full unified diff. The diff is capped so a giant change can't flood a
+/// phone; any git failure yields empty strings (nothing to review).
+pub(crate) fn workspace_review_diff(
+    cwd: &Path,
+    worktree: Option<&WorktreeSpaceMembership>,
+) -> (String, String, String) {
+    const MAX_DIFF_BYTES: usize = 64 * 1024;
+    let target = review_diff_target(cwd, worktree);
+    let stat = git_stdout(cwd, &["diff", "--stat", &target]).unwrap_or_default();
+    // Untrimmed: diff formatting (leading context spaces) is significant.
+    let mut diff = git_stdout_untrimmed(cwd, &["diff", &target]).unwrap_or_default();
+    if diff.len() > MAX_DIFF_BYTES {
+        // Truncate on a char boundary, then append a notice.
+        let mut cut = MAX_DIFF_BYTES;
+        while cut > 0 && !diff.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        diff.truncate(cut);
+        diff.push_str("\n… diff truncated — open on desktop for the full change …\n");
+    }
+    (target, stat, diff)
+}
+
+/// stdout of a git command in `dir` without trimming (preserves diff whitespace),
+/// `None` on failure or empty output.
+fn git_stdout_untrimmed(dir: &Path, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    (!stdout.is_empty()).then_some(stdout)
+}
+
 /// The line typed into the review pane. Leading space keeps it out of shell
 /// history; the trailing newline submits it. `--stat` first so the pager opens
 /// on the summary.
@@ -360,6 +401,34 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success(), "git {args:?} failed in {}", dir.display());
+    }
+
+    #[test]
+    fn workspace_review_diff_reports_uncommitted_change() {
+        let repo = temp_dir("wsdiff");
+        run_git(&repo, &["init", "-q"]);
+        std::fs::write(repo.join("f.txt"), "one\n").unwrap();
+        run_git(&repo, &["add", "."]);
+        run_git(&repo, &["commit", "-q", "-m", "base"]);
+        // Uncommitted edit: the working tree diff against HEAD should show it.
+        std::fs::write(repo.join("f.txt"), "one\ntwo\n").unwrap();
+        let (target, stat, diff) = workspace_review_diff(&repo, None);
+        assert_eq!(target, "HEAD");
+        assert!(stat.contains("f.txt"), "stat: {stat}");
+        assert!(diff.contains("+two"), "diff: {diff}");
+        std::fs::remove_dir_all(&repo).ok();
+    }
+
+    #[test]
+    fn workspace_review_diff_empty_on_clean_tree() {
+        let repo = temp_dir("wsdiff-clean");
+        run_git(&repo, &["init", "-q"]);
+        std::fs::write(repo.join("f.txt"), "one\n").unwrap();
+        run_git(&repo, &["add", "."]);
+        run_git(&repo, &["commit", "-q", "-m", "base"]);
+        let (_target, stat, diff) = workspace_review_diff(&repo, None);
+        assert!(stat.is_empty() && diff.is_empty(), "clean tree has no diff");
+        std::fs::remove_dir_all(&repo).ok();
     }
 
     #[test]
