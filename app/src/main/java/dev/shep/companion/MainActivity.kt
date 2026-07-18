@@ -25,6 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -308,8 +311,8 @@ fun NavShell(
                     onOpenPane = { paneDetail = it },
                     onUnpair = onUnpair,
                 )
-                Tab.Tasks -> ComingSoon("tasks", "dispatch & track worktree tasks — A4")
-                Tab.Memory -> ComingSoon("memory", "USER + repo memory, search & cap — A4")
+                Tab.Tasks -> TasksScreen(client)
+                Tab.Memory -> MemoryScreen(client)
                 Tab.Shep -> ShepScreen()
             }
         }
@@ -355,22 +358,410 @@ fun ShepScreen() {
     }
 }
 
-/** Placeholder for a not-yet-built tab, so A4/A5 slot in without re-architecting. */
+/** Color for a task lifecycle state, reusing the shep attention vocabulary. */
+fun taskStateColor(state: String): Color = when (state) {
+    "blocked" -> ShepColors.red
+    "running" -> ShepColors.copper
+    "done" -> ShepColors.green
+    "cancelled" -> ShepColors.subtext
+    else -> ShepColors.blue // todo (queued, unseen)
+}
+
+/**
+ * Tasks tab (A4): the queue with states, an add-task sheet (repo/runtime/
+ * worktree), cancel, and dispatch-now. Polls `task.list` so a dispatched task
+ * visibly flips todo → running → done — the A4 gate.
+ */
 @Composable
-fun ComingSoon(title: String, blurb: String) {
+fun TasksScreen(client: BridgeClient) {
+    var tasks by remember { mutableStateOf<List<TaskRow>>(emptyList()) }
+    var status by remember { mutableStateOf("loading") }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var showAdd by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    suspend fun refresh() {
+        withContext(Dispatchers.IO) { runCatching { client.call("task.list") } }
+            .onSuccess { tasks = parseTasks(it); status = "" }
+            .onFailure { status = "reconnect: ${it.message}" }
+    }
+
+    // Poll so state transitions (the gate) show without a manual refresh.
+    LaunchedEffect(client) {
+        refresh()
+        while (isActive) { delay(2500); refresh() }
+    }
+
+    fun act(label: String, method: String, params: JSONObject) {
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { client.call(method, params) } }
+                .onSuccess { notice = label; refresh() }
+                .onFailure { notice = it.message }
+        }
+    }
+
+    // Distinct repos already in the queue prefill the add sheet's repo picker.
+    val knownRepos = tasks.map { it.repo }.filter { it.isNotEmpty() }.distinct()
+
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().background(ShepColors.surface).padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, color = ShepColors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("coming soon", color = ShepColors.subtext)
-                Spacer(Modifier.height(6.dp))
-                Text(blurb, color = ShepColors.subtext, fontSize = 12.sp)
+            Text("tasks", color = ShepColors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            if (status.isNotEmpty()) {
+                Text(status, color = ShepColors.subtext, fontSize = 12.sp)
+                Spacer(Modifier.width(12.dp))
             }
+            Text(
+                "+ new",
+                color = ShepColors.copper,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { showAdd = true },
+            )
+        }
+        notice?.let {
+            Text(
+                it,
+                color = ShepColors.peach,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        if (tasks.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("no tasks — queue one with + new", color = ShepColors.subtext)
+            }
+        } else {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(tasks, key = { it.id }) { task ->
+                    TaskCard(
+                        task = task,
+                        onDispatch = {
+                            act("dispatching #${task.id}", "task.dispatch", JSONObject().put("task_id", task.id))
+                        },
+                        onCancel = {
+                            act("cancelled #${task.id}", "task.cancel", JSONObject().put("id", task.id))
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showAdd) {
+        AddTaskSheet(
+            knownRepos = knownRepos,
+            onDismiss = { showAdd = false },
+            onSubmit = { prompt, repo, runtime, worktree ->
+                showAdd = false
+                act(
+                    "queued task",
+                    "task.add",
+                    JSONObject()
+                        .put("prompt", prompt)
+                        .put("repo", repo)
+                        .put("runtime", runtime)
+                        .put("worktree", worktree),
+                )
+            },
+        )
+    }
+}
+
+@Composable
+fun TaskCard(task: TaskRow, onDispatch: () -> Unit, onCancel: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ShepColors.surface)
+            .padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(taskStateColor(task.state)))
+            Spacer(Modifier.width(8.dp))
+            Text("#${task.id}", color = ShepColors.subtext, fontSize = 12.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(task.state, color = taskStateColor(task.state), fontSize = 12.sp)
+            Spacer(Modifier.weight(1f))
+            if (task.useWorktree) Text("⑂", color = ShepColors.copper, fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(task.prompt, color = ShepColors.text, fontSize = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${repoName(task.repo)} · ${task.runtime}" + (task.workspaceId?.let { " · $it" } ?: ""),
+            color = ShepColors.subtext,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (taskIsOpen(task.state)) {
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ShepColors.copper)
+                        .clickable { onDispatch() }
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                ) { Text("dispatch", color = ShepColors.bg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ShepColors.surfaceHigh)
+                        .clickable { onCancel() }
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                ) { Text("cancel", color = ShepColors.subtext, fontSize = 13.sp) }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddTaskSheet(
+    knownRepos: List<String>,
+    onDismiss: () -> Unit,
+    onSubmit: (prompt: String, repo: String, runtime: String, worktree: Boolean) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    var prompt by remember { mutableStateOf("") }
+    var repo by remember { mutableStateOf(knownRepos.firstOrNull() ?: "") }
+    var runtime by remember { mutableStateOf("claude") }
+    var worktree by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ShepColors.surface) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
+            Text("new task", color = ShepColors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = prompt,
+                onValueChange = { prompt = it },
+                placeholder = { Text("prompt for the agent…", color = ShepColors.subtext) },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 4,
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = repo,
+                onValueChange = { repo = it },
+                label = { Text("repo path", color = ShepColors.subtext) },
+                placeholder = { Text("/Users/alex/vault/dev/…", color = ShepColors.subtext) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            if (knownRepos.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    knownRepos.forEach { r ->
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (r == repo) ShepColors.copper else ShepColors.surfaceHigh)
+                                .clickable { repo = r }
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                        ) {
+                            Text(
+                                repoName(r),
+                                color = if (r == repo) ShepColors.bg else ShepColors.subtext,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("runtime", color = ShepColors.subtext, fontSize = 13.sp)
+                Spacer(Modifier.width(12.dp))
+                listOf("claude", "opencode").forEach { rt ->
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (rt == runtime) ShepColors.copper else ShepColors.surfaceHigh)
+                            .clickable { runtime = rt }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Text(rt, color = if (rt == runtime) ShepColors.bg else ShepColors.subtext, fontSize = 12.sp)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(checked = worktree, onCheckedChange = { worktree = it })
+                Spacer(Modifier.width(8.dp))
+                Text("isolate in a worktree", color = ShepColors.text, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { onSubmit(prompt.trim(), repo.trim(), runtime, worktree) },
+                enabled = prompt.isNotBlank() && repo.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("queue task") }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+/**
+ * Memory tab (A4): the USER profile's entries with a cap meter and add / edit /
+ * remove. Backed by the bridge-local `memory.show/add/replace/remove`.
+ */
+@Composable
+fun MemoryScreen(client: BridgeClient) {
+    var view by remember { mutableStateOf<MemoryView?>(null) }
+    var status by remember { mutableStateOf("loading") }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var editing by remember { mutableStateOf<String?>(null) } // existing entry text, or "" for a new entry
+    val scope = rememberCoroutineScope()
+
+    suspend fun refresh() {
+        withContext(Dispatchers.IO) { runCatching { client.call("memory.show") } }
+            .onSuccess { view = parseMemory(it); status = "" }
+            .onFailure { status = "reconnect: ${it.message}" }
+    }
+    LaunchedEffect(client) { refresh() }
+
+    fun mutate(method: String, params: JSONObject, label: String) {
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { client.call(method, params) } }
+                .onSuccess { view = parseMemory(it); notice = label; editing = null }
+                .onFailure { notice = it.message }
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().background(ShepColors.surface).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("memory", color = ShepColors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+            Text("· user", color = ShepColors.subtext, fontSize = 13.sp)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "+ add",
+                color = ShepColors.copper,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { editing = "" },
+            )
+        }
+        val v = view
+        if (v != null) {
+            val overCap = v.percent >= 80
+            Column(Modifier.fillMaxWidth().background(ShepColors.surface).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                LinearProgressIndicator(
+                    progress = { (v.percent / 100f).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    color = if (overCap) ShepColors.peach else ShepColors.copper,
+                    trackColor = ShepColors.surfaceHigh,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${v.used}/${v.cap} chars · ${v.percent}%" + if (overCap) " — consolidate soon" else "",
+                    color = if (overCap) ShepColors.peach else ShepColors.subtext,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+        notice?.let {
+            Text(it, color = ShepColors.peach, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        }
+        if (v == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(if (status.isEmpty()) "loading…" else status, color = ShepColors.subtext)
+            }
+        } else if (v.entries.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("no entries yet — add one with + add", color = ShepColors.subtext)
+            }
+        } else {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(v.entries, key = { it }) { entry ->
+                    MemoryCard(
+                        entry = entry,
+                        onEdit = { editing = entry },
+                        onRemove = { mutate("memory.remove", JSONObject().put("find", entry), "removed") },
+                    )
+                }
+            }
+        }
+    }
+
+    val target = editing
+    if (target != null) {
+        MemoryEditSheet(
+            initial = target,
+            onDismiss = { editing = null },
+            onSave = { text ->
+                if (target.isEmpty()) {
+                    mutate("memory.add", JSONObject().put("text", text), "added")
+                } else {
+                    mutate("memory.replace", JSONObject().put("find", target).put("text", text), "updated")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+fun MemoryCard(entry: String, onEdit: () -> Unit, onRemove: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ShepColors.surface).padding(14.dp),
+    ) {
+        Text(entry, color = ShepColors.text, fontSize = 14.sp)
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("edit", color = ShepColors.copper, fontSize = 13.sp, modifier = Modifier.clickable { onEdit() })
+            Text("remove", color = ShepColors.subtext, fontSize = 13.sp, modifier = Modifier.clickable { onRemove() })
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MemoryEditSheet(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    val sheetState = rememberModalBottomSheetState()
+    var text by remember { mutableStateOf(initial) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ShepColors.surface) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
+            Text(
+                if (initial.isEmpty()) "add entry" else "edit entry",
+                color = ShepColors.text,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("one fact, present tense…", color = ShepColors.subtext) },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 6,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { onSave(text.trim()) },
+                enabled = text.isNotBlank() && text.trim() != initial,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (initial.isEmpty()) "add" else "save") }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -513,6 +904,208 @@ private val STRUCTURAL_SUBSCRIPTIONS = listOf(
     "workspace.updated", "workspace.created", "workspace.closed", "workspace.renamed",
     "pane.created", "pane.closed", "pane.exited", "pane.agent_detected", "layout.updated",
 )
+
+/** Tint diff lines: green added, red removed, copper hunk headers, dim context. */
+fun colorizeDiff(diff: String): androidx.compose.ui.text.AnnotatedString =
+    buildAnnotatedString {
+        diff.lineSequence().forEach { line ->
+            val color = when {
+                line.startsWith("+++") || line.startsWith("---") -> ShepColors.subtext
+                line.startsWith("@@") -> ShepColors.copper
+                line.startsWith("+") -> ShepColors.green
+                line.startsWith("-") -> ShepColors.red
+                else -> ShepColors.text
+            }
+            withStyle(SpanStyle(color = color)) { append(line) }
+            append("\n")
+        }
+    }
+
+/**
+ * Review & Ship (A5): the workspace's diff via `workspace.diff`, with Request
+ * changes (feedback → agent pane + `workspace.set_review_state`) and, for a
+ * linked worktree, Ship (`workspace.ship` merge → `worktree.remove` cleanup).
+ * Reached through Agents → pane → review.
+ */
+@Composable
+fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
+    var stat by remember { mutableStateOf("") }
+    var diff by remember { mutableStateOf(androidx.compose.ui.text.AnnotatedString("")) }
+    var status by remember { mutableStateOf("loading diff…") }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var requesting by remember { mutableStateOf(false) }
+    var confirmShip by remember { mutableStateOf(false) }
+    var shipping by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val scroll = rememberScrollState()
+
+    LaunchedEffect(row.workspaceId) {
+        withContext(Dispatchers.IO) {
+            runCatching { client.call("workspace.diff", JSONObject().put("workspace_id", row.workspaceId), 20) }
+        }.onSuccess {
+            stat = it.optString("stat")
+            val d = it.optString("diff")
+            diff = if (d.isEmpty()) androidx.compose.ui.text.AnnotatedString("") else colorizeDiff(d)
+            status = if (stat.isEmpty() && d.isEmpty()) "no changes to review" else ""
+        }.onFailure { status = "diff failed: ${it.message}" }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().background(ShepColors.surface).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("←", color = ShepColors.copper, fontSize = 22.sp, modifier = Modifier.clickable { onBack() }.padding(end = 14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("review · ${row.workspaceLabel}", color = ShepColors.text, fontWeight = FontWeight.SemiBold)
+                Text(
+                    row.worktreeRepo?.let { "$it${if (row.isWorktree) " · worktree" else ""}" } ?: "working tree",
+                    color = ShepColors.subtext,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+        notice?.let {
+            Text(it, color = ShepColors.peach, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp))
+        }
+        if (stat.isNotEmpty()) {
+            Text(
+                stat,
+                color = ShepColors.subtext,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                modifier = Modifier.fillMaxWidth().background(ShepColors.surface).padding(10.dp),
+            )
+        }
+        Box(Modifier.weight(1f).fillMaxWidth().background(ShepColors.bg)) {
+            if (diff.text.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(status.ifEmpty { "no changes" }, color = ShepColors.subtext)
+                }
+            } else {
+                Text(
+                    diff,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.fillMaxSize().verticalScroll(scroll).padding(10.dp),
+                )
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().background(ShepColors.surface).padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(ShepColors.surfaceHigh)
+                    .clickable { requesting = true }.padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text("request changes", color = ShepColors.peach, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+            if (row.isWorktree) {
+                Box(
+                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                        .background(if (shipping) ShepColors.surfaceHigh else ShepColors.copper)
+                        .clickable(enabled = !shipping) { confirmShip = true }.padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text(if (shipping) "shipping…" else "ship ⑂", color = ShepColors.bg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+            }
+        }
+    }
+
+    if (requesting) {
+        RequestChangesSheet(
+            onDismiss = { requesting = false },
+            onSubmit = { feedback ->
+                requesting = false
+                scope.launch {
+                    val ok = withContext(Dispatchers.IO) {
+                        runCatching {
+                            // Feedback into the agent pane, then flag the workspace.
+                            client.call("agent.send", JSONObject().put("target", row.paneId).put("text", feedback))
+                            client.call(
+                                "workspace.set_review_state",
+                                JSONObject().put("workspace_id", row.workspaceId).put("review_state", "changes_requested"),
+                            )
+                        }.isSuccess
+                    }
+                    notice = if (ok) "changes requested — sent to the agent" else "failed to send feedback"
+                }
+            },
+        )
+    }
+
+    if (confirmShip) {
+        AlertDialog(
+            onDismissRequest = { confirmShip = false },
+            containerColor = ShepColors.surface,
+            title = { Text("Ship this worktree?", color = ShepColors.text) },
+            text = {
+                Text(
+                    "Merge ${row.worktreeRepo ?: "this worktree"}'s branch into its base checkout, then remove the worktree. " +
+                        "Refuses if either side is dirty or the merge conflicts. This can't be undone.",
+                    color = ShepColors.subtext,
+                    fontSize = 13.sp,
+                )
+            },
+            confirmButton = {
+                Text(
+                    "Merge & ship",
+                    color = ShepColors.copper,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable {
+                        confirmShip = false
+                        shipping = true
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val shipped = client.call("workspace.ship", JSONObject().put("workspace_id", row.workspaceId), 30)
+                                    // Cleanup: remove the now-merged worktree (async server op).
+                                    runCatching {
+                                        client.call("worktree.remove", JSONObject().put("workspace_id", row.workspaceId), 30)
+                                    }
+                                    shipped.optString("message", "shipped")
+                                }
+                            }
+                            shipping = false
+                            result.onSuccess { notice = "✓ $it"; onBack() }.onFailure { notice = "ship failed: ${it.message}" }
+                        }
+                    }.padding(8.dp),
+                )
+            },
+            dismissButton = {
+                Text("Cancel", color = ShepColors.subtext, modifier = Modifier.clickable { confirmShip = false }.padding(8.dp))
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RequestChangesSheet(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
+    val sheetState = rememberModalBottomSheetState()
+    var text by remember { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ShepColors.surface) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
+            Text("request changes", color = ShepColors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text("goes straight into the agent's pane and flags the workspace.", color = ShepColors.subtext, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("what needs to change…", color = ShepColors.subtext) },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 6,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = { onSubmit(text.trim()) }, enabled = text.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+                Text("send to agent")
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
 
 @Composable
 fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: () -> Unit) {
@@ -747,8 +1340,15 @@ fun PaneScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
     var liveStatus by remember { mutableStateOf(row.status) }
     var composer by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf<String?>(null) }
+    var reviewing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val scroll = rememberScrollState()
+
+    if (reviewing) {
+        BackHandler { reviewing = false }
+        ReviewScreen(client, row, onBack = { reviewing = false })
+        return
+    }
 
     fun sendKeys(vararg keys: String) {
         scope.launch(Dispatchers.IO) {
@@ -814,10 +1414,17 @@ fun PaneScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
             Text("←", color = ShepColors.copper, fontSize = 22.sp, modifier = Modifier.clickable { onBack() }.padding(end = 14.dp))
             Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor(liveStatus)))
             Spacer(Modifier.width(8.dp))
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text("${row.agent} · $liveStatus", color = ShepColors.text, fontWeight = FontWeight.SemiBold)
                 Text(row.workspaceLabel, color = ShepColors.subtext, fontSize = 12.sp)
             }
+            Text(
+                "review",
+                color = ShepColors.copper,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { reviewing = true }.padding(6.dp),
+            )
         }
         Text(
             if (paneText.text.isEmpty()) androidx.compose.ui.text.AnnotatedString("reading pane...") else paneText,
