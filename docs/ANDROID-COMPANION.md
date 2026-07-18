@@ -1,12 +1,14 @@
 # Shep Android Companion — Plan
 
-Status: A0–A4 BUILT (A4 2026-07-17). A0–A2 shipped + tails closed (bottom-nav
+Status: A0–A5 BUILT (A5 2026-07-17), A6 BUILT 2026-07-17 (app-side; physical-
+device gates owed). A0–A2 shipped + tails closed (bottom-nav
 shell, event-driven home, filter chips, ANSI pane render, QR pairing, version
 gating). A3 notifications implemented and server-verified end-to-end; the final
 locked-screen gate needs the ntfy distributor app on the S22 (Alex's manual
 step). A4 tasks + memory tabs built and live-verified over the bridge. A5 review &
-ship built (workspace.diff/ship JSON API methods + review screen). A6 not
-started. Feature parity with the desktop ADE, re-shaped for a
+ship built (workspace.diff/ship JSON API methods + review screen). A6 polish
+built (widget, launcher shortcut, voice add-task, tablet two-pane, Maestro
+E2E). Feature parity with the desktop ADE, re-shaped for a
 phone: small screen, thumb navigation, interrupted attention. Same NN/g
 psychology contract as the desktop-feel pass (`.local/prd/desktop-feel-pass.md`).
 
@@ -179,10 +181,27 @@ shep server (macmini)
   tested; `just check` 2684 green. Not smoke-rendered on the AVD (reaching the
   Review screen needs a live pane + a debug-server re-pair; blocked by AVD
   keyboard/SELinux automation friction, not a code issue).
-- **A6 — polish.** Home-screen widget (blocked count + top blocked agent),
-  app shortcuts ("New task"), voice add-task, tablet two-pane layout (S22 vs
-  iPad-class widths), Maestro E2E on the AVD + S22 (text anchors, per
-  device-testing conventions).
+- **A6 — polish. BUILT 2026-07-17.** All app-side (no server changes, no
+  protocol surface): **home-screen widget** (`ShepWidgetProvider` +
+  RemoteViews — blocked count + top blocked agent in the shep palette; tap →
+  deep-link into the top blocked pane, ↻ → manual re-pull; updates are
+  pull-on-demand per the battery guardrail: 30-min system floor + refresh on
+  every incoming push + tap), **launcher shortcut** "New task"
+  (`res/xml/shortcuts.xml` → `shep://tasks/new` → Tasks tab with the add sheet
+  pre-opened, showAdd hoisted to NavShell), **voice add-task** (RecognizerIntent
+  chip in the add sheet — the recognizer app holds the mic, so no RECORD_AUDIO;
+  absent recognizer degrades to an inline note), **tablet two-pane** (BoxWithConstraints
+  ≥720.dp: agents list + pane detail side-by-side, phone path unchanged), and
+  **Maestro E2E** (`shep-android/maestro/`, 5 text-anchor flows + README:
+  pair-and-home, tasks incl. the voice chip, memory, the `shep://tasks/new`
+  deep link, tablet two-pane). Verified: all flows GREEN on the phone AVD
+  (emulator-5554) and pairing + two-pane GREEN on the tablet AVD
+  (workmayt_tablet_api35, 2560×1600); widget provider + shortcut published
+  (dumpsys appwidget/shortcut), refresh broadcast crash-free. Owed (needs
+  Alex's hands): Maestro on a physical phone — both phones' wireless-adb ports
+  rotated (re-pair per android-adb-repair, a manual pairing-code step) and the
+  S22 USB showed `unauthorized`; widget pinning on the S22 home screen; voice
+  recognizer on real hardware (AVDs ship no STT app).
 
 ## Verification
 
