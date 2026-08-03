@@ -23,6 +23,25 @@ pub(crate) fn truncate_end(text: &str, max_width: usize) -> String {
     format!("{prefix}…")
 }
 
+/// Truncate from the front, keeping the tail: `…/vault/dev/shep`.
+///
+/// The mirror of `truncate_end`, for paths — the leading directories are the
+/// interchangeable part, the last component is the one being identified.
+pub(crate) fn truncate_start(text: &str, max_width: usize) -> String {
+    if display_width(text) <= max_width {
+        return text.to_string();
+    }
+    if max_width == 0 {
+        return String::new();
+    }
+    if max_width == 1 {
+        return "…".to_string();
+    }
+
+    let suffix = take_suffix_width(text, max_width.saturating_sub(1));
+    format!("…{suffix}")
+}
+
 pub(crate) fn middle_elide(text: &str, max_width: usize) -> String {
     if display_width(text) <= max_width {
         return text.to_string();

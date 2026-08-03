@@ -263,6 +263,35 @@ pub fn extract_context_percent(
     )
 }
 
+/// The last line of real content on the pane's screen — a one-line answer to
+/// "what is this agent actually saying right now".
+///
+/// This is deliberately dumb: it takes the bottom-most line that carries
+/// letters or digits. Agent TUIs frame their input box in box-drawing runes and
+/// pad with blanks, so a naive "last non-empty line" would almost always return
+/// `╰────────╯`. It is a display hint only — never detection evidence, and
+/// never a substitute for an agent's own reported status.
+// Called only from the unix-only screen-detection task; unused on Windows.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub fn extract_activity_line(screen_content: &str) -> Option<String> {
+    screen_content
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| line.chars().any(|c| c.is_alphanumeric()))
+        .map(|line| {
+            // Strip leading decoration — the box-drawing rune a bordered input
+            // line starts with, a prompt caret, a spinner glyph. Enumerating
+            // the runes is a losing game across agents, so drop anything that
+            // is not alphanumeric until the text starts.
+            line.trim_start_matches(|c: char| !c.is_alphanumeric())
+                .trim()
+                .chars()
+                .take(200)
+                .collect()
+        })
+}
+
 pub(crate) fn full_lifecycle_hook_authority(source: &str, agent_label: &str) -> bool {
     matches!(
         (source, agent_label),
@@ -594,6 +623,51 @@ fn is_generic_runtime_or_shell(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn activity_line_skips_the_input_box_frame() {
+        // The realistic failure: a naive "last non-empty line" returns the
+        // bottom border of the agent's input box on every single pane.
+        let screen = "\u{2726} Metamorphosing… (3s · thinking)\n\
+                      \u{256d}\u{2500}\u{2500}\u{2500}\u{2500}\u{256e}\n\
+                      \u{2502} > \u{2502}\n\
+                      \u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}\n   \n";
+        assert_eq!(
+            extract_activity_line(screen).as_deref(),
+            Some("Metamorphosing… (3s · thinking)")
+        );
+    }
+
+    #[test]
+    fn activity_line_strips_leading_decoration() {
+        for framed in [
+            "\u{2502} running tests",
+            "> running tests",
+            "\u{2726} running tests",
+        ] {
+            assert_eq!(
+                extract_activity_line(framed).as_deref(),
+                Some("running tests"),
+                "input: {framed:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn activity_line_is_none_without_real_content() {
+        assert_eq!(extract_activity_line(""), None);
+        assert_eq!(
+            extract_activity_line("   \n\u{2500}\u{2500}\u{2500}\n"),
+            None
+        );
+    }
+
+    #[test]
+    fn activity_line_is_bounded() {
+        let long = "x".repeat(500);
+        let line = extract_activity_line(&long).expect("content");
+        assert_eq!(line.chars().count(), 200);
+    }
 
     fn foreground_process(
         pid: u32,

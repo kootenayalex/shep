@@ -39,6 +39,39 @@ static FOREGROUND_MEMBERS_CACHE: Mutex<ForegroundMembersCache> =
 
 pub fn raise_server_nofile_limit() {}
 
+/// Coarse host vitals from `getloadavg` and `/proc/meminfo`.
+///
+/// `MemAvailable` is the kernel's own estimate of what a new allocation could
+/// actually get, which is the number a human means by "free" — `MemFree` alone
+/// counts the page cache as used and makes every healthy box look full.
+pub fn host_vitals() -> super::HostVitals {
+    let cores = std::thread::available_parallelism().map(|n| n.get()).ok();
+    let load = super::load_average_one();
+    let meminfo = std::fs::read_to_string("/proc/meminfo").unwrap_or_default();
+    let total = meminfo_kib(&meminfo, "MemTotal:");
+    let available = meminfo_kib(&meminfo, "MemAvailable:");
+    let used = total.zip(available).map(|(t, a)| t.saturating_sub(a));
+    super::HostVitals {
+        load_percent: super::load_percent_of(load, cores),
+        cores,
+        memory_percent: total.zip(used).and_then(|(total, used)| {
+            (total > 0).then(|| ((used as f64 / total as f64) * 100.0).round() as u8)
+        }),
+        memory_total_bytes: total,
+        memory_used_bytes: used,
+    }
+}
+
+/// Read a `/proc/meminfo` row, converting its kibibytes to bytes.
+fn meminfo_kib(meminfo: &str, key: &str) -> Option<u64> {
+    meminfo
+        .lines()
+        .find_map(|line| line.strip_prefix(key))
+        .and_then(|rest| rest.split_whitespace().next())
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(|kib| kib * 1024)
+}
+
 fn raw_command_argv(command: &str, flag: &str) -> Vec<std::ffi::OsString> {
     vec!["/bin/sh".into(), flag.into(), command.into()]
 }

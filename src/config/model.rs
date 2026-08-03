@@ -832,6 +832,10 @@ pub struct UiConfig {
     pub titlebar: bool,
     /// Show the persistent key-hint bar at the bottom of the desktop layout. Default: true.
     pub hint_bar: bool,
+    /// Open on the session board instead of dropping straight into a pane, so
+    /// a session with several agents starts with the overview. Enter focuses
+    /// the selected pane. Default: true.
+    pub open_on_board: bool,
     /// Agent sidebar ordering. Saved values are "spaces" or "priority". Default: "spaces".
     pub agent_panel_sort: AgentPanelSortConfig,
     /// Accent color for highlights, borders, and navigation UI.
@@ -1125,6 +1129,7 @@ impl Default for UiConfig {
             hide_tab_bar_when_single_tab: false,
             titlebar: true,
             hint_bar: true,
+            open_on_board: true,
             agent_panel_sort: AgentPanelSortConfig::Spaces,
             accent: "cyan".into(),
             toast: ToastConfig::default(),
@@ -1369,6 +1374,18 @@ hint_bar = false
         let config: Config = toml::from_str(toml).unwrap();
         assert!(!config.ui.titlebar);
         assert!(!config.ui.hint_bar);
+    }
+
+    #[test]
+    fn open_on_board_defaults_on_and_can_be_turned_off() {
+        assert!(Config::default().ui.open_on_board);
+
+        let toml = r#"
+[ui]
+open_on_board = false
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(!config.ui.open_on_board);
     }
 
     #[test]

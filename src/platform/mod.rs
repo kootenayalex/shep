@@ -18,6 +18,24 @@ pub struct ForegroundJob {
     pub processes: Vec<ForegroundProcess>,
 }
 
+/// Coarse host resource facts, for "is this machine keeping up" display.
+///
+/// Every field is optional because these are best-effort readings: a platform
+/// that cannot answer honestly reports `None` rather than a plausible zero.
+/// Deliberately not a GPU/VRAM struct — on Apple Silicon memory is unified and
+/// there is no separate VRAM figure to report, so `memory` covers both.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct HostVitals {
+    /// 1-minute load average divided by core count, as a percentage. Can
+    /// exceed 100 when the machine is oversubscribed — don't clamp it away.
+    pub load_percent: Option<u16>,
+    pub cores: Option<usize>,
+    /// Fraction of physical memory in use, 0..=100.
+    pub memory_percent: Option<u8>,
+    pub memory_total_bytes: Option<u64>,
+    pub memory_used_bytes: Option<u64>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Signal {
     Hangup,
@@ -128,6 +146,32 @@ pub(crate) fn read_limited_reader(
     }
 }
 
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+mod vitals_tests {
+    /// Sanity-check the real host reading. A silently-wrong vitals strip is
+    /// worse than none, and the failure mode of these sysctls/proc reads is a
+    /// plausible-looking zero rather than an error.
+    #[test]
+    fn host_vitals_are_plausible_on_this_machine() {
+        let vitals = super::host_vitals();
+        let cores = vitals.cores.expect("core count");
+        assert!(cores > 0, "cores: {cores}");
+
+        let total = vitals.memory_total_bytes.expect("total memory");
+        assert!(
+            total > 512 * 1024 * 1024,
+            "a machine running shep has more than 512MiB: {total}"
+        );
+
+        let percent = vitals.memory_percent.expect("memory percent");
+        assert!(
+            (1..=99).contains(&percent),
+            "memory should be partly used and partly free: {percent}%"
+        );
+        assert!(vitals.load_percent.is_some(), "load average should read");
+    }
+}
+
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
@@ -151,6 +195,32 @@ pub use fallback::*;
 #[cfg(not(target_os = "linux"))]
 pub fn process_agent_hint(_pid: u32) -> Option<crate::detect::Agent> {
     None
+}
+
+/// Platforms with no vitals implementation report nothing rather than zeros.
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+pub fn host_vitals() -> HostVitals {
+    HostVitals::default()
+}
+
+/// 1-minute load average, shared by the unix implementations.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub(crate) fn load_average_one() -> Option<f64> {
+    let mut averages = [0f64; 3];
+    // SAFETY: getloadavg writes at most `averages.len()` doubles into the
+    // buffer and reports how many it wrote.
+    let written = unsafe { libc::getloadavg(averages.as_mut_ptr(), averages.len() as libc::c_int) };
+    (written > 0).then_some(averages[0])
+}
+
+/// Load average as a percentage of total core capacity.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub(crate) fn load_percent_of(load: Option<f64>, cores: Option<usize>) -> Option<u16> {
+    let (load, cores) = (load?, cores?);
+    if cores == 0 {
+        return None;
+    }
+    Some(((load / cores as f64) * 100.0).round().min(9999.0) as u16)
 }
 
 #[cfg(not(target_os = "macos"))]

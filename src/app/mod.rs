@@ -665,6 +665,7 @@ impl App {
             plugin_commands_in_flight: 0,
             global_menu: state::MenuListState::new(0),
             host_terminal_theme: crate::terminal_theme::TerminalTheme::default(),
+            dashboard_sample: crate::app::state::DashboardSample::default(),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         };
@@ -702,6 +703,17 @@ impl App {
                 .get(idx)
                 .and_then(|ws| ws.focused_pane_id().map(|pane_id| (idx, pane_id)))
         });
+
+        // Start on the overview rather than inside one pane. Only from
+        // Terminal: onboarding, release notes, and announcements have already
+        // claimed the screen for a reason, and an empty board would just be a
+        // wall the user has to dismiss before working.
+        if config.ui.open_on_board && state.mode == state::Mode::Terminal {
+            state.open_board();
+            if state.board.selected.is_none() {
+                state.mode = state::Mode::Terminal;
+            }
+        }
 
         Self {
             config_diagnostic_deadline: None,

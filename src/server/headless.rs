@@ -3915,6 +3915,14 @@ impl HeadlessServer {
             changed = true;
         }
 
+        // Only while the board is on screen: nothing else reads these, and
+        // they cost sysctls plus a sqlite read.
+        if self.app.state.mode == crate::app::state::Mode::Board
+            && self.app.state.dashboard_sample.refresh_if_stale(now)
+        {
+            changed = true;
+        }
+
         if self
             .app
             .selection_autoscroll_deadline

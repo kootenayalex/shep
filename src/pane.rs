@@ -183,6 +183,23 @@ async fn publish_state_changed_event(
 
 // Emitted only by the unix screen-detection task.
 #[cfg(unix)]
+async fn publish_activity_line_event(
+    state_events: mpsc::Sender<AppEvent>,
+    pane_id: PaneId,
+    line: Option<String>,
+) {
+    if let Err(e) = state_events
+        .send(AppEvent::AgentActivityLineReported { pane_id, line })
+        .await
+    {
+        warn!(
+            pane = pane_id.raw(),
+            err = %e,
+            "failed to deliver AgentActivityLineReported event"
+        );
+    }
+}
+
 async fn publish_context_reported_event(
     state_events: mpsc::Sender<AppEvent>,
     pane_id: PaneId,
@@ -602,6 +619,7 @@ fn spawn_basic_detection_task(
         let mut agent_startup_grace_until = None;
         let mut pending_idle = PendingIdleConfirmation::default();
         let mut last_context_percent: Option<u8> = None;
+        let mut last_activity_line: Option<String> = None;
 
         loop {
             let sleep_duration = if pending_idle.active() {
@@ -826,6 +844,14 @@ fn spawn_basic_detection_task(
                 last_context_percent = context_percent;
                 publish_context_reported_event(state_events.clone(), pane_id, context_percent)
                     .await;
+            }
+
+            // Same shape as the context meter: a decoupled display hint,
+            // published only when it changes so an idle pane costs nothing.
+            let activity_line = crate::detect::extract_activity_line(&content);
+            if activity_line != last_activity_line {
+                last_activity_line.clone_from(&activity_line);
+                publish_activity_line_event(state_events.clone(), pane_id, activity_line).await;
             }
 
             let Some(screen_detection) = detection_update_for_publish_with_osc(

@@ -75,6 +75,15 @@ pub enum AppEvent {
         pane_id: PaneId,
         context_percent: Option<u8>,
     },
+    /// Last line of real screen content for a pane. Like `AgentContextReported`
+    /// this is a decoupled display hint: it never drives notifications or
+    /// detection, only the `activity_line` runtime fact. Emitted only by the
+    /// unix screen-detection task.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    AgentActivityLineReported {
+        pane_id: PaneId,
+        line: Option<String>,
+    },
     /// Hook-authoritative agent state was reported for a pane.
     HookStateReported {
         pane_id: PaneId,

@@ -255,6 +255,14 @@ impl App {
             changed = true;
         }
 
+        // Only while the board is on screen: nothing else reads these, and
+        // they cost sysctls plus a sqlite read.
+        if self.state.mode == crate::app::state::Mode::Board
+            && self.state.dashboard_sample.refresh_if_stale(now)
+        {
+            changed = true;
+        }
+
         if self
             .selection_autoscroll_deadline
             .is_some_and(|deadline| now >= deadline)

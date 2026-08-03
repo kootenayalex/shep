@@ -837,6 +837,62 @@ pub(crate) struct BoardState {
     pub selected: Option<PaneId>,
 }
 
+/// Facts the dashboard shows that are too expensive to read every frame:
+/// host vitals (sysctls / `/proc`) and the task-queue depth (sqlite).
+///
+/// Sampled on a timer and cached here so `render` stays pure. Every field is
+/// optional or zero-defaulted: a sample that has not happened yet, or a source
+/// that cannot answer, renders as `—` rather than as a confident wrong number.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct DashboardSample {
+    pub vitals: crate::platform::HostVitals,
+    /// Tasks in the queue that have not finished.
+    pub pending_tasks: Option<usize>,
+    /// When this sample was taken; `None` means "never sampled".
+    pub sampled_at: Option<std::time::Instant>,
+}
+
+/// How stale a dashboard sample may get before it is retaken. Host load and
+/// queue depth do not move fast enough to be worth a per-frame syscall.
+pub const DASHBOARD_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
+
+impl DashboardSample {
+    /// Take a fresh sample if the previous one has aged out.
+    /// Returns whether anything was re-read.
+    pub fn refresh_if_stale(&mut self, now: std::time::Instant) -> bool {
+        if self
+            .sampled_at
+            .is_some_and(|at| now.saturating_duration_since(at) < DASHBOARD_SAMPLE_INTERVAL)
+        {
+            return false;
+        }
+        self.vitals = crate::platform::host_vitals();
+        self.pending_tasks = pending_task_count();
+        self.sampled_at = Some(now);
+        true
+    }
+}
+
+/// Count of unfinished tasks in the queue, or `None` when the queue database
+/// cannot be read (it is created lazily, so absence is normal, not an error).
+fn pending_task_count() -> Option<usize> {
+    let conn = crate::tasks::open_store(&crate::tasks::tasks_db_path()).ok()?;
+    let tasks = crate::tasks::list_tasks(&conn).ok()?;
+    Some(
+        tasks
+            .iter()
+            .filter(|task| {
+                matches!(
+                    task.state,
+                    crate::tasks::TaskState::Todo
+                        | crate::tasks::TaskState::Running
+                        | crate::tasks::TaskState::Blocked
+                )
+            })
+            .count(),
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NavigatorTarget {
     Workspace {
@@ -1537,6 +1593,10 @@ pub struct AppState {
     pub global_menu: MenuListState,
     /// Resolved host terminal default colors for theming embedded panes.
     pub host_terminal_theme: TerminalTheme,
+    /// Sampled host/queue facts for the session-board dashboard. Refreshed on
+    /// a timer rather than per frame because reading them touches sysctls and
+    /// the task database; render only ever reads this snapshot.
+    pub dashboard_sample: DashboardSample,
     /// Set when a persisted session snapshot would change.
     pub session_dirty: bool,
     /// Terminal runtimes that should be shut down by the app/runtime layer
@@ -1917,6 +1977,7 @@ impl AppState {
             plugin_commands_in_flight: 0,
             global_menu: MenuListState::new(0),
             host_terminal_theme: TerminalTheme::default(),
+            dashboard_sample: DashboardSample::default(),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         }

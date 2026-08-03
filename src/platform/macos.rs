@@ -485,6 +485,68 @@ fn process_argv0_name(pid: u32) -> Option<String> {
     Some(name.to_string())
 }
 
+/// Coarse host vitals from `getloadavg` plus two sysctls.
+///
+/// macOS has no cheap "percent CPU busy" counter without sampling twice over
+/// an interval, and the board renders on demand — so load average is the
+/// honest cheap answer. Memory comes from `kern.memorystatus_level`, which the
+/// kernel maintains as the percentage of memory still available; deriving
+/// "used" from it avoids the mach `host_statistics64` dance for a number that
+/// is only ever displayed as a rounded percentage.
+pub fn host_vitals() -> super::HostVitals {
+    let cores = std::thread::available_parallelism().map(|n| n.get()).ok();
+    let load = super::load_average_one();
+    let total = sysctl_u64(b"hw.memsize\0");
+    let free_percent = sysctl_u32(b"kern.memorystatus_level\0")
+        .filter(|level| *level <= 100)
+        .map(|level| level as u8);
+    let memory_percent = free_percent.map(|free| 100u8.saturating_sub(free));
+    super::HostVitals {
+        load_percent: super::load_percent_of(load, cores),
+        cores,
+        memory_percent,
+        memory_total_bytes: total,
+        memory_used_bytes: total
+            .zip(memory_percent)
+            .map(|(total, used)| (total as f64 * (used as f64 / 100.0)) as u64),
+    }
+}
+
+/// `sysctlbyname` for a scalar `u64`. `name` must be NUL-terminated.
+fn sysctl_u64(name: &[u8]) -> Option<u64> {
+    let mut value: u64 = 0;
+    let mut size = std::mem::size_of::<u64>() as libc::size_t;
+    // SAFETY: `name` is NUL-terminated by the caller and `value`/`size` are a
+    // matched buffer-and-length pair for a scalar read.
+    let ret = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr() as *const libc::c_char,
+            &mut value as *mut u64 as *mut libc::c_void,
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    (ret == 0).then_some(value)
+}
+
+/// `sysctlbyname` for a scalar `u32`. `name` must be NUL-terminated.
+fn sysctl_u32(name: &[u8]) -> Option<u32> {
+    let mut value: u32 = 0;
+    let mut size = std::mem::size_of::<u32>() as libc::size_t;
+    // SAFETY: as `sysctl_u64`, for a 32-bit scalar.
+    let ret = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr() as *const libc::c_char,
+            &mut value as *mut u32 as *mut libc::c_void,
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    (ret == 0).then_some(value)
+}
+
 /// Raw `sysctl(KERN_PROCARGS2)` call. Returns the full buffer.
 fn kern_procargs2(pid: u32) -> Option<Vec<u8>> {
     unsafe {
