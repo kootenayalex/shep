@@ -51,6 +51,9 @@ pub enum ResponseResult {
     SessionSnapshot {
         snapshot: Box<SessionSnapshot>,
     },
+    SessionOverview {
+        overview: Box<super::session::SessionOverview>,
+    },
     WorkspaceInfo {
         workspace: WorkspaceInfo,
     },

@@ -57,6 +57,103 @@ impl App {
     }
 }
 
+impl App {
+    pub(super) fn handle_session_overview(&mut self, id: String) -> String {
+        // An API client has no TUI tick behind it, so sample here. The
+        // interval guard makes a polling client cost the same as the board.
+        self.state
+            .dashboard_sample
+            .refresh_if_stale(std::time::Instant::now());
+        encode_success(
+            id,
+            ResponseResult::SessionOverview {
+                overview: Box::new(self.session_overview()),
+            },
+        )
+    }
+
+    /// Build the overview from the same model the session board renders.
+    ///
+    /// Reusing `board_model` is the point: bucketing and attention ordering
+    /// live in exactly one place, so a client rendering this payload and the
+    /// desktop board cannot drift apart as the ordering rules evolve.
+    fn session_overview(&self) -> crate::api::schema::SessionOverview {
+        use crate::api::schema::{
+            SessionOverview, SessionOverviewAgent, SessionOverviewHost, SessionOverviewTotals,
+        };
+
+        let model = crate::ui::board::board_model(&self.state);
+        let summary = crate::ui::board::board_summary(&self.state, &model);
+        let now = std::time::Instant::now();
+
+        let mut agents = Vec::new();
+        for card in model.flattened() {
+            let Some(ws) = self.state.workspaces.get(card.ws_idx) else {
+                continue;
+            };
+            let tab_idx = match ws.find_tab_index_for_pane(card.pane_id) {
+                Some(tab_idx) => tab_idx,
+                None => continue,
+            };
+            let terminal = ws
+                .terminal_id(card.pane_id)
+                .and_then(|id| self.state.terminals.get(id));
+            let state_age_seconds = terminal
+                .and_then(|terminal| terminal.last_agent_state_change_at)
+                .map(|at| now.saturating_duration_since(at).as_secs());
+            agents.push(SessionOverviewAgent {
+                pane_id: self
+                    .public_pane_id(card.ws_idx, card.pane_id)
+                    .unwrap_or_default(),
+                workspace_id: self.public_workspace_id(card.ws_idx),
+                tab_id: self.public_tab_id(card.ws_idx, tab_idx).unwrap_or_default(),
+                tab_name: ws.tab_display_name(tab_idx).unwrap_or_default(),
+                pane_number: ws.public_pane_number(card.pane_id).map(|n| n as u64),
+                workspace_label: card.workspace_label.clone(),
+                branch: card.branch.clone(),
+                name: Some(card.agent_label.clone()),
+                display_agent: card.model.clone(),
+                agent_status: crate::app::api_helpers::pane_agent_status(card.state, card.seen),
+                unseen: !card.seen,
+                custom_status: card.status.clone(),
+                activity_line: card.activity.clone(),
+                context_percent: card.context_percent,
+                cwd: card.cwd.clone(),
+                state_age_seconds,
+                queued_input: self.state.queued_input_count_for_pane(card.pane_id) as u64,
+                focused: ws.focused_pane_id() == Some(card.pane_id)
+                    && self.state.active == Some(card.ws_idx),
+            });
+        }
+
+        let vitals = self.state.dashboard_sample.vitals;
+        SessionOverview {
+            totals: SessionOverviewTotals {
+                agents: summary.agents() as u64,
+                blocked: summary.blocked as u64,
+                done: summary.done as u64,
+                working: summary.working as u64,
+                idle: summary.idle as u64,
+                attention: summary.attention as u64,
+                workspaces: summary.workspaces as u64,
+                tabs: summary.tabs as u64,
+                panes: summary.panes as u64,
+                queued_input: summary.queued_input as u64,
+                pending_tasks: self.state.dashboard_sample.pending_tasks.map(|n| n as u64),
+            },
+            host: SessionOverviewHost {
+                version: crate::build_info::version(),
+                load_percent: vitals.load_percent.map(u64::from),
+                cores: vitals.cores.map(|n| n as u64),
+                memory_percent: vitals.memory_percent,
+                memory_total_bytes: vitals.memory_total_bytes,
+                memory_used_bytes: vitals.memory_used_bytes,
+            },
+            agents,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::api::schema::{EmptyParams, Method, ResponseResult, SuccessResponse};
@@ -77,6 +174,62 @@ mod tests {
         app.state.ensure_test_terminals();
         app.state.active = Some(0);
         app
+    }
+
+    #[test]
+    fn session_overview_carries_placement_totals_and_host_facts() {
+        use crate::detect::{Agent, AgentState};
+
+        let mut app = app_with_two_tabs();
+        app.state.workspaces[0].tabs[0].set_custom_name("review".into());
+        let pane = app.state.workspaces[0].tabs[0].root_pane;
+        let terminal_id = app.state.workspaces[0]
+            .terminal_id(pane)
+            .expect("terminal")
+            .clone();
+        {
+            let terminal = app.state.terminals.get_mut(&terminal_id).expect("terminal");
+            terminal.detected_agent = Some(Agent::Claude);
+            terminal.state = AgentState::Blocked;
+            terminal.set_activity_line(Some("waiting for approval".into()));
+            terminal.set_context_percent(Some(62));
+        }
+
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "req_overview".into(),
+            method: Method::SessionOverview(EmptyParams::default()),
+        });
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        let ResponseResult::SessionOverview { overview } = success.result else {
+            panic!("expected session overview response");
+        };
+
+        assert_eq!(overview.totals.workspaces, 1);
+        assert_eq!(overview.totals.tabs, 2);
+        assert_eq!(overview.totals.blocked, 1);
+        // A blocked agent is by definition waiting on the user.
+        assert_eq!(overview.totals.attention, 1);
+
+        let blocked = overview
+            .agents
+            .first()
+            .expect("blocked agent sorts to the front");
+        assert_eq!(blocked.tab_name, "review", "tab name, not its number");
+        assert_eq!(
+            blocked.activity_line.as_deref(),
+            Some("waiting for approval")
+        );
+        assert_eq!(blocked.context_percent, Some(62));
+        assert!(!blocked.pane_id.is_empty());
+        assert!(!blocked.workspace_id.is_empty());
+
+        // Host facts are sampled by the handler itself, with no TUI tick.
+        assert_eq!(overview.host.version, crate::build_info::version());
+        assert!(
+            overview.host.cores.is_some_and(|cores| cores > 0),
+            "vitals should be sampled on demand: {:?}",
+            overview.host
+        );
     }
 
     #[test]

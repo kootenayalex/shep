@@ -4318,6 +4318,22 @@
         {
           "properties": {
             "method": {
+              "const": "session.overview",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/EmptyParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
               "const": "agent.list",
               "type": "string"
             },
@@ -7780,6 +7796,22 @@
             },
             {
               "properties": {
+                "overview": {
+                  "$ref": "#/schemas/success_response/$defs/SessionOverview"
+                },
+                "type": {
+                  "const": "session_overview",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "overview"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
                 "type": {
                   "const": "workspace_info",
                   "type": "string"
@@ -8851,6 +8883,270 @@
           },
           "required": [
             "live_handoff"
+          ],
+          "type": "object"
+        },
+        "SessionOverview": {
+          "description": "Everything a client needs to render a session overview in one request.",
+          "properties": {
+            "agents": {
+              "description": "Agents in attention order: blocked first, then finished-unseen, then\nworking, then idle — the same order the session board uses.",
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/SessionOverviewAgent"
+              },
+              "type": "array"
+            },
+            "host": {
+              "$ref": "#/schemas/success_response/$defs/SessionOverviewHost"
+            },
+            "totals": {
+              "$ref": "#/schemas/success_response/$defs/SessionOverviewTotals"
+            }
+          },
+          "required": [
+            "totals",
+            "host",
+            "agents"
+          ],
+          "type": "object"
+        },
+        "SessionOverviewAgent": {
+          "description": "One agent as the session overview presents it: the runtime facts a client\nneeds to render an at-a-glance board without a second round-trip per agent.\n\nDeliberately additive to `AgentInfo` rather than a replacement — this\ncarries the *placement* and *display* facts (which tab, how stale, what the\nscreen last said) that a list view needs and a single-agent lookup does not.",
+          "properties": {
+            "activity_line": {
+              "description": "Last line of real content on the pane's screen; a display hint only.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "agent_status": {
+              "$ref": "#/schemas/success_response/$defs/AgentStatus"
+            },
+            "branch": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "context_percent": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "custom_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cwd": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "display_agent": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "pane_id": {
+              "type": "string"
+            },
+            "pane_number": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "queued_input": {
+              "description": "Prompts queued for this pane, waiting for it to go idle.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "state_age_seconds": {
+              "description": "Seconds since this agent's state last changed.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "tab_id": {
+              "type": "string"
+            },
+            "tab_name": {
+              "description": "Human name for the tab: its custom name when set, otherwise its number.",
+              "type": "string"
+            },
+            "unseen": {
+              "description": "True when the agent finished without anyone having looked at the pane.",
+              "type": "boolean"
+            },
+            "workspace_id": {
+              "type": "string"
+            },
+            "workspace_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pane_id",
+            "workspace_id",
+            "tab_id",
+            "tab_name",
+            "workspace_label",
+            "agent_status",
+            "focused"
+          ],
+          "type": "object"
+        },
+        "SessionOverviewHost": {
+          "description": "Coarse facts about the machine the session runs on.\n\nEvery field is optional: a host that cannot answer honestly reports nothing\nrather than a plausible zero. There is no separate GPU memory figure —\non unified-memory hardware there is nothing separate to report.",
+          "properties": {
+            "cores": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "load_percent": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "memory_percent": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "memory_total_bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "memory_used_bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object"
+        },
+        "SessionOverviewTotals": {
+          "description": "Session-wide counts for an overview header.",
+          "properties": {
+            "agents": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "attention": {
+              "description": "Agents waiting on the user: blocked, plus finished-and-unseen.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "blocked": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "done": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "idle": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "panes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "pending_tasks": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "queued_input": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tabs": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "working": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "workspaces": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "agents",
+            "blocked",
+            "done",
+            "working",
+            "idle",
+            "attention",
+            "workspaces",
+            "tabs",
+            "panes",
+            "queued_input"
           ],
           "type": "object"
         },
