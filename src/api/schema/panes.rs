@@ -374,6 +374,8 @@ pub struct PaneScrollInfo {
     pub offset_from_bottom: u64,
     pub max_offset_from_bottom: u64,
     pub viewport_rows: u64,
+    #[serde(default)]
+    pub viewport_cols: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

@@ -919,6 +919,12 @@
               "minimum": 0,
               "type": "integer"
             },
+            "viewport_cols": {
+              "default": 0,
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
             "viewport_rows": {
               "format": "uint64",
               "minimum": 0,
@@ -5305,6 +5311,12 @@
               "minimum": 0,
               "type": "integer"
             },
+            "viewport_cols": {
+              "default": 0,
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
             "viewport_rows": {
               "format": "uint64",
               "minimum": 0,
@@ -7068,6 +7080,12 @@
               "type": "integer"
             },
             "offset_from_bottom": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "viewport_cols": {
+              "default": 0,
               "format": "uint64",
               "minimum": 0,
               "type": "integer"

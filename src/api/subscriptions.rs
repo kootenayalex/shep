@@ -657,11 +657,13 @@ mod tests {
             offset_from_bottom: 0,
             max_offset_from_bottom: 40,
             viewport_rows: 20,
+            viewport_cols: 80,
         };
         let scrolled_back = PaneScrollInfo {
             offset_from_bottom: 8,
             max_offset_from_bottom: 40,
             viewport_rows: 20,
+            viewport_cols: 80,
         };
         let mut subscription = ActiveScrollChangedSubscription {
             pane_id: "pane_1".into(),

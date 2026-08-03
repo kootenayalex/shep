@@ -1971,6 +1971,9 @@ mod tests {
         assert_eq!(scroll.offset_from_bottom, 3);
         assert!(scroll.max_offset_from_bottom >= scroll.offset_from_bottom);
         assert_eq!(scroll.viewport_rows, 5);
+        // Cols come from the pty size, not the scrollbar. Clients that mirror a
+        // pane size their render surface from this.
+        assert_eq!(scroll.viewport_cols, 20);
     }
 
     #[tokio::test]

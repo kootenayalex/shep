@@ -378,11 +378,17 @@ impl App {
         let scroll = self
             .state
             .runtime_for_pane_in_workspace(&self.terminal_runtimes, ws_idx, pane_id)
-            .and_then(|runtime| runtime.scroll_metrics())
-            .map(|metrics| crate::api::schema::PaneScrollInfo {
+            .and_then(|runtime| {
+                // Cols come from the pty size, not the scrollbar — the scrollbar
+                // only measures rows. Clients that mirror a pane need both.
+                let (_, cols) = runtime.current_size();
+                runtime.scroll_metrics().map(|metrics| (metrics, cols))
+            })
+            .map(|(metrics, cols)| crate::api::schema::PaneScrollInfo {
                 offset_from_bottom: metrics.offset_from_bottom as u64,
                 max_offset_from_bottom: metrics.max_offset_from_bottom as u64,
                 viewport_rows: metrics.viewport_rows as u64,
+                viewport_cols: cols as u64,
             });
         let focused = self.state.active == Some(ws_idx)
             && ws.active_tab == tab_idx
