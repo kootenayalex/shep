@@ -19,6 +19,8 @@
 //! loopback — pass the tailscale IP explicitly to reach it from the phone;
 //! never bind a public interface.
 
+mod stream;
+
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -28,6 +30,7 @@ use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
 use tungstenite::handshake::server::{ErrorResponse, Request as WsRequest, Response as WsResponse};
+use tungstenite::http::{header, HeaderValue, StatusCode};
 use tungstenite::{Message, WebSocket};
 
 const DEFAULT_BIND: &str = "127.0.0.1:7431";
@@ -181,7 +184,7 @@ fn handle_ws_client(
         if request_authorized(request, &expected) {
             Ok(response)
         } else {
-            Err(ErrorResponse::new(Some("unauthorized".into())))
+            Err(unauthorized_response())
         }
     };
     let mut socket = tungstenite::accept_hdr(stream, auth_check)?;
@@ -202,7 +205,7 @@ fn handle_ws_client(
     ))?;
 
     let (out_tx, out_rx) = mpsc::channel::<String>();
-    let mut channels: HashMap<u64, Arc<AtomicBool>> = HashMap::new();
+    let mut channels: HashMap<u64, ChannelHandle> = HashMap::new();
 
     loop {
         while let Ok(frame) = out_rx.try_recv() {
@@ -220,17 +223,35 @@ fn handle_ws_client(
             Err(err) => return Err(err.into()),
         }
     }
-    for cancel in channels.values() {
-        cancel.store(true, Ordering::Relaxed);
+    for handle in channels.values() {
+        handle.cancel();
     }
     Ok(())
+}
+
+/// What a channel id is currently bound to.
+///
+/// Relay channels are one-shot: a request in, response lines out, EOF. Stream
+/// channels stay open and additionally accept `data` frames going the other way.
+enum ChannelHandle {
+    Relay(Arc<AtomicBool>),
+    Stream(stream::StreamHandle),
+}
+
+impl ChannelHandle {
+    fn cancel(&self) {
+        match self {
+            Self::Relay(cancel) => cancel.store(true, Ordering::Relaxed),
+            Self::Stream(handle) => handle.cancel(),
+        }
+    }
 }
 
 /// Parse one inbound frame and open/close relay channels accordingly.
 fn handle_client_frame(
     text: &str,
     out_tx: &mpsc::Sender<String>,
-    channels: &mut HashMap<u64, Arc<AtomicBool>>,
+    channels: &mut HashMap<u64, ChannelHandle>,
     api_socket: &Arc<PathBuf>,
 ) {
     let Ok(frame) = serde_json::from_str::<serde_json::Value>(text) else {
@@ -242,8 +263,26 @@ fn handle_client_frame(
         return;
     };
     if frame.get("close").and_then(|value| value.as_bool()) == Some(true) {
-        if let Some(cancel) = channels.remove(&ch) {
-            cancel.store(true, Ordering::Relaxed);
+        if let Some(handle) = channels.remove(&ch) {
+            handle.cancel();
+        }
+        return;
+    }
+    // Input for an open stream channel. Kept ahead of the `req` guard so a
+    // keystroke costs one queue send rather than a fresh channel and socket.
+    if let Some(data) = frame.get("data") {
+        match channels.get(&ch) {
+            Some(ChannelHandle::Stream(handle)) => {
+                if let Err(err) = handle.send_input(data) {
+                    let _ = out_tx.send(channel_error(ch, &err));
+                }
+            }
+            Some(ChannelHandle::Relay(_)) => {
+                let _ = out_tx.send(channel_error(ch, "channel does not accept data"));
+            }
+            None => {
+                let _ = out_tx.send(channel_error(ch, "no such channel"));
+            }
         }
         return;
     }
@@ -251,6 +290,12 @@ fn handle_client_frame(
         let _ = out_tx.send(channel_error(ch, "frame missing req"));
         return;
     };
+    // Reusing a live channel id would orphan the running channel's cancel flag,
+    // leaving a thread with no way to be stopped.
+    if channels.contains_key(&ch) {
+        let _ = out_tx.send(channel_error(ch, "channel already open"));
+        return;
+    }
     // Some methods are handled on the bridge itself rather than proxied to the
     // JSON API. Push registration is a companion-only fact (the phone's
     // UnifiedPush URL); task add/list/cancel and memory show/add/replace/remove
@@ -261,6 +306,23 @@ fn handle_client_frame(
     // it proxies through to the server like everything else.
     if let Some(method) = request.get("method").and_then(|m| m.as_str()) {
         let params = request.get("params");
+        // `pane.stream` is long-lived and duplex, so it is handled ahead of the
+        // one-shot locals below rather than alongside them.
+        if let Some(opened) = stream::try_open(method, params, ch, out_tx, api_socket) {
+            match opened {
+                Ok(handle) => {
+                    channels.insert(ch, ChannelHandle::Stream(handle));
+                }
+                Err(message) => {
+                    let _ = out_tx.send(
+                        serde_json::json!({"ch": ch, "line": {"error": {"message": message}}})
+                            .to_string(),
+                    );
+                    let _ = out_tx.send(serde_json::json!({"ch": ch, "eof": true}).to_string());
+                }
+            }
+            return;
+        }
         let local = push::handle_local_method(method, params)
             .or_else(|| task_local::handle_local_method(method, params))
             .or_else(|| memory_local::handle_local_method(method, params));
@@ -275,7 +337,7 @@ fn handle_client_frame(
         }
     }
     let cancel = Arc::new(AtomicBool::new(false));
-    channels.insert(ch, cancel.clone());
+    channels.insert(ch, ChannelHandle::Relay(cancel.clone()));
     let request_line = request.to_string();
     let out_tx = out_tx.clone();
     let api_socket = api_socket.clone();
@@ -338,6 +400,34 @@ fn relay_channel_io(
 
 fn channel_error(ch: u64, message: &str) -> String {
     serde_json::json!({"ch": ch, "error": message}).to_string()
+}
+
+/// The 401 an unauthenticated upgrade attempt gets.
+///
+/// The status MUST be a failure status. tungstenite refuses to write an error
+/// response whose status is 2xx (`ProtocolError::CustomResponseSuccessful`) and
+/// instead drops the connection having sent nothing at all — which reaches the
+/// client as an opaque "unexpected end of stream", indistinguishable from a
+/// dead network. `ErrorResponse::new` defaults to 200, so set it explicitly.
+///
+/// `write_response` emits only the status line and headers (the body is
+/// appended after it), so Content-Length has to be set by hand or the response
+/// is only framed by the connection close.
+fn unauthorized_response() -> ErrorResponse {
+    const BODY: &str = "unauthorized\n";
+    let mut response = ErrorResponse::new(Some(BODY.to_string()));
+    *response.status_mut() = StatusCode::UNAUTHORIZED;
+    let headers = response.headers_mut();
+    headers.insert(
+        header::WWW_AUTHENTICATE,
+        HeaderValue::from_static("Bearer realm=\"shep bridge\""),
+    );
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    headers.insert(header::CONTENT_LENGTH, HeaderValue::from(BODY.len()));
+    response
 }
 
 /// Constant-time-ish token comparison is unnecessary here (tailnet-only,
@@ -991,6 +1081,45 @@ mod tests {
         assert!(!request_authorized(&request, ""));
     }
 
+    /// Regression: the rejection used to be `ErrorResponse::new(..)`, which
+    /// defaults to 200. tungstenite refuses to write a 2xx error response and
+    /// closes the socket having sent nothing, so the companion app reported
+    /// "unexpected end of stream" and a wrong token looked like a dead network.
+    /// The non-success status is the load-bearing part of this response.
+    #[test]
+    fn unauthorized_response_is_a_real_401() {
+        let response = unauthorized_response();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert!(
+            !response.status().is_success(),
+            "a success status makes tungstenite send nothing at all"
+        );
+        assert_eq!(
+            response.headers().get(header::WWW_AUTHENTICATE).unwrap(),
+            "Bearer realm=\"shep bridge\""
+        );
+        let body = response.body().as_ref().expect("body");
+        assert_eq!(
+            response.headers().get(header::CONTENT_LENGTH).unwrap(),
+            body.len().to_string().as_str(),
+            "write_response emits headers only; the body is appended after it"
+        );
+    }
+
+    /// Assert the bytes that actually reach the client, via the same writer
+    /// tungstenite uses on the rejection path.
+    #[test]
+    fn unauthorized_response_serializes_to_a_401_status_line() {
+        let response = unauthorized_response();
+        let mut out = Vec::new();
+        tungstenite::handshake::server::write_response(&mut out, &response).unwrap();
+        let wire = String::from_utf8(out).unwrap();
+        assert!(
+            wire.starts_with("HTTP/1.1 401 Unauthorized\r\n"),
+            "unexpected status line: {wire:?}"
+        );
+    }
+
     #[test]
     fn token_is_created_once_and_reused() {
         let dir = std::env::temp_dir().join(format!("shep-bridge-test-{}", std::process::id()));
@@ -1014,11 +1143,62 @@ mod tests {
         let (out_tx, _out_rx) = mpsc::channel();
         let mut channels = HashMap::new();
         let cancel = Arc::new(AtomicBool::new(false));
-        channels.insert(7, cancel.clone());
+        channels.insert(7u64, ChannelHandle::Relay(cancel.clone()));
         let sock = Arc::new(PathBuf::from("/nonexistent"));
         handle_client_frame(r#"{"ch":7,"close":true}"#, &out_tx, &mut channels, &sock);
         assert!(cancel.load(Ordering::Relaxed));
         assert!(channels.is_empty());
+    }
+
+    #[test]
+    fn data_frame_without_an_open_channel_errors() {
+        let (out_tx, out_rx) = mpsc::channel();
+        let mut channels = HashMap::new();
+        let sock = Arc::new(PathBuf::from("/nonexistent"));
+        handle_client_frame(
+            r#"{"ch":3,"data":{"text":"hi"}}"#,
+            &out_tx,
+            &mut channels,
+            &sock,
+        );
+        assert!(out_rx.recv().unwrap().contains("no such channel"));
+    }
+
+    #[test]
+    fn data_frame_on_a_relay_channel_errors() {
+        let (out_tx, out_rx) = mpsc::channel();
+        let mut channels = HashMap::new();
+        channels.insert(3u64, ChannelHandle::Relay(Arc::new(AtomicBool::new(false))));
+        let sock = Arc::new(PathBuf::from("/nonexistent"));
+        handle_client_frame(
+            r#"{"ch":3,"data":{"text":"hi"}}"#,
+            &out_tx,
+            &mut channels,
+            &sock,
+        );
+        assert!(out_rx
+            .recv()
+            .unwrap()
+            .contains("channel does not accept data"));
+    }
+
+    #[test]
+    fn reusing_a_live_channel_id_errors_instead_of_orphaning_it() {
+        let (out_tx, out_rx) = mpsc::channel();
+        let mut channels = HashMap::new();
+        let cancel = Arc::new(AtomicBool::new(false));
+        channels.insert(4u64, ChannelHandle::Relay(cancel.clone()));
+        let sock = Arc::new(PathBuf::from("/nonexistent"));
+        handle_client_frame(
+            r#"{"ch":4,"req":{"method":"session.snapshot"}}"#,
+            &out_tx,
+            &mut channels,
+            &sock,
+        );
+        assert!(out_rx.recv().unwrap().contains("channel already open"));
+        // The original channel is untouched and still cancellable.
+        assert!(!cancel.load(Ordering::Relaxed));
+        assert_eq!(channels.len(), 1);
     }
 
     #[test]
