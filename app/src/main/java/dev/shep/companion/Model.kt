@@ -19,7 +19,177 @@ data class AgentRow(
     val worktreeRepo: String?,
     val isWorktree: Boolean,
     val memoryPercent: Int?,
+    // Placement and display facts, present only from `session.overview`. A
+    // server old enough to lack that method leaves them null and the board
+    // degrades to what `session.snapshot` can answer.
+    val tabName: String? = null,
+    val paneNumber: Int? = null,
+    val branch: String? = null,
+    val displayAgent: String? = null,
+    val activityLine: String? = null,
+    val cwd: String? = null,
+    val stateAgeSeconds: Long? = null,
+    val queuedInput: Int = 0,
+) {
+    /**
+     * Where this agent lives, the way the desktop board writes it: the tab's
+     * name when it has one, and a pane number only when the tab holds more
+     * than one pane. `t2·p1` meant nothing to read at a glance.
+     */
+    val location: String?
+        get() {
+            val tab = tabName?.takeIf { it.isNotBlank() }
+            val pane = paneNumber?.let { "p$it" }
+            return when {
+                tab != null && pane != null -> "$tab·$pane"
+                tab != null -> tab
+                else -> pane
+            }
+        }
+}
+
+/** Session-wide counts behind the dashboard strip. */
+data class SessionTotals(
+    val agents: Int = 0,
+    val blocked: Int = 0,
+    val done: Int = 0,
+    val working: Int = 0,
+    val idle: Int = 0,
+    val attention: Int = 0,
+    val workspaces: Int = 0,
+    val tabs: Int = 0,
+    val panes: Int = 0,
+    val queuedInput: Int = 0,
+    val pendingTasks: Int? = null,
 )
+
+/**
+ * Facts about the machine the session runs on. All optional: a host that
+ * cannot answer reports nothing rather than a plausible zero, and the strip
+ * renders an em dash.
+ */
+data class SessionHost(
+    val version: String? = null,
+    val loadPercent: Int? = null,
+    val cores: Int? = null,
+    val memoryPercent: Int? = null,
+    val memoryTotalBytes: Long? = null,
+    val memoryUsedBytes: Long? = null,
+)
+
+/** The whole board in one payload. */
+data class SessionOverview(
+    val totals: SessionTotals,
+    val host: SessionHost,
+    val agents: List<AgentRow>,
+)
+
+private fun JSONObject.optIntOrNull(key: String): Int? =
+    if (has(key) && !isNull(key)) optInt(key) else null
+
+private fun JSONObject.optLongOrNull(key: String): Long? =
+    if (has(key) && !isNull(key)) optLong(key) else null
+
+private fun JSONObject.optStringOrNull(key: String): String? =
+    if (has(key) && !isNull(key)) optString(key).takeIf { it.isNotEmpty() } else null
+
+/**
+ * Parse a `session.overview` result. The server already sorts agents in
+ * attention order, so this preserves array order rather than re-sorting —
+ * that is what keeps the phone and the desktop board showing the same thing.
+ */
+fun parseOverview(result: JSONObject): SessionOverview? {
+    val overview = result.optJSONObject("overview") ?: return null
+    val t = overview.optJSONObject("totals") ?: JSONObject()
+    val h = overview.optJSONObject("host") ?: JSONObject()
+    val agents = mutableListOf<AgentRow>()
+    val array = overview.optJSONArray("agents") ?: JSONArray()
+    for (i in 0 until array.length()) {
+        val a = array.optJSONObject(i) ?: continue
+        agents.add(
+            AgentRow(
+                terminalId = a.optString("pane_id"),
+                paneId = a.optString("pane_id"),
+                workspaceId = a.optString("workspace_id"),
+                workspaceLabel = a.optString("workspace_label"),
+                agent = a.optStringOrNull("name") ?: "agent",
+                status = a.optString("agent_status", "unknown"),
+                contextPercent = a.optIntOrNull("context_percent"),
+                // Review state is not part of the overview; the board's job is
+                // agent state. The review flow still reads it per-agent.
+                reviewState = "",
+                customStatus = a.optStringOrNull("custom_status"),
+                worktreeRepo = null,
+                isWorktree = false,
+                memoryPercent = null,
+                tabName = a.optStringOrNull("tab_name"),
+                paneNumber = a.optIntOrNull("pane_number"),
+                branch = a.optStringOrNull("branch"),
+                displayAgent = a.optStringOrNull("display_agent"),
+                activityLine = a.optStringOrNull("activity_line"),
+                cwd = a.optStringOrNull("cwd"),
+                stateAgeSeconds = a.optLongOrNull("state_age_seconds"),
+                queuedInput = a.optInt("queued_input", 0),
+            )
+        )
+    }
+    return SessionOverview(
+        totals = SessionTotals(
+            agents = t.optInt("agents"),
+            blocked = t.optInt("blocked"),
+            done = t.optInt("done"),
+            working = t.optInt("working"),
+            idle = t.optInt("idle"),
+            attention = t.optInt("attention"),
+            workspaces = t.optInt("workspaces"),
+            tabs = t.optInt("tabs"),
+            panes = t.optInt("panes"),
+            queuedInput = t.optInt("queued_input"),
+            pendingTasks = t.optIntOrNull("pending_tasks"),
+        ),
+        host = SessionHost(
+            version = h.optStringOrNull("version"),
+            loadPercent = h.optIntOrNull("load_percent"),
+            cores = h.optIntOrNull("cores"),
+            memoryPercent = h.optIntOrNull("memory_percent"),
+            memoryTotalBytes = h.optLongOrNull("memory_total_bytes"),
+            memoryUsedBytes = h.optLongOrNull("memory_used_bytes"),
+        ),
+        agents = agents,
+    )
+}
+
+/**
+ * Totals derived from rows alone, for a server too old to serve
+ * `session.overview`. Session shape and host vitals are simply unknown there —
+ * they stay zero/null rather than being guessed at.
+ */
+fun totalsFromRows(rows: List<AgentRow>): SessionTotals = SessionTotals(
+    agents = rows.size,
+    blocked = rows.count { it.status == "blocked" },
+    done = rows.count { it.status == "done" },
+    working = rows.count { it.status == "working" },
+    idle = rows.count { it.status == "idle" },
+    attention = rows.count { it.status == "blocked" || it.status == "done" },
+    queuedInput = rows.sumOf { it.queuedInput },
+)
+
+/** `1234567890` -> `1.1G`, matching the desktop strip. */
+fun humanBytes(bytes: Long): String {
+    val units = listOf(1L shl 30 to "G", 1L shl 20 to "M", 1L shl 10 to "K")
+    for ((scale, suffix) in units) {
+        if (bytes >= scale) return String.format("%.1f%s", bytes.toDouble() / scale, suffix)
+    }
+    return "${bytes}B"
+}
+
+/** `4m`, `2h` — the desktop board's compact age format. */
+fun formatAge(seconds: Long): String = when {
+    seconds < 60 -> "${seconds}s"
+    seconds < 3600 -> "${seconds / 60}m"
+    seconds < 86400 -> "${seconds / 3600}h"
+    else -> "${seconds / 86400}d"
+}
 
 /** Sort weight: blocked demands attention first, then done (unseen), working, idle. */
 fun statusPriority(status: String): Int = when (status) {

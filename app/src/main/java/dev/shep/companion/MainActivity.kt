@@ -1235,6 +1235,8 @@ fun RequestChangesSheet(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
 @Composable
 fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: () -> Unit) {
     var rows by remember { mutableStateOf<List<AgentRow>>(emptyList()) }
+    var totals by remember { mutableStateOf(SessionTotals()) }
+    var host by remember { mutableStateOf(SessionHost()) }
     var status by remember { mutableStateOf("connecting") }
     var filter by remember { mutableStateOf(HomeFilter.Attention) }
 
@@ -1248,12 +1250,34 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
         var subscribedPanes: Set<String> = emptySet()
         var subChannel = -1L
 
+        // `session.overview` answers the whole board in one call. A server
+        // older than that method errors, and we fall back to the snapshot —
+        // fewer facts per card, but every agent still shows up. Latch the
+        // fallback so one probe per connection is enough.
+        var overviewSupported = true
+
         suspend fun refresh() {
+            if (overviewSupported) {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { client.call("session.overview") }
+                }
+                val overview = result.getOrNull()?.let { parseOverview(it) }
+                if (overview != null) {
+                    rows = overview.agents
+                    totals = overview.totals
+                    host = overview.host
+                    status = "live · shep ${overview.host.version ?: ""}".trim()
+                    return
+                }
+                overviewSupported = false
+            }
             val result = withContext(Dispatchers.IO) {
                 runCatching { client.call("session.snapshot") }
             }
             result.onSuccess {
                 rows = parseSnapshot(it)
+                totals = totalsFromRows(rows)
+                host = SessionHost(version = client.serverVersion)
                 status = "live · shep ${client.serverVersion ?: ""}".trim()
             }.onFailure { status = "reconnect: ${it.message}" }
         }
@@ -1325,6 +1349,7 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
+        dev.shep.companion.screens.DashboardStrip(totals, host) { statusColor(it) }
         FilterChips(filter, rows) { filter = it }
         if (visibleRows.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1339,7 +1364,11 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(visibleRows, key = { it.paneId }) { row -> AgentCard(row) { onOpenPane(row) } }
+                items(visibleRows, key = { it.paneId }) { row ->
+                    dev.shep.companion.screens.BoardCard(row, { statusColor(it) }) {
+                        onOpenPane(row)
+                    }
+                }
             }
         }
     }

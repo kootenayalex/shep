@@ -51,4 +51,9 @@ dependencies {
     // JVM unit tests for the pure logic (wire decoding, grid state) that has no
     // Android dependencies and is easy to get subtly wrong.
     testImplementation("junit:junit:4.13.2")
+    // The android.jar on the unit-test classpath stubs org.json — every method
+    // throws "not mocked". This is Android's own JSON implementation
+    // repackaged under Apache-2.0 (the upstream org.json artifact carries the
+    // "Good, not Evil" clause), so wire parsing can be tested on the JVM.
+    testImplementation("com.vaadin.external.google:android-json:0.0.20131108.vaadin1")
 }
