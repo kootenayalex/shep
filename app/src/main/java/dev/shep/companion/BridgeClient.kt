@@ -141,8 +141,22 @@ class BridgeClient(private val url: String, private val token: String) {
     }
 
     /**
+     * Send input into an already-open stream channel: `{"ch":N,"data":{...}}`.
+     *
+     * Only `pane.stream` channels accept this. OkHttp queues the write, so this
+     * is safe to call from the main thread on every keystroke — which is the
+     * point, since the alternative is a round trip per character.
+     */
+    fun sendData(ch: Long, data: JSONObject): Boolean =
+        socket?.send(JSONObject().put("ch", ch).put("data", data).toString()) ?: false
+
+    /**
      * Single request → single response helper. Returns the `result` object or
      * throws with the API error message.
+     *
+     * Blocking: it parks the calling thread on a latch. Push and the home-screen
+     * widget both call this from their own short-lived clients on worker
+     * threads, so the blocking shape has to stay.
      */
     fun call(method: String, params: JSONObject = JSONObject(), timeoutSeconds: Long = 10): JSONObject {
         val latch = CountDownLatch(1)

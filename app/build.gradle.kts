@@ -48,4 +48,7 @@ dependencies {
     // A3 push: UnifiedPush connector — no Google Play Services, distributor-agnostic
     // (ntfy app is the distributor). Apache-2.0.
     implementation("org.unifiedpush.android:connector:2.5.0")
+    // JVM unit tests for the pure logic (wire decoding, grid state) that has no
+    // Android dependencies and is easy to get subtly wrong.
+    testImplementation("junit:junit:4.13.2")
 }

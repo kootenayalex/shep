@@ -40,19 +40,28 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import dev.shep.companion.screens.pane.PaneScreen
+import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepTheme
 
-// Shep theme: warm graphite + copper, same vocabulary as the TUI.
+/**
+ * Screen-level color names, resolved from the one palette.
+ *
+ * These were hand-picked approximations of the TUI's colors; they now delegate
+ * to [ShepPalette], which mirrors `Palette::shep()` exactly. Same names, same
+ * call sites, but the app and the desktop finally render in the same ink.
+ */
 object ShepColors {
-    val bg = Color(0xFF141210)
-    val surface = Color(0xFF1E1B18)
-    val surfaceHigh = Color(0xFF282420)
-    val text = Color(0xFFEDE7DF)
-    val subtext = Color(0xFF9C948A)
-    val copper = Color(0xFFE09A55)   // accent / working
-    val green = Color(0xFF9BC177)    // idle / approved
-    val red = Color(0xFFD9695F)      // blocked
-    val blue = Color(0xFF7FA8C9)     // done (unseen)
-    val peach = Color(0xFFE0B085)    // warning tier
+    val bg = ShepPalette.panelBg
+    val surface = ShepPalette.surfaceDim
+    val surfaceHigh = ShepPalette.surface0
+    val text = ShepPalette.text
+    val subtext = ShepPalette.overlay1
+    val copper = ShepPalette.accent  // accent / working
+    val green = ShepPalette.green    // idle / approved
+    val red = ShepPalette.red        // blocked
+    val blue = ShepPalette.blue      // done (unseen)
+    val peach = ShepPalette.peach    // warning tier
 }
 
 fun statusColor(status: String): Color = when (status) {
@@ -62,6 +71,9 @@ fun statusColor(status: String): Color = when (status) {
     "idle" -> ShepColors.green
     else -> ShepColors.subtext
 }
+
+/** Alias for screens that live outside this file. */
+fun statusColorFor(status: String): Color = statusColor(status)
 
 class MainActivity : ComponentActivity() {
     // Pane id from a `shep://pane?pane=…` notification tap; consumed by NavShell.
@@ -74,17 +86,7 @@ class MainActivity : ComponentActivity() {
         deepLinkPane.value = paneFromIntent(intent)
         deepLinkNewTask.value = newTaskFromIntent(intent)
         setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = ShepColors.copper,
-                    background = ShepColors.bg,
-                    surface = ShepColors.surface,
-                    surfaceVariant = ShepColors.surfaceHigh,
-                    onPrimary = ShepColors.bg,
-                    onBackground = ShepColors.text,
-                    onSurface = ShepColors.text,
-                )
-            ) {
+            ShepTheme {
                 ShepApp(
                     getSharedPreferences("shep", Context.MODE_PRIVATE),
                     deepLinkPane = deepLinkPane.value,
@@ -1455,170 +1457,4 @@ fun AgentCard(row: AgentRow, onClick: () -> Unit) {
 fun ReviewBadge(glyph: String, color: Color) {
     Spacer(Modifier.width(8.dp))
     Text(glyph, color = color, fontSize = 13.sp)
-}
-
-@Composable
-fun PaneScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
-    var paneText by remember { mutableStateOf(androidx.compose.ui.text.AnnotatedString("")) }
-    var liveStatus by remember { mutableStateOf(row.status) }
-    var composer by remember { mutableStateOf("") }
-    var notice by remember { mutableStateOf<String?>(null) }
-    var reviewing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val scroll = rememberScrollState()
-
-    if (reviewing) {
-        BackHandler { reviewing = false }
-        ReviewScreen(client, row, onBack = { reviewing = false })
-        return
-    }
-
-    fun sendKeys(vararg keys: String) {
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                client.call(
-                    "pane.send_keys",
-                    JSONObject().put("pane_id", row.paneId).put("keys", JSONArray(keys.toList())),
-                )
-            }.onFailure { notice = it.message }
-        }
-    }
-
-    fun sendPrompt(queue: Boolean) {
-        val text = composer.trim()
-        if (text.isEmpty()) return
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                client.call(
-                    "agent.send",
-                    JSONObject().put("target", row.paneId).put("text", text).put("queue", queue),
-                )
-            }.onSuccess {
-                composer = ""
-                notice = if (queue) "queued — fires on idle" else "sent"
-            }.onFailure { notice = it.message }
-        }
-    }
-
-    LaunchedEffect(row.paneId) {
-        while (isActive) {
-            val read = withContext(Dispatchers.IO) {
-                runCatching {
-                    client.call(
-                        "agent.read",
-                        JSONObject()
-                            .put("target", row.paneId)
-                            .put("source", "visible")
-                            .put("format", "ansi"),
-                    )
-                }.getOrNull()
-            }
-            if (read != null) {
-                val raw = read.optJSONObject("read")?.optString("text") ?: read.optString("text")
-                paneText = ansiToAnnotated(raw, ShepColors.text)
-                val snapshot = withContext(Dispatchers.IO) {
-                    runCatching { client.call("session.snapshot") }.getOrNull()
-                }
-                snapshot?.let { snap ->
-                    parseSnapshot(snap).find { it.paneId == row.paneId }
-                        ?.let { liveStatus = it.status }
-                }
-                scroll.scrollTo(scroll.maxValue)
-            }
-            delay(1200)
-        }
-    }
-
-    Column(Modifier.fillMaxSize().imePadding()) {
-        Row(
-            Modifier.fillMaxWidth().background(ShepColors.surface).padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("←", color = ShepColors.copper, fontSize = 22.sp, modifier = Modifier.clickable { onBack() }.padding(end = 14.dp))
-            Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor(liveStatus)))
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text("${row.agent} · $liveStatus", color = ShepColors.text, fontWeight = FontWeight.SemiBold)
-                Text(row.workspaceLabel, color = ShepColors.subtext, fontSize = 12.sp)
-            }
-            Text(
-                "review",
-                color = ShepColors.copper,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable { reviewing = true }.padding(6.dp),
-            )
-        }
-        Text(
-            if (paneText.text.isEmpty()) androidx.compose.ui.text.AnnotatedString("reading pane...") else paneText,
-            color = ShepColors.text,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(ShepColors.bg)
-                .verticalScroll(scroll)
-                .padding(10.dp),
-        )
-        notice?.let {
-            Text(
-                it,
-                color = ShepColors.peach,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            )
-        }
-        Row(
-            Modifier.fillMaxWidth().background(ShepColors.surface).padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            QuickKey("y") { sendKeys("y") }
-            QuickKey("n") { sendKeys("n") }
-            QuickKey("enter") { sendKeys("enter") }
-            QuickKey("esc") { sendKeys("esc") }
-            QuickKey("↑") { sendKeys("up") }
-            QuickKey("↓") { sendKeys("down") }
-        }
-        Row(
-            Modifier.fillMaxWidth().background(ShepColors.surface).padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = composer,
-                onValueChange = { composer = it },
-                placeholder = { Text("prompt...", color = ShepColors.subtext) },
-                modifier = Modifier.weight(1f),
-                maxLines = 3,
-            )
-            Spacer(Modifier.width(8.dp))
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Button(onClick = { sendPrompt(false) }, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)) {
-                    Text("send")
-                }
-                Text(
-                    "queue ⇥",
-                    color = ShepColors.copper,
-                    fontSize = 13.sp,
-                    modifier = Modifier.clickable { sendPrompt(true) }.padding(4.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun RowScope.QuickKey(label: String, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .weight(1f)
-            .height(40.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(ShepColors.surfaceHigh)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = ShepColors.text, fontSize = 14.sp)
-    }
 }
