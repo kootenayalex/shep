@@ -1209,6 +1209,15 @@ pub(crate) fn parse_key_combo(s: &str) -> Option<KeyCombo> {
         "right" => KeyCode::Right,
         "up" => KeyCode::Up,
         "down" => KeyCode::Down,
+        // Navigation/editing keys. `format_key_combo` already renders these
+        // through its Debug fallback, so without these arms a formatted binding
+        // could not be parsed back.
+        "delete" | "del" => KeyCode::Delete,
+        "insert" | "ins" => KeyCode::Insert,
+        "home" => KeyCode::Home,
+        "end" => KeyCode::End,
+        "pageup" | "pgup" | "page_up" => KeyCode::PageUp,
+        "pagedown" | "pgdn" | "page_down" => KeyCode::PageDown,
         "minus" => KeyCode::Char('-'),
         "comma" => KeyCode::Char(','),
         "period" => KeyCode::Char('.'),
@@ -1425,6 +1434,46 @@ mod tests {
             parse_key_combo("v"),
             Some((KeyCode::Char('v'), KeyModifiers::empty()))
         );
+    }
+
+    #[test]
+    fn parse_navigation_and_editing_keys() {
+        for (name, expected) in [
+            ("delete", KeyCode::Delete),
+            ("del", KeyCode::Delete),
+            ("insert", KeyCode::Insert),
+            ("home", KeyCode::Home),
+            ("end", KeyCode::End),
+            ("pageup", KeyCode::PageUp),
+            ("pgdn", KeyCode::PageDown),
+        ] {
+            assert_eq!(
+                parse_key_combo(name),
+                Some((expected, KeyModifiers::empty())),
+                "{name} should parse"
+            );
+        }
+    }
+
+    /// `format_key_combo` renders these through its Debug fallback, so parsing
+    /// has to accept what formatting produces.
+    #[test]
+    fn navigation_keys_round_trip_through_format() {
+        for code in [
+            KeyCode::Delete,
+            KeyCode::Insert,
+            KeyCode::Home,
+            KeyCode::End,
+            KeyCode::PageUp,
+            KeyCode::PageDown,
+        ] {
+            let formatted = format_key_combo((code, KeyModifiers::empty()));
+            assert_eq!(
+                parse_key_combo(&formatted),
+                Some((code, KeyModifiers::empty())),
+                "{formatted} should round-trip"
+            );
+        }
     }
 
     #[test]
