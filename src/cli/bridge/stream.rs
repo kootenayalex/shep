@@ -357,17 +357,59 @@ fn open(
 fn resolve_pane_size(api_socket: &Path, pane_id: &str) -> Option<(u16, u16)> {
     let request = json!({
         "id": "bridge-stream-size",
-        "method": "pane.get",
-        "params": {"pane_id": pane_id},
+        "method": "session.snapshot",
+        "params": {},
     });
     let response = api_request(api_socket, &request).ok()?;
-    let scroll = response.get("result")?.get("pane")?.get("scroll")?.clone();
-    let cols = scroll.get("viewport_cols")?.as_u64()?;
-    let rows = scroll.get("viewport_rows")?.as_u64()?;
-    if cols == 0 || rows == 0 {
-        return None;
+    let snapshot = response.get("result")?.get("snapshot")?;
+    pane_size_from_snapshot(snapshot, pane_id)
+}
+
+/// Work out how big the observed pane really is.
+///
+/// `scroll` is authoritative, but `viewport_cols` is newer than the servers
+/// this bridge may be talking to — a bridge upgraded ahead of a long-running
+/// server would otherwise fall back to a default and show a fraction of a wide
+/// pane. The layout rect carries the same dimensions and has always been there,
+/// so it stands in until the server catches up.
+fn pane_size_from_snapshot(snapshot: &Value, pane_id: &str) -> Option<(u16, u16)> {
+    let scroll = snapshot
+        .get("panes")?
+        .as_array()?
+        .iter()
+        .find(|pane| pane.get("pane_id").and_then(Value::as_str) == Some(pane_id))
+        .and_then(|pane| pane.get("scroll"));
+
+    let rows = scroll
+        .and_then(|scroll| scroll.get("viewport_rows"))
+        .and_then(Value::as_u64)
+        .filter(|rows| *rows > 0);
+    let cols = scroll
+        .and_then(|scroll| scroll.get("viewport_cols"))
+        .and_then(Value::as_u64)
+        .filter(|cols| *cols > 0);
+    if let (Some(cols), Some(rows)) = (cols, rows) {
+        return Some((cols as u16, rows as u16));
     }
-    Some((cols as u16, rows as u16))
+
+    let rect = snapshot
+        .get("layouts")?
+        .as_array()?
+        .iter()
+        .filter_map(|layout| layout.get("panes")?.as_array())
+        .flatten()
+        .find(|pane| pane.get("pane_id").and_then(Value::as_str) == Some(pane_id))
+        .and_then(|pane| pane.get("rect"))?;
+    let width = rect.get("width").and_then(Value::as_u64).filter(|w| *w > 0);
+    let height = rect
+        .get("height")
+        .and_then(Value::as_u64)
+        .filter(|h| *h > 0);
+
+    match (cols.or(width), rows.or(height)) {
+        (Some(cols), Some(rows)) => Some((cols as u16, rows as u16)),
+        _ => None,
+    }
 }
 
 /// One request, first response line, connection closed.
@@ -741,6 +783,43 @@ mod tests {
         let line = diff.next(linked, Instant::now()).unwrap();
         assert_eq!(line["cells"][0][5], json!(0));
         assert_eq!(line["links"][0], json!("https://example.invalid"));
+    }
+
+    #[test]
+    fn pane_size_prefers_scroll_metrics() {
+        let snapshot = json!({
+            "panes": [{"pane_id": "w1:p1", "scroll": {"viewport_cols": 170, "viewport_rows": 54}}],
+            "layouts": [{"panes": [{"pane_id": "w1:p1", "rect": {"width": 9, "height": 9}}]}],
+        });
+        assert_eq!(pane_size_from_snapshot(&snapshot, "w1:p1"), Some((170, 54)));
+    }
+
+    /// A bridge upgraded ahead of its server still has to size the pane right.
+    #[test]
+    fn pane_size_falls_back_to_the_layout_rect_when_cols_are_missing() {
+        let snapshot = json!({
+            "panes": [{"pane_id": "w1:p1", "scroll": {"viewport_rows": 54}}],
+            "layouts": [{"panes": [{"pane_id": "w1:p1", "rect": {"width": 170, "height": 54}}]}],
+        });
+        assert_eq!(pane_size_from_snapshot(&snapshot, "w1:p1"), Some((170, 54)));
+    }
+
+    #[test]
+    fn pane_size_uses_the_rect_when_there_are_no_scroll_metrics_at_all() {
+        let snapshot = json!({
+            "panes": [{"pane_id": "w1:p1"}],
+            "layouts": [{"panes": [{"pane_id": "w1:p1", "rect": {"width": 100, "height": 30}}]}],
+        });
+        assert_eq!(pane_size_from_snapshot(&snapshot, "w1:p1"), Some((100, 30)));
+    }
+
+    #[test]
+    fn pane_size_is_none_for_an_unknown_pane() {
+        let snapshot = json!({
+            "panes": [{"pane_id": "w1:p1", "scroll": {"viewport_cols": 80, "viewport_rows": 24}}],
+            "layouts": [{"panes": [{"pane_id": "w1:p1", "rect": {"width": 80, "height": 24}}]}],
+        });
+        assert_eq!(pane_size_from_snapshot(&snapshot, "w9:p9"), None);
     }
 
     #[test]
