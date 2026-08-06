@@ -151,21 +151,68 @@ pub(crate) fn parse_event(raw: &str) -> Option<HistoryEvent> {
 /// `shep memory ingest-event`: read one hook payload from stdin and record it.
 /// Always exits 0 and never writes to stdout — hook callers may interpret
 /// stdout, and a history bug must not disturb the session.
+///
+/// Set `SHEP_HOOK_TRACE` to any non-empty value to append every invocation to
+/// [`hook_trace_path`]. Fail-open ingestion is otherwise indistinguishable from
+/// a hook that never ran at all, which is exactly the state this sidecar was
+/// found in: no rows since 2026-07-18 and no way to tell why.
 pub(crate) fn run_ingest_event() -> i32 {
     use std::io::Read;
     let mut raw = String::new();
     if std::io::stdin().read_to_string(&mut raw).is_err() {
+        trace_hook("stdin-read-failed", "");
         return 0;
     }
     let Some(event) = parse_event(&raw) else {
+        tracing::debug!(
+            bytes = raw.len(),
+            "ingest-event: payload carried no hook_event_name; dropping"
+        );
+        trace_hook("unparsed", &raw);
         return 0;
     };
+    trace_hook(&format!("parsed {}", event.kind), &raw);
     let ts = unix_now();
     let result = open_db(&history_db_path()).and_then(|conn| insert_event(&conn, &event, ts));
     if let Err(err) = result {
         eprintln!("shep memory ingest-event: {err}");
+        trace_hook("insert-failed", &err.to_string());
     }
     0
+}
+
+/// Where [`trace_hook`] appends when `SHEP_HOOK_TRACE` is set.
+pub(crate) fn hook_trace_path() -> PathBuf {
+    crate::config::state_dir().join("hook-trace.log")
+}
+
+/// Append one diagnostic line about this invocation when tracing is enabled.
+/// Silent and best-effort: tracing a hook must not be able to break one.
+fn trace_hook(outcome: &str, detail: &str) {
+    if crate::env_compat::var("SHEP_HOOK_TRACE").is_none_or(|value| value.is_empty()) {
+        return;
+    }
+    append_trace_line(&hook_trace_path(), outcome, detail);
+}
+
+/// Append one trace line to `path`, best-effort. Split from [`trace_hook`] so
+/// the format is testable without touching the real state dir.
+fn append_trace_line(path: &Path, outcome: &str, detail: &str) {
+    use std::io::Write;
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    else {
+        return;
+    };
+    // One line per invocation: newlines in the payload would break the "one
+    // fired hook == one line" property the diagnosis depends on.
+    let detail = detail.replace('\n', "\\n");
+    let _ = writeln!(file, "{} {outcome} {detail}", unix_now());
 }
 
 fn unix_now() -> i64 {
@@ -288,5 +335,40 @@ mod tests {
         // Missing session_id defaults rather than dropping the event.
         let anon = parse_event(r#"{"hook_event_name":"Stop"}"#).unwrap();
         assert_eq!(anon.session_id, "unknown");
+    }
+
+    #[test]
+    fn append_trace_line_keeps_one_invocation_per_line() {
+        let dir = temp_dir("hook-trace");
+        let path = dir.join("nested").join("hook-trace.log");
+        append_trace_line(&path, "unparsed", "{\"a\":1}\n{\"b\":2}");
+        append_trace_line(&path, "parsed Stop", "second");
+        let written = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<_> = written.lines().collect();
+        assert_eq!(lines.len(), 2, "each invocation is exactly one line");
+        assert!(lines[0].contains("unparsed"));
+        assert!(
+            lines[0].contains("{\"a\":1}\\n{\"b\":2}"),
+            "embedded newlines must be escaped, got {}",
+            lines[0]
+        );
+        assert!(lines[1].contains("parsed Stop"));
+    }
+
+    #[test]
+    fn trace_hook_is_silent_unless_enabled() {
+        // nextest runs each test in its own process, so touching the env here
+        // cannot leak into another test.
+        crate::env_compat::remove_process_env_for_test("SHEP_HOOK_TRACE");
+        let path = hook_trace_path();
+        let before = std::fs::metadata(&path).map(|meta| meta.len());
+        trace_hook("unparsed", "should not be written");
+        let after = std::fs::metadata(&path).map(|meta| meta.len());
+        assert_eq!(
+            before.ok(),
+            after.ok(),
+            "tracing must be off by default: {} changed",
+            path.display()
+        );
     }
 }

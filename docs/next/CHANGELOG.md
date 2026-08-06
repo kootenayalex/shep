@@ -28,6 +28,9 @@
 
 ### Fixed
 - `agent.send` now appends the pty Enter (`\r`) that submits the text, so prompts and slash commands sent through the socket API (and the Android companion) actually execute instead of sitting un-submitted in the agent's input line.
+- `shep memory init` no longer installs a second copy of its claude lifecycle hooks when run from a different shep binary. Hook commands embed an absolute binary path, and matching them by the full string made a hook installed by another build look foreign, so each install appended a rival set instead of updating the existing one. Hooks are now matched by shep subcommand and retargeted in place, so re-running init collapses any duplicates that accumulated and points them at the current binary. The same fix applies to the opencode `instructions` entries, where a stale config-dir path was appended beside the correct one rather than corrected.
+- `shep memory status` now audits the installed claude hooks and reports missing, duplicated, or unreachable ones. A hook whose binary path has gone stale — after a rebuild, move, or `cargo clean` — is executed by claude, fails, and is reported nowhere, so a silently dead hook was indistinguishable from a working one. This is what left the `shep memory search` history sidecar unfed for three weeks without any visible symptom.
+- `shep memory ingest-event` can now explain itself: set `SHEP_HOOK_TRACE` to any non-empty value to append every invocation and its parse outcome to `<state>/hook-trace.log`. Ingestion stays fail-open and silent by default, which previously made "the hook never ran" and "the hook ran and the payload did not parse" impossible to tell apart.
 
 ## [0.7.3] - 2026-07-08
 

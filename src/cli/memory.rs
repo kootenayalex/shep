@@ -410,6 +410,21 @@ fn status(repo: Option<PathBuf>) -> std::io::Result<i32> {
         repo_path.display(),
         repo_doc.usage(MemoryKind::Repo.cap())
     );
+
+    // A hook whose binary went stale fails silently, so an unchecked install
+    // looks identical to a working one. Say which it is.
+    let settings = root.join(".claude").join("settings.json");
+    let content = std::fs::read_to_string(&settings).unwrap_or_default();
+    let issues = memory::bridges::audit_claude_hooks(&content, |path| path.exists());
+    if issues.is_empty() {
+        println!("hooks ok  {}", settings.display());
+    } else {
+        println!("hooks {}", settings.display());
+        for issue in issues {
+            println!("  ! {issue}");
+        }
+        println!("  run `shep memory init` to repair");
+    }
     Ok(0)
 }
 
