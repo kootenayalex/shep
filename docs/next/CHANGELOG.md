@@ -24,6 +24,7 @@
 - Warning-tier indicators (git behind, changes-requested badge, memory pressure) moved from red/yellow to the peach token, reserving red for blocked and destructive actions.
 - The session board highlights the selected card with a background fill, and the sidebar marks the selected workspace with an edge marker.
 - Shipping a worktree now confirms with a `✓ shipped` toast.
+- Shep memory files now carry a read protocol in their header, so agents know `shep memory search` exists and when to call it — previously the header only explained how to write, and the retrieval path was never invoked. `shep memory init` refreshes the header in place on repos initialised before this, leaving entries and any hand-written header notes untouched.
 
 ### Fixed
 - `agent.send` now appends the pty Enter (`\r`) that submits the text, so prompts and slash commands sent through the socket API (and the Android companion) actually execute instead of sitting un-submitted in the agent's input line.

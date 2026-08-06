@@ -134,6 +134,44 @@ pub(crate) fn load_or_create(path: &Path, kind: MemoryKind) -> io::Result<Memory
     }
 }
 
+/// Begin marker for the managed read-protocol block inside a memory header.
+pub(crate) const READ_BEGIN: &str = "<!-- BEGIN shep read protocol (managed) -->";
+/// End marker for the managed read-protocol block.
+pub(crate) const READ_END: &str = "<!-- END shep read protocol (managed) -->";
+
+/// Bring an existing memory file's header up to date with the current managed
+/// read protocol. Returns whether the file changed.
+///
+/// [`load_or_create`] only writes a template when the file is absent, so a file
+/// created before the read protocol existed would never learn about
+/// `shep memory search` — and the header is the only text guaranteed to reach
+/// every agent session. This is the upgrade path for those files.
+///
+/// The rewrite is confined to the header (everything before the first delimiter
+/// line) and, within it, to the marked block — so entries are byte-identical
+/// afterwards and hand-written header notes survive. Absent file is not an
+/// error: there is simply nothing to refresh.
+pub(crate) fn refresh_header(path: &Path) -> io::Result<bool> {
+    let raw = match std::fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(err) => return Err(err),
+    };
+    let mut doc = MemoryDoc::parse(&raw);
+    let refreshed = bridges::upsert_marked_block(
+        doc.header(),
+        READ_BEGIN,
+        READ_END,
+        read_protocol().trim_end(),
+    );
+    if refreshed == doc.header() {
+        return Ok(false);
+    }
+    doc.set_header(refreshed);
+    write_doc(path, &doc)?;
+    Ok(true)
+}
+
 /// Serialize a document to disk, creating parent directories as needed.
 pub(crate) fn write_doc(path: &Path, doc: &MemoryDoc) -> io::Result<()> {
     if let Some(parent) = path.parent() {
@@ -153,8 +191,11 @@ fn user_template() -> String {
          \n\
          {}\n\
          \n\
+         {}\n\
+         \n\
          Cap: {USER_CAP} characters of ENTRY CONTENT (this header does not count).\n",
-        writeback_protocol()
+        writeback_protocol(),
+        marked_read_protocol()
     )
 }
 
@@ -168,9 +209,38 @@ fn repo_template() -> String {
          \n\
          {}\n\
          \n\
+         {}\n\
+         \n\
          Cap: {REPO_CAP} characters of ENTRY CONTENT (this header does not count).\n",
-        writeback_protocol()
+        writeback_protocol(),
+        marked_read_protocol()
     )
+}
+
+/// The read protocol wrapped in its managed markers, as it appears in a header.
+fn marked_read_protocol() -> String {
+    format!("{READ_BEGIN}\n{}{READ_END}", read_protocol())
+}
+
+/// Compact read protocol embedded in every template header.
+///
+/// The write-back protocol tells an agent how to record a fact; without this an
+/// agent has no way to learn that recorded facts can be looked up again.
+/// `shep memory search` has existed and been tested for months while nothing in
+/// any agent's context ever mentioned it. Kept to roughly the length of the
+/// write-back protocol: the header is uncounted against the cap, but it is not
+/// free of the reader's attention.
+fn read_protocol() -> String {
+    "## Read protocol\n\
+     These entries are not everything that is known. `shep memory search \"<terms>\"`\n\
+     also searches prior sessions' prompts and replies, which are not in your context.\n\
+     - SEARCH FIRST when: about to re-derive an environment, build, or convention\n\
+       fact; about to ask the human something they may have answered before;\n\
+       picking up work in a part of this repo you have not seen this session.\n\
+     - Returns matching entries plus history snippets with the match in [brackets].\n\
+       Terms are ANDed and matched as words, not meaning — retry with fewer or\n\
+       different words. A miss is cheap and expected; skipping the search is not.\n"
+        .to_string()
 }
 
 /// Compact write-back protocol embedded in every template header. Adapted from
@@ -202,6 +272,93 @@ mod tests {
                 "template header must not contain a lone delimiter line"
             );
         }
+    }
+
+    #[test]
+    fn templates_carry_the_read_protocol() {
+        for template in [user_template(), repo_template()] {
+            assert!(template.contains("Read protocol"));
+            assert!(template.contains("shep memory search"));
+            assert!(template.contains(READ_BEGIN) && template.contains(READ_END));
+        }
+    }
+
+    #[test]
+    fn refresh_header_adds_read_protocol_and_leaves_entries_intact() {
+        let dir = crate::memory::tests::temp_dir("refresh-adds");
+        let path = dir.join("MEMORY.md");
+        // A file as it existed before the read protocol: write-back header only.
+        let legacy = format!(
+            "# Project memory (shep shared memory)\n\n{}\n\nCap: {REPO_CAP} characters.\n",
+            writeback_protocol()
+        );
+        let mut doc = MemoryDoc::from_template(&legacy);
+        doc.add("build with just check", REPO_CAP).unwrap();
+        doc.add("trunk is master", REPO_CAP).unwrap();
+        write_doc(&path, &doc).unwrap();
+        let entries_before = doc.entries().to_vec();
+
+        assert!(refresh_header(&path).unwrap(), "legacy header must change");
+
+        let after = MemoryDoc::parse(&std::fs::read_to_string(&path).unwrap());
+        assert!(after.header().contains("Read protocol"));
+        assert!(after.header().contains("shep memory search"));
+        // The whole point: upgrading the header must not touch a single entry.
+        assert_eq!(after.entries(), entries_before.as_slice());
+        // The pre-existing write-back protocol survives alongside the new block.
+        assert!(after.header().contains("Write-back protocol"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn refresh_header_is_idempotent_and_preserves_hand_written_notes() {
+        let dir = crate::memory::tests::temp_dir("refresh-idempotent");
+        let path = dir.join("MEMORY.md");
+        let mut doc = MemoryDoc::from_template(&repo_template());
+        doc.add("only entry", REPO_CAP).unwrap();
+        write_doc(&path, &doc).unwrap();
+        // A note the human added to the header by hand.
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let hand_edited = raw.replace(
+            "# Project memory (shep shared memory)",
+            "# Project memory (shep shared memory)\n\nNOTE: ask Alex before pruning.",
+        );
+        std::fs::write(&path, &hand_edited).unwrap();
+
+        // A file already carrying the current block is left alone entirely.
+        assert!(!refresh_header(&path).unwrap());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), hand_edited);
+
+        // And the marked block never duplicates.
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(after.matches(READ_BEGIN).count(), 1);
+        assert!(after.contains("NOTE: ask Alex before pruning."));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn refresh_header_works_on_a_full_file_and_ignores_a_missing_one() {
+        let dir = crate::memory::tests::temp_dir("refresh-full");
+        let path = dir.join("MEMORY.md");
+        // Nothing to refresh is not an error.
+        assert!(!refresh_header(&path).unwrap());
+
+        // A file at its cap must still be upgradable: the header is uncounted,
+        // so refresh must never surface an Overflow.
+        let legacy = format!("# Project memory\n\n{}\n", writeback_protocol());
+        let mut doc = MemoryDoc::from_template(&legacy);
+        doc.add(&"x".repeat(REPO_CAP), REPO_CAP).unwrap();
+        write_doc(&path, &doc).unwrap();
+        assert_eq!(doc.usage(REPO_CAP).used, REPO_CAP);
+
+        assert!(refresh_header(&path).unwrap());
+        let after = MemoryDoc::parse(&std::fs::read_to_string(&path).unwrap());
+        assert_eq!(after.usage(REPO_CAP).used, REPO_CAP);
+        assert!(after.header().contains("Read protocol"));
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

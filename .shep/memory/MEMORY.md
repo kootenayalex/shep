@@ -15,6 +15,18 @@ overlapping entries and drop the stalest in one edit, then add.
 
 Cap: 2200 characters of ENTRY CONTENT (this header does not count).
 
+<!-- BEGIN shep read protocol (managed) -->
+## Read protocol
+These entries are not everything that is known. `shep memory search "<terms>"`
+also searches prior sessions' prompts and replies, which are not in your context.
+- SEARCH FIRST when: about to re-derive an environment, build, or convention
+fact; about to ask the human something they may have answered before;
+picking up work in a part of this repo you have not seen this session.
+- Returns matching entries plus history snippets with the match in [brackets].
+Terms are ANDed and matched as words, not meaning — retry with fewer or
+different words. A miss is cheap and expected; skipping the search is not.
+<!-- END shep read protocol (managed) -->
+
 §
 
 Run 'just check' before committing; ~2,658 tests must stay green.

@@ -97,6 +97,19 @@ pub(crate) fn install_bridges(paths: &BridgePaths) -> io::Result<Vec<String>> {
         paths.repo_memory.display()
     ));
 
+    // Files created before the read protocol existed keep their original header
+    // forever (`load_or_create` only templates on absence), so init doubles as
+    // the header upgrade path. Entries are untouched either way.
+    let mut refreshed = Vec::new();
+    for (path, label) in [(&paths.user_memory, "user"), (&paths.repo_memory, "repo")] {
+        if super::refresh_header(path)? {
+            refreshed.push(label);
+        }
+    }
+    if !refreshed.is_empty() {
+        messages.push(format!("read protocol added to: {}", refreshed.join(" + ")));
+    }
+
     // 1. claude-code per-repo: autoMemoryDirectory + lifecycle hooks, one merge.
     let claude_settings = paths.repo_root.join(".claude").join("settings.json");
     let auto_memory_dir = super::repo_memory_dir(&paths.repo_root);

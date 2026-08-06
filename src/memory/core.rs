@@ -146,6 +146,18 @@ impl MemoryDoc {
         MemoryDoc { header, entries }
     }
 
+    /// The free-form header region: everything before the first delimiter line.
+    /// Never counted against the cap.
+    pub fn header(&self) -> &str {
+        &self.header
+    }
+
+    /// Replace the header region wholesale, leaving entries untouched. Used by
+    /// header refresh to upgrade a managed block in place.
+    pub fn set_header(&mut self, header: String) {
+        self.header = header;
+    }
+
     /// Build a fresh document from a template header with no entries.
     pub fn from_template(header: &str) -> Self {
         MemoryDoc {

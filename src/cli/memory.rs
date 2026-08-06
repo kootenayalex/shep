@@ -443,7 +443,9 @@ fn print_help() {
     );
     eprintln!("  shep memory status [--repo <path>]               usage for both files");
     eprintln!("  shep memory search \"<query>\" [--limit <n>]        memory + session history");
-    eprintln!("  shep memory init [--repo <path>]                 install agent bridges + files");
+    eprintln!(
+        "  shep memory init [--repo <path>]                 install/refresh agent bridges + files"
+    );
 }
 
 #[cfg(test)]
