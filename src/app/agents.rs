@@ -124,7 +124,12 @@ impl App {
         let focus = params.focus;
         let (rows, cols) = self.state.estimate_pane_size();
 
-        let (ws_idx, tab_idx, pane_id) = if let Some(tab_id) = params.tab_id {
+        let (ws_idx, tab_idx, pane_id) = if params.new_workspace {
+            if params.tab_id.is_some() || params.workspace_id.is_some() {
+                return Err(AgentStartError::PlacementConflict);
+            }
+            self.spawn_agent_workspace(cwd, rows, cols, &argv, extra_env, focus)?
+        } else if let Some(tab_id) = params.tab_id {
             let (ws_idx, tab_idx) =
                 self.parse_tab_id(&tab_id)
                     .ok_or_else(|| AgentStartError::TargetNotFound {

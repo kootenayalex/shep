@@ -298,8 +298,8 @@ fn handle_client_frame(
     }
     // Some methods are handled on the bridge itself rather than proxied to the
     // JSON API. Push registration is a companion-only fact (the phone's
-    // UnifiedPush URL); task add/list/cancel and memory show/add/replace/remove
-    // are local file operations on `<state>/tasks.db` and the memory files —
+    // UnifiedPush URL); task add/list/cancel/remove/clear/assign and memory
+    // show/add/replace/remove are local file operations on `<state>/tasks.db` and the memory files —
     // exactly what the `shep task`/`shep memory` CLIs do, so exposing them here
     // (not as new API methods) keeps them out of the herdr API contract /
     // protocol version. `task.dispatch` is NOT local: it must spawn a pane, so
@@ -796,7 +796,8 @@ mod push {
     }
 }
 
-/// Bridge-local task queue methods (`task.list`/`task.add`/`task.cancel`).
+/// Bridge-local task queue methods (`task.list`/`add`/`cancel`/`remove`/
+/// `clear`/`assign`).
 ///
 /// These mirror the `shep task` CLI: add/list/cancel are direct operations on
 /// the local `<state>/tasks.db` (they work server-up-or-not), so the bridge —
@@ -816,6 +817,9 @@ mod task_local {
             "task.list" => Some(list()),
             "task.add" => Some(add(params)),
             "task.cancel" => Some(cancel(params)),
+            "task.remove" => Some(remove(params)),
+            "task.clear" => Some(clear()),
+            "task.assign" => Some(assign(params)),
             _ => None,
         }
     }
@@ -903,6 +907,48 @@ mod task_local {
         Ok(json!({ "cancelled": cancelled }))
     }
 
+    fn task_id(params: Option<&Value>) -> Result<i64, String> {
+        params
+            .and_then(|params| params.get("id"))
+            .and_then(|value| value.as_i64())
+            .ok_or_else(|| "missing id".to_string())
+    }
+
+    fn remove(params: Option<&Value>) -> Result<Value, String> {
+        let id = task_id(params)?;
+        let conn = open()?;
+        let removed = tasks::delete_task(&conn, id).map_err(|err| err.to_string())?;
+        Ok(json!({ "removed": removed }))
+    }
+
+    /// Sweep every finished task. Absent store is an empty sweep, not an error —
+    /// a phone clearing a queue that was never created has nothing to fix.
+    fn clear() -> Result<Value, String> {
+        if !tasks::tasks_db_path().exists() {
+            return Ok(json!({ "removed": 0 }));
+        }
+        let conn = open()?;
+        let removed = tasks::clear_finished(&conn).map_err(|err| err.to_string())?;
+        Ok(json!({ "removed": removed }))
+    }
+
+    /// Hand an open task to a workspace whose agent is already running. The
+    /// caller sends the prompt itself (`agent.send`); this records the linkage
+    /// so the server's state tracker carries the task to blocked/done.
+    fn assign(params: Option<&Value>) -> Result<Value, String> {
+        let id = task_id(params)?;
+        let workspace_id = params
+            .and_then(|params| params.get("workspace_id"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or("missing workspace_id")?;
+        let conn = open()?;
+        let assigned = tasks::assign_task(&conn, id, workspace_id, tasks::unix_now())
+            .map_err(|err| err.to_string())?;
+        Ok(json!({ "assigned": assigned }))
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -912,6 +958,17 @@ mod task_local {
             assert!(handle_local_method("task.dispatch", None).is_none());
             assert!(handle_local_method("session.snapshot", None).is_none());
             assert!(handle_local_method("task.list", None).is_some());
+            assert!(handle_local_method("task.remove", None).is_some());
+            assert!(handle_local_method("task.clear", None).is_some());
+            assert!(handle_local_method("task.assign", None).is_some());
+        }
+
+        #[test]
+        fn remove_and_assign_validate_their_params() {
+            assert!(remove(Some(&json!({}))).is_err());
+            assert!(assign(Some(&json!({ "id": 1 }))).is_err());
+            assert!(assign(Some(&json!({ "workspace_id": "w1" }))).is_err());
+            assert!(assign(Some(&json!({ "id": 1, "workspace_id": "  " }))).is_err());
         }
 
         #[test]

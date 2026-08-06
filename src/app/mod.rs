@@ -3962,6 +3962,7 @@ mod tests {
                 cwd: None,
                 workspace_id: None,
                 tab_id: None,
+                new_workspace: false,
                 split: Some(crate::api::schema::SplitDirection::Right),
                 focus: true,
                 argv: vec![exiting_test_command().into()],
@@ -3977,6 +3978,78 @@ mod tests {
 
         assert_eq!(app.state.active, Some(0));
         assert_eq!(app.state.workspaces[0].focused_pane_id(), Some(root));
+
+        let runtimes: Vec<_> = app.terminal_runtimes.drain().collect();
+        for (_terminal_id, runtime) in runtimes {
+            runtime.shutdown();
+        }
+    }
+
+    #[tokio::test]
+    async fn agent_start_new_workspace_roots_argv_in_a_fresh_workspace() {
+        let mut app = test_app();
+        let workspace = Workspace::test_new("agent-start-existing");
+        app.state.workspaces = vec![workspace];
+        app.state.ensure_test_terminals();
+        app.state.active = Some(0);
+        app.state.selected = 0;
+
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "req_agent_start_new_workspace".into(),
+            method: crate::api::schema::Method::AgentStart(crate::api::schema::AgentStartParams {
+                name: "worker".into(),
+                cwd: None,
+                workspace_id: None,
+                tab_id: None,
+                new_workspace: true,
+                split: None,
+                focus: false,
+                argv: vec![exiting_test_command().into()],
+                env: Default::default(),
+            }),
+        });
+        let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(response["result"]["type"], "agent_started");
+        // A second workspace appeared, with a single pane (the agent argv is
+        // its root — no shell pane, no split).
+        assert_eq!(app.state.workspaces.len(), 2);
+        assert_eq!(app.state.workspaces[1].tabs.len(), 1);
+        assert_eq!(app.state.workspaces[1].tabs[0].panes.len(), 1);
+
+        let runtimes: Vec<_> = app.terminal_runtimes.drain().collect();
+        for (_terminal_id, runtime) in runtimes {
+            runtime.shutdown();
+        }
+    }
+
+    #[test]
+    fn agent_start_new_workspace_conflicts_with_explicit_placement() {
+        let mut app = test_app();
+        let workspace = Workspace::test_new("agent-start-existing");
+        app.state.workspaces = vec![workspace];
+        app.state.ensure_test_terminals();
+        app.state.active = Some(0);
+        app.state.selected = 0;
+
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "req_agent_start_conflict".into(),
+            method: crate::api::schema::Method::AgentStart(crate::api::schema::AgentStartParams {
+                name: "worker".into(),
+                cwd: None,
+                workspace_id: Some("w_1".into()),
+                tab_id: None,
+                new_workspace: true,
+                split: None,
+                focus: false,
+                argv: vec![exiting_test_command().into()],
+                env: Default::default(),
+            }),
+        });
+        let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(response["error"]["code"], "agent_placement_conflict");
+        assert_eq!(app.state.workspaces.len(), 1);
 
         let runtimes: Vec<_> = app.terminal_runtimes.drain().collect();
         for (_terminal_id, runtime) in runtimes {

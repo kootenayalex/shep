@@ -188,12 +188,15 @@ impl App {
         {
             return agent_not_found(id, &params.target);
         }
-        if let Err(err) = self.send_or_queue_pane_text(
-            resolved.ws_idx,
-            resolved.pane_id,
-            params.text,
-            params.queue,
-        ) {
+        // `\r` is Enter at the pty layer: agent CLIs submit on it. Without it
+        // the text lands in the REPL input but never executes (slash commands
+        // included) — the same convention the TUI queue modal uses
+        // (app/input/modal.rs). Strip client-supplied trailing newlines so we
+        // submit exactly once.
+        let text = format!("{}\r", params.text.trim_end_matches(['\r', '\n']));
+        if let Err(err) =
+            self.send_or_queue_pane_text(resolved.ws_idx, resolved.pane_id, text, params.queue)
+        {
             return encode_error(id, "agent_send_failed", err);
         }
 
@@ -270,5 +273,41 @@ mod tests {
             panic!("expected agent info response");
         };
         assert_eq!(agent.agent_status, AgentStatus::Idle);
+    }
+
+    #[tokio::test]
+    async fn agent_send_appends_submit_enter_before_queueing() {
+        let mut app = app_with_agent();
+        let pane_id = app.state.workspaces[0].tabs[0].root_pane;
+        let terminal_id = app.state.workspaces[0].tabs[0].panes[&pane_id]
+            .attached_terminal_id
+            .clone();
+        // agent.send refuses a target with no live runtime, so the pane needs
+        // one before the queue path is reachable at all.
+        app.state.workspaces[0].insert_test_runtime(
+            pane_id,
+            crate::terminal::TerminalRuntime::test_with_screen_bytes(80, 24, b""),
+        );
+        app.state
+            .terminals
+            .get_mut(&terminal_id)
+            .unwrap()
+            .set_detected_state(Some(Agent::Pi), AgentState::Working);
+
+        let response = app.handle_agent_send(
+            "req".into(),
+            AgentSendParams {
+                target: "pi".into(),
+                text: "/model\n".into(),
+                queue: true,
+            },
+        );
+
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(success.result, ResponseResult::Ok {});
+        // `\r` is Enter at the pty layer: without it the text sat un-submitted
+        // in the REPL input and slash commands never executed.
+        let queued = &app.state.queued_pane_input[&pane_id];
+        assert_eq!(queued, &vec!["/model\r".to_string()]);
     }
 }

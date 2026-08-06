@@ -267,12 +267,12 @@ fn matched_rule_region_preview<'a>(
 
 fn agent_start(args: &[String]) -> std::io::Result<i32> {
     let Some(name) = args.first() else {
-        eprintln!("usage: shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
+        eprintln!("usage: shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--new-workspace] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
         return Ok(2);
     };
 
     let Some(separator) = args.iter().position(|arg| arg == "--") else {
-        eprintln!("usage: shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
+        eprintln!("usage: shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--new-workspace] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
         return Ok(2);
     };
     if separator == args.len() - 1 {
@@ -283,6 +283,7 @@ fn agent_start(args: &[String]) -> std::io::Result<i32> {
     let mut cwd = None;
     let mut workspace_id = None;
     let mut tab_id = None;
+    let mut new_workspace = false;
     let mut split = None;
     let mut focus = false;
     let mut env = HashMap::new();
@@ -322,6 +323,10 @@ fn agent_start(args: &[String]) -> std::io::Result<i32> {
                 split = Some(super::parse_split_direction(value)?);
                 index += 2;
             }
+            "--new-workspace" => {
+                new_workspace = true;
+                index += 1;
+            }
             "--focus" => {
                 focus = true;
                 index += 1;
@@ -359,6 +364,7 @@ fn agent_start(args: &[String]) -> std::io::Result<i32> {
             cwd,
             workspace_id,
             tab_id,
+            new_workspace,
             split,
             focus,
             argv: args[separator + 1..].to_vec(),

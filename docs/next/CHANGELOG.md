@@ -13,6 +13,9 @@
 - Added Android companion tasks + memory (A4): the bridge handles `task.list`/`task.add`/`task.cancel` and `memory.show`/`add`/`replace`/`remove` locally (direct operations on `<state>/tasks.db` and the memory files, like the `shep task`/`shep memory` CLIs — no new API method or protocol bump), so the companion's Tasks and Memory tabs work over the same relay. `task.dispatch` still proxies to the server, which spawns the pane.
 - Added Android companion push (A3): the bridge handles `push.register` locally (persisting companion push endpoints to `<config>/push-endpoints.json`), and `shep bridge notify-push` — wired via `[notifications] exec` — POSTs the blocked-transition context to each endpoint's ntfy topic so the phone can page you with lock-screen Approve/Deny. `SHEP_NTFY_PUBLISH_BASE` rewrites the publish target to a co-located broker.
 
+- Added `agent.start` `new_workspace` (`shep agent start --new-workspace`) to root an agent in a fresh workspace of its own instead of splitting into an existing workspace or tab; it conflicts with explicit `workspace_id`/`tab_id` placement.
+- Added bridge-local `task.remove`, `task.clear`, and `task.assign` so the companion can delete one task, sweep finished ones, and hand an open task to a workspace whose agent is already running.
+
 ### Changed
 - Panel, modal, toast, and pane borders now use rounded corners.
 - Agent labels on split-pane borders are on by default and carry the agent state (e.g. `claude · working`) in the state-ring color (`ui.show_agent_labels_on_pane_borders`, now default true).
@@ -20,6 +23,9 @@
 - Warning-tier indicators (git behind, changes-requested badge, memory pressure) moved from red/yellow to the peach token, reserving red for blocked and destructive actions.
 - The session board highlights the selected card with a background fill, and the sidebar marks the selected workspace with an edge marker.
 - Shipping a worktree now confirms with a `✓ shipped` toast.
+
+### Fixed
+- `agent.send` now appends the pty Enter (`\r`) that submits the text, so prompts and slash commands sent through the socket API (and the Android companion) actually execute instead of sitting un-submitted in the agent's input line.
 
 ## [0.7.3] - 2026-07-08
 

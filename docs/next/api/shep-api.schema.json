@@ -1246,6 +1246,10 @@
             "name": {
               "type": "string"
             },
+            "new_workspace": {
+              "description": "Place the agent in a fresh workspace rooted at argv, instead of\nsplitting into an existing workspace/tab. Conflicts with workspace_id\nand tab_id.",
+              "type": "boolean"
+            },
             "split": {
               "anyOf": [
                 {

@@ -42,6 +42,11 @@ pub struct AgentStartParams {
     pub workspace_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tab_id: Option<String>,
+    /// Place the agent in a fresh workspace rooted at argv, instead of
+    /// splitting into an existing workspace/tab. Conflicts with workspace_id
+    /// and tab_id.
+    #[serde(default, skip_serializing_if = "crate::api::schema::is_false")]
+    pub new_workspace: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub split: Option<SplitDirection>,
     #[serde(default)]

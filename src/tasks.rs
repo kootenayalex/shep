@@ -194,6 +194,49 @@ pub(crate) fn cancel_task(conn: &Connection, id: i64, now: i64) -> io::Result<bo
     Ok(changed > 0)
 }
 
+/// Remove one task outright. Returns whether a row was deleted.
+///
+/// Cancelling leaves a tombstone in the list, which is right while a task is
+/// still interesting and wrong once it is not. Deleting is the sweep: the queue
+/// is a working surface, not an audit log.
+pub(crate) fn delete_task(conn: &Connection, id: i64) -> io::Result<bool> {
+    let changed = conn
+        .execute("DELETE FROM tasks WHERE id = ?1", rusqlite::params![id])
+        .map_err(io_err)?;
+    Ok(changed > 0)
+}
+
+/// Delete every finished task (`done` / `cancelled`). Returns the count removed.
+/// Open loops — todo, running, blocked — are never swept.
+pub(crate) fn clear_finished(conn: &Connection) -> io::Result<usize> {
+    let changed = conn
+        .execute("DELETE FROM tasks WHERE state IN ('done', 'cancelled')", [])
+        .map_err(io_err)?;
+    Ok(changed)
+}
+
+/// Hand an open task to an agent session that is already running.
+///
+/// Dispatch spawns a pane; assignment does not — the caller has already sent
+/// the prompt into a live pane, and this records where it went. Marking it
+/// `running` against that workspace is what lets the existing agent-state
+/// tracker carry it to `blocked`/`done` exactly as a dispatched task.
+pub(crate) fn assign_task(
+    conn: &Connection,
+    id: i64,
+    workspace_id: &str,
+    now: i64,
+) -> io::Result<bool> {
+    let changed = conn
+        .execute(
+            "UPDATE tasks SET state = 'running', workspace_id = ?2, updated_at = ?3
+             WHERE id = ?1 AND state IN ('todo', 'blocked')",
+            rusqlite::params![id, workspace_id, now],
+        )
+        .map_err(io_err)?;
+    Ok(changed > 0)
+}
+
 /// The running task (if any) dispatched into `workspace_id`.
 pub(crate) fn task_for_workspace(
     conn: &Connection,
@@ -336,6 +379,46 @@ mod tests {
         let done = add_task(&conn, "q", Path::new("/r"), TaskRuntime::Claude, false, 4).unwrap();
         set_task_state(&conn, done, TaskState::Done, None, 5).unwrap();
         assert!(!cancel_task(&conn, done, 6).unwrap());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn delete_removes_one_row_and_clear_sweeps_only_finished() {
+        let (dir, conn) = temp_store("sweep");
+        let todo = add_task(&conn, "a", Path::new("/r"), TaskRuntime::Claude, false, 1).unwrap();
+        let done = add_task(&conn, "b", Path::new("/r"), TaskRuntime::Claude, false, 2).unwrap();
+        let cancelled =
+            add_task(&conn, "c", Path::new("/r"), TaskRuntime::Claude, false, 3).unwrap();
+        let running = add_task(&conn, "d", Path::new("/r"), TaskRuntime::Claude, false, 4).unwrap();
+        set_task_state(&conn, done, TaskState::Done, None, 5).unwrap();
+        cancel_task(&conn, cancelled, 6).unwrap();
+        set_task_state(&conn, running, TaskState::Running, Some("w1"), 7).unwrap();
+
+        // Clear sweeps the two finished rows and leaves the open loops alone.
+        assert_eq!(clear_finished(&conn).unwrap(), 2);
+        let left: Vec<i64> = list_tasks(&conn).unwrap().iter().map(|t| t.id).collect();
+        assert_eq!(left, vec![todo, running]);
+
+        // Delete is unconditional — an open task can be removed outright.
+        assert!(delete_task(&conn, running).unwrap());
+        assert!(!delete_task(&conn, running).unwrap());
+        assert_eq!(list_tasks(&conn).unwrap().len(), 1);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn assign_links_an_open_task_to_a_live_workspace() {
+        let (dir, conn) = temp_store("assign");
+        let id = add_task(&conn, "p", Path::new("/r"), TaskRuntime::Claude, false, 1).unwrap();
+        assert!(assign_task(&conn, id, "w3", 2).unwrap());
+        let task = get_task(&conn, id).unwrap().unwrap();
+        assert_eq!(task.state, TaskState::Running);
+        assert_eq!(task.workspace_id.as_deref(), Some("w3"));
+        // The existing tracker can now find it and carry it to done.
+        assert_eq!(task_for_workspace(&conn, "w3").unwrap().unwrap().id, id);
+        // Finished tasks are not reassignable.
+        set_task_state(&conn, id, TaskState::Done, None, 3).unwrap();
+        assert!(!assign_task(&conn, id, "w4", 4).unwrap());
         std::fs::remove_dir_all(&dir).ok();
     }
 
