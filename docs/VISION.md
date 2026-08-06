@@ -21,7 +21,7 @@ Alex's daily workflow is mosh → herdr → 4–6 concurrent claude-code/opencod
 1. **Build beside the VT core, not into it.** herdr's server/API/detection layers are the substrate. New ADE state lives in **server state + socket API** (per upstream `AGENTS.md` guardrail); the TUI renders it. Never touch `terminal/state.rs` / `pane/terminal.rs` unless forced.
 2. **Files + CLI-native bridges over custom protocols.** Memory, tasks, hooks all ride plain files, the existing socket API, and each agent CLI's own config mechanisms (damon-ade's proven approach). Agents interact via the `shep` CLI (they already have Bash).
 3. **Mosh discipline:** every new UI surface is glyph/color-cheap, width-adaptive, incremental-redraw.
-4. **No paid third-party services** (standing rule): local model routing goes through odysseus-mlx (`127.0.0.1:7860/mlx/v1`), not OpenRouter; notifications bridge to user-configured local commands (voicebox/KDE Connect), no push SaaS.
+4. **No paid third-party services** (standing rule): local model routing goes through the local LM Studio server (`127.0.0.1:1234/v1`), not OpenRouter; notifications bridge to user-configured local commands (voicebox/KDE Connect), no push SaaS. (Originally odysseus-mlx on `:7860`; that gateway was retired 2026-08-01.)
 
 ## Milestones
 
@@ -66,7 +66,7 @@ Lifecycle verbs (claude-squad): **launch / pause / review / ship**.
 - Board overlay (M1) gains task columns — becomes the full kanban.
 
 ### M5 — Flagship polish (as time/value allows, in order)
-1. **Model/runtime bar**: relaunch same worktree under a different runtime/model, incl. local models via `ANTHROPIC_BASE_URL=http://127.0.0.1:7860/mlx/v1` → claude-code on odysseus-mlx.
+1. **Model/runtime bar**: relaunch same worktree under a different runtime/model, incl. local models via `ANTHROPIC_BASE_URL=http://127.0.0.1:1234/v1` → claude-code on the local LM Studio server.
 2. **Tab-to-queue input** (codex): queue a prompt to a busy session, fires when it goes idle.
 3. **Approach comparison**: run one task in 2 sessions/worktrees, side-by-side (width-adaptive, stacked when narrow) diff compare.
 4. **Session recording**: asciinema-format pane recording + replay.
@@ -93,9 +93,9 @@ Architect+delegate: this plan is the architecture; execution runs as **Opus 4.8 
 5. M3: dirty worktree → review overlay shows diff + stats; ship merges + cleans up; request-changes lands in the origin session's input.
 6. M4: `shep task add` → auto-dispatch on idle → completion flips board state; watcher file-drop enqueues.
 
-## Status — 2026-07-09
+## Status — 2026-08-06
 
-M0–M4 are landed and green (`just check`, ~2,650 tests). From M5, tab-to-queue
+M0–M4 are landed and green (`just check`, 2,756 tests). From M5, tab-to-queue
 is landed (`shep agent send --queue`, pane "Queue prompt..." menu).
 
 **Model routing (M5.1) is config, not code**: `[tasks]` launch commands are
@@ -103,18 +103,42 @@ free-form shell, so local-model dispatch is
 
 ```toml
 [tasks]
-claude_command = "ANTHROPIC_BASE_URL=http://127.0.0.1:7860/mlx/v1 claude"
+claude_command = "ANTHROPIC_BASE_URL=http://127.0.0.1:1234/v1 claude"
 ```
 
-(odysseus-mlx gateway). Per-task model choice = a second config profile or an
+(local LM Studio server). Per-task model choice = a second config profile or an
 inline env prefix; a first-class model bar remains open.
 
-**Deferred** (open, in rough value order):
+### Landed since 2026-07-11
+
+- **Live pane streaming + bridge** — `pane.stream` over the JSON API, and
+  `shep bridge`: an authenticated WebSocket relay for companion clients, with
+  `shep bridge pair` printing (and QR-rendering) the pairing payload.
+- **Android companion, A0–A6** — the phone client in its own repo
+  (`~/vault/dev/shep-android`), pairing through the bridge: agents/panes,
+  tasks, memory, push wake-ups over ntfy, review & ship (`workspace.diff`,
+  `workspace.ship`), home-screen widget, launcher shortcut, voice add-task,
+  and a tablet two-pane layout. See `docs/ANDROID-COMPANION.md`. Owed: the
+  physical-device passes (Maestro on a real phone, S22 widget pinning, voice
+  recognizer on hardware) — those need Alex's hands, not code.
+- **Session board as command centre** — `session.overview`, a desktop titlebar,
+  a persistent key-hint bar, and the board promoted to the *leading* screen:
+  Esc in a recognized agent pane returns to the board and `shift+esc` sends the
+  interrupt through (`ui.escape_returns_to_board`). Needs a terminal that
+  disambiguates escape codes (Ghostty, kitty, WezTerm).
+- **Memory is readable, not just writable** — memory file headers now carry a
+  read protocol so agents learn `shep memory search` exists; `shep memory init`
+  refreshes headers in place on repos initialised earlier.
+- **Memory hook plumbing repaired (2026-08-06)** — hooks are matched by shep
+  subcommand rather than by full command string, so init retargets them instead
+  of installing a rival set per binary path; `shep memory status` audits them;
+  `SHEP_HOOK_TRACE` makes ingestion observable. A hook with a stale binary path
+  fails completely silently, which had left the history sidecar unfed from
+  2026-07-18 until this was found.
+
+**Deferred** (open, in rough value order — all confirmed unbuilt 2026-08-06):
 - dispatch-review to a second agent (M3 stretch)
 - board task/review columns (board currently shows agent states only)
 - approach comparison (two worktrees side-by-side)
 - session recording (asciinema)
 - native width-adaptive diff widget (review currently uses a pager pane)
-
-Landed 2026-07-11: queued-input indicator (`⇥N` teal badge on sidebar rows
-and board cards).
