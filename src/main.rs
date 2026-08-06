@@ -312,6 +312,13 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # Hints are derived from your keybindings; mode overlays share this row.
 # hint_bar = true
 
+# Make the session board the leading screen: Esc in a pane running a recognized
+# agent returns to the board instead of reaching the agent, and shift+esc sends
+# the interrupt through. Panes with no detected agent always get Esc unchanged.
+# Needs a host terminal that disambiguates escape codes (Ghostty, kitty, WezTerm);
+# without it shift+esc arrives as bare Esc and agents cannot be interrupted.
+# escape_returns_to_board = true
+
 # Agent panel ordering: "spaces" (grouped by space) or "priority" (attention queue).
 # "workspaces" is accepted as an alias for "spaces".
 # agent_panel_sort = "spaces"

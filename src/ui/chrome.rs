@@ -127,6 +127,12 @@ pub(super) fn render_hint_bar(app: &AppState, frame: &mut Frame, area: Rect) {
 
     let prefix = crate::config::format_key_combo((app.prefix_code, app.prefix_mods));
     let mut hints: Vec<(String, &'static str)> = vec![(prefix, "prefix")];
+    // Esc leads back to the board from an agent pane, so say so while the user
+    // is standing in one — and name the interrupt they gave up to get it.
+    if app.escape_returns_to_board_here() {
+        hints.push(("esc".to_string(), "board"));
+        hints.push(("shift+esc".to_string(), "interrupt"));
+    }
     for (bindings, label) in [
         (&app.keybinds.workspace_picker, "spaces"),
         (&app.keybinds.new_tab, "tab"),

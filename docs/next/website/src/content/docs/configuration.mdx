@@ -329,6 +329,22 @@ The agent panel shows all agents across all spaces. `agent_panel_sort` can be `s
 
 `confirm_close` controls whether closing a workspace asks for confirmation. `prompt_new_tab_name` controls whether new tabs ask for a label first.
 
+### Session board as the leading screen
+
+The session board is the full-screen agent overview: `blocked`, `done`, `working`, and `idle` columns in descending attention order. Two options make it the screen you start and return to.
+
+```toml
+[ui]
+open_on_board = true
+escape_returns_to_board = true
+```
+
+`open_on_board` starts a session on the board instead of dropping straight into a pane, so a session with several agents opens on the overview. Enter focuses the selected pane.
+
+`escape_returns_to_board` makes Esc the way back out. In a pane running an agent Herdr recognizes, a bare Esc returns to the board and `shift+esc` sends the interrupt to the agent instead. Panes with no detected agent — shells, editors, pagers — always receive Esc unchanged, so this never breaks the app inside a pane.
+
+This trade needs a host terminal that disambiguates escape codes, which means Ghostty, kitty, or WezTerm. Without one, `shift+esc` arrives as a bare Esc and the agent can no longer be interrupted from the keyboard; set `escape_returns_to_board = false` on those hosts and use Esc for the interrupt as before.
+
 Set `mouse_capture = false` if you want your terminal to handle normal clicks, such as command-clicking URLs. With mouse capture enabled, Ctrl-click opens pane links when your terminal sends that modified click to Herdr. This includes macOS; Cmd-click is not reported separately from plain click while Herdr captures mouse input. Use Shift-Ctrl-click on Linux or Shift-Cmd-click on macOS for the terminal-native bypass path.
 
 `host_cursor` controls whether Herdr uses the outer terminal's native cursor or draws its own cursor as terminal cell content. The default, `auto`, draws Herdr's cursor on Windows to avoid ConPTY cursor flicker during active redraws, and uses the native cursor elsewhere. Set it to `native` to always use the outer terminal cursor, or `drawn` to always use Herdr's drawn cursor.

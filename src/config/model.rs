@@ -836,6 +836,16 @@ pub struct UiConfig {
     /// a session with several agents starts with the overview. Enter focuses
     /// the selected pane. Default: true.
     pub open_on_board: bool,
+    /// Make the board the leading screen: a bare Esc in a pane running a
+    /// recognized agent returns to the session board instead of reaching the
+    /// agent, and `shift+esc` sends the interrupt through instead. Panes with
+    /// no detected agent (shells, editors, pagers) always get Esc unchanged.
+    ///
+    /// Requires a host terminal that disambiguates escape codes (Ghostty,
+    /// kitty, WezTerm); on hosts without it `shift+esc` arrives as bare Esc and
+    /// the agent can no longer be interrupted with the keyboard, so set this to
+    /// false there. Default: true.
+    pub escape_returns_to_board: bool,
     /// Agent sidebar ordering. Saved values are "spaces" or "priority". Default: "spaces".
     pub agent_panel_sort: AgentPanelSortConfig,
     /// Accent color for highlights, borders, and navigation UI.
@@ -1130,6 +1140,7 @@ impl Default for UiConfig {
             titlebar: true,
             hint_bar: true,
             open_on_board: true,
+            escape_returns_to_board: true,
             agent_panel_sort: AgentPanelSortConfig::Spaces,
             accent: "cyan".into(),
             toast: ToastConfig::default(),
@@ -1386,6 +1397,18 @@ open_on_board = false
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         assert!(!config.ui.open_on_board);
+    }
+
+    #[test]
+    fn escape_returns_to_board_defaults_on_and_can_be_turned_off() {
+        assert!(Config::default().ui.escape_returns_to_board);
+
+        let toml = r#"
+[ui]
+escape_returns_to_board = false
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(!config.ui.escape_returns_to_board);
     }
 
     #[test]

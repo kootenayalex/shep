@@ -623,6 +623,7 @@ impl App {
             hide_tab_bar_when_single_tab: config.ui.hide_tab_bar_when_single_tab,
             titlebar: config.ui.titlebar,
             hint_bar: config.ui.hint_bar,
+            escape_returns_to_board: config.ui.escape_returns_to_board,
             pane_history_persistence: config.experimental.pane_history,
             reveal_hidden_cursor_for_cjk_ime: config.experimental.reveal_hidden_cursor_for_cjk_ime,
             cjk_ime_agent_filter_configured: !config.experimental.cjk_ime_agents.is_empty(),
@@ -1423,6 +1424,7 @@ impl App {
                 self.state.hide_tab_bar_when_single_tab = config.ui.hide_tab_bar_when_single_tab;
                 self.state.titlebar = config.ui.titlebar;
                 self.state.hint_bar = config.ui.hint_bar;
+                self.state.escape_returns_to_board = config.ui.escape_returns_to_board;
                 self.state.agent_panel_sort =
                     agent_panel_sort_from_config(config.ui.agent_panel_sort);
                 self.state.agent_panel_scroll = 0;

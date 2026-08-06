@@ -1523,6 +1523,9 @@ pub struct AppState {
     pub hide_tab_bar_when_single_tab: bool,
     pub titlebar: bool,
     pub hint_bar: bool,
+    /// Esc in an agent pane returns to the session board; `shift+esc` carries
+    /// the interrupt through to the agent instead.
+    pub escape_returns_to_board: bool,
     pub pane_history_persistence: bool,
     /// Expose the focused pane's cursor anchor to the outer terminal even when
     /// the pane requested `?25l`. See `[experimental] reveal_hidden_cursor_for_cjk_ime`.
@@ -1623,6 +1626,37 @@ impl AppState {
 
     pub fn agent_border_labels_enabled(&self) -> bool {
         self.show_agent_labels_on_pane_borders
+    }
+
+    /// True when `pane_id` runs an agent Shep recognizes — the same authority
+    /// the board and sidebar use to call a pane an agent at all.
+    pub fn pane_runs_known_agent(&self, ws_idx: usize, pane_id: PaneId) -> bool {
+        self.workspaces
+            .get(ws_idx)
+            .and_then(|ws| ws.terminal_id(pane_id))
+            .and_then(|terminal_id| self.terminals.get(terminal_id))
+            .is_some_and(|terminal| terminal.effective_known_agent().is_some())
+    }
+
+    /// True when the focused pane of the active workspace runs a known agent.
+    pub fn focused_pane_runs_known_agent(&self) -> bool {
+        let Some(ws_idx) = self.active else {
+            return false;
+        };
+        let Some(pane_id) = self
+            .workspaces
+            .get(ws_idx)
+            .and_then(|ws| ws.focused_pane_id())
+        else {
+            return false;
+        };
+        self.pane_runs_known_agent(ws_idx, pane_id)
+    }
+
+    /// True when Esc should walk back out to the board instead of reaching the
+    /// focused pane.
+    pub fn escape_returns_to_board_here(&self) -> bool {
+        self.escape_returns_to_board && self.focused_pane_runs_known_agent()
     }
 
     /// Prompts queued for `pane_id` (M5 tab-to-queue), still waiting on idle.
@@ -1926,6 +1960,7 @@ impl AppState {
             hide_tab_bar_when_single_tab: false,
             titlebar: false,
             hint_bar: false,
+            escape_returns_to_board: false,
             pane_history_persistence: false,
             reveal_hidden_cursor_for_cjk_ime: false,
             cjk_ime_agent_filter_configured: false,

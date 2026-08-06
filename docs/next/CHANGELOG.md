@@ -17,6 +17,7 @@
 - Added bridge-local `task.remove`, `task.clear`, and `task.assign` so the companion can delete one task, sweep finished ones, and hand an open task to a workspace whose agent is already running.
 
 ### Changed
+- The session board is now the leading screen: Esc in a pane running a recognized agent returns to the board instead of reaching the agent, and `shift+esc` sends the interrupt through (`ui.escape_returns_to_board`, default on). Panes with no detected agent keep their own Esc. Needs a host terminal that disambiguates escape codes (Ghostty, kitty, WezTerm); turn it off elsewhere.
 - Panel, modal, toast, and pane borders now use rounded corners.
 - Agent labels on split-pane borders are on by default and carry the agent state (e.g. `claude · working`) in the state-ring color (`ui.show_agent_labels_on_pane_borders`, now default true).
 - Toast borders now use the severity color instead of a neutral border.

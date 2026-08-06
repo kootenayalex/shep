@@ -84,6 +84,31 @@ impl App {
         let ws_idx = self.state.active?;
         let ws = self.state.workspaces.get(ws_idx)?;
         let pane_id = ws.focused_pane_id()?;
+
+        // The session board is the leading screen: Esc walks back out to it
+        // rather than reaching the agent, and shift+esc is how you interrupt.
+        // Only agent panes are remapped — a shell, editor, or pager still owns
+        // its own Esc, where stealing it would break the pane app outright.
+        let mut key = key;
+        if self.state.escape_returns_to_board
+            && key_event.code == KeyCode::Esc
+            && key.kind != crossterm::event::KeyEventKind::Release
+            && self.state.pane_runs_known_agent(ws_idx, pane_id)
+        {
+            if key_event.modifiers == crossterm::event::KeyModifiers::SHIFT {
+                // Send the agent a bare Esc: shift+esc is Shep's own escape
+                // hatch, not something the pane app should have to understand.
+                key.modifiers = crossterm::event::KeyModifiers::empty();
+            } else if key_event.modifiers.is_empty() {
+                debug!(
+                    ?pane_id,
+                    "returning to session board instead of forwarding esc to agent pane"
+                );
+                self.state.open_board();
+                return None;
+            }
+        }
+
         let rt =
             self.state
                 .runtime_for_pane_in_workspace(&self.terminal_runtimes, ws_idx, pane_id)?;
@@ -199,6 +224,78 @@ mod tests {
     use super::super::{unique_temp_path, wait_for_file};
     use super::*;
     use crate::{config::Config, events::AppEvent, workspace::Workspace};
+
+    /// An app focused on one pane, with the board-as-home Esc remap enabled and
+    /// the focused pane optionally running a recognized agent.
+    fn app_for_escape_test(agent_pane: bool) -> App {
+        let (mut app, _) = app_with_screen_bytes(b"");
+        app.state.escape_returns_to_board = true;
+        app.state.ensure_test_terminals();
+        if agent_pane {
+            let pane_id = app.state.workspaces[0].tabs[0].root_pane;
+            let terminal_id = app.state.workspaces[0].tabs[0].panes[&pane_id]
+                .attached_terminal_id
+                .clone();
+            app.state
+                .terminals
+                .get_mut(&terminal_id)
+                .expect("test terminal")
+                .detected_agent = Some(crate::detect::Agent::Claude);
+        }
+        app
+    }
+
+    fn escape_key(modifiers: KeyModifiers) -> TerminalKey {
+        TerminalKey::new(KeyCode::Esc, modifiers)
+    }
+
+    #[tokio::test]
+    async fn escape_in_agent_pane_returns_to_board_instead_of_reaching_the_agent() {
+        let mut app = app_for_escape_test(true);
+
+        let forwarded = app.prepare_terminal_key_forward(escape_key(KeyModifiers::empty()));
+
+        assert!(forwarded.is_none(), "esc must not reach the agent");
+        assert_eq!(app.state.mode, Mode::Board);
+    }
+
+    #[tokio::test]
+    async fn shift_escape_in_agent_pane_forwards_a_bare_escape_to_the_agent() {
+        let mut app = app_for_escape_test(true);
+
+        let forwarded = app
+            .prepare_terminal_key_forward(escape_key(KeyModifiers::SHIFT))
+            .expect("shift+esc forwards to the agent");
+
+        // The agent must see a plain interrupt, not a kitty-encoded shift+esc.
+        assert_eq!(forwarded.bytes.as_ref(), &[0x1b]);
+        assert_eq!(app.state.mode, Mode::Terminal);
+    }
+
+    #[tokio::test]
+    async fn escape_in_a_pane_without_an_agent_still_reaches_the_pane() {
+        let mut app = app_for_escape_test(false);
+
+        let forwarded = app
+            .prepare_terminal_key_forward(escape_key(KeyModifiers::empty()))
+            .expect("non-agent panes keep their own esc");
+
+        assert_eq!(forwarded.bytes.as_ref(), &[0x1b]);
+        assert_eq!(app.state.mode, Mode::Terminal);
+    }
+
+    #[tokio::test]
+    async fn escape_reaches_the_agent_when_the_board_remap_is_disabled() {
+        let mut app = app_for_escape_test(true);
+        app.state.escape_returns_to_board = false;
+
+        let forwarded = app
+            .prepare_terminal_key_forward(escape_key(KeyModifiers::empty()))
+            .expect("esc forwards when the remap is off");
+
+        assert_eq!(forwarded.bytes.as_ref(), &[0x1b]);
+        assert_eq!(app.state.mode, Mode::Terminal);
+    }
 
     fn app_with_screen_bytes(bytes: &[u8]) -> (App, crate::layout::PaneInfo) {
         let mut app = app_for_mouse_test();
