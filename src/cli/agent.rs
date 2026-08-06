@@ -684,7 +684,7 @@ fn print_agent_help() {
     eprintln!("  shep agent focus <target>");
     eprintln!("  shep agent wait <target> --status <idle|working|blocked|unknown> [--timeout MS]");
     eprintln!("  shep agent attach <target> [--takeover]");
-    eprintln!("  shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
+    eprintln!("  shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--new-workspace] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
     eprintln!("  shep agent explain <target> [--json]");
     eprintln!("  shep agent explain --file PATH --agent LABEL [--json]");
     eprintln!("  targets accept terminal ids, unique agent names, detected/reported agent labels, and legacy pane ids");
