@@ -2,6 +2,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    // FCM. The first Google dependency in a repo that was otherwise org.json +
+    // OkHttp on purpose; taken because nothing else wakes an Android app out of
+    // Doze reliably, which is the whole job of a notification.
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -45,8 +49,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // QR pairing scanner — no Google Play Services, license-clean (Apache-2.0).
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-    // A3 push: UnifiedPush connector — no Google Play Services, distributor-agnostic
-    // (ntfy app is the distributor). Apache-2.0.
+    // Push. FCM is the transport that actually wakes the app from Doze; the
+    // UnifiedPush connector stays until an FCM build is confirmed working on a
+    // real phone, so there is never a window with no working transport.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
     implementation("org.unifiedpush.android:connector:2.5.0")
     // JVM unit tests for the pure logic (wire decoding, grid state) that has no
     // Android dependencies and is easy to get subtly wrong.

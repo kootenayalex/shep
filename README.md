@@ -14,5 +14,40 @@ approve/deny), A4 tasks + memory tabs, A5 review & ship, A6 polish (home-screen
 widget, "New task" launcher shortcut, voice add-task, tablet two-pane) — see
 `maestro/README.md` for the E2E flows.
 
+## Screens
+
+- **board** — the session board, the same five card lines as `render_card` in
+  the desktop. Agent names come from the server's `display_name`, so this and
+  the desktop call the same agent the same thing.
+- **spaces** — the session's shape: spaces → tabs → panes, with open, close,
+  rename, focus and split at each level. Every action is an existing JSON API
+  method; nothing about the session lives only on the phone.
+- **tasks**, **memory**, **shep** (notification settings + push diagnostics).
+
+## Push notifications
+
+Delivery is FCM. It is the only transport that reliably wakes an Android app
+out of Doze, which is the entire job of a notification — a self-hosted broker is
+a background service the OS is free to kill, silently, exactly when you have
+stopped watching the screen. Messages are data-only so the app builds its own
+notification and keeps the lock-screen Approve/Deny.
+
+This is the only Google dependency in a repo that is otherwise `org.json` +
+OkHttp on purpose. It needs Play Services on the device and a
+`app/google-services.json` from the Firebase project. The UnifiedPush path is
+still present and still works; it will be removed once FCM is confirmed on real
+hardware.
+
+Server side needs a Firebase service-account key at
+`<shep config>/fcm-service-account.json`. `shep bridge notify-push` signs a JWT
+with `openssl` to mint access tokens. If notifications are not arriving, the
+**Send test notification** button in the shep tab reports per device what
+actually happened — push failing is otherwise indistinguishable from nothing
+having happened.
+
+Which kinds to notify about (blocked / done / task / review) is chosen in the
+app and stored on the server, so a muted kind costs no radio wake and the
+setting survives a reinstall.
+
 Build: `./gradlew assembleRelease` (JDK 17, compileSdk 35). Release is
 debug-signed on purpose — personal sideload only.

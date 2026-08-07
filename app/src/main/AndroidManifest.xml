@@ -54,7 +54,17 @@
                 android:resource="@xml/widget_blocked_info" />
         </receiver>
 
-        <!-- UnifiedPush delivery: wakes the app (closed) when shep pages it. -->
+        <!-- FCM delivery: the transport that wakes the app out of Doze. -->
+        <service
+            android:name=".ShepMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- UnifiedPush delivery: kept until FCM is confirmed on real hardware,
+             so there is never a window with no working transport. -->
         <receiver
             android:name=".PushReceiver"
             android:exported="true">
