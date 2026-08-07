@@ -263,6 +263,15 @@ impl App {
             changed = true;
         }
 
+        // The queue rows cost a second sqlite read, so they are sampled only
+        // while the screen that draws them is actually on.
+        if self.state.mode == crate::app::state::Mode::Board
+            && self.state.board.view == crate::app::state::BoardView::Tasks
+            && self.state.task_queue.refresh_if_stale(now)
+        {
+            changed = true;
+        }
+
         if self
             .selection_autoscroll_deadline
             .is_some_and(|deadline| now >= deadline)

@@ -253,6 +253,16 @@ impl App {
         }
 
         if self.state.mode == Mode::Board {
+            // The detail screens draw over the card geometry, so hit-testing
+            // cards there would focus a pane the user never clicked. A click
+            // steps back to the columns instead.
+            if self.state.board.view != crate::app::state::BoardView::Columns {
+                if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
+                    self.state
+                        .set_board_view(crate::app::state::BoardView::Columns);
+                }
+                return true;
+            }
             match mouse.kind {
                 MouseEventKind::Moved => {
                     if let Some(pane) =

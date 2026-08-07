@@ -22,7 +22,7 @@ use super::sidebar::{agent_panel_entries, format_event_age};
 use super::status::{state_dot, state_label};
 use super::text::{truncate_end, truncate_start};
 use super::widgets::render_panel_shell;
-use crate::app::state::AppState;
+use crate::app::state::{AppState, BoardView, TaskQueueRow};
 use crate::detect::AgentState;
 use crate::layout::PaneId;
 
@@ -397,6 +397,20 @@ fn board_body(inner: Rect) -> Rect {
 
 /// How many dashboard rows fit. Below this the strip is dropped entirely
 /// rather than half-rendered.
+/// Body rect for a detail screen: everything between the title row and the
+/// footer row, indented one column so text does not sit on the panel border.
+fn detail_body(inner: Rect) -> Rect {
+    if inner.height <= 2 || inner.width <= 2 {
+        return Rect::new(inner.x, inner.y, 0, 0);
+    }
+    Rect::new(
+        inner.x + 1,
+        inner.y + 2,
+        inner.width.saturating_sub(2),
+        inner.height.saturating_sub(3),
+    )
+}
+
 fn dashboard_rows(inner: Rect) -> u16 {
     if inner.height >= 12 {
         DASHBOARD_ROWS
@@ -690,7 +704,11 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
     );
 }
 
-pub(super) fn render_board_overlay(app: &AppState, frame: &mut Frame) {
+pub(super) fn render_board_overlay(
+    app: &AppState,
+    terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
+    frame: &mut Frame,
+) {
     let area = board_area(app);
     let Some(inner) = render_panel_shell(frame, area, app.palette.accent, app.palette.panel_bg)
     else {
@@ -700,9 +718,26 @@ pub(super) fn render_board_overlay(app: &AppState, frame: &mut Frame) {
     render_title(app, frame, Rect::new(inner.x, inner.y, inner.width, 1));
 
     let model = board_model(app);
-    let body = board_body(inner);
     let footer_y = inner.y + inner.height.saturating_sub(1);
     render_footer(app, frame, Rect::new(inner.x, footer_y, inner.width, 1));
+
+    // The detail screens replace the dashboard and columns entirely; they keep
+    // only the panel shell, title, and footer so the board stays recognisable.
+    match app.board.view {
+        BoardView::Agent => {
+            let body = detail_body(inner);
+            render_agent_detail(app, terminal_runtimes, frame, &model, body);
+            return;
+        }
+        BoardView::Tasks => {
+            let body = detail_body(inner);
+            render_task_queue(app, frame, body);
+            return;
+        }
+        BoardView::Columns => {}
+    }
+
+    let body = board_body(inner);
 
     let rows = dashboard_rows(inner);
     if rows > 0 {
@@ -737,10 +772,23 @@ fn render_title(app: &AppState, frame: &mut Frame, area: Rect) {
     let p = &app.palette;
     let title = Style::default().fg(p.accent).add_modifier(Modifier::BOLD);
     let dim = Style::default().fg(p.overlay0);
-    let line = Line::from(vec![
-        Span::styled(" session board ", title),
-        Span::styled("· what are my agents doing", dim),
-    ]);
+    // On a detail screen the title doubles as the breadcrumb back to the board.
+    let line = match app.board.view {
+        BoardView::Columns => Line::from(vec![
+            Span::styled(" session board ", title),
+            Span::styled("· what are my agents doing", dim),
+        ]),
+        BoardView::Agent => Line::from(vec![
+            Span::styled(" session board ", dim),
+            Span::styled("/ ", dim),
+            Span::styled("agent", title),
+        ]),
+        BoardView::Tasks => Line::from(vec![
+            Span::styled(" session board ", dim),
+            Span::styled("/ ", dim),
+            Span::styled("task queue", title),
+        ]),
+    };
     frame.render_widget(Paragraph::new(line), area);
 }
 
@@ -748,15 +796,30 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
     let p = &app.palette;
     let key = Style::default().fg(p.accent).add_modifier(Modifier::BOLD);
     let dim = Style::default().fg(p.overlay0);
-    let line = Line::from(vec![
-        Span::styled(" enter", key),
-        Span::styled(" focus  ", dim),
-        Span::styled("hjkl/↑↓←→", key),
-        Span::styled(" move  ", dim),
-        Span::styled("esc/q", key),
-        Span::styled(" close", dim),
-    ]);
-    frame.render_widget(Paragraph::new(line), area);
+    // Each screen advertises only the keys that do something on it, and every
+    // screen says what esc does — from a detail screen that is "back", not
+    // "close", so the board is always one step away.
+    let hints: &[(&str, &str)] = match app.board.view {
+        BoardView::Columns => &[
+            ("enter", " focus  "),
+            ("i", " inspect  "),
+            ("hjkl/↑↓←→", " move  "),
+            ("t", " tasks  "),
+            ("esc/q", " close"),
+        ],
+        BoardView::Agent => &[
+            ("enter", " attach  "),
+            ("t", " tasks  "),
+            ("esc/q", " back to board"),
+        ],
+        BoardView::Tasks => &[("jk/↑↓", " move  "), ("esc/q/t", " back to board")],
+    };
+    let mut spans = vec![Span::raw(" ")];
+    for (k, label) in hints {
+        spans.push(Span::styled(*k, key));
+        spans.push(Span::styled(*label, dim));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 fn render_column_header(app: &AppState, frame: &mut Frame, area: Rect, col: usize, count: usize) {
@@ -992,6 +1055,386 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     frame.render_widget(
         Paragraph::new(Line::from(line5)),
         Rect::new(rect.x, rect.y + 4, rect.width, 1),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Detail screens
+// ---------------------------------------------------------------------------
+
+/// Width of the label column in the detail key/value block.
+const DETAIL_KEY_WIDTH: usize = 13;
+
+/// The selected card, or the first one on the board when the selection no
+/// longer resolves (the agent it pointed at can exit while the board is open).
+pub(crate) fn detail_card<'a>(app: &AppState, model: &'a BoardModel) -> Option<&'a BoardCard> {
+    let selected = app.board.selected;
+    let cards = model.flattened();
+    cards
+        .iter()
+        .find(|card| Some(card.pane_id) == selected)
+        .or_else(|| cards.first())
+        .copied()
+}
+
+/// Everything shep knows about one agent, plus a window onto what its screen
+/// is actually showing — the board's "tell me more" without attaching.
+fn render_agent_detail(
+    app: &AppState,
+    terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
+    frame: &mut Frame,
+    model: &BoardModel,
+    body: Rect,
+) {
+    if body.width == 0 || body.height == 0 {
+        return;
+    }
+    let p = &app.palette;
+    let dim = Style::default().fg(p.overlay0);
+    let Some(card) = detail_card(app, model) else {
+        frame.render_widget(
+            Paragraph::new("no agent selected").style(dim),
+            Rect::new(body.x, body.y, body.width, 1),
+        );
+        return;
+    };
+    let width = body.width as usize;
+    let mut y = body.y;
+    let bottom = body.y + body.height;
+    let row = |frame: &mut Frame, y: &mut u16, line: Line<'static>| {
+        if *y < bottom {
+            frame.render_widget(Paragraph::new(line), Rect::new(body.x, *y, body.width, 1));
+            *y += 1;
+        }
+    };
+
+    // Heading: the same dot/name/model identity the card leads with, at rest.
+    let (dot, dot_style) = state_dot(card.state, card.seen, p);
+    let mut heading = vec![
+        Span::styled(dot, dot_style),
+        Span::raw(" "),
+        Span::styled(
+            card.agent_label.clone(),
+            Style::default().fg(p.text).add_modifier(Modifier::BOLD),
+        ),
+    ];
+    if let Some(model_name) = &card.model {
+        heading.push(Span::styled(format!("  {model_name}"), dim));
+    }
+    row(frame, &mut y, Line::from(heading));
+
+    let mut sub = card.workspace_label.clone();
+    if let Some(branch) = &card.branch {
+        sub.push_str(" · ");
+        sub.push_str(branch);
+    }
+    if !card.location.is_empty() {
+        sub.push_str(" · ");
+        sub.push_str(&card.location);
+    }
+    if let Some(age) = card_age(app, card) {
+        sub.push_str(" · last activity ");
+        sub.push_str(&age);
+    }
+    row(
+        frame,
+        &mut y,
+        Line::from(Span::styled(truncate_end(&sub, width), dim)),
+    );
+    row(frame, &mut y, Line::from(""));
+
+    // Key/value block. Each value keeps the colour it has on the card so the
+    // two screens read as the same information, not two reports of it.
+    let queued = app.queued_input_count_for_pane(card.pane_id);
+    let mut state_value = state_label(card.state, card.seen).to_string();
+    if queued > 0 {
+        state_value.push_str(&format!(" · \u{21e5}{queued} queued"));
+    }
+    let value_width = width.saturating_sub(DETAIL_KEY_WIDTH);
+    let kv = |frame: &mut Frame, y: &mut u16, key: &str, value: String, style: Style| {
+        row(
+            frame,
+            y,
+            Line::from(vec![
+                Span::styled(format!("{key:<DETAIL_KEY_WIDTH$}"), dim),
+                Span::styled(truncate_end(&value, value_width), style),
+            ]),
+        );
+    };
+    kv(
+        frame,
+        &mut y,
+        "state",
+        state_value,
+        Style::default().fg(super::status::state_label_color(card.state, card.seen, p)),
+    );
+    if let Some(status) = &card.status {
+        kv(
+            frame,
+            &mut y,
+            "status",
+            status.clone(),
+            Style::default().fg(p.text),
+        );
+    }
+    if let Some(activity) = &card.activity {
+        kv(
+            frame,
+            &mut y,
+            "activity",
+            activity.clone(),
+            Style::default()
+                .fg(p.overlay1)
+                .add_modifier(Modifier::ITALIC),
+        );
+    }
+    if let Some(cwd) = &card.cwd {
+        kv(
+            frame,
+            &mut y,
+            "working dir",
+            cwd.clone(),
+            Style::default().fg(p.text),
+        );
+    }
+    if let Some(percent) = card.context_percent {
+        let color = match percent {
+            85..=u8::MAX => p.red,
+            60..=84 => p.yellow,
+            _ => p.overlay1,
+        };
+        kv(
+            frame,
+            &mut y,
+            "context",
+            context_gauge(percent),
+            Style::default().fg(color),
+        );
+    }
+    row(frame, &mut y, Line::from(""));
+
+    // The live screen. Read from the pane runtime the same way the navigator
+    // reads runtime facts; absent (headless, or a pane with no runtime) it
+    // simply says so rather than drawing an empty frame.
+    if y >= bottom {
+        return;
+    }
+    let screen_rect = Rect::new(body.x, y, body.width, bottom - y);
+    render_agent_screen(app, terminal_runtimes, frame, card, screen_rect);
+}
+
+/// The bordered "live screen" excerpt at the foot of the agent detail.
+fn render_agent_screen(
+    app: &AppState,
+    terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
+    frame: &mut Frame,
+    card: &BoardCard,
+    rect: Rect,
+) {
+    let p = &app.palette;
+    let dim = Style::default().fg(p.overlay0);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled("live screen", dim))),
+        Rect::new(rect.x, rect.y, rect.width, 1),
+    );
+    if rect.height < 3 {
+        return;
+    }
+    let inner = Rect::new(
+        rect.x,
+        rect.y + 1,
+        rect.width,
+        rect.height.saturating_sub(1),
+    );
+    let visible = inner.height as usize;
+    let text = app
+        .runtime_for_pane_in_workspace(terminal_runtimes, card.ws_idx, card.pane_id)
+        .map(|runtime| runtime.recent_text(visible));
+    let Some(text) = text else {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "  (no live screen for this pane)",
+                dim,
+            ))),
+            Rect::new(inner.x, inner.y, inner.width, 1),
+        );
+        return;
+    };
+    // Keep the last `visible` non-empty-tail lines: trailing blank rows are
+    // the agent's input-box padding and would push real output off the top.
+    let mut lines: Vec<&str> = text.lines().collect();
+    while lines.last().is_some_and(|line| line.trim().is_empty()) {
+        lines.pop();
+    }
+    let start = lines.len().saturating_sub(visible);
+    let width = inner.width as usize;
+    for (offset, line) in lines[start..].iter().enumerate() {
+        let y = inner.y + offset as u16;
+        if y >= inner.y + inner.height {
+            break;
+        }
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                truncate_end(line, width),
+                Style::default().fg(p.subtext0),
+            ))),
+            Rect::new(inner.x, y, inner.width, 1),
+        );
+    }
+}
+
+/// Colour for a task-queue state, matching the agent-state language: red is
+/// blocked, yellow is running, green is done, dim is waiting.
+fn task_state_color(
+    state: crate::tasks::TaskState,
+    p: &crate::app::state::Palette,
+) -> ratatui::style::Color {
+    match state {
+        crate::tasks::TaskState::Blocked => p.red,
+        crate::tasks::TaskState::Running => p.yellow,
+        crate::tasks::TaskState::Done => p.green,
+        crate::tasks::TaskState::Todo => p.overlay1,
+        crate::tasks::TaskState::Cancelled => p.overlay0,
+    }
+}
+
+/// The dispatch queue behind the dashboard's `tasks` count: what is waiting,
+/// what is running, and which repo each one belongs to.
+fn render_task_queue(app: &AppState, frame: &mut Frame, body: Rect) {
+    if body.width == 0 || body.height == 0 {
+        return;
+    }
+    let p = &app.palette;
+    let dim = Style::default().fg(p.overlay0);
+    let rows = &app.task_queue.rows;
+
+    if !app.task_queue.sampled {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled("reading queue…", dim))),
+            Rect::new(body.x, body.y, body.width, 1),
+        );
+        return;
+    }
+    if rows.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled("queue is empty", dim))),
+            Rect::new(body.x, body.y, body.width, 1),
+        );
+        return;
+    }
+
+    // Header: the same counts the dashboard shows, broken out by state.
+    let running = rows
+        .iter()
+        .filter(|row| row.state == crate::tasks::TaskState::Running)
+        .count();
+    let waiting = rows
+        .iter()
+        .filter(|row| row.state == crate::tasks::TaskState::Todo)
+        .count();
+    let header = Line::from(vec![
+        Span::styled(rows.len().to_string(), Style::default().fg(p.text)),
+        Span::styled(" in queue  ·  ", dim),
+        Span::styled(running.to_string(), Style::default().fg(p.yellow)),
+        Span::styled(" running  ·  ", dim),
+        Span::styled(waiting.to_string(), Style::default().fg(p.overlay1)),
+        Span::styled(" waiting", dim),
+    ]);
+    frame.render_widget(
+        Paragraph::new(header),
+        Rect::new(body.x, body.y, body.width, 1),
+    );
+
+    // Two rows per task plus a blank separator, same rhythm as a board card.
+    const TASK_STRIDE: u16 = 3;
+    let list_top = body.y + 2;
+    if list_top >= body.y + body.height {
+        return;
+    }
+    let list_height = body.y + body.height - list_top;
+    let capacity = (list_height / TASK_STRIDE).max(1) as usize;
+    // Scroll the window so the selection stays visible.
+    let selected = app.board.task_selected.min(rows.len().saturating_sub(1));
+    let start = selected.saturating_sub(capacity.saturating_sub(1));
+    for (offset, row) in rows[start..].iter().take(capacity).enumerate() {
+        let y = list_top + offset as u16 * TASK_STRIDE;
+        render_task_row(app, frame, row, start + offset == selected, {
+            Rect::new(body.x, y, body.width, 2)
+        });
+    }
+}
+
+fn render_task_row(
+    app: &AppState,
+    frame: &mut Frame,
+    row: &TaskQueueRow,
+    selected: bool,
+    rect: Rect,
+) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+    let p = &app.palette;
+    if selected {
+        let buf = frame.buffer_mut();
+        for y in rect.top()..rect.bottom() {
+            for x in rect.left()..rect.right() {
+                buf[(x, y)].set_style(Style::default().bg(p.surface0));
+            }
+        }
+    }
+    let dim = Style::default().fg(p.overlay0);
+    let width = rect.width as usize;
+    let color = task_state_color(row.state, p);
+    let marker = if selected { "\u{258c}" } else { " " };
+    let marker_style = if selected {
+        Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(p.overlay0)
+    };
+
+    // Line 1: marker · state dot · prompt … state label pinned to the right
+    // edge, so the states line up into a column that can be read down.
+    let label = row.state.as_str();
+    let prompt_budget = width.saturating_sub(3).saturating_sub(label.len() + 2);
+    let prompt = truncate_end(&row.prompt, prompt_budget);
+    let used = 3 + prompt.chars().count() + label.len();
+    let pad = width.saturating_sub(used).max(2);
+    let line1 = vec![
+        Span::styled(marker.to_string(), marker_style),
+        Span::styled("\u{25cf} ", Style::default().fg(color)),
+        Span::styled(prompt, Style::default().fg(p.text)),
+        Span::styled(
+            format!("{}{label}", " ".repeat(pad)),
+            Style::default().fg(color),
+        ),
+    ];
+    frame.render_widget(
+        Paragraph::new(Line::from(line1)),
+        Rect::new(rect.x, rect.y, rect.width, 1),
+    );
+
+    if rect.height < 2 {
+        return;
+    }
+    // Line 2: where it will run.
+    let mut meta = format!("{} · {}", row.repo_label, row.runtime.as_str());
+    if row.use_worktree {
+        meta.push_str(" · worktree");
+    }
+    if row.dispatched {
+        meta.push_str(" · dispatched");
+    }
+    meta.push_str(&format!(
+        " · {}",
+        format_event_age(std::time::Duration::from_secs(row.age_secs.max(0) as u64))
+    ));
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            format!("   {}", truncate_end(&meta, width.saturating_sub(3))),
+            dim,
+        ))),
+        Rect::new(rect.x, rect.y + 1, rect.width, 1),
     );
 }
 
@@ -1245,6 +1688,229 @@ mod tests {
         );
     }
 
+    /// Seed a queue sample so the task screen has something to draw without
+    /// touching the real task database.
+    fn seed_task_queue(state: &mut AppState) {
+        use crate::app::state::TaskQueueRow;
+        use crate::tasks::{TaskRuntime, TaskState};
+        state.task_queue.sampled = true;
+        state.task_queue.sampled_at = Some(std::time::Instant::now());
+        state.task_queue.rows = vec![
+            TaskQueueRow {
+                id: 1,
+                prompt: "harden the stripe webhook signature check".into(),
+                state: TaskState::Running,
+                repo_label: "workmayt".into(),
+                runtime: TaskRuntime::Claude,
+                use_worktree: true,
+                dispatched: true,
+                age_secs: 240,
+            },
+            TaskQueueRow {
+                id: 2,
+                prompt: "draft the 0.9.0 release notes".into(),
+                state: TaskState::Todo,
+                repo_label: "shep".into(),
+                runtime: TaskRuntime::Opencode,
+                use_worktree: false,
+                dispatched: false,
+                age_secs: 1140,
+            },
+            TaskQueueRow {
+                id: 3,
+                prompt: "unblock the gitea 403 on emberline".into(),
+                state: TaskState::Blocked,
+                repo_label: "emberline".into(),
+                runtime: TaskRuntime::Claude,
+                use_worktree: false,
+                dispatched: true,
+                age_secs: 660,
+            },
+        ];
+    }
+
+    #[test]
+    fn task_queue_screen_lists_rows_with_state_and_repo() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let (mut state, _panes) = board_state();
+        seed_task_queue(&mut state);
+        state.board.task_selected = 1;
+
+        let mut terminal = Terminal::new(TestBackend::new(80, 14)).expect("test terminal");
+        terminal
+            .draw(|frame| render_task_queue(&state, frame, Rect::new(0, 0, 80, 14)))
+            .expect("task queue should render");
+
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..14)
+            .map(|y| (0..80).map(|x| buffer[(x, y)].symbol()).collect())
+            .collect();
+        let screen = rows.join("\n");
+        assert!(screen.contains("3 in queue"), "header counts: {screen}");
+        assert!(screen.contains("1 running"), "header counts: {screen}");
+        assert!(
+            screen.contains("harden the stripe webhook"),
+            "prompt: {screen}"
+        );
+        assert!(
+            screen.contains("workmayt · claude · worktree"),
+            "meta line: {screen}"
+        );
+        assert!(screen.contains("blocked"), "state label: {screen}");
+        // The selected row (index 1) carries the marker, no other row does.
+        let marked: Vec<&String> = rows.iter().filter(|row| row.contains('▌')).collect();
+        assert_eq!(marked.len(), 1, "exactly one selection marker: {screen}");
+        assert!(
+            marked[0].contains("draft the 0.9.0 release notes"),
+            "marker on the selected row: {:?}",
+            marked[0]
+        );
+    }
+
+    #[test]
+    fn task_queue_screen_distinguishes_unsampled_from_empty() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let (mut state, _panes) = board_state();
+        let render = |state: &AppState| {
+            let mut terminal = Terminal::new(TestBackend::new(40, 3)).expect("test terminal");
+            terminal
+                .draw(|frame| render_task_queue(state, frame, Rect::new(0, 0, 40, 3)))
+                .expect("render");
+            let buffer = terminal.backend().buffer();
+            (0..40).map(|x| buffer[(x, 0)].symbol()).collect::<String>()
+        };
+        // Never sampled is not the same claim as "you have no tasks".
+        assert!(render(&state).contains("reading queue"));
+        state.task_queue.sampled = true;
+        assert!(render(&state).contains("queue is empty"));
+    }
+
+    // Constructing a pane runtime needs a reactor, like the pane render tests.
+    #[tokio::test]
+    async fn agent_detail_shows_the_panes_live_screen() {
+        use crate::terminal::{TerminalRuntime, TerminalRuntimeRegistry};
+        use ratatui::{backend::TestBackend, Terminal};
+        let (mut state, panes) = board_state();
+        state.board.view = BoardView::Agent;
+        state.board.selected = Some(panes[0]);
+        state.workspaces[0].tabs[0].runtimes.insert(
+            panes[0],
+            TerminalRuntime::test_with_scrollback_bytes(
+                60,
+                6,
+                4096,
+                b"cargo clippy --all-targets\r\nwarning: unused import\r\n? apply the fix\r\n",
+            ),
+        );
+
+        let mut terminal = Terminal::new(TestBackend::new(70, 20)).expect("test terminal");
+        let runtimes = TerminalRuntimeRegistry::new();
+        let model = board_model(&state);
+        terminal
+            .draw(|frame| {
+                render_agent_detail(&state, &runtimes, frame, &model, Rect::new(0, 0, 70, 20))
+            })
+            .expect("agent detail should render");
+
+        let buffer = terminal.backend().buffer();
+        let screen: String = (0..20)
+            .map(|y| (0..70).map(|x| buffer[(x, y)].symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(screen.contains("live screen"), "screen heading: {screen}");
+        assert!(
+            screen.contains("? apply the fix"),
+            "the pane's own output should be on screen: {screen}"
+        );
+        assert!(
+            !screen.contains("no live screen"),
+            "a pane with a runtime is not a pane without one: {screen}"
+        );
+    }
+
+    #[test]
+    fn agent_detail_falls_back_when_the_selection_no_longer_resolves() {
+        // An agent can exit while the board is open; the detail screen should
+        // land on a real card rather than render nothing.
+        let (mut state, panes) = board_state();
+        let model = board_model(&state);
+        state.board.selected = Some(panes[2]);
+        assert_eq!(
+            detail_card(&state, &model).map(|c| c.pane_id),
+            Some(panes[2])
+        );
+        state.board.selected = Some(PaneId::from_raw(9999));
+        assert!(
+            detail_card(&state, &model).is_some(),
+            "stale selection should fall back to the first card"
+        );
+        state.board.selected = None;
+        assert!(detail_card(&state, &model).is_some());
+    }
+
+    #[tokio::test]
+    #[ignore = "visual preview, run with --nocapture"]
+    async fn preview_agent_detail() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let (mut state, panes) = board_state();
+        state.workspaces[0].tabs[0].runtimes.insert(
+            panes[0],
+            crate::terminal::TerminalRuntime::test_with_scrollback_bytes(
+                100,
+                8,
+                8192,
+                b"\xe2\x97\x8f Update(apps/api/src/stripe/webhook.ts)\r\n  41 additions, 8 removals\r\n\r\n? Do you want to make this edit to webhook.ts\r\n  1. Yes  2. Yes, allow all edits  3. No\r\n",
+            ),
+        );
+        state.view.terminal_area = Rect::new(0, 0, 110, 26);
+        state.view.sidebar_rect = Rect::new(0, 0, 110, 26);
+        state.board.view = crate::app::state::BoardView::Agent;
+        state.board.selected = Some(panes[0]);
+        state
+            .queued_pane_input
+            .insert(panes[0], vec!["next".into()]);
+        let tid = state.workspaces[0]
+            .terminal_id(panes[0])
+            .expect("terminal")
+            .clone();
+        let t = state.terminals.get_mut(&tid).expect("terminal");
+        t.set_activity_line(Some("? Do you want to make this edit to webhook.ts".into()));
+        t.set_context_percent(Some(74));
+        t.cwd = std::path::PathBuf::from("/Users/alex/vault/dev/workmayt");
+
+        let mut term = Terminal::new(TestBackend::new(110, 26)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+            .expect("render");
+        let buffer = term.backend().buffer();
+        for y in 0..26 {
+            let row: String = (0..110).map(|x| buffer[(x, y)].symbol()).collect();
+            println!("{}", row.trim_end());
+        }
+    }
+
+    #[test]
+    #[ignore = "visual preview, run with --nocapture"]
+    fn preview_task_queue() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let (mut state, _panes) = board_state();
+        state.view.terminal_area = Rect::new(0, 0, 110, 20);
+        state.view.sidebar_rect = Rect::new(0, 0, 110, 20);
+        state.board.view = crate::app::state::BoardView::Tasks;
+        state.board.task_selected = 1;
+        seed_task_queue(&mut state);
+
+        let mut term = Terminal::new(TestBackend::new(110, 20)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+            .expect("render");
+        let buffer = term.backend().buffer();
+        for y in 0..20 {
+            let row: String = (0..110).map(|x| buffer[(x, y)].symbol()).collect();
+            println!("{}", row.trim_end());
+        }
+    }
+
     #[test]
     #[ignore = "visual preview, run with --nocapture"]
     fn preview_full_board() {
@@ -1283,7 +1949,8 @@ mod tests {
             );
         }
         let mut term = Terminal::new(TestBackend::new(150, 34)).expect("test terminal");
-        term.draw(|frame| render_board_overlay(&state, frame))
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
             .expect("render");
         let buffer = term.backend().buffer();
         for y in 0..34 {

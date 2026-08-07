@@ -667,6 +667,7 @@ impl App {
             global_menu: state::MenuListState::new(0),
             host_terminal_theme: crate::terminal_theme::TerminalTheme::default(),
             dashboard_sample: crate::app::state::DashboardSample::default(),
+            task_queue: crate::app::state::TaskQueueSample::default(),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         };

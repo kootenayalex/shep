@@ -15,6 +15,7 @@
 
 - Added `agent.start` `new_workspace` (`shep agent start --new-workspace`) to root an agent in a fresh workspace of its own instead of splitting into an existing workspace or tab; it conflicts with explicit `workspace_id`/`tab_id` placement.
 - Added bridge-local `task.remove`, `task.clear`, and `task.assign` so the companion can delete one task, sweep finished ones, and hand an open task to a workspace whose agent is already running.
+- Added two detail screens to the session board. `i` on a card opens the agent screen: its state, status, activity, working directory, and context gauge, plus a live window onto what the pane is actually showing — everything the card truncates, without attaching to it. `t` opens the task queue behind the dashboard's task count: what is waiting, what is running, and which repo and runtime each task belongs to. Esc steps back to the columns from either screen before it closes the board, so the board is always one key away from itself.
 
 ### Changed
 - The session board is now the leading screen: Esc in a pane running a recognized agent returns to the board instead of reaching the agent, and `shift+esc` sends the interrupt through (`ui.escape_returns_to_board`, default on). Panes with no detected agent keep their own Esc. Needs a host terminal that disambiguates escape codes (Ghostty, kitty, WezTerm); turn it off elsewhere.
