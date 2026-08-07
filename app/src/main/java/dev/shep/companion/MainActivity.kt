@@ -120,7 +120,8 @@ class MainActivity : ComponentActivity() {
 
 /** Bottom-nav destinations. Glyphs mirror the TUI vocabulary (no icon dep). */
 enum class Tab(val label: String, val glyph: String) {
-    Agents("agents", "◫"),
+    Agents("board", "◫"),
+    Spaces("spaces", "❏"),
     Tasks("tasks", "☰"),
     Memory("memory", "✦"),
     Shep("shep", "⚙"),
@@ -150,13 +151,19 @@ fun ShepApp(
         ActivityResultContracts.RequestPermission()
     ) { /* granted or not — push still registers; the OS just suppresses posts */ }
 
-    // Once paired, register for UnifiedPush and (13+) request the notif permission.
-    // Runs whenever pairing flips true; UnifiedPush.registerApp is idempotent.
+    // Once paired, register for push and (13+) request the notif permission.
+    // Runs whenever pairing flips true; both registrations are idempotent.
     LaunchedEffect(paired) {
         if (paired) {
             if (Build.VERSION.SDK_INT >= 33) {
                 notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
             }
+            // FCM is the transport that works when the phone is asleep. No
+            // kinds are passed: an unqualified re-register on every app start
+            // must not overwrite a choice made in settings.
+            FcmManager.register(context)
+            // UnifiedPush stays registered alongside until FCM is confirmed on
+            // real hardware, so a failure of one is not a failure of both.
             withContext(Dispatchers.IO) { PushManager.register(context) }
         }
     }
@@ -288,6 +295,8 @@ fun NavShell(
 ) {
     var tab by remember { mutableStateOf(Tab.Agents) }
     var paneDetail by remember { mutableStateOf<AgentRow?>(null) }
+    // A pane id waiting to be resolved into the row the pane view needs.
+    var openPaneById by remember { mutableStateOf<String?>(null) }
     // Hoisted from TasksScreen so the new-task deep-link can pre-open the sheet.
     var tasksShowAdd by remember { mutableStateOf(false) }
 
@@ -302,6 +311,17 @@ fun NavShell(
         }?.find { it.paneId == target }
         if (row != null) paneDetail = row
         onDeepLinkConsumed()
+    }
+
+    // Same resolution, from the spaces tree. It stays on the Spaces tab, so
+    // closing the pane view returns you to where you were.
+    LaunchedEffect(openPaneById) {
+        val target = openPaneById ?: return@LaunchedEffect
+        val row = withContext(Dispatchers.IO) {
+            runCatching { parseSnapshot(client.call("session.snapshot")) }.getOrNull()
+        }?.find { it.paneId == target }
+        if (row != null) paneDetail = row
+        openPaneById = null
     }
 
     // Launcher shortcut / widget (shep://tasks/new): Tasks tab, sheet open.
@@ -382,6 +402,14 @@ fun NavShell(
                             onOpenPane = { paneDetail = it },
                             onUnpair = onUnpair,
                         )
+                        Tab.Spaces -> dev.shep.companion.screens.SpacesScreen(
+                            client = client,
+                            // The tree knows a pane id; the pane view wants the
+                            // board's row for it, so resolve through the same
+                            // path a notification tap uses rather than inventing
+                            // a second, thinner pane view.
+                            onOpenPane = { node -> openPaneById = node.paneId },
+                        )
                         Tab.Tasks -> TasksScreen(
                             client = client,
                             showAdd = tasksShowAdd,
@@ -396,16 +424,25 @@ fun NavShell(
     }
 }
 
-/** Settings tab: A3 push status + re-register, over the future review/ship home. */
+/**
+ * Settings tab: what shep will notify about, and whether push works at all.
+ *
+ * The toggles change what the *server* sends, not just what this phone shows.
+ * That way a muted kind costs no radio wake, and the choice survives a
+ * reinstall. The test button exists because a broken push setup looks exactly
+ * like a quiet one — there is no other way to tell them apart.
+ */
 @Composable
 fun ShepScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("shep", Context.MODE_PRIVATE) }
     var status by remember { mutableStateOf(prefs.getString("push_status", "not registered") ?: "") }
-    var endpoint by remember { mutableStateOf(prefs.getString("push_endpoint", null)) }
-    val scope = rememberCoroutineScope()
+    var token by remember { mutableStateOf(prefs.getString("fcm_token", null)) }
+    var kinds by remember { mutableStateOf(FcmManager.selectedKinds(context)) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Row(
             Modifier.fillMaxWidth().background(ShepColors.surface).padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -413,24 +450,88 @@ fun ShepScreen() {
             Text("shep", color = ShepColors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("push notifications", color = ShepColors.text, fontWeight = FontWeight.SemiBold)
+            Text("notify me about", color = ShepColors.text, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "shep stops sending what is off here, so it costs no battery.",
+                color = ShepColors.subtext,
+                fontSize = 11.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            NotifyKind.entries.forEach { kind ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val next = if (kind in kinds) kinds - kind else kinds + kind
+                            kinds = next
+                            FcmManager.setKinds(context, next) { status = it }
+                        }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(kind.label, color = ShepColors.text, fontSize = 14.sp)
+                        Text(
+                            kind.description,
+                            color = ShepColors.subtext,
+                            fontSize = 11.sp,
+                        )
+                    }
+                    Switch(
+                        checked = kind in kinds,
+                        onCheckedChange = { on ->
+                            val next = if (on) kinds + kind else kinds - kind
+                            kinds = next
+                            FcmManager.setKinds(context, next) { status = it }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = ShepColors.bg,
+                            checkedTrackColor = ShepColors.copper,
+                            uncheckedThumbColor = ShepColors.subtext,
+                            uncheckedTrackColor = ShepColors.surfaceHigh,
+                        ),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            Text("delivery", color = ShepColors.text, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(6.dp))
             Text(status, color = ShepColors.subtext, fontSize = 13.sp)
-            endpoint?.let {
-                Spacer(Modifier.height(4.dp))
-                Text(it, color = ShepColors.subtext, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
+            Text(
+                if (token != null) "registered with FCM" else "no FCM token yet",
+                color = if (token != null) ShepColors.green else ShepColors.peach,
+                fontSize = 12.sp,
+            )
             Spacer(Modifier.height(12.dp))
-            Button(onClick = {
-                scope.launch {
-                    // Show the immediate outcome; the endpoint (if any) arrives
-                    // asynchronously via PushReceiver.onNewEndpoint into prefs.
-                    status = withContext(Dispatchers.IO) { PushManager.register(context) }
-                    endpoint = prefs.getString("push_endpoint", null)
-                }
-            }) { Text("Re-register push") }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = {
+                        testing = true
+                        testResult = null
+                        FcmManager.sendTest(context) {
+                            testResult = it
+                            testing = false
+                        }
+                    },
+                    enabled = !testing,
+                ) { Text(if (testing) "sending…" else "Send test notification") }
+                TextButton(onClick = {
+                    FcmManager.register(context, kinds)
+                    status = "registering…"
+                    token = prefs.getString("fcm_token", null)
+                }) { Text("Re-register", color = ShepColors.subtext) }
+            }
+            testResult?.let {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    it,
+                    color = if (it.startsWith("sent to")) ShepColors.green else ShepColors.peach,
+                    fontSize = 12.sp,
+                )
+            }
             Spacer(Modifier.height(24.dp))
-            Text("review, ship & settings — A5", color = ShepColors.subtext, fontSize = 12.sp)
         }
     }
 }
@@ -561,7 +662,7 @@ fun TasksScreen(
         dev.shep.companion.screens.AssignTaskSheet(
             task = task,
             sessions = sessions,
-            names = distinctNames(sessions),
+            names = sessions.associate { it.paneId to (it.displayName ?: it.agent) },
             onDismiss = { assigning = null },
             onAssign = { row ->
                 assigning = null
@@ -1408,7 +1509,6 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
     }
 
     val visibleRows = rows.filter { filter.accepts(it.status) }
-    val names = distinctNames(rows)
     // Directories already in play seed the new-session picker, so starting a
     // second session where you are working is two taps and no typing.
     val recentRepos = rows.mapNotNull { it.cwd }.distinct()
@@ -1489,7 +1589,7 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
             Modifier.fillMaxWidth().background(ShepColors.surface).padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("agents", color = ShepColors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("board", color = ShepColors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             Text(status, color = ShepColors.subtext, fontSize = 12.sp)
             Spacer(Modifier.width(12.dp))
@@ -1552,7 +1652,7 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
                     dev.shep.companion.screens.BoardCard(
                         row = row,
                         statusColor = { statusColor(it) },
-                        displayName = names[row.paneId] ?: row.agent,
+                        displayName = row.displayName ?: row.agent,
                         onLongClick = { renaming = row },
                         onClick = { onOpenPane(row) },
                     )

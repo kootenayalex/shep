@@ -39,9 +39,11 @@ import dev.shep.companion.ui.theme.ShepPalette
  * src/ui/board.rs. That correspondence is the point — this is a companion
  * view of one screen, not a second design.
  *
- * [displayName] is the board-wide-unique name from `distinctNames`, not
+ * [displayName] is the session-wide-unique name the server decides, not
  * `row.agent`: a screenful of cards all reading "claude" is the thing this
- * card exists to stop. Long-pressing offers to name it something better.
+ * card exists to stop, and deciding it server-side is what keeps this card and
+ * the desktop board naming the same agent the same way. Long-pressing offers
+ * to name it something better.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

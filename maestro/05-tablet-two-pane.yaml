@@ -3,6 +3,6 @@
 appId: dev.shep.companion
 ---
 - launchApp
-- assertVisible: "agents"
+- assertVisible: "board"
 - assertVisible: "select an agent"
 - assertVisible: "attention.*"

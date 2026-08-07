@@ -1,0 +1,31 @@
+# Spaces tree: the session's shape, and the controls that change it.
+# Needs a paired app (run 01 first) against a bridge with at least one space.
+# Text anchors only (no ids) per device-testing conventions.
+#
+# Deliberately does NOT close anything: a flow that destroys spaces cannot be
+# run against a real session, and this one is meant to be.
+appId: dev.shep.companion
+---
+- launchApp
+- tapOn: "spaces"
+# Header and the affordance for opening a session from here.
+- assertVisible: "spaces"
+- assertVisible: "\\+ new"
+# The tree's three levels. Every space offers these; at least one is on screen.
+- assertVisible: "go to"
+- assertVisible: "\\+ tab"
+- assertVisible: "rename"
+# Pane-level controls live under the tabs.
+- assertVisible: "split"
+
+# The new-session sheet opens and asks the three things shep needs.
+- tapOn: "\\+ new"
+- assertVisible: "new session"
+- assertVisible: "directory"
+- assertVisible: "run"
+# The runtimes, including a plain shell as a first-class choice.
+- assertVisible: "claude"
+- assertVisible: "terminal"
+# Back dismisses the sheet (hideKeyboard is unavailable on OxygenOS).
+- pressKey: back
+- assertVisible: "spaces"

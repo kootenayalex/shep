@@ -26,6 +26,12 @@ data class AgentRow(
     val paneNumber: Int? = null,
     val branch: String? = null,
     val displayAgent: String? = null,
+    /**
+     * What to call this agent, decided by the server so the desktop board and
+     * the phone cannot call the same agent different things. Falls back to
+     * [agent] against a server too old to send it.
+     */
+    val displayName: String? = null,
     val activityLine: String? = null,
     val cwd: String? = null,
     val stateAgeSeconds: Long? = null,
@@ -46,59 +52,6 @@ data class AgentRow(
                 else -> pane
             }
         }
-}
-
-/**
- * Increasingly-specific names for one agent, shortest first.
- *
- * The first entry is what shep itself calls the agent — a custom name once it
- * has been renamed, otherwise the runtime ("claude", "shell"). Each further
- * entry pins it down by one more fact. [distinctNames] picks the shortest one
- * that is not shared with another agent on the board.
- */
-fun nameCandidates(row: AgentRow): List<String> {
-    val candidates = mutableListOf(row.agent)
-    var accumulated = row.agent
-    listOfNotNull(
-        row.workspaceLabel.takeIf { it.isNotBlank() },
-        row.branch,
-        row.tabName?.takeIf { it.isNotBlank() },
-        row.paneNumber?.let { "p$it" },
-    ).forEach {
-        accumulated = "$accumulated · $it"
-        candidates.add(accumulated)
-    }
-    return candidates
-}
-
-/**
- * A name per agent that no other agent on the board answers to, keyed by pane id.
- *
- * Five Claude sessions in the same repo are all "claude · shep · master" —
- * true, and useless. This spends detail only where it buys a distinction: an
- * agent that is already the only "claude" stays "claude", and only the ones
- * that collide grow a workspace, a branch, a tab, a pane number. The pane id is
- * the last resort precisely because `w2:p1` is what we are trying to avoid
- * showing; it appears only when nothing else separates two agents.
- */
-fun distinctNames(rows: List<AgentRow>): Map<String, String> {
-    val candidates = rows.associate { it.paneId to nameCandidates(it) }
-    val resolved = mutableMapOf<String, String>()
-    val depth = candidates.values.maxOfOrNull { it.size } ?: 0
-    for (level in 0 until depth) {
-        val pending = rows.filter { it.paneId !in resolved }.associate { row ->
-            val options = candidates.getValue(row.paneId)
-            row.paneId to (options.getOrNull(level) ?: options.last())
-        }
-        val counts = pending.values.groupingBy { it }.eachCount()
-        pending.forEach { (paneId, name) -> if (counts[name] == 1) resolved[paneId] = name }
-    }
-    rows.forEach { row ->
-        if (row.paneId !in resolved) {
-            resolved[row.paneId] = "${candidates.getValue(row.paneId).last()} · ${row.paneId}"
-        }
-    }
-    return resolved
 }
 
 /** Session-wide counts behind the dashboard strip. */
@@ -179,6 +132,7 @@ fun parseOverview(result: JSONObject): SessionOverview? {
                 paneNumber = a.optIntOrNull("pane_number"),
                 branch = a.optStringOrNull("branch"),
                 displayAgent = a.optStringOrNull("display_agent"),
+                displayName = a.optStringOrNull("display_name"),
                 activityLine = a.optStringOrNull("activity_line"),
                 cwd = a.optStringOrNull("cwd"),
                 stateAgeSeconds = a.optLongOrNull("state_age_seconds"),
@@ -370,4 +324,126 @@ fun parseMemory(result: JSONObject): MemoryView {
         cap = result.optInt("cap"),
         percent = result.optInt("percent"),
     )
+}
+
+/**
+ * The session's shape: spaces, their tabs, and the panes inside them.
+ *
+ * The board answers "who needs me", ordered by attention and flat on purpose.
+ * This answers the other question — "what is open, and where" — which is the
+ * one you need to close something or start something beside it. Both come from
+ * the same server, so a rename in either place is the same rename.
+ *
+ * "Space" is the word shep's own picker uses; the API says `workspace`.
+ */
+data class PaneNode(
+    val paneId: String,
+    val tabId: String,
+    val agent: String?,
+    val status: String,
+    val cwd: String?,
+    val focused: Boolean,
+)
+
+data class TabNode(
+    val tabId: String,
+    val workspaceId: String,
+    val label: String,
+    val number: Int,
+    val status: String,
+    val focused: Boolean,
+    val panes: List<PaneNode>,
+)
+
+data class SpaceNode(
+    val workspaceId: String,
+    val label: String,
+    val number: Int,
+    val status: String,
+    val reviewState: String,
+    val focused: Boolean,
+    val activeTabId: String?,
+    val worktreeRepo: String?,
+    val isWorktree: Boolean,
+    val tabs: List<TabNode>,
+) {
+    /**
+     * Closing the last tab in a space is refused by the server — the space is
+     * what you close instead. Asking here keeps the UI from offering a button
+     * that can only return an error.
+     */
+    val hasOnlyOneTab: Boolean get() = tabs.size <= 1
+}
+
+/**
+ * Build the space → tab → pane tree from one `session.snapshot`.
+ *
+ * The snapshot is three flat lists plus ids, so this is the join. Order is the
+ * server's own: spaces and tabs come back in session order, which is the order
+ * the desktop shows them in, and re-sorting would be the phone inventing a
+ * second arrangement of the same session.
+ */
+fun parseTree(result: JSONObject): List<SpaceNode> {
+    val snapshot = result.optJSONObject("snapshot") ?: return emptyList()
+
+    val panesByTab = mutableMapOf<String, MutableList<PaneNode>>()
+    val panes = snapshot.optJSONArray("panes") ?: JSONArray()
+    for (i in 0 until panes.length()) {
+        val p = panes.optJSONObject(i) ?: continue
+        val tabId = p.optString("tab_id")
+        panesByTab.getOrPut(tabId) { mutableListOf() }.add(
+            PaneNode(
+                paneId = p.optString("pane_id"),
+                tabId = tabId,
+                agent = p.optStringOrNull("label")
+                    ?: p.optStringOrNull("display_agent")
+                    ?: p.optStringOrNull("agent"),
+                status = p.optString("agent_status", "unknown"),
+                cwd = p.optStringOrNull("cwd"),
+                focused = p.optBoolean("focused"),
+            )
+        )
+    }
+
+    val tabsByWorkspace = mutableMapOf<String, MutableList<TabNode>>()
+    val tabs = snapshot.optJSONArray("tabs") ?: JSONArray()
+    for (i in 0 until tabs.length()) {
+        val t = tabs.optJSONObject(i) ?: continue
+        val workspaceId = t.optString("workspace_id")
+        val tabId = t.optString("tab_id")
+        tabsByWorkspace.getOrPut(workspaceId) { mutableListOf() }.add(
+            TabNode(
+                tabId = tabId,
+                workspaceId = workspaceId,
+                label = t.optString("label"),
+                number = t.optInt("number"),
+                status = t.optString("agent_status", "unknown"),
+                focused = t.optBoolean("focused"),
+                panes = panesByTab[tabId].orEmpty(),
+            )
+        )
+    }
+
+    val spaces = mutableListOf<SpaceNode>()
+    val workspaces = snapshot.optJSONArray("workspaces") ?: JSONArray()
+    for (i in 0 until workspaces.length()) {
+        val w = workspaces.optJSONObject(i) ?: continue
+        val id = w.optString("workspace_id")
+        val worktree = w.optJSONObject("worktree")
+        spaces.add(
+            SpaceNode(
+                workspaceId = id,
+                label = w.optString("label").ifEmpty { id },
+                number = w.optInt("number"),
+                status = w.optString("agent_status", "unknown"),
+                reviewState = w.optString("review_state", "none"),
+                focused = w.optBoolean("focused"),
+                activeTabId = w.optStringOrNull("active_tab_id"),
+                worktreeRepo = worktree?.optStringOrNull("repo_name"),
+                isWorktree = worktree?.optBoolean("is_linked_worktree") ?: false,
+                tabs = tabsByWorkspace[id].orEmpty(),
+            )
+        )
+    }
+    return spaces
 }

@@ -11,4 +11,4 @@ appId: dev.shep.companion
 - assertVisible: "voice"
 - assertVisible: "repo path"
 - back
-- assertVisible: "agents"
+- assertVisible: "board"
