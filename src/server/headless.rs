@@ -246,21 +246,38 @@ struct NotifyExecContext {
     agent: Option<String>,
     workspace: Option<String>,
     message: Option<String>,
+    /// One line naming what happened, for a notification that has a headline
+    /// and a body. Agent-state events leave it unset and let the receiver
+    /// phrase it; task and review events set it because "task #4 is done" is
+    /// not derivable from a pane id.
+    title: Option<String>,
+    /// Set only for `task` events.
+    task_id: Option<i64>,
 }
 
-/// Spawn the exec-bridge command detached, passing transition context through
+/// Spawn the exec-bridge command detached, passing event context through
 /// `SHEP_NOTIFY_*` env vars. Never blocks the caller: a short-lived reaper
 /// thread waits on the child so it does not become a zombie.
+///
+/// `state` is the agent state for agent-state events, and `None` for events
+/// that are not about a pane's agent (a task moving, a workspace becoming
+/// reviewable). `SHEP_NOTIFY_STATE` stays the agent state so existing exec
+/// commands keep working; `SHEP_NOTIFY_KIND` is what tells the receiver which
+/// of the four subscriptions this belongs to.
 fn spawn_notify_exec(
     command: &str,
     pane_id: PaneId,
-    state: AgentState,
+    kind: crate::config::NotifyKind,
+    state: Option<AgentState>,
     context: NotifyExecContext,
 ) {
     let mut cmd = notify_exec_command(command);
+    cmd.env("SHEP_NOTIFY_KIND", kind.label());
     cmd.env(
         "SHEP_NOTIFY_STATE",
-        crate::detect::manifest::agent_state_label(state),
+        state
+            .map(crate::detect::manifest::agent_state_label)
+            .unwrap_or_default(),
     );
     cmd.env("SHEP_NOTIFY_AGENT", context.agent.unwrap_or_default());
     cmd.env(
@@ -269,6 +286,11 @@ fn spawn_notify_exec(
     );
     cmd.env("SHEP_NOTIFY_PANE_ID", pane_id.raw().to_string());
     cmd.env("SHEP_NOTIFY_MESSAGE", context.message.unwrap_or_default());
+    cmd.env("SHEP_NOTIFY_TITLE", context.title.unwrap_or_default());
+    cmd.env(
+        "SHEP_NOTIFY_TASK_ID",
+        context.task_id.map(|id| id.to_string()).unwrap_or_default(),
+    );
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
@@ -1325,6 +1347,9 @@ impl HeadlessServer {
         let db_path = crate::tasks::tasks_db_path();
         let has_store = db_path.exists();
         let finished = prev_state == AgentState::Working && new_state == AgentState::Idle;
+        // Collected rather than fired inline: the task/review bookkeeping below
+        // holds a `&mut` borrow of the workspaces, and firing needs `&self`.
+        let mut notify_events: Vec<(crate::config::NotifyKind, String, Option<i64>)> = Vec::new();
 
         if has_store {
             let Ok(conn) = crate::tasks::open_store(&db_path) else {
@@ -1353,6 +1378,13 @@ impl HeadlessServer {
                         {
                             tracing::warn!(err = %err, task_id = task.id, "task state update failed");
                         }
+                        // Already gated on a real change by the filter above,
+                        // so every arrival here is worth reporting once.
+                        notify_events.push((
+                            crate::config::NotifyKind::Task,
+                            format!("task #{} {}", task.id, next.as_str()),
+                            Some(task.id),
+                        ));
                         if next == crate::tasks::TaskState::Done {
                             if let Some(ws) = self
                                 .app
@@ -1362,6 +1394,14 @@ impl HeadlessServer {
                                 .find(|ws| ws.id == ws_id)
                             {
                                 ws.review_state = crate::api::schema::ReviewState::NeedsReview;
+                                notify_events.push((
+                                    crate::config::NotifyKind::Review,
+                                    format!(
+                                        "{} is ready for review",
+                                        ws.custom_name.as_deref().unwrap_or(&ws.id)
+                                    ),
+                                    None,
+                                ));
                             }
                         }
                     }
@@ -1377,6 +1417,10 @@ impl HeadlessServer {
                 }
             }
         }
+
+        for (kind, title, task_id) in notify_events {
+            self.fire_notify_exec_event(pane_id, kind, title, task_id);
+        }
     }
 
     fn maybe_fire_notify_exec(
@@ -1385,11 +1429,13 @@ impl HeadlessServer {
         prev_state: AgentState,
         new_state: AgentState,
     ) {
+        let finished = prev_state == AgentState::Working && new_state == AgentState::Idle;
         let decision = notify_exec_decision(
             &self.app.state.notifications,
             self.notify_exec_fired.get(&pane_id).copied(),
             prev_state,
             new_state,
+            finished,
         );
         match decision {
             NotifyExecDecision::Skip { clear_debounce } => {
@@ -1403,9 +1449,35 @@ impl HeadlessServer {
                     return;
                 };
                 let context = self.notify_exec_context(pane_id);
-                spawn_notify_exec(&exec, pane_id, new_state, context);
+                let kind = crate::config::NotifyKind::from_agent_state(new_state, finished);
+                spawn_notify_exec(&exec, pane_id, kind, Some(new_state), context);
             }
         }
+    }
+
+    /// Fire the exec-bridge for an event that is not an agent-state change.
+    ///
+    /// Task and review events arrive already de-duplicated — the callers only
+    /// reach here on a real change — so this deliberately skips the per-pane
+    /// state debounce, which exists for a different problem (an agent being
+    /// re-reported in the state it is already in).
+    fn fire_notify_exec_event(
+        &self,
+        pane_id: PaneId,
+        kind: crate::config::NotifyKind,
+        title: String,
+        task_id: Option<i64>,
+    ) {
+        if !self.app.state.notifications.should_notify(kind) {
+            return;
+        }
+        let Some(exec) = self.app.state.notifications.exec.clone() else {
+            return;
+        };
+        let mut context = self.notify_exec_context(pane_id);
+        context.title = Some(title);
+        context.task_id = task_id;
+        spawn_notify_exec(&exec, pane_id, kind, None, context);
     }
 
     /// Gather the (agent, workspace, message) context passed to the exec-bridge
@@ -1429,6 +1501,7 @@ impl HeadlessServer {
                     agent,
                     workspace,
                     message,
+                    ..NotifyExecContext::default()
                 };
             }
         }
@@ -3295,6 +3368,13 @@ impl HeadlessServer {
 
             // Exec-bridge for state changes that landed during an API request.
             self.maybe_fire_notify_exec(*pane_id, *prev_state, new_state);
+            // ...and the same task bookkeeping the output-driven paths do.
+            // An agent that reports its own state through `pane.report_agent`
+            // — which is how hook-driven runtimes report — otherwise never
+            // moved its task out of `running` or marked the workspace for
+            // review, so the queue silently stopped tracking exactly the
+            // agents that report most reliably.
+            self.maybe_task_transition(*pane_id, *prev_state, new_state);
         }
 
         if !skip_default_workspace && latest_app_client(&self.clients).is_some() {

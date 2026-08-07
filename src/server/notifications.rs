@@ -72,18 +72,24 @@ pub(crate) enum NotifyExecDecision {
 /// exec-bridge. `last_fired` is the state most recently fired for this pane (or
 /// `None`). Debounce contract: at most one exec per pane per state-transition —
 /// no repeat fire while the pane stays in the same notify state.
+///
+/// `finished` marks the transition as a completed run rather than an agent that
+/// merely went quiet, which is what lets `notify_on = ["done"]` page on the
+/// former without also paging on the latter.
 pub(crate) fn notify_exec_decision(
     notifications: &config::NotificationsConfig,
     last_fired: Option<AgentState>,
     prev: AgentState,
     new: AgentState,
+    finished: bool,
 ) -> NotifyExecDecision {
     if prev == new {
         return NotifyExecDecision::Skip {
             clear_debounce: false,
         };
     }
-    if !notifications.should_notify(new) {
+    let kind = config::NotifyKind::from_agent_state(new, finished);
+    if !notifications.should_notify(kind) {
         // The pane left the notify set; forget the last fire so the next entry
         // into a notify state is treated as a fresh transition.
         return NotifyExecDecision::Skip {
@@ -116,21 +122,27 @@ mod tests {
     use crate::terminal::TerminalState;
 
     use super::{notify_exec_decision, NotifyExecDecision};
-    use crate::config::{NotificationsConfig, NotifyState};
+    use crate::config::{NotificationsConfig, NotifyKind};
     use crate::detect::AgentState;
 
-    fn notify_on(states: &[NotifyState]) -> NotificationsConfig {
+    fn notify_on(kinds: &[NotifyKind]) -> NotificationsConfig {
         NotificationsConfig {
-            notify_on: states.to_vec(),
+            notify_on: kinds.to_vec(),
             exec: None,
         }
     }
 
     #[test]
     fn notify_exec_skips_when_state_unchanged() {
-        let config = notify_on(&[NotifyState::Blocked]);
+        let config = notify_on(&[NotifyKind::Blocked]);
         assert_eq!(
-            notify_exec_decision(&config, None, AgentState::Blocked, AgentState::Blocked),
+            notify_exec_decision(
+                &config,
+                None,
+                AgentState::Blocked,
+                AgentState::Blocked,
+                false
+            ),
             NotifyExecDecision::Skip {
                 clear_debounce: false
             }
@@ -139,16 +151,22 @@ mod tests {
 
     #[test]
     fn notify_exec_fires_on_transition_into_blocked() {
-        let config = notify_on(&[NotifyState::Blocked]);
+        let config = notify_on(&[NotifyKind::Blocked]);
         assert_eq!(
-            notify_exec_decision(&config, None, AgentState::Working, AgentState::Blocked),
+            notify_exec_decision(
+                &config,
+                None,
+                AgentState::Working,
+                AgentState::Blocked,
+                false
+            ),
             NotifyExecDecision::Fire
         );
     }
 
     #[test]
     fn notify_exec_does_not_refire_while_state_stays_blocked() {
-        let config = notify_on(&[NotifyState::Blocked]);
+        let config = notify_on(&[NotifyKind::Blocked]);
         // Already fired for blocked; a redundant blocked report must not re-fire.
         assert_eq!(
             notify_exec_decision(
@@ -156,6 +174,7 @@ mod tests {
                 Some(AgentState::Blocked),
                 AgentState::Working,
                 AgentState::Blocked,
+                false,
             ),
             NotifyExecDecision::Skip {
                 clear_debounce: false
@@ -165,13 +184,14 @@ mod tests {
 
     #[test]
     fn notify_exec_clears_debounce_when_leaving_notify_set() {
-        let config = notify_on(&[NotifyState::Blocked]);
+        let config = notify_on(&[NotifyKind::Blocked]);
         assert_eq!(
             notify_exec_decision(
                 &config,
                 Some(AgentState::Blocked),
                 AgentState::Blocked,
                 AgentState::Working,
+                false,
             ),
             NotifyExecDecision::Skip {
                 clear_debounce: true
@@ -183,7 +203,13 @@ mod tests {
     fn notify_exec_empty_filter_fires_on_every_transition() {
         let config = notify_on(&[]);
         assert_eq!(
-            notify_exec_decision(&config, None, AgentState::Blocked, AgentState::Working),
+            notify_exec_decision(
+                &config,
+                None,
+                AgentState::Blocked,
+                AgentState::Working,
+                false
+            ),
             NotifyExecDecision::Fire
         );
         assert_eq!(
@@ -192,8 +218,64 @@ mod tests {
                 Some(AgentState::Working),
                 AgentState::Working,
                 AgentState::Idle,
+                true,
             ),
             NotifyExecDecision::Fire
+        );
+    }
+
+    /// `done` pages on a run that finished, and stays quiet for a pane that
+    /// merely drifted into idle without having been working.
+    #[test]
+    fn notify_exec_done_fires_only_on_a_completed_run() {
+        let config = notify_on(&[NotifyKind::Done]);
+        assert_eq!(
+            notify_exec_decision(&config, None, AgentState::Working, AgentState::Idle, true),
+            NotifyExecDecision::Fire
+        );
+        assert_eq!(
+            notify_exec_decision(&config, None, AgentState::Unknown, AgentState::Idle, false),
+            NotifyExecDecision::Skip {
+                clear_debounce: true
+            }
+        );
+    }
+
+    /// `done` and `blocked` are independent subscriptions: asking for one must
+    /// not quietly deliver the other.
+    #[test]
+    fn notify_exec_done_does_not_imply_blocked() {
+        let config = notify_on(&[NotifyKind::Done]);
+        assert_eq!(
+            notify_exec_decision(
+                &config,
+                None,
+                AgentState::Working,
+                AgentState::Blocked,
+                false
+            ),
+            NotifyExecDecision::Skip {
+                clear_debounce: true
+            }
+        );
+    }
+
+    /// Subscribing to `idle` still means every trip through idle, completed run
+    /// or not — the old spelling keeps its old meaning.
+    #[test]
+    fn notify_exec_idle_still_matches_completions() {
+        let config = notify_on(&[NotifyKind::Idle]);
+        assert_eq!(
+            notify_exec_decision(&config, None, AgentState::Unknown, AgentState::Idle, false),
+            NotifyExecDecision::Fire
+        );
+        // A completed run reports as `done`, so an `idle` subscriber does not
+        // get it. Subscribe to both to hear about both.
+        assert_eq!(
+            notify_exec_decision(&config, None, AgentState::Working, AgentState::Idle, true),
+            NotifyExecDecision::Skip {
+                clear_debounce: true
+            }
         );
     }
 

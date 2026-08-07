@@ -33,7 +33,7 @@ pub(crate) use self::keybinds::parse_key_combo;
 // Part of the public `NotificationsConfig` surface; currently only named by
 // exec-bridge tests in other modules, so allow it to be otherwise unused.
 #[allow(unused_imports)]
-pub use self::model::NotifyState;
+pub use self::model::NotifyKind;
 
 pub const CONFIG_PATH_ENV_VAR: &str = "SHEP_CONFIG_PATH";
 pub const DEFAULT_SCROLLBACK_LIMIT_BYTES: usize = 10_000_000;

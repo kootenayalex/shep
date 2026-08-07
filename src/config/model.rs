@@ -908,27 +908,58 @@ impl Default for RemoteConfig {
     }
 }
 
-/// An agent state that the exec-bridge notification filter can match on.
-/// Neutral runtime naming — mirrors `crate::detect::AgentState`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+/// Something worth interrupting a human for, that the exec-bridge filter can
+/// match on. Neutral runtime naming.
+///
+/// The first four mirror `crate::detect::AgentState` and are what `notify_on`
+/// has always accepted. `Done` is deliberately not the same as `Idle`: an agent
+/// going idle because it finished a run is the interesting half, and an agent
+/// that was idle all along is noise. `Task` and `Review` are not agent states
+/// at all — they are the queue and the review gate reaching a state a human
+/// wanted to hear about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum NotifyState {
+pub enum NotifyKind {
     Idle,
     Working,
     Blocked,
     Unknown,
+    /// An agent went idle after working — a run completed.
+    Done,
+    /// A queued task changed state.
+    Task,
+    /// A workspace is ready for review.
+    Review,
 }
 
-impl NotifyState {
-    fn matches(self, state: crate::detect::AgentState) -> bool {
+impl NotifyKind {
+    /// The kind an effective agent-state transition reports as.
+    ///
+    /// `finished` distinguishes "went idle after working" from "was already
+    /// sitting idle", which is the whole difference between [`Self::Done`] and
+    /// [`Self::Idle`].
+    pub fn from_agent_state(state: crate::detect::AgentState, finished: bool) -> Self {
         use crate::detect::AgentState;
-        matches!(
-            (self, state),
-            (Self::Idle, AgentState::Idle)
-                | (Self::Working, AgentState::Working)
-                | (Self::Blocked, AgentState::Blocked)
-                | (Self::Unknown, AgentState::Unknown)
-        )
+        match state {
+            AgentState::Idle if finished => Self::Done,
+            AgentState::Idle => Self::Idle,
+            AgentState::Working => Self::Working,
+            AgentState::Blocked => Self::Blocked,
+            AgentState::Unknown => Self::Unknown,
+        }
+    }
+
+    /// Wire/env spelling, shared by `notify_on` config and `SHEP_NOTIFY_KIND`.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Working => "working",
+            Self::Blocked => "blocked",
+            Self::Unknown => "unknown",
+            Self::Done => "done",
+            Self::Task => "task",
+            Self::Review => "review",
+        }
     }
 }
 
@@ -943,10 +974,10 @@ impl NotifyState {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct NotificationsConfig {
-    /// Agent states whose effective transitions fire the exec-bridge.
-    /// Empty list = fire on every effective state change (i.e. the maximal,
-    /// no-filter behavior). Default: `["blocked"]`.
-    pub notify_on: Vec<NotifyState>,
+    /// Kinds of event that fire the exec-bridge. Empty list = fire on
+    /// everything (i.e. the maximal, no-filter behavior). Default:
+    /// `["blocked"]`.
+    pub notify_on: Vec<NotifyKind>,
     /// Shell command run detached when a transition passes `notify_on`.
     /// Context is passed via `SHEP_NOTIFY_*` env vars. Unset = no exec.
     pub exec: Option<String>,
@@ -955,17 +986,17 @@ pub struct NotificationsConfig {
 impl Default for NotificationsConfig {
     fn default() -> Self {
         Self {
-            notify_on: vec![NotifyState::Blocked],
+            notify_on: vec![NotifyKind::Blocked],
             exec: None,
         }
     }
 }
 
 impl NotificationsConfig {
-    /// Whether an effective transition into `state` passes the `notify_on`
-    /// filter. An empty `notify_on` list matches every state.
-    pub fn should_notify(&self, state: crate::detect::AgentState) -> bool {
-        self.notify_on.is_empty() || self.notify_on.iter().any(|allowed| allowed.matches(state))
+    /// Whether `kind` passes the `notify_on` filter. An empty `notify_on` list
+    /// matches everything.
+    pub fn should_notify(&self, kind: NotifyKind) -> bool {
+        self.notify_on.is_empty() || self.notify_on.contains(&kind)
     }
 }
 
@@ -1838,21 +1869,18 @@ switch_ascii_input_source_in_prefix = true
     #[test]
     fn notifications_defaults_to_blocked_only_and_no_exec() {
         let config = Config::default();
-        assert_eq!(config.notifications.notify_on, vec![NotifyState::Blocked]);
+        assert_eq!(config.notifications.notify_on, vec![NotifyKind::Blocked]);
         assert!(config.notifications.exec.is_none());
-        assert!(config
-            .notifications
-            .should_notify(crate::detect::AgentState::Blocked));
-        assert!(!config
-            .notifications
-            .should_notify(crate::detect::AgentState::Idle));
-        assert!(!config
-            .notifications
-            .should_notify(crate::detect::AgentState::Working));
+        assert!(config.notifications.should_notify(NotifyKind::Blocked));
+        assert!(!config.notifications.should_notify(NotifyKind::Idle));
+        assert!(!config.notifications.should_notify(NotifyKind::Working));
+        assert!(!config.notifications.should_notify(NotifyKind::Done));
+        assert!(!config.notifications.should_notify(NotifyKind::Task));
+        assert!(!config.notifications.should_notify(NotifyKind::Review));
     }
 
     #[test]
-    fn notifications_empty_notify_on_matches_every_state() {
+    fn notifications_empty_notify_on_matches_every_kind() {
         let toml = r#"
 [notifications]
 notify_on = []
@@ -1861,36 +1889,58 @@ exec = "voicebox-say"
         let config: Config = toml::from_str(toml).unwrap();
         assert!(config.notifications.notify_on.is_empty());
         assert_eq!(config.notifications.exec.as_deref(), Some("voicebox-say"));
-        for state in [
-            crate::detect::AgentState::Idle,
-            crate::detect::AgentState::Working,
-            crate::detect::AgentState::Blocked,
-            crate::detect::AgentState::Unknown,
+        for kind in [
+            NotifyKind::Idle,
+            NotifyKind::Working,
+            NotifyKind::Blocked,
+            NotifyKind::Unknown,
+            NotifyKind::Done,
+            NotifyKind::Task,
+            NotifyKind::Review,
         ] {
-            assert!(config.notifications.should_notify(state));
+            assert!(config.notifications.should_notify(kind));
         }
     }
 
     #[test]
-    fn notifications_parses_multiple_states() {
+    fn notifications_parses_multiple_kinds() {
         let toml = r#"
 [notifications]
-notify_on = ["blocked", "idle"]
+notify_on = ["blocked", "done", "task", "review"]
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         assert_eq!(
             config.notifications.notify_on,
-            vec![NotifyState::Blocked, NotifyState::Idle]
+            vec![
+                NotifyKind::Blocked,
+                NotifyKind::Done,
+                NotifyKind::Task,
+                NotifyKind::Review
+            ]
         );
-        assert!(config
-            .notifications
-            .should_notify(crate::detect::AgentState::Idle));
-        assert!(config
-            .notifications
-            .should_notify(crate::detect::AgentState::Blocked));
-        assert!(!config
-            .notifications
-            .should_notify(crate::detect::AgentState::Working));
+        assert!(config.notifications.should_notify(NotifyKind::Done));
+        assert!(config.notifications.should_notify(NotifyKind::Review));
+        assert!(!config.notifications.should_notify(NotifyKind::Working));
+        // `done` is a completion, not every trip through idle.
+        assert!(!config.notifications.should_notify(NotifyKind::Idle));
+    }
+
+    /// A run that finishes is `done`; a pane that was already idle is not.
+    #[test]
+    fn notify_kind_separates_completion_from_plain_idle() {
+        use crate::detect::AgentState;
+        assert_eq!(
+            NotifyKind::from_agent_state(AgentState::Idle, true),
+            NotifyKind::Done
+        );
+        assert_eq!(
+            NotifyKind::from_agent_state(AgentState::Idle, false),
+            NotifyKind::Idle
+        );
+        assert_eq!(
+            NotifyKind::from_agent_state(AgentState::Blocked, true),
+            NotifyKind::Blocked
+        );
     }
 
     #[test]
