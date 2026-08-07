@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import dev.shep.companion.screens.SessionRuntime
 import dev.shep.companion.screens.pane.PaneScreen
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepTheme
@@ -456,14 +457,20 @@ fun TasksScreen(
     onShowAddChange: (Boolean) -> Unit = {},
 ) {
     var tasks by remember { mutableStateOf<List<TaskRow>>(emptyList()) }
+    var sessions by remember { mutableStateOf<List<AgentRow>>(emptyList()) }
     var status by remember { mutableStateOf("loading") }
     var notice by remember { mutableStateOf<String?>(null) }
+    var assigning by remember { mutableStateOf<TaskRow?>(null) }
     val scope = rememberCoroutineScope()
 
     suspend fun refresh() {
         withContext(Dispatchers.IO) { runCatching { client.call("task.list") } }
             .onSuccess { tasks = parseTasks(it); status = "" }
             .onFailure { status = "reconnect: ${it.message}" }
+        // The board is what makes a task assignable, so it is polled alongside
+        // the queue rather than fetched only when the picker opens.
+        withContext(Dispatchers.IO) { runCatching { client.call("session.overview") } }
+            .onSuccess { result -> parseOverview(result)?.let { sessions = it.agents } }
     }
 
     // Poll so state transitions (the gate) show without a manual refresh.
@@ -492,6 +499,17 @@ fun TasksScreen(
             Spacer(Modifier.weight(1f))
             if (status.isNotEmpty()) {
                 Text(status, color = ShepColors.subtext, fontSize = 12.sp)
+                Spacer(Modifier.width(12.dp))
+            }
+            if (tasks.any { !taskIsOpen(it.state) && it.state != "running" }) {
+                Text(
+                    "clear done",
+                    color = ShepColors.subtext,
+                    fontSize = 13.sp,
+                    modifier = Modifier.clickable {
+                        act("cleared finished tasks", "task.clear", JSONObject())
+                    },
+                )
                 Spacer(Modifier.width(12.dp))
             }
             Text(
@@ -529,10 +547,51 @@ fun TasksScreen(
                         onCancel = {
                             act("cancelled #${task.id}", "task.cancel", JSONObject().put("id", task.id))
                         },
+                        onAssign = { assigning = task },
+                        onRemove = {
+                            act("removed #${task.id}", "task.remove", JSONObject().put("id", task.id))
+                        },
                     )
                 }
             }
         }
+    }
+
+    assigning?.let { task ->
+        dev.shep.companion.screens.AssignTaskSheet(
+            task = task,
+            sessions = sessions,
+            names = distinctNames(sessions),
+            onDismiss = { assigning = null },
+            onAssign = { row ->
+                assigning = null
+                // Send first, record second: the prompt landing in the pane is
+                // the real effect, and `task.assign` only claims what already
+                // happened. Queued delivery means a busy agent picks it up when
+                // it next goes idle instead of being interrupted.
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            client.call(
+                                "agent.send",
+                                JSONObject()
+                                    .put("target", row.paneId)
+                                    .put("text", task.prompt)
+                                    .put("queue", true),
+                            )
+                            client.call(
+                                "task.assign",
+                                JSONObject()
+                                    .put("id", task.id)
+                                    .put("workspace_id", row.workspaceId),
+                            )
+                        }
+                    }
+                        .onSuccess { notice = "sent #${task.id} to ${row.agent}"; refresh() }
+                        .onFailure { notice = "assign failed: ${it.message}" }
+                }
+            },
+        )
     }
 
     if (showAdd) {
@@ -556,7 +615,13 @@ fun TasksScreen(
 }
 
 @Composable
-fun TaskCard(task: TaskRow, onDispatch: () -> Unit, onCancel: () -> Unit) {
+fun TaskCard(
+    task: TaskRow,
+    onDispatch: () -> Unit,
+    onCancel: () -> Unit,
+    onAssign: () -> Unit = {},
+    onRemove: () -> Unit = {},
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -583,24 +648,44 @@ fun TaskCard(task: TaskRow, onDispatch: () -> Unit, onCancel: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (taskIsOpen(task.state)) {
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (taskIsOpen(task.state)) {
+                // "send to" leads: handing work to an agent already sitting in
+                // the right repo is the cheaper move, and dispatch — which
+                // spawns a whole new pane — is the fallback, not the default.
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(ShepColors.copper)
+                        .clickable { onAssign() }
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                ) { Text("send to…", color = ShepColors.bg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ShepColors.surfaceHigh)
                         .clickable { onDispatch() }
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                ) { Text("dispatch", color = ShepColors.bg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                ) { Text("new pane", color = ShepColors.subtext, fontSize = 13.sp) }
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(ShepColors.surfaceHigh)
                         .clickable { onCancel() }
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                 ) { Text("cancel", color = ShepColors.subtext, fontSize = 13.sp) }
             }
+            Spacer(Modifier.weight(1f))
+            // Always removable. A queue you cannot empty stops being a queue.
+            Text(
+                "remove",
+                color = ShepColors.subtext,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .clickable { onRemove() }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+            )
         }
     }
 }
@@ -1239,6 +1324,10 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
     var host by remember { mutableStateOf(SessionHost()) }
     var status by remember { mutableStateOf("connecting") }
     var filter by remember { mutableStateOf(HomeFilter.Attention) }
+    var showNew by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<AgentRow?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     // Event-driven refresh: subscribe to structural events + a per-pane
     // agent_status_changed sub for each live pane, and re-snapshot on any event
@@ -1319,6 +1408,81 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
     }
 
     val visibleRows = rows.filter { filter.accepts(it.status) }
+    val names = distinctNames(rows)
+    // Directories already in play seed the new-session picker, so starting a
+    // second session where you are working is two taps and no typing.
+    val recentRepos = rows.mapNotNull { it.cwd }.distinct()
+
+    /**
+     * Open a session the way a person does at the desktop: make a workspace
+     * rooted at `cwd`, then run the runtime in the shell it already gave you.
+     *
+     * `agent.start` is deliberately not used here. With a `workspace_id` it
+     * *splits* into the workspace, which would leave the fresh root shell
+     * sitting next to the agent; with `new_workspace` it cannot carry a label.
+     * Typing the command into the root pane costs one call, leaves exactly one
+     * pane, and is the same path shep's own detection is built to watch — so a
+     * "terminal" is simply this flow with nothing typed.
+     */
+    fun startSession(cwd: String, name: String, runtime: SessionRuntime) {
+        scope.launch {
+            notice = "starting ${runtime.label}…"
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val created = client.call(
+                        "workspace.create",
+                        JSONObject()
+                            .put("cwd", cwd)
+                            .put("focus", true)
+                            .apply { if (name.isNotBlank()) put("label", name) },
+                    )
+                    val paneId = created.optJSONObject("root_pane")
+                        ?.optString("pane_id")
+                        ?.takeIf { it.isNotEmpty() }
+                        ?: throw IllegalStateException("workspace.create returned no root pane")
+                    if (runtime.argv.isNotEmpty()) {
+                        client.call(
+                            "pane.send_text",
+                            JSONObject()
+                                .put("pane_id", paneId)
+                                .put("text", runtime.argv.joinToString(" ") + "\n"),
+                        )
+                    }
+                    // Name the agent too, not just the workspace: the board's
+                    // first line reads the agent name, and that is the line
+                    // that has to stop saying "claude" five times over. Best
+                    // effort — the runtime may not be detected yet, and a
+                    // session that started without its name is still started.
+                    if (name.isNotBlank()) {
+                        runCatching {
+                            client.call(
+                                "agent.rename",
+                                JSONObject().put("target", paneId).put("name", name),
+                            )
+                        }
+                    }
+                }
+            }
+                .onSuccess { notice = "started ${runtime.label}" }
+                .onFailure { notice = "could not start: ${it.message}" }
+        }
+    }
+
+    fun renameSession(row: AgentRow, name: String) {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    client.call(
+                        "agent.rename",
+                        JSONObject().put("target", row.paneId)
+                            .apply { if (name.isNotBlank()) put("name", name) },
+                    )
+                }
+            }
+                .onSuccess { notice = if (name.isBlank()) "name reset" else "renamed to $name" }
+                .onFailure { notice = "rename failed: ${it.message}" }
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -1328,6 +1492,14 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
             Text("agents", color = ShepColors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             Text(status, color = ShepColors.subtext, fontSize = 12.sp)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "+ new",
+                color = ShepColors.copper,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { showNew = true },
+            )
             Spacer(Modifier.width(12.dp))
             Text(
                 "unpair",
@@ -1349,12 +1521,24 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
+        notice?.let {
+            Text(
+                it,
+                color = ShepColors.peach,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { notice = null }
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
         dev.shep.companion.screens.DashboardStrip(totals, host) { statusColor(it) }
         FilterChips(filter, rows) { filter = it }
         if (visibleRows.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    if (rows.isEmpty()) "no agents running" else "nothing ${filter.label}",
+                    if (rows.isEmpty()) "no sessions — start one with + new"
+                    else "nothing ${filter.label}",
                     color = ShepColors.subtext,
                 )
             }
@@ -1365,12 +1549,37 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(visibleRows, key = { it.paneId }) { row ->
-                    dev.shep.companion.screens.BoardCard(row, { statusColor(it) }) {
-                        onOpenPane(row)
-                    }
+                    dev.shep.companion.screens.BoardCard(
+                        row = row,
+                        statusColor = { statusColor(it) },
+                        displayName = names[row.paneId] ?: row.agent,
+                        onLongClick = { renaming = row },
+                        onClick = { onOpenPane(row) },
+                    )
                 }
             }
         }
+    }
+
+    if (showNew) {
+        dev.shep.companion.screens.NewSessionSheet(
+            recentRepos = recentRepos,
+            onDismiss = { showNew = false },
+            onStart = { cwd, name, runtime ->
+                showNew = false
+                startSession(cwd, name, runtime)
+            },
+        )
+    }
+    renaming?.let { row ->
+        dev.shep.companion.screens.RenameSessionSheet(
+            row = row,
+            onDismiss = { renaming = null },
+            onRename = { name ->
+                renaming = null
+                renameSession(row, name)
+            },
+        )
     }
 }
 

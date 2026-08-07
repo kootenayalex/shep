@@ -48,6 +48,59 @@ data class AgentRow(
         }
 }
 
+/**
+ * Increasingly-specific names for one agent, shortest first.
+ *
+ * The first entry is what shep itself calls the agent — a custom name once it
+ * has been renamed, otherwise the runtime ("claude", "shell"). Each further
+ * entry pins it down by one more fact. [distinctNames] picks the shortest one
+ * that is not shared with another agent on the board.
+ */
+fun nameCandidates(row: AgentRow): List<String> {
+    val candidates = mutableListOf(row.agent)
+    var accumulated = row.agent
+    listOfNotNull(
+        row.workspaceLabel.takeIf { it.isNotBlank() },
+        row.branch,
+        row.tabName?.takeIf { it.isNotBlank() },
+        row.paneNumber?.let { "p$it" },
+    ).forEach {
+        accumulated = "$accumulated · $it"
+        candidates.add(accumulated)
+    }
+    return candidates
+}
+
+/**
+ * A name per agent that no other agent on the board answers to, keyed by pane id.
+ *
+ * Five Claude sessions in the same repo are all "claude · shep · master" —
+ * true, and useless. This spends detail only where it buys a distinction: an
+ * agent that is already the only "claude" stays "claude", and only the ones
+ * that collide grow a workspace, a branch, a tab, a pane number. The pane id is
+ * the last resort precisely because `w2:p1` is what we are trying to avoid
+ * showing; it appears only when nothing else separates two agents.
+ */
+fun distinctNames(rows: List<AgentRow>): Map<String, String> {
+    val candidates = rows.associate { it.paneId to nameCandidates(it) }
+    val resolved = mutableMapOf<String, String>()
+    val depth = candidates.values.maxOfOrNull { it.size } ?: 0
+    for (level in 0 until depth) {
+        val pending = rows.filter { it.paneId !in resolved }.associate { row ->
+            val options = candidates.getValue(row.paneId)
+            row.paneId to (options.getOrNull(level) ?: options.last())
+        }
+        val counts = pending.values.groupingBy { it }.eachCount()
+        pending.forEach { (paneId, name) -> if (counts[name] == 1) resolved[paneId] = name }
+    }
+    rows.forEach { row ->
+        if (row.paneId !in resolved) {
+            resolved[row.paneId] = "${candidates.getValue(row.paneId).last()} · ${row.paneId}"
+        }
+    }
+    return resolved
+}
+
 /** Session-wide counts behind the dashboard strip. */
 data class SessionTotals(
     val agents: Int = 0,

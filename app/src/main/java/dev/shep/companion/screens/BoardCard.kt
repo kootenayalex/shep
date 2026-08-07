@@ -1,7 +1,8 @@
 package dev.shep.companion.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,15 +38,26 @@ import dev.shep.companion.ui.theme.ShepPalette
  * The lines are the same lines, in the same order, as `render_card` in
  * src/ui/board.rs. That correspondence is the point — this is a companion
  * view of one screen, not a second design.
+ *
+ * [displayName] is the board-wide-unique name from `distinctNames`, not
+ * `row.agent`: a screenful of cards all reading "claude" is the thing this
+ * card exists to stop. Long-pressing offers to name it something better.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BoardCard(row: AgentRow, statusColor: (String) -> Color, onClick: () -> Unit) {
+fun BoardCard(
+    row: AgentRow,
+    statusColor: (String) -> Color,
+    displayName: String = row.agent,
+    onLongClick: () -> Unit = {},
+    onClick: () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(ShepPalette.surface0)
-            .clickable { onClick() }
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -59,10 +71,13 @@ fun BoardCard(row: AgentRow, statusColor: (String) -> Color, onClick: () -> Unit
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                row.agent,
+                displayName,
                 color = ShepPalette.text,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
             row.displayAgent?.let {
                 Spacer(Modifier.width(8.dp))
