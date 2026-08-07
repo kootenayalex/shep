@@ -79,15 +79,27 @@ impl App {
                 target: target.to_string(),
             }));
         };
+        // Clearing has to undo both halves of the set above, or "reset the
+        // name" leaves the manual pane label behind and the pane keeps
+        // answering to a name the caller just removed.
+        let cleared = normalized_name.is_none();
         match normalized_name {
             Some(name) => {
                 terminal.set_agent_name(name.clone());
                 terminal.set_manual_label(name);
             }
-            None => terminal.clear_agent_name(),
+            None => {
+                terminal.clear_agent_name();
+                terminal.clear_manual_label();
+            }
         }
         self.state.mark_session_dirty();
-        self.agent_info(resolved.ws_idx, resolved.pane_id)
+        // A pane whose only claim to agenthood was the manual name stops being
+        // an agent the moment that name is cleared, so `agent_info` reports
+        // nothing. That is the rename succeeding, not the target going missing
+        // — reporting `agent_not_found` there told callers their own successful
+        // reset had failed.
+        self.agent_info_allowing_non_agent(resolved.ws_idx, resolved.pane_id, cleared)
             .ok_or_else(|| {
                 AgentRenameError::Target(TerminalTargetError::NotFound {
                     target: target.to_string(),
@@ -415,10 +427,24 @@ impl App {
         ws_idx: usize,
         pane_id: crate::layout::PaneId,
     ) -> Option<crate::api::schema::AgentInfo> {
+        self.agent_info_allowing_non_agent(ws_idx, pane_id, false)
+    }
+
+    /// [`agent_info`], optionally without the "is this actually an agent" gate.
+    ///
+    /// Every caller wants the gate — `agent.get` on a plain shell should 404 —
+    /// except the one that just removed the pane's agent name and still owes
+    /// the caller a description of what it changed.
+    fn agent_info_allowing_non_agent(
+        &self,
+        ws_idx: usize,
+        pane_id: crate::layout::PaneId,
+        allow_non_agent: bool,
+    ) -> Option<crate::api::schema::AgentInfo> {
         let ws = self.state.workspaces.get(ws_idx)?;
         let pane_state = ws.pane_state(pane_id)?;
         let terminal = self.state.terminals.get(&pane_state.attached_terminal_id)?;
-        if !terminal.is_agent_terminal() {
+        if !allow_non_agent && !terminal.is_agent_terminal() {
             return None;
         }
         let pane = self.pane_info(ws_idx, pane_id)?;

@@ -112,6 +112,12 @@ fn spawn_shep_with_shell(
     spawn_shep_with_options(config_home, runtime_dir, socket_path, None, shell)
 }
 
+/// Per-test state dir, sibling to the test's config dir. `shep` appends its own
+/// `shep`/`shep-dev` component, so this is the XDG root, not the final path.
+fn state_home(config_home: &Path) -> PathBuf {
+    config_home.with_file_name("state")
+}
+
 fn spawn_shep_with_options(
     config_home: &Path,
     runtime_dir: &Path,
@@ -137,6 +143,10 @@ fn spawn_shep_with_options(
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
+    // Without this the server resolves `state_dir()` to the developer's own
+    // `~/.local/state/shep`, so anything touching the task store would read and
+    // write real tasks from a test run.
+    cmd.env("XDG_STATE_HOME", state_home(config_home));
     cmd.env("SHEP_SOCKET_PATH", socket_path);
     cmd.env_remove("SHEP_CLIENT_SOCKET_PATH");
     cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
@@ -1004,6 +1014,77 @@ fn agent_methods_round_trip_over_socket() {
     );
     assert_eq!(focused["result"]["agent"]["tab_id"], second_tab_id);
     assert_eq!(focused["result"]["agent"]["focused"], true);
+
+    cleanup_spawned_shep(child, base);
+}
+
+/// Naming a plain shell and then clearing that name has to report success and
+/// remove both halves of the name.
+///
+/// A pane with no detected agent is an agent only because someone named it, so
+/// clearing the name un-agents it and `agent_info` goes quiet — which used to
+/// surface as `agent_not_found` on a rename that had in fact just succeeded.
+/// The companion's "reset name" button hit exactly this: the reset worked and
+/// the phone reported it as failed.
+#[test]
+fn agent_rename_clearing_a_shell_name_succeeds_and_drops_the_pane_label() {
+    let _lock = test_lock();
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    let child = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    let created = send_request(
+        &socket_path,
+        &format!(
+            r#"{{"id":"ws","method":"workspace.create","params":{{"cwd":"{}","focus":true}}}}"#,
+            base.display()
+        ),
+    );
+    let pane_id = created["result"]["root_pane"]["pane_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    // A freshly created workspace runs a shell, not an agent.
+    assert!(created["result"]["root_pane"].get("label").is_none());
+
+    let named = send_request(
+        &socket_path,
+        &format!(
+            r#"{{"id":"name","method":"agent.rename","params":{{"target":"{pane_id}","name":"billing fix"}}}}"#
+        ),
+    );
+    assert_eq!(named["result"]["agent"]["name"], "billing fix");
+
+    let cleared = send_request(
+        &socket_path,
+        &format!(r#"{{"id":"clear","method":"agent.rename","params":{{"target":"{pane_id}"}}}}"#),
+    );
+    assert!(
+        cleared.get("error").is_none(),
+        "clearing a shell's name must not report an error: {cleared}"
+    );
+    assert!(cleared["result"]["agent"].get("name").is_none());
+
+    // Both halves gone: the manual pane label was set alongside the agent name
+    // and has to be cleared with it, or the pane keeps showing the old name.
+    let panes = send_request(
+        &socket_path,
+        r#"{"id":"panes","method":"pane.list","params":{}}"#,
+    );
+    let pane = panes["result"]["panes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|pane| pane["pane_id"] == pane_id.as_str())
+        .expect("pane should still exist after the rename is cleared");
+    assert!(
+        pane.get("label").is_none(),
+        "manual pane label should be cleared with the agent name: {pane}"
+    );
 
     cleanup_spawned_shep(child, base);
 }
