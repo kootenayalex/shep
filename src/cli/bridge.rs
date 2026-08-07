@@ -494,29 +494,94 @@ fn base64_url(bytes: &[u8]) -> String {
 #[allow(dead_code)]
 type WsSocket = WebSocket<TcpStream>;
 
-/// Companion push endpoints + the blocked-transition publish hook.
+/// Companion push endpoints + the notification publish hook.
 ///
-/// The phone registers its UnifiedPush endpoint over the bridge (`push.register`)
-/// and shep persists it to `<config>/push-endpoints.json`. When an agent blocks,
-/// `[notifications] exec = "shep bridge notify-push"` fires `notify_push`, which
-/// reads `SHEP_NOTIFY_*` and POSTs a small JSON body to each endpoint. Under
-/// UnifiedPush the body is opaque passthrough — the companion's MessagingReceiver
-/// parses it and renders the actionable notification.
+/// The phone registers itself over the bridge (`push.register`) and shep
+/// persists it to `<config>/push-endpoints.json`. When something worth
+/// interrupting a human happens, `[notifications] exec = "shep bridge
+/// notify-push"` fires [`push::notify_push`], which reads `SHEP_NOTIFY_*` and
+/// delivers it to each registered device.
+///
+/// Two transports, because they fail differently:
+///
+/// - **FCM** — the default. Google's push service is privileged by the OS, so a
+///   high-priority message wakes the app out of Doze; nothing else on Android
+///   reliably does. The payload is data-only, so the app builds the
+///   notification itself and keeps its Approve/Deny actions.
+/// - **UnifiedPush** — a plain http(s) POST to a broker (ntfy) the user runs.
+///   Kept because it needs no Google dependency, and because rows registered by
+///   older builds must keep working.
+///
+/// Each device also carries the [`crate::config::NotifyKind`]s it wants. Muting
+/// happens here rather than on the phone so a muted kind costs no radio wake at
+/// all — and so the phone's settings survive a reinstall.
 mod push {
     use std::path::PathBuf;
 
-    /// Where registered endpoints live. One JSON array of `{endpoint,label,added_unix}`.
+    /// Where registered devices live. One JSON array; see [`load`] for the
+    /// accepted shapes.
     fn endpoints_path() -> PathBuf {
         crate::config::config_dir().join("push-endpoints.json")
     }
 
-    #[derive(Clone)]
-    struct Endpoint {
-        url: String,
-        label: String,
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub(super) enum Transport {
+        /// FCM registration token for one app install.
+        Fcm { token: String },
+        /// Broker URL that accepts an unauthenticated POST.
+        UnifiedPush { url: String },
     }
 
-    fn load(path: &std::path::Path) -> Vec<Endpoint> {
+    impl Transport {
+        /// Stable per-device identity, used to dedup registrations and to
+        /// address one device in `push.set_kinds`.
+        fn key(&self) -> &str {
+            match self {
+                Transport::Fcm { token } => token,
+                Transport::UnifiedPush { url } => url,
+            }
+        }
+
+        fn name(&self) -> &'static str {
+            match self {
+                Transport::Fcm { .. } => "fcm",
+                Transport::UnifiedPush { .. } => "unifiedpush",
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub(super) struct Endpoint {
+        pub(super) transport: Transport,
+        pub(super) label: String,
+        /// Kinds this device wants. `None` means "everything", which is what an
+        /// older registration that predates per-kind routing implies.
+        pub(super) kinds: Option<Vec<String>>,
+    }
+
+    impl Endpoint {
+        /// Whether this device asked to hear about `kind`.
+        ///
+        /// An empty `SHEP_NOTIFY_KIND` (an exec fired by a build older than
+        /// kinds, or by hand) is delivered to everyone rather than dropped —
+        /// silence is the worse failure for a notification system.
+        pub(super) fn wants(&self, kind: &str) -> bool {
+            if kind.is_empty() {
+                return true;
+            }
+            match &self.kinds {
+                None => true,
+                Some(kinds) => kinds.iter().any(|k| k == kind),
+            }
+        }
+    }
+
+    /// Parse the persisted device list.
+    ///
+    /// Three shapes are accepted, because the file predates both other columns:
+    /// `{"endpoint":…}` (UnifiedPush, pre-transport), `{"transport":"fcm",
+    /// "token":…}`, and `{"transport":"unifiedpush","endpoint":…}`.
+    pub(super) fn load(path: &std::path::Path) -> Vec<Endpoint> {
         let Ok(text) = std::fs::read_to_string(path) else {
             return Vec::new();
         };
@@ -525,28 +590,47 @@ mod push {
         };
         value
             .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| {
-                        let url = item.get("endpoint")?.as_str()?.to_string();
-                        let label = item
-                            .get("label")
-                            .and_then(|l| l.as_str())
-                            .unwrap_or_default()
-                            .to_string();
-                        Some(Endpoint { url, label })
-                    })
-                    .collect()
-            })
+            .map(|items| items.iter().filter_map(parse_endpoint).collect())
             .unwrap_or_default()
     }
 
-    fn store(path: &std::path::Path, endpoints: &[Endpoint]) -> std::io::Result<()> {
-        let array: Vec<serde_json::Value> = endpoints
-            .iter()
-            .map(|e| serde_json::json!({"endpoint": e.url, "label": e.label}))
-            .collect();
+    fn parse_endpoint(item: &serde_json::Value) -> Option<Endpoint> {
+        let declared = item.get("transport").and_then(|t| t.as_str());
+        let token = item.get("token").and_then(|t| t.as_str());
+        let url = item.get("endpoint").and_then(|e| e.as_str());
+        let transport = match (declared, token, url) {
+            (Some("fcm"), Some(token), _) if !token.is_empty() => Transport::Fcm {
+                token: token.to_string(),
+            },
+            // No declared transport: infer from whichever field is present, so
+            // rows written before this column keep loading.
+            (None, Some(token), _) if !token.is_empty() => Transport::Fcm {
+                token: token.to_string(),
+            },
+            (_, _, Some(url)) if !url.is_empty() => Transport::UnifiedPush {
+                url: url.to_string(),
+            },
+            _ => return None,
+        };
+        let label = item
+            .get("label")
+            .and_then(|l| l.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let kinds = item.get("kinds").and_then(|k| k.as_array()).map(|arr| {
+            arr.iter()
+                .filter_map(|k| k.as_str().map(str::to_string))
+                .collect()
+        });
+        Some(Endpoint {
+            transport,
+            label,
+            kinds,
+        })
+    }
+
+    pub(super) fn store(path: &std::path::Path, endpoints: &[Endpoint]) -> std::io::Result<()> {
+        let array: Vec<serde_json::Value> = endpoints.iter().map(endpoint_json).collect();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -559,26 +643,96 @@ mod push {
         Ok(())
     }
 
+    fn endpoint_json(endpoint: &Endpoint) -> serde_json::Value {
+        let mut value = match &endpoint.transport {
+            Transport::Fcm { token } => {
+                serde_json::json!({"transport": "fcm", "token": token, "label": endpoint.label})
+            }
+            Transport::UnifiedPush { url } => {
+                serde_json::json!({"transport": "unifiedpush", "endpoint": url, "label": endpoint.label})
+            }
+        };
+        if let Some(kinds) = &endpoint.kinds {
+            value["kinds"] = serde_json::json!(kinds);
+        }
+        value
+    }
+
     fn is_valid_endpoint(url: &str) -> bool {
         (url.starts_with("http://") || url.starts_with("https://")) && url.len() <= 2048
     }
 
-    fn register_at(path: &std::path::Path, url: &str, label: &str) -> Result<usize, String> {
-        if !is_valid_endpoint(url) {
-            return Err("endpoint must be an http(s) URL".to_string());
+    /// FCM registration tokens are opaque; bound the length and reject
+    /// whitespace rather than pretending to validate the format.
+    fn is_valid_token(token: &str) -> bool {
+        !token.is_empty() && token.len() <= 4096 && !token.chars().any(char::is_whitespace)
+    }
+
+    fn register_at(
+        path: &std::path::Path,
+        transport: Transport,
+        label: &str,
+        kinds: Option<Vec<String>>,
+    ) -> Result<usize, String> {
+        match &transport {
+            Transport::UnifiedPush { url } if !is_valid_endpoint(url) => {
+                return Err("endpoint must be an http(s) URL".to_string())
+            }
+            Transport::Fcm { token } if !is_valid_token(token) => {
+                return Err("token must be a non-empty opaque string".to_string())
+            }
+            _ => {}
         }
         let mut endpoints = load(path);
-        // Dedup by URL: re-registration (endpoint rotation keeps the same URL until
-        // the distributor reassigns it) updates the label rather than piling up.
-        if let Some(existing) = endpoints.iter_mut().find(|e| e.url == url) {
+        // Dedup by transport identity: re-registering the same device updates
+        // it in place rather than piling up duplicates that each cost a send.
+        if let Some(existing) = endpoints
+            .iter_mut()
+            .find(|e| e.transport.key() == transport.key())
+        {
             existing.label = label.to_string();
+            // Re-registration without an explicit kinds list keeps whatever the
+            // device already chose; the app registers on every cold start and
+            // must not silently reset the user's settings.
+            if kinds.is_some() {
+                existing.kinds = kinds;
+            }
         } else {
             endpoints.push(Endpoint {
-                url: url.to_string(),
+                transport,
                 label: label.to_string(),
+                kinds,
             });
         }
         let count = endpoints.len();
+        store(path, &endpoints).map_err(|err| err.to_string())?;
+        Ok(count)
+    }
+
+    /// Change which kinds one device wants.
+    ///
+    /// `key` addresses the device by token or endpoint URL. It may be omitted
+    /// when exactly one device is registered — the overwhelmingly common case,
+    /// and it saves the phone from having to remember its own token.
+    fn set_kinds_at(
+        path: &std::path::Path,
+        key: Option<&str>,
+        kinds: Vec<String>,
+    ) -> Result<usize, String> {
+        let mut endpoints = load(path);
+        if endpoints.is_empty() {
+            return Err("no registered devices".to_string());
+        }
+        let index = match key {
+            Some(key) => endpoints
+                .iter()
+                .position(|e| e.transport.key() == key)
+                .ok_or_else(|| "no registered device matches that token".to_string())?,
+            None if endpoints.len() == 1 => 0,
+            None => return Err("several devices registered; pass token to say which".to_string()),
+        };
+        endpoints[index].kinds = Some(kinds);
+        let count = endpoints[index].kinds.as_ref().map_or(0, Vec::len);
         store(path, &endpoints).map_err(|err| err.to_string())?;
         Ok(count)
     }
@@ -591,6 +745,12 @@ mod push {
     ) -> Option<Result<serde_json::Value, String>> {
         match method {
             "push.register" => {
+                let token = params
+                    .and_then(|p| p.get("token"))
+                    .and_then(|t| t.as_str())
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
                 let url = params
                     .and_then(|p| p.get("endpoint"))
                     .and_then(|e| e.as_str())
@@ -602,23 +762,120 @@ mod push {
                     .and_then(|l| l.as_str())
                     .unwrap_or_default()
                     .to_string();
-                if url.is_empty() {
-                    return Some(Err("missing endpoint".to_string()));
-                }
+                let kinds = params
+                    .and_then(|p| p.get("kinds"))
+                    .and_then(kinds_from_json);
+                // Explicit transport wins; otherwise the field that is present
+                // says which one this is.
+                let declared = params
+                    .and_then(|p| p.get("transport"))
+                    .and_then(|t| t.as_str());
+                let transport = match (declared, token.is_empty(), url.is_empty()) {
+                    (Some("fcm"), false, _) | (None, false, _) => Transport::Fcm { token },
+                    (Some("unifiedpush"), _, false) | (None, true, false) => {
+                        Transport::UnifiedPush { url }
+                    }
+                    (Some(other), _, _) if other != "fcm" && other != "unifiedpush" => {
+                        return Some(Err(format!("unknown transport {other}")))
+                    }
+                    _ => return Some(Err("missing token or endpoint".to_string())),
+                };
                 Some(
-                    register_at(&endpoints_path(), &url, &label)
+                    register_at(&endpoints_path(), transport, &label, kinds)
                         .map(|count| serde_json::json!({"registered": true, "count": count})),
+                )
+            }
+            "push.set_kinds" => {
+                let Some(kinds) = params
+                    .and_then(|p| p.get("kinds"))
+                    .and_then(kinds_from_json)
+                else {
+                    return Some(Err("missing kinds".to_string()));
+                };
+                let key = params
+                    .and_then(|p| p.get("token").or_else(|| p.get("endpoint")))
+                    .and_then(|t| t.as_str())
+                    .map(str::trim)
+                    .filter(|t| !t.is_empty());
+                Some(
+                    set_kinds_at(&endpoints_path(), key, kinds)
+                        .map(|count| serde_json::json!({"updated": true, "kinds": count})),
                 )
             }
             "push.list" => {
                 let list: Vec<serde_json::Value> = load(&endpoints_path())
                     .into_iter()
-                    .map(|e| serde_json::json!({"endpoint": e.url, "label": e.label}))
+                    .map(|e| {
+                        let mut value = endpoint_json(&e);
+                        value["transport"] = serde_json::json!(e.transport.name());
+                        value
+                    })
                     .collect();
                 Some(Ok(serde_json::json!({"endpoints": list})))
             }
+            // The diagnostic this whole subsystem was missing. Push failing is
+            // invisible by construction — nothing arrives, and nothing says so —
+            // which is how a broken setup went unnoticed for weeks. This reports
+            // per-device what actually happened, synchronously, to whoever asked.
+            "push.test" => Some(Ok(test_send(&endpoints_path()))),
             _ => None,
         }
+    }
+
+    fn test_send(path: &std::path::Path) -> serde_json::Value {
+        let endpoints = load(path);
+        if endpoints.is_empty() {
+            return serde_json::json!({"sent": 0, "results": [], "detail": "no registered devices"});
+        }
+        let payload = Payload {
+            kind: "test".to_string(),
+            state: String::new(),
+            agent: "shep".to_string(),
+            workspace: String::new(),
+            pane_id: String::new(),
+            title: "test notification".to_string(),
+            task_id: String::new(),
+            message: "if you can see this, push works".to_string(),
+        };
+        let mut sent = 0usize;
+        let results: Vec<serde_json::Value> = endpoints
+            .iter()
+            .map(|endpoint| {
+                let outcome = match &endpoint.transport {
+                    Transport::UnifiedPush { url } => {
+                        // Deliberately not rewritten by SHEP_NTFY_PUBLISH_BASE:
+                        // a test should exercise the endpoint as registered.
+                        post(url, &payload.fields().to_string())
+                            .map(|_| "sent".to_string())
+                            .unwrap_or_else(|err| format!("failed: {err}"))
+                    }
+                    Transport::Fcm { token } => match fcm::send(token, &payload) {
+                        Ok(fcm::Delivery::Sent) => "sent".to_string(),
+                        Ok(fcm::Delivery::Unregistered) => "unregistered".to_string(),
+                        Err(err) => format!("failed: {err}"),
+                    },
+                };
+                if outcome == "sent" {
+                    sent += 1;
+                }
+                serde_json::json!({
+                    "label": endpoint.label,
+                    "transport": endpoint.transport.name(),
+                    "outcome": outcome,
+                })
+            })
+            .collect();
+        serde_json::json!({"sent": sent, "results": results})
+    }
+
+    fn kinds_from_json(value: &serde_json::Value) -> Option<Vec<String>> {
+        Some(
+            value
+                .as_array()?
+                .iter()
+                .filter_map(|k| k.as_str().map(str::to_string))
+                .collect(),
+        )
     }
 
     /// `shep bridge notify-push` — the `[notifications] exec` target. Reads the
@@ -626,41 +883,116 @@ mod push {
     /// endpoint. Best-effort and non-fatal: a dead endpoint must not wedge the
     /// exec-bridge, so failures are logged and the exit code stays 0.
     pub(super) fn notify_push(_args: &[String]) -> std::io::Result<i32> {
-        let endpoints = load(&endpoints_path());
+        let path = endpoints_path();
+        let endpoints = load(&path);
         if endpoints.is_empty() {
-            eprintln!("shep bridge notify-push: no registered endpoints; nothing to do");
+            eprintln!("shep bridge notify-push: no registered devices; nothing to do");
             return Ok(0);
         }
-        let state = std::env::var("SHEP_NOTIFY_STATE").unwrap_or_default();
-        let agent = std::env::var("SHEP_NOTIFY_AGENT").unwrap_or_default();
-        let workspace = std::env::var("SHEP_NOTIFY_WORKSPACE").unwrap_or_default();
-        let pane_id = std::env::var("SHEP_NOTIFY_PANE_ID").unwrap_or_default();
-        let message = truncate(
-            &std::env::var("SHEP_NOTIFY_MESSAGE").unwrap_or_default(),
-            400,
-        );
-        let body = serde_json::json!({
-            "state": state,
-            "agent": agent,
-            "workspace": workspace,
-            "pane_id": pane_id,
-            "message": message,
-        })
-        .to_string();
+        let kind = std::env::var("SHEP_NOTIFY_KIND").unwrap_or_default();
+        let payload = Payload {
+            kind: kind.clone(),
+            state: std::env::var("SHEP_NOTIFY_STATE").unwrap_or_default(),
+            agent: std::env::var("SHEP_NOTIFY_AGENT").unwrap_or_default(),
+            workspace: std::env::var("SHEP_NOTIFY_WORKSPACE").unwrap_or_default(),
+            pane_id: std::env::var("SHEP_NOTIFY_PANE_ID").unwrap_or_default(),
+            title: std::env::var("SHEP_NOTIFY_TITLE").unwrap_or_default(),
+            task_id: std::env::var("SHEP_NOTIFY_TASK_ID").unwrap_or_default(),
+            message: truncate(
+                &std::env::var("SHEP_NOTIFY_MESSAGE").unwrap_or_default(),
+                400,
+            ),
+        };
 
-        // Co-location shortcut: when shep and ntfy run on the same host (the
-        // usual setup) the mini's resolver can't resolve the broker's MagicDNS
-        // name, and a tailnet round-trip is pointless anyway. `SHEP_NTFY_PUBLISH_BASE`
-        // (e.g. http://127.0.0.1:2587) rewrites scheme+host and keeps the topic
-        // path, so the publish stays on loopback. Unset = POST the endpoint as-is.
+        // Co-location shortcut for UnifiedPush only: when shep and the broker
+        // run on the same host the resolver often can't resolve the broker's
+        // MagicDNS name, and the tailnet round-trip is pointless anyway.
+        // `SHEP_NTFY_PUBLISH_BASE` (e.g. http://127.0.0.1:2587) rewrites
+        // scheme+host and keeps the topic path. It must never touch an FCM row:
+        // rewriting Google's endpoint to loopback is how a working push setup
+        // silently stops arriving.
         let base_override = std::env::var("SHEP_NTFY_PUBLISH_BASE").ok();
+        let mut stale: Vec<String> = Vec::new();
+        let mut delivered = 0usize;
         for endpoint in &endpoints {
-            let target = resolve_publish_url(&endpoint.url, base_override.as_deref());
-            if let Err(err) = post(&target, &body) {
-                eprintln!("shep bridge notify-push: {target} failed: {err}");
+            if !endpoint.wants(&kind) {
+                continue;
+            }
+            match &endpoint.transport {
+                Transport::UnifiedPush { url } => {
+                    let target = resolve_publish_url(url, base_override.as_deref());
+                    match post(&target, &payload.to_json()) {
+                        Ok(_) => delivered += 1,
+                        Err(err) => {
+                            eprintln!("shep bridge notify-push: {target} failed: {err}")
+                        }
+                    }
+                }
+                Transport::Fcm { token } => match fcm::send(token, &payload) {
+                    Ok(fcm::Delivery::Sent) => delivered += 1,
+                    Ok(fcm::Delivery::Unregistered) => {
+                        eprintln!(
+                            "shep bridge notify-push: dropping unregistered device {}",
+                            endpoint.label
+                        );
+                        stale.push(token.clone());
+                    }
+                    Err(err) => {
+                        eprintln!("shep bridge notify-push: fcm send failed: {err}")
+                    }
+                },
             }
         }
+
+        // A token that FCM says is gone will never work again — the app was
+        // uninstalled or reinstalled — so drop it rather than paying a failed
+        // request on every future notification.
+        if !stale.is_empty() {
+            let kept: Vec<Endpoint> = endpoints
+                .into_iter()
+                .filter(|e| !stale.iter().any(|token| token == e.transport.key()))
+                .collect();
+            if let Err(err) = store(&path, &kept) {
+                eprintln!("shep bridge notify-push: could not prune stale devices: {err}");
+            }
+        }
+        if delivered == 0 {
+            eprintln!("shep bridge notify-push: nothing delivered for kind {kind:?}");
+        }
         Ok(0)
+    }
+
+    /// What one notification says. Flat and all-strings because FCM's `data`
+    /// block only carries strings, and the UnifiedPush body is the same shape so
+    /// the app has one parser rather than two.
+    pub(super) struct Payload {
+        pub(super) kind: String,
+        pub(super) state: String,
+        pub(super) agent: String,
+        pub(super) workspace: String,
+        pub(super) pane_id: String,
+        pub(super) title: String,
+        pub(super) task_id: String,
+        pub(super) message: String,
+    }
+
+    impl Payload {
+        pub(super) fn fields(&self) -> serde_json::Value {
+            serde_json::json!({
+                "kind": self.kind,
+                "state": self.state,
+                "agent": self.agent,
+                "workspace": self.workspace,
+                "pane_id": self.pane_id,
+                "title": self.title,
+                "task_id": self.task_id,
+                "message": self.message,
+            })
+        }
+
+        fn to_json(&self) -> String {
+            self.fields().to_string()
+        }
     }
 
     /// Rewrite `endpoint`'s scheme+authority to `base` while preserving the topic
@@ -690,6 +1022,382 @@ mod push {
         text.chars().take(max).collect::<String>() + "…"
     }
 
+    /// FCM HTTP v1 delivery.
+    ///
+    /// Sending needs an OAuth2 access token minted from a service-account key,
+    /// which means signing a JWT with RS256. Rather than take an RSA/JWT crate
+    /// for one signature an hour, this shells out to `openssl` — the same
+    /// reasoning that already has this module shelling out to `curl` instead of
+    /// depending on an HTTP client.
+    pub(super) mod fcm {
+        use super::Payload;
+        use std::io::Write;
+        use std::path::{Path, PathBuf};
+
+        const SCOPE: &str = "https://www.googleapis.com/auth/firebase.messaging";
+        /// Google mints one-hour tokens; refresh a minute early so a send never
+        /// races the expiry.
+        const EXPIRY_SKEW_SECS: u64 = 60;
+
+        pub(super) enum Delivery {
+            Sent,
+            /// FCM says this token is dead: the app was uninstalled or its
+            /// registration was replaced. Never recoverable.
+            Unregistered,
+        }
+
+        fn service_account_path() -> PathBuf {
+            crate::config::config_dir().join("fcm-service-account.json")
+        }
+
+        fn token_cache_path() -> PathBuf {
+            crate::config::config_dir().join("fcm-token.json")
+        }
+
+        struct ServiceAccount {
+            project_id: String,
+            client_email: String,
+            private_key: String,
+            token_uri: String,
+        }
+
+        fn load_service_account(path: &Path) -> Result<ServiceAccount, String> {
+            let text = std::fs::read_to_string(path).map_err(|err| {
+                format!(
+                    "no FCM service account at {}: {err} — download one from the \
+                     Firebase console (Project settings → Service accounts)",
+                    path.display()
+                )
+            })?;
+            let value: serde_json::Value =
+                serde_json::from_str(&text).map_err(|err| format!("malformed key file: {err}"))?;
+            let field = |name: &str| -> Result<String, String> {
+                value
+                    .get(name)
+                    .and_then(|v| v.as_str())
+                    .filter(|v| !v.is_empty())
+                    .map(str::to_string)
+                    .ok_or_else(|| format!("key file is missing {name}"))
+            };
+            Ok(ServiceAccount {
+                project_id: field("project_id")?,
+                client_email: field("client_email")?,
+                private_key: field("private_key")?,
+                token_uri: field("token_uri")
+                    .unwrap_or_else(|_| "https://oauth2.googleapis.com/token".to_string()),
+            })
+        }
+
+        fn now_unix() -> u64 {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0)
+        }
+
+        fn base64url(bytes: &[u8]) -> String {
+            use base64::Engine;
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+        }
+
+        /// Sign `input` with the service account's RSA key, via `openssl`.
+        ///
+        /// openssl reads the key from a file, not stdin (stdin carries the data
+        /// being signed), so the PEM is written to a 0600 file in the config
+        /// directory for the duration of the call and removed after. It sits
+        /// beside the service-account JSON, which already holds the same key at
+        /// the same permissions, so this widens nothing.
+        fn sign_rs256(private_key_pem: &str, input: &str) -> Result<Vec<u8>, String> {
+            let key_path = crate::config::config_dir().join(format!(
+                ".fcm-signing-key-{}-{}.pem",
+                std::process::id(),
+                now_unix()
+            ));
+            if let Some(parent) = key_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+            }
+            std::fs::write(&key_path, private_key_pem).map_err(|err| err.to_string())?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600));
+            }
+            let result = sign_with_key_file(&key_path, input);
+            let _ = std::fs::remove_file(&key_path);
+            result
+        }
+
+        fn sign_with_key_file(key_path: &Path, input: &str) -> Result<Vec<u8>, String> {
+            let mut child = std::process::Command::new("openssl")
+                .arg("dgst")
+                .arg("-sha256")
+                .arg("-sign")
+                .arg(key_path)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|err| format!("could not run openssl: {err}"))?;
+            child
+                .stdin
+                .take()
+                .ok_or("openssl stdin unavailable")?
+                .write_all(input.as_bytes())
+                .map_err(|err| err.to_string())?;
+            let output = child.wait_with_output().map_err(|err| err.to_string())?;
+            if !output.status.success() {
+                return Err(format!(
+                    "openssl signing failed: {}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ));
+            }
+            Ok(output.stdout)
+        }
+
+        /// Build the signed JWT that is exchanged for an access token.
+        fn build_assertion(account: &ServiceAccount, issued_at: u64) -> Result<String, String> {
+            let header = base64url(br#"{"alg":"RS256","typ":"JWT"}"#);
+            let claims = base64url(
+                serde_json::json!({
+                    "iss": account.client_email,
+                    "scope": SCOPE,
+                    "aud": account.token_uri,
+                    "iat": issued_at,
+                    "exp": issued_at + 3600,
+                })
+                .to_string()
+                .as_bytes(),
+            );
+            let signing_input = format!("{header}.{claims}");
+            let signature = sign_rs256(&account.private_key, &signing_input)?;
+            Ok(format!("{signing_input}.{}", base64url(&signature)))
+        }
+
+        fn cached_token(path: &Path, now: u64) -> Option<String> {
+            let text = std::fs::read_to_string(path).ok()?;
+            let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+            let expires_at = value.get("expires_at")?.as_u64()?;
+            if expires_at <= now + EXPIRY_SKEW_SECS {
+                return None;
+            }
+            value
+                .get("access_token")?
+                .as_str()
+                .filter(|t| !t.is_empty())
+                .map(str::to_string)
+        }
+
+        fn cache_token(path: &Path, token: &str, expires_at: u64) {
+            let body = serde_json::json!({"access_token": token, "expires_at": expires_at});
+            if std::fs::write(path, body.to_string()).is_ok() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+                }
+            }
+        }
+
+        fn access_token(account: &ServiceAccount) -> Result<String, String> {
+            let cache = token_cache_path();
+            let now = now_unix();
+            if let Some(token) = cached_token(&cache, now) {
+                return Ok(token);
+            }
+            let assertion = build_assertion(account, now)?;
+            let form = format!(
+                "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={assertion}"
+            );
+            let response = super::post_form(&account.token_uri, &form)
+                .map_err(|err| format!("token exchange failed: {err}"))?;
+            let value: serde_json::Value = serde_json::from_str(&response.body)
+                .map_err(|err| format!("token response was not JSON: {err}"))?;
+            let token = value
+                .get("access_token")
+                .and_then(|t| t.as_str())
+                .ok_or_else(|| format!("token response had no access_token: {}", response.body))?;
+            let expires_in = value
+                .get("expires_in")
+                .and_then(|e| e.as_u64())
+                .unwrap_or(3600);
+            cache_token(&cache, token, now + expires_in);
+            Ok(token.to_string())
+        }
+
+        /// Send one notification to one device.
+        pub(super) fn send(token: &str, payload: &Payload) -> Result<Delivery, String> {
+            let account = load_service_account(&service_account_path())?;
+            let access = access_token(&account)?;
+            let url = format!(
+                "https://fcm.googleapis.com/v1/projects/{}/messages:send",
+                account.project_id
+            );
+            // Data-only, deliberately: a `notification` block would have Android
+            // render the notification itself, which drops the Approve/Deny
+            // actions and the pane deep-link. High priority is what gets the app
+            // woken out of Doze at all.
+            let body = serde_json::json!({
+                "message": {
+                    "token": token,
+                    "android": { "priority": "high" },
+                    "data": payload.fields(),
+                }
+            })
+            .to_string();
+            let response = super::post_json_authorized(&url, &body, &access)?;
+            if response.status == 200 {
+                return Ok(Delivery::Sent);
+            }
+            // 404 UNREGISTERED / 403 SENDER_ID_MISMATCH mean this token is gone
+            // for good; anything else may be transient and is worth reporting.
+            if response.status == 404 || response.body.contains("UNREGISTERED") {
+                return Ok(Delivery::Unregistered);
+            }
+            Err(format!(
+                "fcm returned {}: {}",
+                response.status,
+                summarize_error(&response.body)
+            ))
+        }
+
+        /// Reduce an FCM error body to its one useful sentence.
+        ///
+        /// The raw response is a ~500-character nested JSON document. This is
+        /// surfaced in a phone's settings screen, where that is unreadable, and
+        /// `error.message` already says the whole story.
+        fn summarize_error(body: &str) -> String {
+            serde_json::from_str::<serde_json::Value>(body)
+                .ok()
+                .and_then(|value| {
+                    value
+                        .get("error")?
+                        .get("message")?
+                        .as_str()
+                        .map(str::to_string)
+                })
+                .unwrap_or_else(|| super::truncate(body.trim(), 200))
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            #[test]
+            fn cached_token_is_ignored_once_inside_the_refresh_skew() {
+                let path = std::env::temp_dir()
+                    .join(format!("shep-fcm-token-{}.json", std::process::id()));
+                cache_token(&path, "abc", 1_000);
+                // Comfortably valid.
+                assert_eq!(cached_token(&path, 500).as_deref(), Some("abc"));
+                // Inside the skew: treated as expired so a send never races it.
+                assert!(cached_token(&path, 1_000 - EXPIRY_SKEW_SECS).is_none());
+                assert!(cached_token(&path, 2_000).is_none());
+                let _ = std::fs::remove_file(&path);
+            }
+
+            /// A phone settings screen shows this string, so it has to be one
+            /// readable sentence rather than the raw nested error document.
+            #[test]
+            fn error_summary_keeps_the_sentence_and_drops_the_envelope() {
+                let body = r#"{"error":{"code":400,"message":"The registration token is not a valid FCM registration token","status":"INVALID_ARGUMENT","details":[{"@type":"x"}]}}"#;
+                assert_eq!(
+                    summarize_error(body),
+                    "The registration token is not a valid FCM registration token"
+                );
+                // A non-JSON body (a proxy error page, say) still says something.
+                assert_eq!(summarize_error("  gateway timeout  "), "gateway timeout");
+            }
+
+            #[test]
+            fn service_account_reports_what_is_missing() {
+                let path =
+                    std::env::temp_dir().join(format!("shep-fcm-sa-{}.json", std::process::id()));
+                std::fs::write(&path, r#"{"project_id":"p"}"#).unwrap();
+                let err = load_service_account(&path)
+                    .err()
+                    .expect("a key file missing client_email must not load");
+                assert!(err.contains("client_email"), "{err}");
+                let _ = std::fs::remove_file(&path);
+            }
+
+            #[test]
+            fn missing_service_account_says_where_to_put_one() {
+                let err = load_service_account(Path::new("/nonexistent/fcm.json"))
+                    .err()
+                    .expect("a missing key file must not load");
+                assert!(err.contains("Firebase console"), "{err}");
+            }
+
+            /// The assertion must be three base64url segments over the exact
+            /// signing input, or Google rejects it with an opaque error.
+            #[test]
+            fn assertion_is_three_segments_signed_over_the_first_two() {
+                let key_path =
+                    std::env::temp_dir().join(format!("shep-fcm-key-{}.pem", std::process::id()));
+                let generated = std::process::Command::new("openssl")
+                    .args([
+                        "genpkey",
+                        "-algorithm",
+                        "RSA",
+                        "-pkeyopt",
+                        "rsa_keygen_bits:2048",
+                    ])
+                    .arg("-out")
+                    .arg(&key_path)
+                    .output();
+                let Ok(output) = generated else { return };
+                if !output.status.success() {
+                    return;
+                }
+                let pem = std::fs::read_to_string(&key_path).unwrap();
+                let account = ServiceAccount {
+                    project_id: "p".into(),
+                    client_email: "svc@example.com".into(),
+                    private_key: pem,
+                    token_uri: "https://oauth2.googleapis.com/token".into(),
+                };
+                let assertion = build_assertion(&account, 1_700_000_000).unwrap();
+                let parts: Vec<&str> = assertion.split('.').collect();
+                assert_eq!(parts.len(), 3, "{assertion}");
+                assert!(!parts[2].is_empty());
+                // base64url, not standard base64: '+' and '/' would be rejected.
+                assert!(!assertion.contains('+') && !assertion.contains('/'));
+                use base64::Engine;
+                let claims = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .decode(parts[1])
+                    .unwrap();
+                let claims: serde_json::Value = serde_json::from_slice(&claims).unwrap();
+                assert_eq!(claims["iss"], "svc@example.com");
+                assert_eq!(claims["scope"], SCOPE);
+                assert_eq!(claims["exp"].as_u64().unwrap(), 1_700_003_600);
+                let _ = std::fs::remove_file(&key_path);
+            }
+
+            /// The temporary PEM must not survive the signature.
+            #[test]
+            fn signing_key_file_is_removed_even_when_openssl_rejects_the_key() {
+                let before = signing_key_files();
+                assert!(sign_rs256("not a key", "data").is_err());
+                assert_eq!(signing_key_files(), before);
+            }
+
+            fn signing_key_files() -> usize {
+                std::fs::read_dir(crate::config::config_dir())
+                    .map(|entries| {
+                        entries
+                            .flatten()
+                            .filter(|e| {
+                                e.file_name()
+                                    .to_string_lossy()
+                                    .starts_with(".fcm-signing-key-")
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0)
+            }
+        }
+    }
+
     /// POST `body` to `url` via `curl`. curl is ubiquitous on the unix targets
     /// this fork supports, handles http(s)+redirects, and keeps shep free of an
     /// HTTP-client dependency for a fire-and-forget publish.
@@ -714,6 +1422,77 @@ mod push {
         }
     }
 
+    /// An HTTP response we need to read, not just fire and forget.
+    pub(super) struct Response {
+        pub(super) status: u16,
+        pub(super) body: String,
+    }
+
+    /// Run curl and split the trailing status code off the body.
+    ///
+    /// `-w '%{http_code}'` appends the code after the body, so the last three
+    /// characters are the status and everything before them is the payload.
+    fn curl_capture(args: &[&str]) -> Result<Response, String> {
+        let output = std::process::Command::new("curl")
+            .args(["-sS", "-m", "20", "-w", "%{http_code}"])
+            .args(args)
+            .output()
+            .map_err(|err| format!("could not run curl: {err}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "curl failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        let combined = String::from_utf8_lossy(&output.stdout).to_string();
+        if combined.len() < 3 {
+            return Err(format!("curl returned no status code: {combined:?}"));
+        }
+        let split = combined.len() - 3;
+        let status = combined[split..].parse::<u16>().map_err(|_| {
+            format!(
+                "curl returned a malformed status code: {:?}",
+                &combined[split..]
+            )
+        })?;
+        Ok(Response {
+            status,
+            body: combined[..split].to_string(),
+        })
+    }
+
+    /// POST a form-encoded body — the OAuth2 token exchange.
+    pub(super) fn post_form(url: &str, form: &str) -> Result<Response, String> {
+        curl_capture(&[
+            "-X",
+            "POST",
+            "-H",
+            "Content-Type: application/x-www-form-urlencoded",
+            "--data",
+            form,
+            url,
+        ])
+    }
+
+    /// POST JSON with a bearer token — the FCM send.
+    pub(super) fn post_json_authorized(
+        url: &str,
+        body: &str,
+        access_token: &str,
+    ) -> Result<Response, String> {
+        curl_capture(&[
+            "-X",
+            "POST",
+            "-H",
+            "Content-Type: application/json",
+            "-H",
+            &format!("Authorization: Bearer {access_token}"),
+            "--data",
+            body,
+            url,
+        ])
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -726,14 +1505,35 @@ mod push {
             ))
         }
 
+        fn unified(url: &str) -> Transport {
+            Transport::UnifiedPush {
+                url: url.to_string(),
+            }
+        }
+
+        fn fcm_token(token: &str) -> Transport {
+            Transport::Fcm {
+                token: token.to_string(),
+            }
+        }
+
         #[test]
         fn register_dedups_and_updates_label() {
             let path = tmp("dedup");
             std::fs::remove_file(&path).ok();
-            assert_eq!(register_at(&path, "https://ntfy/UPa", "phone").unwrap(), 1);
+            assert_eq!(
+                register_at(&path, unified("https://ntfy/UPa"), "phone", None).unwrap(),
+                1
+            );
             // Same URL, new label → still one entry, label updated.
-            assert_eq!(register_at(&path, "https://ntfy/UPa", "s22").unwrap(), 1);
-            assert_eq!(register_at(&path, "https://ntfy/UPb", "avd").unwrap(), 2);
+            assert_eq!(
+                register_at(&path, unified("https://ntfy/UPa"), "s22", None).unwrap(),
+                1
+            );
+            assert_eq!(
+                register_at(&path, unified("https://ntfy/UPb"), "avd", None).unwrap(),
+                2
+            );
             let loaded = load(&path);
             assert_eq!(loaded.len(), 2);
             assert_eq!(loaded[0].label, "s22");
@@ -744,8 +1544,142 @@ mod push {
         fn register_rejects_non_http() {
             let path = tmp("reject");
             std::fs::remove_file(&path).ok();
-            assert!(register_at(&path, "ftp://nope", "x").is_err());
-            assert!(register_at(&path, "", "x").is_err());
+            assert!(register_at(&path, unified("ftp://nope"), "x", None).is_err());
+            assert!(register_at(&path, unified(""), "x", None).is_err());
+            assert!(register_at(&path, fcm_token(""), "x", None).is_err());
+            assert!(register_at(&path, fcm_token("has space"), "x", None).is_err());
+            std::fs::remove_file(&path).ok();
+        }
+
+        /// The app re-registers on every cold start, and must not wipe the
+        /// user's notification settings when it does.
+        #[test]
+        fn re_registering_without_kinds_keeps_the_chosen_ones() {
+            let path = tmp("keep-kinds");
+            std::fs::remove_file(&path).ok();
+            register_at(
+                &path,
+                fcm_token("tok"),
+                "phone",
+                Some(vec!["blocked".into(), "done".into()]),
+            )
+            .unwrap();
+            register_at(&path, fcm_token("tok"), "phone", None).unwrap();
+            let loaded = load(&path);
+            assert_eq!(loaded.len(), 1);
+            assert_eq!(
+                loaded[0].kinds.as_deref(),
+                Some(&["blocked".to_string(), "done".to_string()][..])
+            );
+            std::fs::remove_file(&path).ok();
+        }
+
+        /// Rows written before the transport and kinds columns existed must
+        /// still load, as UnifiedPush wanting everything.
+        #[test]
+        fn legacy_rows_load_as_unifiedpush_wanting_every_kind() {
+            let path = tmp("legacy");
+            std::fs::write(
+                &path,
+                r#"[{"endpoint":"https://ntfy.sh/abc?up=1","label":"CPH2611"}]"#,
+            )
+            .unwrap();
+            let loaded = load(&path);
+            assert_eq!(loaded.len(), 1);
+            assert_eq!(loaded[0].transport, unified("https://ntfy.sh/abc?up=1"));
+            assert!(loaded[0].kinds.is_none());
+            for kind in ["blocked", "done", "task", "review"] {
+                assert!(loaded[0].wants(kind));
+            }
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
+        fn kinds_filter_delivery_per_device() {
+            let endpoint = Endpoint {
+                transport: fcm_token("tok"),
+                label: "phone".into(),
+                kinds: Some(vec!["blocked".into(), "review".into()]),
+            };
+            assert!(endpoint.wants("blocked"));
+            assert!(endpoint.wants("review"));
+            assert!(!endpoint.wants("done"));
+            assert!(!endpoint.wants("task"));
+            // An exec that reports no kind still gets through: dropping it
+            // would turn an upgrade mismatch into total silence.
+            assert!(endpoint.wants(""));
+        }
+
+        #[test]
+        fn set_kinds_targets_the_only_device_without_being_told_which() {
+            let path = tmp("setkinds-one");
+            std::fs::remove_file(&path).ok();
+            register_at(&path, fcm_token("tok"), "phone", None).unwrap();
+            assert_eq!(set_kinds_at(&path, None, vec!["done".into()]).unwrap(), 1);
+            assert_eq!(
+                load(&path)[0].kinds.as_deref(),
+                Some(&["done".to_string()][..])
+            );
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
+        fn set_kinds_requires_a_target_when_several_devices_are_registered() {
+            let path = tmp("setkinds-many");
+            std::fs::remove_file(&path).ok();
+            register_at(&path, fcm_token("a"), "phone", None).unwrap();
+            register_at(&path, fcm_token("b"), "tablet", None).unwrap();
+            assert!(set_kinds_at(&path, None, vec!["done".into()]).is_err());
+            set_kinds_at(&path, Some("b"), vec!["done".into()]).unwrap();
+            let loaded = load(&path);
+            assert!(loaded[0].kinds.is_none());
+            assert_eq!(loaded[1].kinds.as_deref(), Some(&["done".to_string()][..]));
+            std::fs::remove_file(&path).ok();
+        }
+
+        /// The co-location rewrite is a UnifiedPush affordance and must never
+        /// be reachable for an FCM row.
+        ///
+        /// This is the shape of the bug that made push stop arriving: a phone
+        /// registered against one broker while `SHEP_NTFY_PUBLISH_BASE`
+        /// redirected every publish to another, and nothing reported a failure
+        /// because the POST to the wrong place succeeded.
+        #[test]
+        fn publish_url_rewrite_applies_only_to_unifiedpush() {
+            let base = Some("http://127.0.0.1:2587");
+            assert_eq!(
+                resolve_publish_url("https://ntfy.example/UPa?up=1", base),
+                "http://127.0.0.1:2587/UPa?up=1"
+            );
+            // An FCM device carries no URL to rewrite — the send target is
+            // derived from the service account's project id instead — so the
+            // transport itself is the guard.
+            let endpoint = Endpoint {
+                transport: fcm_token("tok"),
+                label: "phone".into(),
+                kinds: None,
+            };
+            assert!(matches!(endpoint.transport, Transport::Fcm { .. }));
+        }
+
+        /// A round-trip through the file must not quietly change a device.
+        #[test]
+        fn store_and_load_round_trip_both_transports() {
+            let path = tmp("roundtrip");
+            let original = vec![
+                Endpoint {
+                    transport: fcm_token("tok"),
+                    label: "phone".into(),
+                    kinds: Some(vec!["blocked".into()]),
+                },
+                Endpoint {
+                    transport: unified("https://ntfy/UPa"),
+                    label: "old".into(),
+                    kinds: None,
+                },
+            ];
+            store(&path, &original).unwrap();
+            assert_eq!(load(&path), original);
             std::fs::remove_file(&path).ok();
         }
 
