@@ -112,6 +112,7 @@ impl App {
                 workspace_label: card.workspace_label.clone(),
                 branch: card.branch.clone(),
                 name: Some(card.agent_label.clone()),
+                display_name: card.display_name.clone(),
                 display_agent: card.model.clone(),
                 agent_status: crate::app::api_helpers::pane_agent_status(card.state, card.seen),
                 unseen: !card.seen,

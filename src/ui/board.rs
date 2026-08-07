@@ -74,6 +74,13 @@ pub(crate) struct BoardCard {
     pub ws_idx: usize,
     pub pane_id: PaneId,
     pub agent_label: String,
+    /// The shortest name no other card on the board answers to.
+    ///
+    /// Filled by [`assign_distinct_names`] once the whole board is known, so it
+    /// is `agent_label` plus only as much placement as it takes to tell this
+    /// agent apart from the others. See that function for why this is not just
+    /// `agent_label`.
+    pub display_name: String,
     pub workspace_label: String,
     /// Tab/pane location tag, e.g. `t2·p1` (multi-tab) or `p3`.
     pub location: String,
@@ -218,10 +225,12 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             .filter(|model| Some(model.as_str()) != entry.agent_label.as_deref());
         let cwd = terminal.map(|terminal| contract_home(&terminal.cwd));
         let activity = terminal.and_then(|terminal| terminal.activity_line.clone());
+        let agent_label = entry.agent_label.unwrap_or_else(|| "agent".to_string());
         model.columns[col].push(BoardCard {
             ws_idx: entry.ws_idx,
             pane_id: entry.pane_id,
-            agent_label: entry.agent_label.unwrap_or_else(|| "agent".to_string()),
+            display_name: agent_label.clone(),
+            agent_label,
             workspace_label: entry.primary_label,
             location,
             branch,
@@ -243,7 +252,89 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             )
         });
     }
+    assign_distinct_names(&mut model);
     model
+}
+
+/// Give every card the shortest name no other card answers to.
+///
+/// Five claude sessions in the same repo are all "claude" — true, and useless
+/// for telling them apart. Spending detail everywhere is no better: a board
+/// where every card reads `claude · shep · master · docs` has the same problem
+/// in a longer form. So detail is spent only where it buys a distinction. An
+/// agent that is already the only "claude" stays "claude", and only the ones
+/// that collide grow a workspace, then a branch, then a location.
+///
+/// This lives here, on the shared board model, rather than in any one client:
+/// the desktop board and the companion both render whatever this produces, so
+/// the two cannot drift into calling the same agent different things.
+fn assign_distinct_names(model: &mut BoardModel) {
+    let candidates: Vec<(PaneId, Vec<String>)> = model
+        .flattened()
+        .iter()
+        .map(|card| (card.pane_id, name_candidates(card)))
+        .collect();
+    let depth = candidates
+        .iter()
+        .map(|(_, names)| names.len())
+        .max()
+        .unwrap_or(0);
+
+    let mut resolved: std::collections::HashMap<PaneId, String> = std::collections::HashMap::new();
+    for level in 0..depth {
+        // At this level, every still-ambiguous card proposes its name; the ones
+        // whose proposal is unique keep it and stop growing.
+        let mut proposals: Vec<(PaneId, String)> = Vec::new();
+        for (pane_id, names) in &candidates {
+            if resolved.contains_key(pane_id) {
+                continue;
+            }
+            let name = names.get(level).or_else(|| names.last());
+            if let Some(name) = name {
+                proposals.push((*pane_id, name.clone()));
+            }
+        }
+        for (pane_id, name) in &proposals {
+            let unique = proposals.iter().filter(|(_, other)| other == name).count() == 1;
+            if unique {
+                resolved.insert(*pane_id, name.clone());
+            }
+        }
+    }
+
+    for (pane_id, names) in &candidates {
+        if !resolved.contains_key(pane_id) {
+            // Nothing about placement separated these two. The pane id always
+            // does, and is the last resort precisely because `w2:p1` is the
+            // unreadable thing this exists to avoid.
+            let fallback = names.last().cloned().unwrap_or_default();
+            resolved.insert(*pane_id, format!("{fallback} · {}", pane_id.raw()));
+        }
+    }
+
+    for cards in &mut model.columns {
+        for card in cards.iter_mut() {
+            if let Some(name) = resolved.get(&card.pane_id) {
+                card.display_name = name.clone();
+            }
+        }
+    }
+}
+
+/// Increasingly specific names for one card, shortest first.
+fn name_candidates(card: &BoardCard) -> Vec<String> {
+    let mut names = vec![card.agent_label.clone()];
+    let mut accumulated = card.agent_label.clone();
+    let extras = [
+        Some(card.workspace_label.clone()).filter(|l| !l.is_empty()),
+        card.branch.clone(),
+        Some(card.location.clone()).filter(|l| !l.is_empty()),
+    ];
+    for extra in extras.into_iter().flatten() {
+        accumulated = format!("{accumulated} · {extra}");
+        names.push(accumulated.clone());
+    }
+    names
 }
 
 /// The initial board selection when opening: the currently focused pane if it
@@ -942,7 +1033,7 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         Span::styled(marker.to_string(), marker_style),
         Span::styled(dot, dot_style),
         Span::raw(" "),
-        Span::styled(truncate_end(&card.agent_label, agent_budget), agent_style),
+        Span::styled(truncate_end(&card.display_name, agent_budget), agent_style),
     ];
     if let Some(queued_label) = &queued_label {
         line1.push(Span::styled(
@@ -1114,7 +1205,7 @@ fn render_agent_detail(
         Span::styled(dot, dot_style),
         Span::raw(" "),
         Span::styled(
-            card.agent_label.clone(),
+            card.display_name.clone(),
             Style::default().fg(p.text).add_modifier(Modifier::BOLD),
         ),
     ];
@@ -2092,6 +2183,105 @@ mod tests {
             .find(|card| card.ws_idx == ws_idx)
             .cloned()
             .expect("card for workspace")
+    }
+
+    /// A card builder for the naming rules alone — they only read the four
+    /// name-bearing fields, so the rest stays at its cheapest.
+    fn named_card(
+        pane: u32,
+        agent: &str,
+        workspace: &str,
+        branch: Option<&str>,
+        location: &str,
+    ) -> BoardCard {
+        BoardCard {
+            ws_idx: 0,
+            pane_id: PaneId::from_raw(pane),
+            agent_label: agent.to_string(),
+            display_name: agent.to_string(),
+            workspace_label: workspace.to_string(),
+            location: location.to_string(),
+            branch: branch.map(str::to_string),
+            status: None,
+            state: crate::detect::AgentState::Idle,
+            seen: true,
+            context_percent: None,
+            cwd: None,
+            model: None,
+            activity: None,
+            sort_seq: None,
+        }
+    }
+
+    fn names_for(cards: Vec<BoardCard>) -> Vec<String> {
+        let mut model = BoardModel::default();
+        model.columns[3] = cards;
+        assign_distinct_names(&mut model);
+        model.columns[3]
+            .iter()
+            .map(|card| card.display_name.clone())
+            .collect()
+    }
+
+    /// An agent that is already the only one of its name pays nothing for the
+    /// others' ambiguity.
+    #[test]
+    fn distinct_names_spend_detail_only_where_it_buys_a_distinction() {
+        let names = names_for(vec![
+            named_card(1, "claude", "shep", Some("master"), "p1"),
+            named_card(2, "claude", "workmayt", Some("master"), "p1"),
+            named_card(3, "opencode", "shep", Some("master"), "p1"),
+        ]);
+        // opencode is unique at the shortest level and stays short.
+        assert_eq!(names[2], "opencode");
+        // The two claudes are separated by workspace, and stop there.
+        assert_eq!(names[0], "claude · shep");
+        assert_eq!(names[1], "claude · workmayt");
+    }
+
+    /// Detail keeps growing only for the cards that are still colliding.
+    #[test]
+    fn distinct_names_grow_through_branch_then_location() {
+        let names = names_for(vec![
+            named_card(1, "claude", "shep", Some("master"), "docs"),
+            named_card(2, "claude", "shep", Some("fix/push"), "p1"),
+            named_card(3, "claude", "shep", Some("master"), "board"),
+        ]);
+        // Unique once the branch is added.
+        assert_eq!(names[1], "claude · shep · fix/push");
+        // Same branch: these two need the location too.
+        assert_eq!(names[0], "claude · shep · master · docs");
+        assert_eq!(names[2], "claude · shep · master · board");
+    }
+
+    /// The pane id is the last resort, not the first: it appears only when
+    /// nothing readable separates two agents.
+    #[test]
+    fn distinct_names_fall_back_to_the_pane_id_only_when_nothing_else_differs() {
+        let names = names_for(vec![
+            named_card(7, "claude", "shep", Some("master"), "p1"),
+            named_card(9, "claude", "shep", Some("master"), "p1"),
+        ]);
+        assert_eq!(names[0], "claude · shep · master · p1 · 7");
+        assert_eq!(names[1], "claude · shep · master · p1 · 9");
+    }
+
+    /// One agent on the board never grows a suffix.
+    #[test]
+    fn a_lone_agent_keeps_its_plain_name() {
+        let names = names_for(vec![named_card(1, "claude", "shep", Some("master"), "p1")]);
+        assert_eq!(names, vec!["claude".to_string()]);
+    }
+
+    /// Empty placement fields must not produce dangling separators.
+    #[test]
+    fn distinct_names_skip_placement_the_session_does_not_have() {
+        let names = names_for(vec![
+            named_card(1, "claude", "", None, ""),
+            named_card(2, "claude", "", None, ""),
+        ]);
+        assert_eq!(names[0], "claude · 1");
+        assert_eq!(names[1], "claude · 2");
     }
 
     #[test]

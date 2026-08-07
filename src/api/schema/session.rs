@@ -42,6 +42,11 @@ pub struct SessionOverviewAgent {
     pub branch: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// The name to show for this agent: shep's own label plus only as much
+    /// placement as it takes to tell it apart from the other agents in the
+    /// session. Clients should render this rather than deriving their own, so
+    /// every surface calls the same agent the same thing.
+    pub display_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_agent: Option<String>,
     pub agent_status: super::common::AgentStatus,

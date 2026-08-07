@@ -8960,6 +8960,10 @@
                 "null"
               ]
             },
+            "display_name": {
+              "description": "The name to show for this agent: shep's own label plus only as much\nplacement as it takes to tell it apart from the other agents in the\nsession. Clients should render this rather than deriving their own, so\nevery surface calls the same agent the same thing.",
+              "type": "string"
+            },
             "focused": {
               "type": "boolean"
             },
@@ -9019,6 +9023,7 @@
             "tab_id",
             "tab_name",
             "workspace_label",
+            "display_name",
             "agent_status",
             "focused"
           ],
