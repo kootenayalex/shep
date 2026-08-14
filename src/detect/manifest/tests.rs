@@ -579,6 +579,23 @@ fn claude_osc_title_braille_prefix_is_working() {
 }
 
 #[test]
+fn claude_osc_title_half_circle_prefix_is_working() {
+    // Claude Code 2.1.228 replaced the braille spinner in the OSC title with
+    // the two-frame half-circle pair "◐"/"◑" (U+25D0/U+25D1). Without this the
+    // working state is invisible: nothing else reports it, and the prompt box
+    // still shows "❯" mid-turn, so the pane reads idle while the agent works.
+    for frame in ["◐", "◑"] {
+        let result = osc_explain(Agent::Claude, "", &format!("{frame} project"), "");
+        assert_eq!(result.state, AgentState::Working);
+        assert_eq!(
+            result.matched_rule.as_ref().map(|r| r.id.as_str()),
+            Some("osc_title_working")
+        );
+        assert!(result.visible_working);
+    }
+}
+
+#[test]
 fn claude_osc_title_static_prefix_is_idle() {
     // "✳" is U+2733, static prefix when Claude is not working
     let result = osc_explain(Agent::Claude, "", "✳ Claude Code", "");
