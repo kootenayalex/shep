@@ -299,17 +299,14 @@ pub(super) fn render_keybind_help_overlay(app: &AppState, frame: &mut Frame) {
         );
     }
 
+    let mut footer = super::widgets::scroll_hint_spans(app.mouse_capture, &app.palette);
+    footer.extend([
+        Span::styled(glyphs::SEP_WIDE, Style::default().fg(app.palette.overlay0)),
+        Span::styled("close", Style::default().fg(app.palette.overlay0)),
+        Span::styled(" esc / enter ", Style::default().fg(app.palette.text)),
+    ]);
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(" scroll ", Style::default().fg(app.palette.overlay0)),
-            Span::styled(glyphs::KEYS_WHEEL, Style::default().fg(app.palette.text)),
-            Span::styled(glyphs::SEP_WIDE, Style::default().fg(app.palette.overlay0)),
-            Span::styled("jump", Style::default().fg(app.palette.overlay0)),
-            Span::styled(" pgup / pgdn ", Style::default().fg(app.palette.text)),
-            Span::styled(glyphs::SEP_WIDE, Style::default().fg(app.palette.overlay0)),
-            Span::styled("close", Style::default().fg(app.palette.overlay0)),
-            Span::styled(" esc / enter ", Style::default().fg(app.palette.text)),
-        ])),
+        Paragraph::new(Line::from(footer)),
         stack.footer.unwrap_or_default(),
     );
 }

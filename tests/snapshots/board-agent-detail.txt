@@ -12,7 +12,7 @@
 │ state        blocked · ⇥2 queued                                                                                     │
 │ activity     may I run the stripe integration tests?                                                                 │
 │ working dir  ~/vault/dev/workmayt                                                                                    │
-│ context      ████▍░ 72%                                                                                              │
+│ context      ████▍░  72%                                                                                             │
 │                                                                                                                      │
 │ live screen                                                                                                          │
 │   (no live screen for this pane)                                                                                     │
@@ -54,7 +54,7 @@ aggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg
 agccccccccccccceeeeeeeeeeeeeeeeeeeggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agcccccccccccccdddddddddddddddddddddddddddddddddddddddggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agccccccccccccciiiiiiiiiiiiiiiiiiiigggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
-agccccccccccccckkkkkkkkkkgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
+agccccccccccccckkkkkkkkkkkggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agcccccccccccgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agccccccccccccccccccccccccccccccccggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga

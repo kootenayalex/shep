@@ -23,7 +23,7 @@
  ⠹│ enter                        open workspace                             ▕│ │
   │ 1..9                         switch workspace                           ▕│ │
   │                                                                          │ │
- ●│ scroll wheel ↑↓  ·  jump pgup / pgdn   ·  close esc / enter              │ │
+ ●│ scroll jk/↑↓ or wheel ↑↓  ·  jump pgup / pgdn  ·  close esc / enter      │ │
   ╰──────────────────────────────────────────────────────────────────────────╯─╯
  ctrl+b prefix  w spaces  c tab  ? keys  q detach
 
@@ -49,7 +49,7 @@ ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
 pwaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
 ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
 ppannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnapw
-pdaffffffffttttttttffffffffftttttttttttttfffffffffftttttttttttttnnnnnnnnnnnnnapw
+pdafffffffftttttffffttttttttfffffffffttttttttttttfffffffffftttttttttttttnnnnnapw
 ppaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaww
 occccccgggggggggcgggggggggcggggggcgggggggcgggggggooooooooooooooooooooooooooooooo
 

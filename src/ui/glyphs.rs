@@ -124,6 +124,10 @@ pub(super) const QUEUED: &str = "⇥";
 
 // ── Meters ──────────────────────────────────────────────────────────────────
 
+/// The unfilled part of a bar, where the track has to be visible in the ink
+/// rather than in a background colour.
+pub(super) const TRACK: &str = "░";
+
 /// Block eighths, empty through full.
 ///
 /// A bar drawn in whole cells can only be as precise as its width — an
@@ -240,6 +244,11 @@ mod tests {
     /// Box drawing is deliberately **not** covered. It is structural rather
     /// than semantic, ratatui owns a canonical set of it, and an ASCII-safe
     /// mode would swap ratatui's border set rather than these constants.
+    ///
+    /// A `\u{258c}` escape counts as a `▌`. Writing the escape is how you get
+    /// past a rule that only reads the literal — which is not a hypothetical:
+    /// six sites in `board.rs`, `sidebar.rs` and `status.rs` were spelled that
+    /// way and the first version of this test waved every one of them through.
     #[test]
     fn a_named_mark_is_defined_once() {
         let named = [
@@ -260,6 +269,7 @@ mod tests {
             TICK,
             QUEUED,
             SEP,
+            TRACK,
             // The state vocabulary, from `status.rs`.
             "◉",
             "○",
@@ -305,14 +315,20 @@ mod tests {
                         continue;
                     }
                     for glyph in named {
-                        // Only inside a string literal, so a comment or an
-                        // identifier does not trip it.
-                        if line
+                        // Both spellings of the same character. A `char`
+                        // literal counts too — `'\u{2014}'` is an em dash
+                        // however it is quoted.
+                        let escaped: String = glyph
+                            .chars()
+                            .map(|c| format!("\\u{{{:x}}}", c as u32))
+                            .collect();
+                        let found = line
                             .split('"')
                             .skip(1)
                             .step_by(2)
-                            .any(|lit| lit.contains(glyph))
-                        {
+                            .any(|lit| lit.contains(glyph) || lit.contains(&escaped))
+                            || line.contains(&format!("'{escaped}'"));
+                        if found {
                             offenders.push(format!("{name}:{}: {glyph}", number + 1));
                         }
                     }

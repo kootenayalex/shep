@@ -150,6 +150,32 @@ pub(super) fn render_modal_or_notice(
     }
 }
 
+/// The scroll half of a scrollable modal's footer.
+///
+/// Keys first and always, wheel only when shep is actually receiving one.
+/// Three modals used to advertise `wheel ↑↓` — two of them advertised *nothing
+/// else* — so with `mouse_capture = false` their footers named the one control
+/// that does nothing and stayed silent about `jk/↑↓`, `pgup/pgdn`, `home` and
+/// `end`, all of which have always worked.
+pub(super) fn scroll_hint_spans<'a>(mouse_capture: bool, p: &Palette) -> Vec<Span<'a>> {
+    let label = Style::default().fg(p.overlay0);
+    let key = Style::default().fg(p.text);
+    let mut spans = vec![
+        Span::styled(" scroll ", label),
+        Span::styled(glyphs::KEYS_VERTICAL, key),
+    ];
+    if mouse_capture {
+        spans.push(Span::styled(" or ", label));
+        spans.push(Span::styled(glyphs::KEYS_WHEEL, key));
+    }
+    spans.push(Span::styled(glyphs::SEP_WIDE, label));
+    spans.push(Span::styled("jump", label));
+    // No trailing space: SEP_WIDE brings its own, and the two together made
+    // this gap one column wider than every other gap on the row.
+    spans.push(Span::styled(" pgup / pgdn", key));
+    spans
+}
+
 pub(super) fn render_modal_header(frame: &mut Frame, area: Rect, title: &str, p: &Palette) {
     let line = Line::from(vec![Span::styled(
         title,

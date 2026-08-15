@@ -320,9 +320,9 @@ pub(super) fn review_badge(
     use crate::api::schema::ReviewState;
     let (glyph, color) = match state {
         ReviewState::None => return None,
-        ReviewState::NeedsReview => ("\u{25c6}", p.mauve),
-        ReviewState::ChangesRequested => ("\u{21ba}", p.peach),
-        ReviewState::Approved => ("\u{2713}", p.green),
+        ReviewState::NeedsReview => ("◆", p.mauve),
+        ReviewState::ChangesRequested => (super::glyphs::RESET, p.peach),
+        ReviewState::Approved => (super::glyphs::TICK, p.green),
     };
     Some((glyph, Style::default().fg(color)))
 }

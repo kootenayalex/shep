@@ -5,21 +5,21 @@
  shep                                                 workmayt · 1                                          ◉ 1 blocked
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ session board · what are my agents doing                                                                             │
-│ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  3 ws · 3 tabs · 5 panes  ·  ⇥2 queued  ·  │
+│ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  ⇥2 queued  ·  2 tasks                     │
 │ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G                                                       │
 │ blocked 1                     done 1                        working 2                    idle 1                      │
 │                                                                                                                      │
-│ ◉ claude · workmayt ⇥2 p1     ● claude · emberline          ⠹ opencode p2                ○ claude · shep p1          │
-│  workmayt · fix/stripe-we… 2m  emberline · master 6m         workmayt · fix/stripe-… 20s  shep · feat/design-pass 1h │
-│  blocked                       done                          working                      idle                       │
-│  may I run the stripe integr…  pushed 3 commits to master    Metamorphosing…                                         │
-│  …ult/dev/workmayt ████▍░ 72%  …lt/dev/emberline █████▎ 88%  …kmayt/apps/site ██▌░░░ 41%  ~/vault/dev/shep ▊░░░░░ 12%│
+│ ◉ claude · workmayt ⇥2    p1  ● claude · emberline          ⠹ opencode               p2  ○ claude · shep          p1 │
+│   workmayt · fix/stripe-… 2m    emberline · master      6m    workmayt · fix/strip… 20s    shep · feat/design-pa… 1h │
+│   blocked                       done                          working                      idle                      │
+│   may I run the stripe inte…    pushed 3 commits to master    Metamorphosing…                                        │
+│   …/dev/workmayt ████▍░  72%    …dev/emberline █████▎  88%    …yt/apps/site ██▌░░░  41%    …ult/dev/shep ▊░░░░░  12% │
 │                                                                                                                      │
-│                                                             ⠹ codex p2                                               │
-│                                                              shep · feat/design-pass 2m                              │
-│                                                              working                                                 │
-│                                                              reading src/ui/board.rs                                 │
-│                                                              …ees/design-pass ███▎░░ 55%                             │
+│                                                             ⠹ codex                  p2                              │
+│                                                               shep · feat/design-pa… 2m                              │
+│                                                               working                                                │
+│                                                               reading src/ui/board.rs                                │
+│                                                               …/design-pass ███▎░░  55%                              │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -47,21 +47,21 @@
 kbbbbkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkppppppppggglkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkjjjjjjjjjjjk
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 abbbbbbbbbbbbbbbggggggggggggggggggggggggggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-aggggggggojjjjjjjjjjjjmmmmmiiiiiiiiommmmmcccccommmmmqqqqqqqqommmmmeeeeeommmmmgggggggggggggggggggggggmmmmmnnnnnnnnnmmmmma
+aggggggggojjjjjjjjjjjjmmmmmiiiiiiiiommmmmcccccommmmmqqqqqqqqommmmmeeeeeommmmmnnnnnnnnnmmmmmoooooookkkkkkkkkkkkkkkkkkkkka
 aggggggooooommmmmgggggoooggggggggggggmmmmmggggooogggggggggggggggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
 ajjjjjjjjggkkkkkkkkkkkkkkkkkkkkrrrrrggkkkkkkkkkkkkkkkkkkkkkkkddddddddggkkkkkkkkkkkkkkkkkkkfffffggkkkkkkkkkkkkkkkkkkkkkka
 akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-agikooooooooooooooooonnngggkkkkgckooooooooooooooooookkkkkkkkkgqkoooooooogggkkkkkkkkkkkkkkkgekooooooooooooogggkkkkkkkkkka
-akkggggggggggggggggggggggggggggkkgggggggggggggggggggggkkkkkkkkkgggggggggggggggggggggggggggkkggggggggggggggggggggggggggka
-aiiiiiiiiikkkkkkkkkkkkkkkkkkkkkcccccckkkkkkkkkkkkkkkkkkkkkkkkqqqqqqqqqkkkkkkkkkkkkkkkkkkkkeeeeeekkkkkkkkkkkkkkkkkkkkkkka
-ahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhkkhhhhhhhhhhhhhhhhhkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkgggggggggggggggggqqqqqqqqqqqkkgggggggggggggggggiiiiiiiiiiikkgggggggggggggggggggggggggggkkggggggggggggggggggggggggggga
+agikooooooooooooooooonnnkkkkggkgckooooooooooooooooookkkkkkkkkgqkooooooookkkkkkkkkkkkkkkggkgekoooooooooooookkkkkkkkkkggka
+akkkgggggggggggggggggggggggkggkkkkggggggggggggggggggkkkkkkggkkkkgggggggggggggggggggggkgggkkkkggggggggggggggggggggggkggka
+aiiiiiiiiiikkkkkkkkkkkkkkkkkkkkccccccckkkkkkkkkkkkkkkkkkkkkkkqqqqqqqqqqkkkkkkkkkkkkkkkkkkkeeeeeeekkkkkkkkkkkkkkkkkkkkkka
+ahhhhhhhhhhhhhhhhhhhhhhhhhhhhhkhhhhhhhhhhhhhhhhhhhhhhhhhhhhhkhhhhhhhhhhhhhhhhhhkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkggggggggggggggkqqqqqqqqqqqkkkkggggggggggggggkiiiiiiiiiiikkkkgggggggggggggkgggggggggggkkkkgggggggggggggkgggggggggggka
 akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkgqkooooogggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkggggggggggggggggggggggggggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkqqqqqqqqqkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkhhhhhhhhhhhhhhhhhhhhhhhhhkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkgggggggggggggggggggggggggggkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkgqkoooookkkkkkkkkkkkkkkkkkggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkggggggggggggggggggggggkggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkqqqqqqqqqqkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkhhhhhhhhhhhhhhhhhhhhhhhhhhkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkgggggggggggggkgggggggggggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
 akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
 akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
 akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka

@@ -570,6 +570,24 @@ fn snapshot_board_task_queue() {
     assert_screen(&mut state, "board-task-queue", MID.0, MID.1);
 }
 
+/// The two detail screens at 80x24, where their key/value columns have the
+/// least room to be wrong quietly.
+#[test]
+fn snapshot_board_agent_detail_small() {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    state.board.view = BoardView::Agent;
+    assert_screen(&mut state, "board-agent-detail-small", SMALL.0, SMALL.1);
+}
+
+#[test]
+fn snapshot_board_task_queue_small() {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    state.board.view = BoardView::Tasks;
+    assert_screen(&mut state, "board-task-queue-small", SMALL.0, SMALL.1);
+}
+
 /// The normal working screen: titlebar, sidebar, tab bar, pane grid, hint bar.
 ///
 /// `Mode::Terminal` explicitly, because `AppState::test_new` starts in
@@ -638,6 +656,29 @@ fn snapshot_keybind_help_small() {
     let mut state = fixture::session();
     state.mode = Mode::KeybindHelp;
     assert_screen(&mut state, "keybind-help-small", SMALL.0, SMALL.1);
+}
+
+/// The whole app with `mouse_capture = false`.
+///
+/// Shep receives no mouse events in this mode, so anything that can only be
+/// clicked is unreachable — the tab-scroll arrows, the `+` new-tab button and
+/// the sidebar's `new`/`menu` buttons all correctly disappear. The footers that
+/// advertise scrolling are the interesting part: this pins that they name keys
+/// rather than a wheel that is not listening.
+#[test]
+fn snapshot_desktop_no_mouse() {
+    let mut state = fixture::session();
+    state.mode = Mode::Terminal;
+    state.mouse_capture = false;
+    assert_screen(&mut state, "desktop-no-mouse", MID.0, MID.1);
+}
+
+#[test]
+fn snapshot_keybind_help_no_mouse() {
+    let mut state = fixture::session();
+    state.mode = Mode::KeybindHelp;
+    state.mouse_capture = false;
+    assert_screen(&mut state, "keybind-help-no-mouse", SMALL.0, SMALL.1);
 }
 
 #[test]

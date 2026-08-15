@@ -1005,7 +1005,7 @@ fn render_workspace_list(
             if queued > 0 {
                 line1.push(Span::styled(" ", Style::default()));
                 line1.push(Span::styled(
-                    format!("\u{21e5}{queued}"),
+                    format!("{}{queued}", glyphs::QUEUED),
                     Style::default().fg(p.teal),
                 ));
             }
@@ -1303,6 +1303,14 @@ fn render_sidebar_toggle(
     collapsed: bool,
     p: &Palette,
 ) {
+    // Expanded, `«` is purely a click target, and with `mouse_capture = false`
+    // shep never hears the click — so it goes, the same way the `new` and
+    // `menu` buttons a row above it do. Collapsed, `»` stays whatever the mouse
+    // is doing: it is the only remaining evidence that a sidebar exists, and it
+    // is where the attention badge lights up.
+    if !collapsed && !app.mouse_capture {
+        return;
+    }
     let toggle_area = if collapsed {
         collapsed_sidebar_toggle_rect(area)
     } else {
@@ -1342,6 +1350,34 @@ mod tests {
             terminal.backend().buffer()[(toggle.x, toggle.y)].symbol(),
             "«"
         );
+    }
+
+    /// With no mouse, the expanded collapse button is not drawn — but the
+    /// collapsed one still is, because it is the only thing left saying there
+    /// is a sidebar, and it carries the attention badge.
+    #[test]
+    fn the_collapse_button_needs_a_mouse_but_the_reopen_hint_does_not() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.mouse_capture = false;
+        let area = Rect::new(0, 0, 26, 20);
+
+        for (collapsed, expected) in [(false, " "), (true, "\u{bb}")] {
+            let mut terminal =
+                Terminal::new(TestBackend::new(26, 20)).expect("test terminal should initialize");
+            terminal
+                .draw(|frame| render_sidebar_toggle(&app, frame, area, collapsed, &app.palette))
+                .expect("sidebar toggle should render");
+            let toggle = if collapsed {
+                collapsed_sidebar_toggle_rect(area)
+            } else {
+                expanded_sidebar_toggle_rect(area)
+            };
+            assert_eq!(
+                terminal.backend().buffer()[(toggle.x, toggle.y)].symbol(),
+                expected,
+                "collapsed={collapsed}"
+            );
+        }
     }
 
     #[test]

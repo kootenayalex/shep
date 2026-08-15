@@ -21,7 +21,7 @@ use ratatui::{
 use super::glyphs;
 use super::sidebar::{agent_panel_entries, format_event_age};
 use super::status::{agent_icon, state_label};
-use super::text::{truncate_end, truncate_start};
+use super::text::{display_width, truncate_end, truncate_start};
 use super::widgets::render_panel_shell;
 use crate::app::state::{AppState, BoardView, TaskQueueRow};
 use crate::detect::AgentState;
@@ -35,6 +35,20 @@ pub(crate) const BOARD_COLUMNS: usize = 4;
 const CARD_ROWS: u16 = 5;
 /// Card slot height including a one-row gap between cards.
 const CARD_STRIDE: u16 = CARD_ROWS + 1;
+
+/// The card's left gutter: selection marker, state glyph, and the space after
+/// it. Every line below the first indents to here, so the glyph hangs in the
+/// margin and the rest of the card is one text column. They used to indent by
+/// two, which aligned them with the gap between the glyph and the name —
+/// under nothing at all.
+const CARD_INDENT: usize = 3;
+
+/// Columns of air at a card's right edge.
+///
+/// The lanes are cut from the panel's full inner width with no gap, so the
+/// rightmost card's text sat flush against the border while every other lane
+/// had one — which reads as a clipped card rather than a column.
+const CARD_RIGHT_MARGIN: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BoardDir {
@@ -152,15 +166,22 @@ fn contract_home(path: &std::path::Path) -> String {
 /// percentages, so 60% and 74% were the same picture; eighths give the same
 /// six columns forty-nine, which is the difference between a gauge that
 /// reports and one that rounds.
+///
+/// The number is right-aligned in its own three columns. The gauge is pinned to
+/// the card's right edge, so an unpadded `100%` would drag the bar one column
+/// left of every other card's — a shifted bar in a column of bars reads as a
+/// different measurement.
 fn context_gauge(percent: u8) -> String {
     const WIDTH: usize = 6;
-    const TRACK: &str = "\u{2591}";
     let percent = percent.min(100);
     // Any nonzero reading lights something, so "barely used" still outranks
     // "unknown" — which is a different claim and draws nothing.
     let smallest = 1.0 / (WIDTH * 8) as f32;
     let fraction = (f32::from(percent) / 100.0).max(if percent > 0 { smallest } else { 0.0 });
-    format!("{} {percent}%", super::glyphs::bar(fraction, WIDTH, TRACK))
+    format!(
+        "{} {percent:>3}%",
+        super::glyphs::bar(fraction, WIDTH, glyphs::TRACK)
+    )
 }
 
 /// Human-readable "where is this agent" tag.
@@ -445,10 +466,30 @@ pub(crate) fn board_area(app: &AppState) -> Rect {
     app.view.sidebar_rect.union(app.view.terminal_area)
 }
 
-/// Whether the board should collapse to a stacked single-column layout, using
-/// the same width threshold as the mobile layout switch.
+/// Narrowest lane that can still hold a card.
+///
+/// Below this the gutter, the agent name and the location cannot coexist and
+/// the name — the one thing a card exists to tell you — is the part that gives
+/// way: on a standard 80-column terminal the four lanes were 20 columns each
+/// and every card read `◉ claude · … ⇥2 p1`.
+const MIN_CARD_WIDTH: u16 = 24;
+
+/// Whether the board should collapse to a stacked single-column layout.
+///
+/// Two conditions, because the board is four columns wide where the rest of the
+/// app is one: it stacks when the terminal is phone-narrow *or* when splitting
+/// it four ways would leave lanes too thin to read. Using only the mobile
+/// threshold meant a four-column board on an 80-column terminal, which is
+/// exactly where stacking helps most — the same cards, at full width, one at a
+/// time.
 pub(crate) fn is_narrow(app: &AppState) -> bool {
-    super::mobile::is_mobile_width(board_area(app), app.mobile_width_threshold)
+    let area = board_area(app);
+    if let Some(inner) = inner_area(area) {
+        if inner.width / (BOARD_COLUMNS as u16) < MIN_CARD_WIDTH {
+            return true;
+        }
+    }
+    super::mobile::is_mobile_width(area, app.mobile_width_threshold)
 }
 
 fn inner_area(area: Rect) -> Option<Rect> {
@@ -691,39 +732,84 @@ fn human_bytes(bytes: u64) -> String {
 }
 
 /// Two-row dashboard: the session pulse, then the host it runs on.
+/// Assemble a strip of facts into one line, dropping whole facts that will not
+/// fit.
+///
+/// A `Paragraph` clipped at the terminal's edge leaves debris. On an 80-column
+/// board this strip ended `·  3` — the head of "3 ws · 3 tabs · 5 panes",
+/// reading as a count of something unnamed — and at 120 it ended on a dangling
+/// separator promising a fact that was not there.
+///
+/// Facts are given in the order a glance wants them, and this stops at the
+/// first one that does not fit rather than skipping ahead to a shorter one:
+/// a strip that is a prefix of a known order can be read, and a gap-toothed
+/// subset of it cannot.
+fn fit_strip<'a>(facts: Vec<Vec<Span<'a>>>, sep: &Span<'a>, width: usize) -> Vec<Span<'a>> {
+    let span_width =
+        |spans: &[Span<'a>]| -> usize { spans.iter().map(|s| display_width(&s.content)).sum() };
+    let sep_width = display_width(&sep.content);
+    let mut out: Vec<Span<'a>> = Vec::new();
+    let mut used = 0usize;
+    for fact in facts {
+        let lead = if out.is_empty() { 0 } else { sep_width };
+        if used + lead + span_width(&fact) > width {
+            break;
+        }
+        used += lead + span_width(&fact);
+        if lead > 0 {
+            out.push(sep.clone());
+        }
+        out.extend(fact);
+    }
+    out
+}
+
 fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &BoardSummary) {
     let p = &app.palette;
     let dim = Style::default().fg(p.overlay0);
     let value = Style::default().fg(p.text);
-    let sep = || Span::styled(glyphs::SEP_WIDE, Style::default().fg(p.surface0));
+    let sep = Span::styled(glyphs::SEP_WIDE, Style::default().fg(p.surface0));
+    let width = area.width as usize;
 
-    // Row 1 — agents and session shape.
-    let mut row1 = vec![
+    // Row 1 — agents and session shape, most worth knowing first.
+    let mut lead = vec![
         Span::styled(" agents ", dim),
         Span::styled(summary.agents().to_string(), value),
     ];
     if summary.attention > 0 {
-        // The one number on this strip that is a call to action.
-        row1.push(Span::styled(
+        // The one number on this strip that is a call to action, so it rides
+        // with the head count instead of being a fact that can fall off.
+        lead.push(Span::styled(
             format!("  {} need you", summary.attention),
             Style::default().fg(p.red).add_modifier(Modifier::BOLD),
         ));
     }
+    let mut facts = vec![lead];
     for (label, count, state, seen) in [
         ("blocked", summary.blocked, AgentState::Blocked, true),
         ("done", summary.done, AgentState::Idle, false),
         ("working", summary.working, AgentState::Working, true),
         ("idle", summary.idle, AgentState::Idle, true),
     ] {
-        row1.push(sep());
-        row1.push(Span::styled(
-            format!("{label} "),
-            Style::default().fg(super::status::state_label_color(state, seen, p)),
-        ));
-        row1.push(Span::styled(count.to_string(), value));
+        facts.push(vec![
+            Span::styled(
+                format!("{label} "),
+                Style::default().fg(super::status::state_label_color(state, seen, p)),
+            ),
+            Span::styled(count.to_string(), value),
+        ]);
     }
-    row1.push(sep());
-    row1.push(Span::styled(
+    if summary.queued_input > 0 {
+        facts.push(vec![Span::styled(
+            format!("{}{} queued", glyphs::QUEUED, summary.queued_input),
+            Style::default().fg(p.teal),
+        )]);
+    }
+    if let Some(pending) = app.dashboard_sample.pending_tasks.filter(|n| *n > 0) {
+        facts.push(vec![Span::styled(format!("{pending} tasks"), value)]);
+    }
+    // Session shape last: it describes the furniture, not the work.
+    facts.push(vec![Span::styled(
         format!(
             "{} ws {s} {} tabs {s} {} panes",
             summary.workspaces,
@@ -732,20 +818,9 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
             s = glyphs::SEP
         ),
         dim,
-    ));
-    if summary.queued_input > 0 {
-        row1.push(sep());
-        row1.push(Span::styled(
-            format!("\u{21e5}{} queued", summary.queued_input),
-            Style::default().fg(p.teal),
-        ));
-    }
-    if let Some(pending) = app.dashboard_sample.pending_tasks.filter(|n| *n > 0) {
-        row1.push(sep());
-        row1.push(Span::styled(format!("{pending} tasks"), value));
-    }
+    )]);
     frame.render_widget(
-        Paragraph::new(Line::from(row1)),
+        Paragraph::new(Line::from(fit_strip(facts, &sep, width))),
         Rect::new(area.x, area.y, area.width, 1),
     );
 
@@ -756,26 +831,28 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
     // Row 2 — the host. Unsampled or unreadable values print as an em dash
     // rather than a confident zero.
     let vitals = app.dashboard_sample.vitals;
-    let mut row2 = vec![
+    let mut rows = vec![vec![
         Span::styled(" shep ", dim),
         Span::styled(env!("CARGO_PKG_VERSION"), value),
-    ];
-    row2.push(sep());
-    row2.push(Span::styled("load ", dim));
+    ]];
+    let mut load = vec![Span::styled("load ", dim)];
     match (vitals.load_percent, vitals.cores) {
-        (Some(load), Some(cores)) => {
-            let color = match load {
+        (Some(percent), Some(cores)) => {
+            let color = match percent {
                 100..=u16::MAX => p.red,
                 70..=99 => p.yellow,
                 _ => p.text,
             };
-            row2.push(Span::styled(format!("{load}%"), Style::default().fg(color)));
-            row2.push(Span::styled(format!(" of {cores} cores"), dim));
+            load.push(Span::styled(
+                format!("{percent}%"),
+                Style::default().fg(color),
+            ));
+            load.push(Span::styled(format!(" of {cores} cores"), dim));
         }
-        _ => row2.push(Span::styled("\u{2014}", dim)),
+        _ => load.push(Span::styled(glyphs::DASH, dim)),
     }
-    row2.push(sep());
-    row2.push(Span::styled("mem ", dim));
+    rows.push(load);
+    let mut mem = vec![Span::styled("mem ", dim)];
     match vitals.memory_percent {
         Some(percent) => {
             let color = match percent {
@@ -783,22 +860,23 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
                 75..=89 => p.yellow,
                 _ => p.text,
             };
-            row2.push(Span::styled(
+            mem.push(Span::styled(
                 format!("{percent}%"),
                 Style::default().fg(color),
             ));
             if let (Some(used), Some(total)) = (vitals.memory_used_bytes, vitals.memory_total_bytes)
             {
-                row2.push(Span::styled(
+                mem.push(Span::styled(
                     format!(" {} of {}", human_bytes(used), human_bytes(total)),
                     dim,
                 ));
             }
         }
-        None => row2.push(Span::styled("\u{2014}", dim)),
+        None => mem.push(Span::styled(glyphs::DASH, dim)),
     }
+    rows.push(mem);
     frame.render_widget(
-        Paragraph::new(Line::from(row2)),
+        Paragraph::new(Line::from(fit_strip(rows, &sep, width))),
         Rect::new(area.x, area.y + 1, area.width, 1),
     );
 }
@@ -1017,49 +1095,63 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     };
     let dim = Style::default().fg(p.overlay0);
 
-    // Line 1: marker · dot · agent label · model … location.
-    // The context meter moved to its own line as a gauge.
-    let head = format!("{marker}{dot} ");
-    let loc_width = card.location.chars().count();
+    // Every line draws inside this, leaving CARD_RIGHT_MARGIN of air.
+    let content = width.saturating_sub(CARD_RIGHT_MARGIN);
+    let indent = " ".repeat(CARD_INDENT);
+    // Spaces that push a trailing fact out to the content edge. At least one,
+    // so a right-aligned fact never touches the text it follows.
+    let pin = |used: usize, trailing: usize| {
+        " ".repeat(content.saturating_sub(used).saturating_sub(trailing).max(1))
+    };
+
+    // Line 1: marker · glyph · agent · model · queued … location.
+    //
+    // The location is pinned right rather than trailing the name, so the lane
+    // reads as a column of places instead of a ragged edge — and so this line
+    // is the same line the phone's card draws.
     let model = card.model.clone().unwrap_or_default();
     let model_reserved = if model.is_empty() {
         0
     } else {
-        model.chars().count() + 1
+        display_width(&model) + 1
     };
     // Queued-input badge (M5 tab-to-queue): prompts waiting for idle.
     let queued = app.queued_input_count_for_pane(card.pane_id);
-    let queued_label = (queued > 0).then(|| format!("\u{21e5}{queued}"));
+    let queued_label = (queued > 0).then(|| format!("{}{queued}", glyphs::QUEUED));
     let queued_reserved = queued_label
         .as_ref()
-        .map(|label| label.chars().count() + 1)
+        .map(|label| display_width(label) + 1)
         .unwrap_or(0);
-    let agent_budget = width
-        .saturating_sub(head.chars().count())
-        .saturating_sub(loc_width)
+    let loc_width = display_width(&card.location);
+    let loc_reserved = if loc_width == 0 { 0 } else { loc_width + 1 };
+    let agent_budget = content
+        .saturating_sub(CARD_INDENT)
+        .saturating_sub(loc_reserved)
         .saturating_sub(model_reserved)
-        .saturating_sub(queued_reserved)
-        .saturating_sub(1);
+        .saturating_sub(queued_reserved);
+    let name = truncate_end(&card.display_name, agent_budget);
+    let mut used = CARD_INDENT + display_width(&name) + model_reserved + queued_reserved;
     let mut line1 = vec![
         Span::styled(marker.to_string(), marker_style),
         Span::styled(dot, dot_style),
         Span::raw(" "),
-        Span::styled(truncate_end(&card.display_name, agent_budget), agent_style),
+        Span::styled(name, agent_style),
     ];
-    if let Some(queued_label) = &queued_label {
-        line1.push(Span::styled(
-            format!(" {queued_label}"),
-            Style::default().fg(p.teal),
-        ));
-    }
     if !model.is_empty() {
         line1.push(Span::styled(
             format!(" {model}"),
             Style::default().fg(p.teal),
         ));
     }
-    if !card.location.is_empty() {
-        line1.push(Span::styled(format!(" {}", card.location), dim));
+    if let Some(queued_label) = &queued_label {
+        line1.push(Span::styled(
+            format!(" {queued_label}"),
+            Style::default().fg(p.teal),
+        ));
+    }
+    if loc_width > 0 {
+        line1.push(Span::raw(pin(used, loc_width)));
+        line1.push(Span::styled(card.location.clone(), dim));
     }
     frame.render_widget(
         Paragraph::new(Line::from(line1)),
@@ -1069,22 +1161,23 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     if rect.height < 2 {
         return;
     }
-    // Line 2: workspace · branch … age.
+    // Line 2: workspace · branch … age, pinned right.
     let age = card_age(app, card).unwrap_or_default();
+    let age_width = display_width(&age);
     let mut meta = card.workspace_label.clone();
     if let Some(branch) = &card.branch {
         meta.push_str(glyphs::SEP_SPACED);
         meta.push_str(branch);
     }
-    let meta_budget = width
-        .saturating_sub(2)
-        .saturating_sub(age.chars().count() + 1);
-    let mut line2 = vec![
-        Span::raw("  "),
-        Span::styled(truncate_end(&meta, meta_budget), dim),
-    ];
-    if !age.is_empty() {
-        line2.push(Span::styled(format!(" {age}"), dim));
+    let meta_budget = content
+        .saturating_sub(CARD_INDENT)
+        .saturating_sub(if age_width == 0 { 0 } else { age_width + 1 });
+    let meta = truncate_end(&meta, meta_budget);
+    used = CARD_INDENT + display_width(&meta);
+    let mut line2 = vec![Span::raw(indent.clone()), Span::styled(meta, dim)];
+    if age_width > 0 {
+        line2.push(Span::raw(pin(used, age_width)));
+        line2.push(Span::styled(age, dim));
     }
     frame.render_widget(
         Paragraph::new(Line::from(line2)),
@@ -1103,7 +1196,10 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         Style::default().fg(super::status::state_label_color(card.state, card.seen, p));
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
-            format!("  {}", truncate_end(&status, width.saturating_sub(2))),
+            format!(
+                "{indent}{}",
+                truncate_end(&status, content.saturating_sub(CARD_INDENT))
+            ),
             status_style,
         ))),
         Rect::new(rect.x, rect.y + 2, rect.width, 1),
@@ -1117,7 +1213,10 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     if let Some(activity) = &card.activity {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
-                format!("  {}", truncate_end(activity, width.saturating_sub(2))),
+                format!(
+                    "{indent}{}",
+                    truncate_end(activity, content.saturating_sub(CARD_INDENT))
+                ),
                 Style::default()
                     .fg(p.overlay0)
                     .add_modifier(Modifier::ITALIC),
@@ -1129,30 +1228,26 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     if rect.height < 5 {
         return;
     }
-    // Line 5: where it is working … context gauge, right-aligned.
+    // Line 5: where it is working … context gauge, pinned right so the gauges
+    // stack into a column that can be read down for the one about to fill.
     let gauge = card.context_percent.map(context_gauge).unwrap_or_default();
-    let gauge_reserved = if gauge.is_empty() {
-        0
-    } else {
-        gauge.chars().count() + 1
-    };
+    let gauge_width = display_width(&gauge);
     let cwd = card.cwd.clone().unwrap_or_default();
-    let cwd_budget = width.saturating_sub(2).saturating_sub(gauge_reserved);
-    let mut line5 = vec![
-        Span::raw("  "),
-        Span::styled(truncate_start(&cwd, cwd_budget), dim),
-    ];
-    if !gauge.is_empty() {
+    let cwd_budget = content
+        .saturating_sub(CARD_INDENT)
+        .saturating_sub(if gauge_width == 0 { 0 } else { gauge_width + 1 });
+    let cwd = truncate_start(&cwd, cwd_budget);
+    used = CARD_INDENT + display_width(&cwd);
+    let mut line5 = vec![Span::raw(indent), Span::styled(cwd, dim)];
+    if gauge_width > 0 {
         // Near-full context is the thing worth noticing, so it warms up.
         let gauge_color = match card.context_percent.unwrap_or(0) {
             85..=u8::MAX => p.red,
             60..=84 => p.yellow,
             _ => p.overlay0,
         };
-        line5.push(Span::styled(
-            format!(" {gauge}"),
-            Style::default().fg(gauge_color),
-        ));
+        line5.push(Span::raw(pin(used, gauge_width)));
+        line5.push(Span::styled(gauge, Style::default().fg(gauge_color)));
     }
     frame.render_widget(
         Paragraph::new(Line::from(line5)),
@@ -1483,7 +1578,7 @@ fn render_task_row(
     let width = rect.width as usize;
     let task = super::status::task_appearance(row.state, app.spinner_tick);
     let color = task.color(p);
-    let marker = if selected { "\u{258c}" } else { " " };
+    let marker = if selected { glyphs::MARKER } else { " " };
     let marker_style = if selected {
         Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
     } else {
@@ -2178,6 +2273,127 @@ mod tests {
             .collect();
         // Forty-eight eighths plus empty.
         assert_eq!(distinct.len(), 49);
+    }
+
+    /// Every gauge is the same width, so a lane of them is a column of bars
+    /// with a column of numbers beside it rather than a staircase.
+    #[test]
+    fn every_gauge_measures_the_same() {
+        let widths: std::collections::HashSet<usize> = (0..=100)
+            .map(|p| display_width(&context_gauge(p)))
+            .collect();
+        assert_eq!(widths.len(), 1, "gauge widths: {widths:?}");
+    }
+
+    /// The facts that do not fit come off whole.
+    ///
+    /// Clipping the `Paragraph` instead left `·  3` on an 80-column board — the
+    /// head of "3 ws · 3 tabs · 5 panes", which reads as a count of something
+    /// that is never named.
+    #[test]
+    fn the_dashboard_drops_whole_facts_rather_than_clipping_one() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let (state, _) = board_state();
+        let model = board_model(&state);
+        let summary = board_summary(&state, &model);
+        for width in 20u16..=140 {
+            let mut terminal = Terminal::new(TestBackend::new(width, 2)).expect("test terminal");
+            terminal
+                .draw(|frame| render_dashboard(&state, frame, Rect::new(0, 0, width, 2), &summary))
+                .expect("dashboard should render");
+            let buffer = terminal.backend().buffer();
+            for y in 0..2 {
+                let row: String = (0..width).map(|x| buffer[(x, y)].symbol()).collect();
+                let row = row.trim_end();
+                assert!(
+                    !row.ends_with(glyphs::SEP),
+                    "width {width} row {y} ends on a separator: {row:?}"
+                );
+                // Every fact ends in a word or a digit — never a bare fragment
+                // of a longer phrase.
+                if let Some(last) = row.split_whitespace().next_back() {
+                    assert!(
+                        last.chars().next_back().is_some_and(|c| c.is_alphanumeric()
+                            || c == '%'
+                            || c == glyphs::DASH.chars().next().unwrap_or('-')),
+                        "width {width} row {y} ends mid-fact: {row:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Four lanes need four times the room, so the board stacks well before
+    /// the rest of the app does. At 80 columns the lanes were 20 wide and
+    /// every card elided its agent's name away to nothing.
+    #[test]
+    fn the_board_stacks_before_its_lanes_get_too_thin_to_read() {
+        let (mut state, _) = board_state();
+        let wide = Rect::new(0, 0, 120, 40);
+        let standard = Rect::new(0, 0, 80, 24);
+        state.view.sidebar_rect = standard;
+        state.view.terminal_area = standard;
+        assert!(is_narrow(&state), "80 columns is four 20-column lanes");
+        state.view.sidebar_rect = wide;
+        state.view.terminal_area = wide;
+        assert!(!is_narrow(&state), "120 columns has room for four lanes");
+    }
+
+    /// Location, age and gauge sit on the card's right edge, one column in.
+    ///
+    /// They used to trail whatever text came before them, so they only looked
+    /// aligned when that text happened to be long enough to truncate — which
+    /// is to say a lane of short names produced a ragged right edge.
+    #[test]
+    fn a_cards_trailing_facts_pin_to_the_right_edge() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let (state, panes) = board_state();
+        let model = board_model(&state);
+        let card = &model.columns[0][0];
+        assert_eq!(card.pane_id, panes[0]);
+
+        const WIDTH: u16 = 60;
+        let mut terminal = Terminal::new(TestBackend::new(WIDTH, 5)).expect("test terminal");
+        terminal
+            .draw(|frame| render_card(&state, frame, Rect::new(0, 0, WIDTH, 5), card, false))
+            .expect("card should render");
+        let buffer = terminal.backend().buffer();
+        let row_at = |y: u16| -> String { (0..WIDTH).map(|x| buffer[(x, y)].symbol()).collect() };
+        for y in 0..5u16 {
+            assert!(
+                row_at(y).ends_with(' '),
+                "row {y} has no right margin: {:?}",
+                row_at(y)
+            );
+        }
+        // Only the rows that actually carry a trailing fact — a card whose
+        // agent has no recorded age has nothing to pin on its second line.
+        let trailing = [
+            (0u16, card.location.clone()),
+            (1, card_age(&state, card).unwrap_or_default()),
+            (
+                4,
+                card.context_percent.map(context_gauge).unwrap_or_default(),
+            ),
+        ];
+        for (y, fact) in trailing {
+            if fact.is_empty() {
+                continue;
+            }
+            let row = row_at(y);
+            let drawn = row.trim_end();
+            // The margin is exactly one column: anything wider means the fact
+            // stopped short of the edge instead of pinning to it.
+            assert_eq!(
+                drawn.chars().count() + CARD_RIGHT_MARGIN,
+                WIDTH as usize,
+                "row {y} is not pinned right: {row:?}"
+            );
+            assert!(
+                drawn.ends_with(fact.trim_end()),
+                "row {y} should end with {fact:?}: {row:?}"
+            );
+        }
     }
 
     #[test]

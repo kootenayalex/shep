@@ -127,6 +127,49 @@ Every other non-ASCII mark the desktop draws lives in `src/ui/glyphs.rs`, with
 a test pinning each one to a single column. A mark that measures two shifts
 everything after it on the row.
 
+## Layout
+
+**A card's trailing facts pin to its right edge**, one column in. Location, age
+and context gauge each end on the same column, so a lane of cards reads as three
+columns rather than a ragged edge — and so does the phone's card, which lays the
+same line out with a weighted spacer. Trailing them after whatever text came
+before only *looked* aligned when that text happened to be long enough to
+truncate. The gauge's number is right-aligned in its own three columns for the
+same reason: an unpadded `100%` drags its bar a column left of every other.
+
+**A strip drops whole facts, never part of one.** Terminal clipping is a
+guillotine: the board's dashboard used to end `·  3` — the head of
+`3 ws · 3 tabs · 5 panes`, reading as a count of something never named. Facts go
+in the order a glance wants them and the line stops at the first one that does
+not fit, so what remains is a prefix of a known order rather than a gap-toothed
+subset of it.
+
+**A layout collapses on its own threshold, not the app's.** The board is four
+columns where the rest of shep is one, so it stacks at four times the width —
+on a standard 80×24 its lanes were 20 columns and every card had elided its
+agent's name to nothing.
+
+**Too small to draw is a sentence, not a blank screen.** Five modals guarded on
+a hardcoded width and rendered nothing below it, which from the outside is
+indistinguishable from a keybinding that does not exist.
+
+## Affordances without a mouse
+
+`mouse_capture = false` is a supported configuration, and in it shep receives no
+mouse events at all. **Anything that can only be clicked is not drawn** when it
+cannot be clicked: the tab-scroll arrows, the `+` new-tab button, the sidebar's
+`new` and `menu` buttons, and the expanded sidebar's `«` collapse button.
+
+Two carve-outs, both because the mark is doing a second job:
+
+- The **collapsed** sidebar's `»` stays. It is the only remaining evidence that a
+  sidebar exists, and it is where the attention badge lights up.
+- A **hint** names the keys first and the wheel only when there is one. Three
+  scrollable modals advertised `wheel ↑↓` — two of them advertised nothing else —
+  so without a mouse their footers named the one control that does nothing and
+  stayed silent about `jk/↑↓`, `pgup/pgdn`, `home` and `end`, all of which have
+  always worked.
+
 ## Rules that have bitten us
 
 1. **A glyph gets one meaning.** `✓` was idle *and* approved; `⇥` is queued input
@@ -140,3 +183,8 @@ everything after it on the row.
 4. **The palette doc-comments in `src/app/state.rs` are the tiebreaker.** When
    the two surfaces disagreed about `working` and `done`, those comments already
    said yellow and blue; both implementations had drifted from them.
+5. **A rule that reads only the literal form is not a rule.** The first version
+   of the "every mark is named once" test scanned for `▌` and waved through the
+   six sites that had written `"\u{258c}"`. It now reads both spellings — and
+   writing the escape to get past it is not a workaround, it is the thing the
+   test exists to catch.
