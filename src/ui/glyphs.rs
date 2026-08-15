@@ -124,10 +124,6 @@ pub(super) const QUEUED: &str = "⇥";
 
 // ── Meters ──────────────────────────────────────────────────────────────────
 
-/// The unfilled part of a bar, where the track has to be visible in the ink
-/// rather than in a background colour.
-pub(super) const TRACK: &str = "░";
-
 /// Block eighths, empty through full.
 ///
 /// A bar drawn in whole cells can only be as precise as its width — an
@@ -136,30 +132,25 @@ pub(super) const TRACK: &str = "░";
 /// one that rounds.
 pub(super) const EIGHTHS: [&str; 9] = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
 
-/// Fill `width` cells to `fraction`, to the nearest eighth of a cell.
+/// How a bar of `width` cells divides at `fraction`: whole filled cells, the
+/// eighth-index of the boundary cell (`0` when the fill lands on a cell edge),
+/// and the empty cells after it.
 ///
-/// `track` is what an unfilled cell draws — `" "` for a bar that relies on a
-/// background colour, `"░"` for one drawn in a single span where the track has
-/// to be visible in the ink itself.
-pub(super) fn bar(fraction: f32, width: usize, track: &str) -> String {
+/// Parts rather than a finished string, because a bar drawn well is not one
+/// string. The boundary cell wants the fill as its *foreground* over the track
+/// as its *background*, so the two meet inside a single cell and the bar stays
+/// one continuous rectangle. Drawn as plain text it let the panel show through
+/// that cell and the bar read as broken — a defect every cell-exact snapshot
+/// passed, because every cell was right.
+pub(super) fn bar_parts(fraction: f32, width: usize) -> (usize, usize, usize) {
     if width == 0 {
-        return String::new();
+        return (0, 0, 0);
     }
     let eighths = (fraction.clamp(0.0, 1.0) * (width * 8) as f32).round() as usize;
-    let full = eighths / 8;
-    let remainder = eighths % 8;
-    let mut out = String::with_capacity(width * 3);
-    for _ in 0..full.min(width) {
-        out.push_str(EIGHTHS[8]);
-    }
-    if full < width && remainder > 0 {
-        out.push_str(EIGHTHS[remainder]);
-    }
-    let drawn = full.min(width) + usize::from(full < width && remainder > 0);
-    for _ in drawn..width {
-        out.push_str(track);
-    }
-    out
+    let full = (eighths / 8).min(width);
+    let remainder = if full < width { eighths % 8 } else { 0 };
+    let track = width - full - usize::from(remainder > 0);
+    (full, remainder, track)
 }
 
 #[cfg(test)]
@@ -199,18 +190,22 @@ mod tests {
         }
     }
 
-    /// A bar is exactly as wide as it was asked to be, whatever the fraction —
-    /// otherwise it pushes whatever follows it off the end of the row.
+    /// A bar accounts for exactly the cells it was asked for, whatever the
+    /// fraction — otherwise it pushes whatever follows it off the end of the
+    /// row, or leaves a hole in the middle of itself.
     #[test]
     fn a_bar_is_the_width_it_was_asked_for() {
         for width in [0usize, 1, 4, 8, 20] {
             for step in 0..=40 {
                 let fraction = step as f32 / 40.0;
+                let (full, remainder, track) = bar_parts(fraction, width);
                 assert_eq!(
-                    display_width(&bar(fraction, width, " ")),
+                    full + usize::from(remainder > 0) + track,
                     width,
-                    "bar({fraction}, {width})"
+                    "bar_parts({fraction}, {width}) = {:?}",
+                    (full, remainder, track)
                 );
+                assert!(remainder < 8, "remainder is an eighth index");
             }
         }
     }
@@ -219,9 +214,12 @@ mod tests {
     /// same. A four-cell bar used to have five states; it now has thirty-three.
     #[test]
     fn eighths_resolve_what_whole_cells_cannot() {
-        let width = 4;
-        let distinct: std::collections::HashSet<String> =
-            (0..=32).map(|n| bar(n as f32 / 32.0, width, " ")).collect();
+        let distinct: std::collections::HashSet<(usize, usize)> = (0..=32)
+            .map(|n| {
+                let (full, remainder, _) = bar_parts(n as f32 / 32.0, 4);
+                (full, remainder)
+            })
+            .collect();
         assert_eq!(distinct.len(), 33);
     }
 
@@ -229,8 +227,8 @@ mod tests {
     /// than an empty one.
     #[test]
     fn out_of_range_fractions_clamp() {
-        assert_eq!(bar(-1.0, 4, " "), "    ");
-        assert_eq!(bar(2.0, 4, " "), "████");
+        assert_eq!(bar_parts(-1.0, 4), (0, 0, 4));
+        assert_eq!(bar_parts(2.0, 4), (4, 0, 0));
     }
 
     /// A named mark is defined once.
@@ -269,7 +267,6 @@ mod tests {
             TICK,
             QUEUED,
             SEP,
-            TRACK,
             // The state vocabulary, from `status.rs`.
             "◉",
             "○",

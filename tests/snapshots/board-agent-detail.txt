@@ -1,4 +1,4 @@
-# board-agent-detail 120x40 · 11 styles
+# board-agent-detail 120x40 · 13 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
@@ -12,7 +12,7 @@
 │ state        blocked · ⇥2 queued                                                                                     │
 │ activity     may I run the stripe integration tests?                                                                 │
 │ working dir  ~/vault/dev/workmayt                                                                                    │
-│ context      ████▍░  72%                                                                                             │
+│ context      ████▍   72%                                                                                             │
 │                                                                                                                      │
 │ live screen                                                                                                          │
 │   (no live screen for this pane)                                                                                     │
@@ -44,17 +44,17 @@
  ctrl+b prefix  w spaces  c tab  ? keys  q detach
 
 --- styles ---
-gbbbbgggggggggggggggggggggggggggggggggggggggggggggggggjjjjjjjjccchggggggggggggggggggggggggggggggggggggggggggfffffffffffg
+gbbbbgggggggggggggggggggggggggggggggggggggggggggggggggkkkkkkkkccciggggggggggggggggggggggggggggggggggggggggggfffffffffffg
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 acccccccccccccccccbbbbbgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
-agegjjjjjjjjjjjjjjjjjgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
+agegkkkkkkkkkkkkkkkkkgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agcccccccccccccccccccccccccccccccccccccccccccccccccccccgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agccccccccccccceeeeeeeeeeeeeeeeeeeggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agcccccccccccccdddddddddddddddddddddddddddddddddddddddggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
-agccccccccccccciiiiiiiiiiiiiiiiiiiigggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
-agccccccccccccckkkkkkkkkkkggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
+agcccccccccccccjjjjjjjjjjjjjjjjjjjjgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
+agcccccccccccccmmmmmhlllllggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agcccccccccccgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agccccccccccccccccccccccccccccccccggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
@@ -94,7 +94,9 @@ d = fg:overlay1 bg:panel_bg italic
 e = fg:red bg:panel_bg
 f = fg:red bg:panel_bg bold
 g = fg:reset bg:panel_bg
-h = fg:subtext0 bg:panel_bg
-i = fg:text bg:panel_bg
-j = fg:text bg:panel_bg bold
-k = fg:yellow bg:panel_bg
+h = fg:reset bg:surface1
+i = fg:subtext0 bg:panel_bg
+j = fg:text bg:panel_bg
+k = fg:text bg:panel_bg bold
+l = fg:yellow bg:panel_bg
+m = fg:yellow bg:surface1

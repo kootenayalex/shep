@@ -23,7 +23,7 @@ use super::sidebar::{agent_panel_entries, format_event_age};
 use super::status::{agent_icon, state_label};
 use super::text::{display_width, truncate_end, truncate_start};
 use super::widgets::render_panel_shell;
-use crate::app::state::{AppState, BoardView, TaskQueueRow};
+use crate::app::state::{AppState, BoardView, Palette, TaskQueueRow};
 use crate::detect::AgentState;
 use crate::layout::PaneId;
 
@@ -171,17 +171,64 @@ fn contract_home(path: &std::path::Path) -> String {
 /// the card's right edge, so an unpadded `100%` would drag the bar one column
 /// left of every other card's — a shifted bar in a column of bars reads as a
 /// different measurement.
-fn context_gauge(percent: u8) -> String {
-    const WIDTH: usize = 6;
+/// The bar is drawn cell by cell rather than as one string, and the boundary
+/// cell carries the fill as foreground over the track as background. As plain
+/// text the partial cell showed the panel through it and the bar read as
+/// broken — a gap between the fill and the track — which every cell-exact
+/// snapshot passed, because every cell was right. It took looking at pixels.
+const GAUGE_WIDTH: usize = 6;
+
+fn context_gauge_spans<'a>(percent: u8, p: &Palette) -> Vec<Span<'a>> {
     let percent = percent.min(100);
+    // Near-full context is the thing worth noticing, so it warms up. Both the
+    // card and the detail screen come through here: they used to each carry
+    // this ladder and disagreed about the cold end.
+    let color = match percent {
+        85..=u8::MAX => p.red,
+        60..=84 => p.yellow,
+        _ => p.overlay0,
+    };
     // Any nonzero reading lights something, so "barely used" still outranks
     // "unknown" — which is a different claim and draws nothing.
-    let smallest = 1.0 / (WIDTH * 8) as f32;
+    let smallest = 1.0 / (GAUGE_WIDTH * 8) as f32;
     let fraction = (f32::from(percent) / 100.0).max(if percent > 0 { smallest } else { 0.0 });
-    format!(
-        "{} {percent:>3}%",
-        super::glyphs::bar(fraction, WIDTH, glyphs::TRACK)
-    )
+    let (full, remainder, empty) = glyphs::bar_parts(fraction, GAUGE_WIDTH);
+    // The whole bar sits on `surface1` — a recessed channel — and the fill is
+    // drawn into it. The boundary cell's unfilled part is that same channel,
+    // so the fill's edge is a hard line inside one cell rather than a hole.
+    let track = Style::default().bg(p.surface1);
+    let mut spans = Vec::new();
+    if full > 0 {
+        spans.push(Span::styled(
+            glyphs::EIGHTHS[8].repeat(full),
+            track.fg(color),
+        ));
+    }
+    if remainder > 0 {
+        spans.push(Span::styled(
+            glyphs::EIGHTHS[remainder].to_string(),
+            track.fg(color),
+        ));
+    }
+    if empty > 0 {
+        // EIGHTHS[0] is a space: nothing but the channel.
+        spans.push(Span::styled(glyphs::EIGHTHS[0].repeat(empty), track));
+    }
+    spans.push(Span::styled(
+        format!(" {percent:>3}%"),
+        Style::default().fg(color),
+    ));
+    spans
+}
+
+/// The gauge's text, for measuring it and for tests.
+fn spans_text(spans: &[Span<'_>]) -> String {
+    spans.iter().map(|s| s.content.as_ref()).collect()
+}
+
+#[cfg(test)]
+fn context_gauge(percent: u8) -> String {
+    spans_text(&context_gauge_spans(percent, &Palette::shep()))
 }
 
 /// Human-readable "where is this agent" tag.
@@ -1230,8 +1277,11 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     }
     // Line 5: where it is working … context gauge, pinned right so the gauges
     // stack into a column that can be read down for the one about to fill.
-    let gauge = card.context_percent.map(context_gauge).unwrap_or_default();
-    let gauge_width = display_width(&gauge);
+    let gauge = card
+        .context_percent
+        .map(|percent| context_gauge_spans(percent, p))
+        .unwrap_or_default();
+    let gauge_width = display_width(&spans_text(&gauge));
     let cwd = card.cwd.clone().unwrap_or_default();
     let cwd_budget = content
         .saturating_sub(CARD_INDENT)
@@ -1240,14 +1290,8 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     used = CARD_INDENT + display_width(&cwd);
     let mut line5 = vec![Span::raw(indent), Span::styled(cwd, dim)];
     if gauge_width > 0 {
-        // Near-full context is the thing worth noticing, so it warms up.
-        let gauge_color = match card.context_percent.unwrap_or(0) {
-            85..=u8::MAX => p.red,
-            60..=84 => p.yellow,
-            _ => p.overlay0,
-        };
         line5.push(Span::raw(pin(used, gauge_width)));
-        line5.push(Span::styled(gauge, Style::default().fg(gauge_color)));
+        line5.extend(gauge);
     }
     frame.render_widget(
         Paragraph::new(Line::from(line5)),
@@ -1399,18 +1443,15 @@ fn render_agent_detail(
         );
     }
     if let Some(percent) = card.context_percent {
-        let color = match percent {
-            85..=u8::MAX => p.red,
-            60..=84 => p.yellow,
-            _ => p.overlay1,
-        };
-        kv(
-            frame,
-            &mut y,
-            "context",
-            context_gauge(percent),
-            Style::default().fg(color),
-        );
+        // Straight through `context_gauge_spans` so the boundary cell keeps its
+        // track background here too, rather than being flattened into one
+        // colour by `kv`.
+        let mut line = vec![Span::styled(
+            format!("{:<DETAIL_KEY_WIDTH$}", "context"),
+            dim,
+        )];
+        line.extend(context_gauge_spans(percent, p));
+        row(frame, &mut y, Line::from(line));
     }
     row(frame, &mut y, Line::from(""));
 
@@ -2245,16 +2286,13 @@ mod tests {
 
     #[test]
     fn context_gauge_fills_proportionally_and_clamps() {
-        // Empty draws only track.
-        assert!(context_gauge(0).starts_with("\u{2591}"));
-        assert_eq!(
-            context_gauge(100),
-            "\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588} 100%"
-        );
+        // Empty draws only the channel, which is bare background.
+        assert!(context_gauge(0).starts_with("      "));
+        assert_eq!(context_gauge(100), "██████ 100%");
         // Any nonzero percentage lights something, so a barely used context is
         // still visibly distinct from an unknown one — an eighth now, rather
         // than a whole cell, because a whole cell overstated 1% by sixteen.
-        assert!(!context_gauge(1).starts_with("\u{2591}"));
+        assert!(!context_gauge(1).starts_with("  "));
         // Only a full context fills the bar: a nearly-full agent must stay
         // visually distinguishable from a finished one.
         assert_ne!(context_gauge(88), context_gauge(100));
