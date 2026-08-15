@@ -125,10 +125,11 @@ object ShepShape {
 /**
  * How long things take.
  *
- * Only the spinner is animated today; the rest of the motion pass is the next
- * phase. Rather than declare a scale nothing reads — which is exactly how
- * `MaterialTheme.shapes` sat configured and ignored in this app for months —
- * this holds the one cadence that is live, and grows when it has consumers.
+ * Motion here has one job: make a change that happened *elsewhere* legible.
+ * This is a companion to a screen you are not looking at, so a card that
+ * silently swaps colour or teleports up the list is a change you missed. It is
+ * not decoration, and the desktop deliberately has none of it — a TUI over
+ * mosh cannot afford to repaint for the sake of feeling nice.
  */
 object ShepMotion {
     /**
@@ -137,6 +138,25 @@ object ShepMotion {
      * braille frames at 125ms come to the same cadence.
      */
     const val SPINNER_FRAME_MS = 180L
+
+    /** A colour settling into its new tier. Long enough to catch, short
+     *  enough that a board of six agents changing at once is not a light show. */
+    const val QUICK_MS = 220
+
+    /** A meter filling, a card moving up the list. */
+    const val STANDARD_MS = 320
+
+    /** A tab arriving. */
+    const val ENTER_MS = 180
+
+    /**
+     * How long a notice stays before it clears itself.
+     *
+     * Three of the six hand-rolled notices could not be dismissed at all, so
+     * they sat on screen until the next one replaced them — "renamed to x"
+     * still showing ten minutes later is a lie about what is happening now.
+     */
+    const val NOTICE_MS = 4000L
 }
 
 /*

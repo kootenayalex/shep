@@ -54,6 +54,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 /**
  * The events that change the session's shape.
@@ -106,6 +108,7 @@ fun SpacesScreen(
     var confirming by remember { mutableStateOf<Confirm?>(null) }
     var renaming by remember { mutableStateOf<Renaming?>(null) }
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     suspend fun refresh() {
         withContext(Dispatchers.IO) { runCatching { client.call("session.snapshot") } }
@@ -349,6 +352,9 @@ fun SpacesScreen(
                     target.action,
                     style = ShepType.action.copy(color = ShepPalette.red),
                 ) {
+                    // Closing a space stops everything running in it. A tick
+                    // is the difference between "I pressed it" and "it went".
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     confirming = null
                     target.run()
                 }

@@ -15,6 +15,8 @@ import dev.shep.companion.ui.theme.ShepSemantic
 import dev.shep.companion.ui.theme.ShepType
 import dev.shep.companion.ui.theme.StateAppearance
 import kotlinx.coroutines.delay
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 
 /**
  * One agent's state, as the mark the desktop draws for it.
@@ -79,9 +81,18 @@ fun TaskGlyph(
 
 @Composable
 private fun Glyph(appearance: StateAppearance, modifier: Modifier, style: TextStyle) {
+    // The colour eases; the glyph does not. A shape that morphs is a
+    // distraction, but a shape that changes while its colour slides tells you
+    // *which* card just moved on a board where six of them look alike — which
+    // is the whole reason to animate anything on a screen you glance at.
+    val ink by animateColorAsState(
+        targetValue = appearance.color,
+        animationSpec = tween(ShepMotion.QUICK_MS),
+        label = "state-ink",
+    )
     Text(
         appearance.glyph,
-        style = style.copy(color = appearance.color),
+        style = style.copy(color = ink),
         textAlign = TextAlign.Center,
         modifier = modifier.semantics { contentDescription = appearance.description },
     )

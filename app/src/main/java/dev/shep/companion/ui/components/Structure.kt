@@ -31,6 +31,13 @@ import dev.shep.companion.ui.theme.ShepShape
 import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import dev.shep.companion.ui.theme.ShepMotion
+import kotlinx.coroutines.delay
 
 /**
  * The one line at the top of a tab.
@@ -90,6 +97,17 @@ fun Notice(
     tone: NoticeTone = NoticeTone.Info,
     onDismiss: (() -> Unit)? = null,
 ) {
+    // An Info notice is a receipt — "renamed to x", "queued task" — and a
+    // receipt has a shelf life. It clears itself after
+    // [ShepMotion.NOTICE_MS] so the screen stops asserting something that
+    // stopped being true minutes ago. An Alert does not: a protocol mismatch
+    // is a standing condition, not an event.
+    if (onDismiss != null && tone == NoticeTone.Info) {
+        LaunchedEffect(text) {
+            delay(ShepMotion.NOTICE_MS)
+            onDismiss()
+        }
+    }
     val background = if (tone == NoticeTone.Alert) ShepPalette.peach else Color.Transparent
     val ink = if (tone == NoticeTone.Alert) ShepPalette.panelBg else ShepPalette.peach
     Text(
@@ -149,6 +167,19 @@ fun Meter(
     modifier: Modifier = Modifier,
     height: androidx.compose.ui.unit.Dp = ShepSize.meterHeight,
 ) {
+    // Animated because a meter that jumps reads as a redraw, and one that
+    // fills reads as a measurement — and these two both report a number that
+    // matters exactly when it is climbing.
+    val filled by animateFloatAsState(
+        targetValue = fraction.coerceIn(0f, 1f),
+        animationSpec = tween(ShepMotion.STANDARD_MS),
+        label = "meter",
+    )
+    val ink by animateColorAsState(
+        targetValue = color,
+        animationSpec = tween(ShepMotion.QUICK_MS),
+        label = "meter-ink",
+    )
     Box(
         modifier
             .height(height)
@@ -157,10 +188,10 @@ fun Meter(
     ) {
         Box(
             Modifier
-                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                .fillMaxWidth(filled)
                 .height(height)
                 .clip(ShepShape.bar)
-                .background(color),
+                .background(ink),
         )
     }
 }

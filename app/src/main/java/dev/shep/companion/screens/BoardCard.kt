@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import dev.shep.companion.AgentRow
 import dev.shep.companion.formatAge
+import dev.shep.companion.ui.components.Meter
 import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepShape
@@ -51,12 +52,13 @@ import dev.shep.companion.ui.theme.ShepType
 fun BoardCard(
     row: AgentRow,
     statusColor: (String) -> Color,
+    modifier: Modifier = Modifier,
     displayName: String = row.agent,
     onLongClick: () -> Unit = {},
     onClick: () -> Unit,
 ) {
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clip(ShepShape.card)
             .background(ShepPalette.surface0)
@@ -176,21 +178,12 @@ fun ContextGauge(percent: Int) {
         else -> ShepPalette.overlay0
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .width(ShepSize.gaugeWidth)
-                .height(ShepSize.gaugeHeight)
-                .clip(ShepShape.bar)
-                .background(ShepPalette.surface1)
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth(clamped / 100f)
-                    .height(ShepSize.gaugeHeight)
-                    .clip(ShepShape.bar)
-                    .background(color)
-            )
-        }
+        Meter(
+            fraction = clamped / 100f,
+            color = color,
+            height = ShepSize.gaugeHeight,
+            modifier = Modifier.width(ShepSize.gaugeWidth),
+        )
         Spacer(Modifier.width(ShepSpace.snug))
         Text("$clamped%", style = ShepType.badge.copy(color = color))
     }

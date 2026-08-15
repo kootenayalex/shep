@@ -44,6 +44,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 /** Tint diff lines: green added, red removed, copper hunk headers, dim context. */
 fun colorizeDiff(diff: String): AnnotatedString =
@@ -84,6 +86,7 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
     var shipping by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val scroll = rememberScrollState()
+    val haptics = LocalHapticFeedback.current
 
     LaunchedEffect(row.workspaceId) {
         withContext(Dispatchers.IO) {
@@ -219,6 +222,8 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
                     "Merge & ship",
                     style = ShepType.action.copy(color = ShepPalette.accent),
                 ) {
+                        // A merge that cannot be undone. It gets a tick.
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         confirmShip = false
                         shipping = true
                         scope.launch {

@@ -49,6 +49,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 // Structural subscriptions (no pane arg) that signal the agent list changed
 // shape; a re-snapshot on any of these keeps the board in sync without
@@ -86,6 +88,7 @@ fun BoardScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: 
     var renaming by remember { mutableStateOf<AgentRow?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     // Event-driven refresh: subscribe to structural events + a per-pane
     // agent_status_changed sub for each live pane, and re-snapshot on any event
@@ -270,10 +273,21 @@ fun BoardScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: 
             ) {
                 items(visibleRows, key = { it.paneId }) { row ->
                     BoardCard(
+                        // The board sorts by attention, so a card that starts
+                        // needing you *moves*. Without this it teleports, and a
+                        // card arriving at the top by teleport is the change
+                        // this whole screen exists to show you, unshown.
+                        modifier = Modifier.animateItem(),
                         row = row,
                         statusColor = { statusColor(it) },
                         displayName = row.displayName ?: row.agent,
-                        onLongClick = { renaming = row },
+                        onLongClick = {
+                            // The app's one hidden gesture. Without a tick you
+                            // cannot tell a long-press that worked from one
+                            // that was half a second short.
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            renaming = row
+                        },
                         onClick = { onOpenPane(row) },
                     )
                 }

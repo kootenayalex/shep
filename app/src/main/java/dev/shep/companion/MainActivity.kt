@@ -54,6 +54,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import dev.shep.companion.ui.theme.ShepMotion
 
 // Bridge protocol the app was built against (shep src/protocol/wire.rs
 // PROTOCOL_VERSION at vendor time). A mismatch soft-warns; it does not brick a
@@ -387,27 +390,37 @@ fun NavShell(
                         }
                     }
                 } else {
-                    when (tab) {
-                        Tab.Agents -> BoardScreen(
-                            client = client,
-                            onOpenPane = { paneDetail = it },
-                            onUnpair = onUnpair,
-                        )
-                        Tab.Spaces -> SpacesScreen(
-                            client = client,
-                            // The tree knows a pane; the pane view wants the
-                            // board's row for it, so resolve through the same
-                            // path a notification tap uses rather than inventing
-                            // a second, thinner pane view.
-                            onOpenPane = { node, label -> openPaneNode = node to label },
-                        )
-                        Tab.Tasks -> TasksScreen(
-                            client = client,
-                            showAdd = tasksShowAdd,
-                            onShowAddChange = { tasksShowAdd = it },
-                        )
-                        Tab.Memory -> MemoryScreen(client)
-                        Tab.Shep -> ServerScreen()
+                    // A crossfade, not a slide: these are five peers, not a
+                    // stack, and a directional transition would claim an order
+                    // the nav bar does not have. Short enough that switching
+                    // tabs still feels like switching, not like waiting.
+                    Crossfade(
+                        targetState = tab,
+                        animationSpec = tween(ShepMotion.ENTER_MS),
+                        label = "tab",
+                    ) { current ->
+                        when (current) {
+                            Tab.Agents -> BoardScreen(
+                                client = client,
+                                onOpenPane = { paneDetail = it },
+                                onUnpair = onUnpair,
+                            )
+                            Tab.Spaces -> SpacesScreen(
+                                client = client,
+                                // The tree knows a pane; the pane view wants
+                                // the board's row for it, so resolve through
+                                // the same path a notification tap uses rather
+                                // than inventing a second, thinner pane view.
+                                onOpenPane = { node, label -> openPaneNode = node to label },
+                            )
+                            Tab.Tasks -> TasksScreen(
+                                client = client,
+                                showAdd = tasksShowAdd,
+                                onShowAddChange = { tasksShowAdd = it },
+                            )
+                            Tab.Memory -> MemoryScreen(client)
+                            Tab.Shep -> ServerScreen()
+                        }
                     }
                 }
             }
