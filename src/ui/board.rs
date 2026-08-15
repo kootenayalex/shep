@@ -1376,19 +1376,6 @@ fn render_agent_screen(
 
 /// Colour for a task-queue state, matching the agent-state language: red is
 /// blocked, yellow is running, green is done, dim is waiting.
-fn task_state_color(
-    state: crate::tasks::TaskState,
-    p: &crate::app::state::Palette,
-) -> ratatui::style::Color {
-    match state {
-        crate::tasks::TaskState::Blocked => p.red,
-        crate::tasks::TaskState::Running => p.yellow,
-        crate::tasks::TaskState::Done => p.green,
-        crate::tasks::TaskState::Todo => p.overlay1,
-        crate::tasks::TaskState::Cancelled => p.overlay0,
-    }
-}
-
 /// The dispatch queue behind the dashboard's `tasks` count: what is waiting,
 /// what is running, and which repo each one belongs to.
 fn render_task_queue(app: &AppState, frame: &mut Frame, body: Rect) {
@@ -1476,7 +1463,8 @@ fn render_task_row(
     }
     let dim = Style::default().fg(p.overlay0);
     let width = rect.width as usize;
-    let color = task_state_color(row.state, p);
+    let task = super::status::task_appearance(row.state, app.spinner_tick);
+    let color = task.color(p);
     let marker = if selected { "\u{258c}" } else { " " };
     let marker_style = if selected {
         Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
@@ -1486,14 +1474,16 @@ fn render_task_row(
 
     // Line 1: marker · state dot · prompt … state label pinned to the right
     // edge, so the states line up into a column that can be read down.
-    let label = row.state.as_str();
+    let label = task.label;
     let prompt_budget = width.saturating_sub(3).saturating_sub(label.len() + 2);
     let prompt = truncate_end(&row.prompt, prompt_budget);
     let used = 3 + prompt.chars().count() + label.len();
     let pad = width.saturating_sub(used).max(2);
     let line1 = vec![
         Span::styled(marker.to_string(), marker_style),
-        Span::styled("\u{25cf} ", Style::default().fg(color)),
+        // The state's own glyph, not a filled dot in five colours: three of
+        // these rows used to be distinguishable by hue alone.
+        Span::styled(format!("{} ", task.glyph), Style::default().fg(color)),
         Span::styled(prompt, Style::default().fg(p.text)),
         Span::styled(
             format!("{}{label}", " ".repeat(pad)),

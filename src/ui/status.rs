@@ -226,6 +226,9 @@ pub(super) enum StateInk {
     Working,
     DoneUnseen,
     Settled,
+    /// Accepted but not started. Dimmer than working, brighter than absent —
+    /// the queue is a backlog, and the eye should land on what is moving.
+    Waiting,
     Absent,
 }
 
@@ -236,6 +239,7 @@ impl StateInk {
             StateInk::Working => p.yellow,
             StateInk::DoneUnseen => p.blue,
             StateInk::Settled => p.green,
+            StateInk::Waiting => p.overlay1,
             StateInk::Absent => p.overlay0,
         }
     }
@@ -255,6 +259,27 @@ pub(super) fn state_appearance(state: AgentState, seen: bool, tick: u32) -> Stat
         // else. A state and a badge sharing a mark made both ambiguous.
         (AgentState::Idle, true) => ("○", "idle", StateInk::Settled),
         (AgentState::Unknown, _) => ("·", "idle", StateInk::Absent),
+    };
+    StateAppearance { glyph, label, ink }
+}
+
+/// The task-queue vocabulary. Same shapes, because they mean the same things.
+///
+/// A ring is stopped, movement is working, filled is finished, hollow is
+/// waiting, a speck is nothing. Only "done" takes a different tier from the
+/// agent table — settled rather than done-unseen — because a task has no
+/// notion of your having looked at it.
+///
+/// The queue used to draw a filled `●` for all five states and differ only in
+/// hue, which is the one thing `docs/DESIGN-LANGUAGE.md` says never to do.
+pub(super) fn task_appearance(state: crate::tasks::TaskState, tick: u32) -> StateAppearance {
+    use crate::tasks::TaskState;
+    let (glyph, label, ink) = match state {
+        TaskState::Blocked => ("◉", "blocked", StateInk::Stop),
+        TaskState::Running => (super::spinner_frame(tick), "running", StateInk::Working),
+        TaskState::Done => ("●", "done", StateInk::Settled),
+        TaskState::Todo => ("○", "todo", StateInk::Waiting),
+        TaskState::Cancelled => ("·", "cancelled", StateInk::Absent),
     };
     StateAppearance { glyph, label, ink }
 }
@@ -307,6 +332,41 @@ mod tests {
     /// The companion has the same table in `ShepSemanticTest.kt`. If you change
     /// one, change the other and the doc — a phone that disagrees with the
     /// desktop about what yellow means is the bug this pins.
+    /// The queue's labels are the wire format, so a typo here would rename a
+    /// state in the UI while the server kept calling it something else.
+    #[test]
+    fn task_labels_are_the_wire_format() {
+        use crate::tasks::TaskState;
+        for state in [
+            TaskState::Todo,
+            TaskState::Running,
+            TaskState::Blocked,
+            TaskState::Done,
+            TaskState::Cancelled,
+        ] {
+            assert_eq!(task_appearance(state, 0).label, state.as_str());
+        }
+    }
+
+    /// Colour is never the only channel — the queue used to draw one filled
+    /// dot for all five states.
+    #[test]
+    fn every_task_state_has_its_own_glyph() {
+        use crate::tasks::TaskState;
+        let glyphs: Vec<&str> = [
+            TaskState::Todo,
+            TaskState::Running,
+            TaskState::Blocked,
+            TaskState::Done,
+            TaskState::Cancelled,
+        ]
+        .into_iter()
+        .map(|s| task_appearance(s, 0).glyph)
+        .collect();
+        let unique: std::collections::HashSet<&&str> = glyphs.iter().collect();
+        assert_eq!(unique.len(), glyphs.len(), "{glyphs:?}");
+    }
+
     #[test]
     fn state_vocabulary_matches_the_design_language() {
         let p = Palette::shep();

@@ -8,13 +8,13 @@
 │                                                                                                                      │
 │ 3 in queue  ·  1 running  ·  1 waiting                                                                               │
 │                                                                                                                      │
-│ ▌● harden the stripe webhook signature check                                                                 running │
+│ ▌⠹ harden the stripe webhook signature check                                                                 running │
 │    workmayt · claude · worktree · dispatched · 4m                                                                    │
 │                                                                                                                      │
-│  ● draft the 0.9.0 release notes                                                                                todo │
+│  ○ draft the 0.9.0 release notes                                                                                todo │
 │    shep · opencode · 19m                                                                                             │
 │                                                                                                                      │
-│  ● unblock the gitea 403 on emberline                                                                        blocked │
+│  ◉ unblock the gitea 403 on emberline                                                                        blocked │
 │    emberline · claude · dispatched · 2h                                                                              │
 │                                                                                                                      │
 │                                                                                                                      │

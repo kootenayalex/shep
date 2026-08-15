@@ -74,6 +74,31 @@ family — ring, filling, full, empty, speck.
 What is shared is the meaning and the cadence: working animates, in yellow, at
 roughly two-thirds of a second per turn. How it animates belongs to the medium.
 
+## Task-queue states
+
+A task is a different thing from an agent, so it gets its own row of the table
+— but the *shapes* are the same, because they mean the same things.
+
+| state | label | glyph | colour |
+|---|---|---|---|
+| blocked | `blocked` | `◉` | red |
+| running | `running` | spinner | yellow |
+| done | `done` | `●` | green |
+| todo | `todo` | `○` | overlay1 |
+| cancelled | `cancelled` | `·` | overlay0 |
+
+Only "done" takes a different tier from the agent table: settled green rather
+than done-unseen blue, because a task has no notion of your having looked at it.
+Todo is `overlay1` — dimmer than running, brighter than cancelled — because the
+queue is a backlog and the eye should land on what is moving.
+
+The labels are the wire format (`TaskState::as_str`), pinned by a test on the
+desktop side, so a typo cannot rename a state in the UI while the server keeps
+calling it something else.
+
+- Desktop: `task_appearance` in `src/ui/status.rs`.
+- Companion: `ShepSemantic.task` in `ui/theme/ShepSemantic.kt`.
+
 ## Badges
 
 Badges sit beside a name and answer a different question from state.
@@ -100,7 +125,8 @@ idle is now `○`.
    why needs-review moved to mauve. `teal` was queued *and* done, which is why
    done moved to blue.
 3. **Never distinguish by colour alone.** Three board-card states once shared a
-   filled `●` and differed only in hue.
+   filled `●` and differed only in hue, and the task queue did it for all five
+   of its states on both surfaces at once.
 4. **The palette doc-comments in `src/app/state.rs` are the tiebreaker.** When
    the two surfaces disagreed about `working` and `done`, those comments already
    said yellow and blue; both implementations had drifted from them.
