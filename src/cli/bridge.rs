@@ -20,6 +20,7 @@
 //! never bind a public interface.
 
 mod stream;
+mod transcript;
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -325,7 +326,8 @@ fn handle_client_frame(
         }
         let local = push::handle_local_method(method, params)
             .or_else(|| task_local::handle_local_method(method, params))
-            .or_else(|| memory_local::handle_local_method(method, params));
+            .or_else(|| memory_local::handle_local_method(method, params))
+            .or_else(|| transcript::handle_local_method(method, params, api_socket));
         if let Some(outcome) = local {
             let line = match outcome {
                 Ok(result) => serde_json::json!({"result": result}),
