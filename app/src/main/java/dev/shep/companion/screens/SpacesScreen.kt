@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -54,6 +53,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import dev.shep.companion.ui.components.StateGlyph
 
 /**
  * The events that change the session's shape.
@@ -526,12 +526,9 @@ private fun reviewBadge(state: String): String? = when (state) {
 
 @Composable
 private fun StatusDot(status: String, size: Int = 8) {
-    Box(
-        Modifier
-            .size(size.dp)
-            .clip(CircleShape)
-            .background(statusColorFor(status)),
-    )
+    // `size` was a dot diameter and is now a type size; the two happen to read
+    // at about the same weight, so the tree's rhythm is unchanged.
+    StateGlyph(status, fontSize = (size + 4).sp)
 }
 
 @Composable

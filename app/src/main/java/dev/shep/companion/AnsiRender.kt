@@ -1,6 +1,8 @@
 package dev.shep.companion
 
 import androidx.compose.ui.graphics.Color
+import dev.shep.companion.terminal.PackedColor
+import dev.shep.companion.ui.theme.ShepPalette
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -19,30 +21,15 @@ import androidx.compose.ui.text.withStyle
 private const val ESC = '\u001B'
 private const val BEL = '\u0007'
 
-// 16-colour palette tuned for the dark shep background (index 0 = a visible
-// grey, not pure black, so "black" text stays legible).
-private val ANSI_16 = listOf(
-    Color(0xFF5A554E), Color(0xFFD9695F), Color(0xFF9BC177), Color(0xFFE0B085),
-    Color(0xFF7FA8C9), Color(0xFFC79BC9), Color(0xFF7FC9C4), Color(0xFFEDE7DF),
-    Color(0xFF6C665E), Color(0xFFE98A80), Color(0xFFB4D897), Color(0xFFF0C6A0),
-    Color(0xFF9EC2DD), Color(0xFFD9B4DB), Color(0xFF9EDBD6), Color(0xFFFFFFFF),
-)
+// Scrollback and the live stream render the same pane, so they resolve colours
+// through the same table. This file used to carry a second sixteen-colour
+// palette of its own, which made a pane's red #D9695F in history and #E66A5E
+// live — the same output in two different inks depending on which view you
+// happened to be in.
+private val ANSI_16 = ShepPalette.ansi16
 
-private fun xterm256(n: Int): Color = when {
-    n < 16 -> ANSI_16[n.coerceIn(0, 15)]
-    n in 16..231 -> {
-        val i = n - 16
-        val r = i / 36
-        val g = (i % 36) / 6
-        val b = i % 6
-        fun c(v: Int) = if (v == 0) 0 else 55 + v * 40
-        Color(c(r), c(g), c(b))
-    }
-    else -> {
-        val v = 8 + (n - 232).coerceIn(0, 23) * 10
-        Color(v, v, v)
-    }
-}
+private fun xterm256(n: Int): Color =
+    PackedColor.xterm256(n.coerceIn(0, 255), ShepPalette.text)
 
 fun ansiToAnnotated(raw: String, base: Color): AnnotatedString = buildAnnotatedString {
     var fg: Color? = null

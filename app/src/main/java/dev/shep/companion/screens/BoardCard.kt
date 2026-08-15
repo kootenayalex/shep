@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import dev.shep.companion.AgentRow
 import dev.shep.companion.formatAge
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.components.StateGlyph
 
 /**
  * One agent, laid out as the desktop board's card: identity line, placement
@@ -65,13 +65,8 @@ fun BoardCard(
     ) {
         // Line 1 — dot, agent, model, queued badge … location.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(statusColor(row.status))
-            )
-            Spacer(Modifier.width(10.dp))
+            StateGlyph(row.status, fontSize = 13.sp)
+            Spacer(Modifier.width(8.dp))
             Text(
                 displayName,
                 color = ShepPalette.text,

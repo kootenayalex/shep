@@ -52,8 +52,15 @@ object ShepPalette {
      * means. Order is the standard ANSI one (black, red, green, yellow, blue,
      * magenta, cyan, white, then the bright variants).
      */
+    /**
+     * Slot 0 of [ansi16]. A pane that explicitly asks for ANSI black on a dark
+     * terminal is asking to be invisible, so shep answers with the dimmest ink
+     * you can still read rather than with the background itself.
+     */
+    val ansiBlack = Color(0xFF5A554E)
+
     val ansi16: List<Color> = listOf(
-        panelBg, red, green, yellow, blue, mauve, teal, subtext0,
+        ansiBlack, red, green, yellow, blue, mauve, teal, subtext0,
         overlay0, red, green, yellow, blue, mauve, teal, text,
     )
 }

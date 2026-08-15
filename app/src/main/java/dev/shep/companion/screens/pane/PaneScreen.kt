@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
@@ -51,6 +50,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import dev.shep.companion.ui.components.StateGlyph
+import androidx.compose.ui.unit.sp
 
 /** Live keystrokes, or compose-and-queue for when the agent is busy. */
 enum class InputMode { Stream, Queue }
@@ -319,7 +320,7 @@ private fun PaneTitleBar(
             modifier = Modifier.clickable { onHistory() }.padding(4.dp))
         Text("review", style = ShepType.hint.copy(color = ShepPalette.accent),
             modifier = Modifier.clickable { onReview() }.padding(4.dp))
-        Box(Modifier.size(8.dp).clip(CircleShape).background(statusColorFor(status)))
+        StateGlyph(status, fontSize = 12.sp)
     }
 }
 
