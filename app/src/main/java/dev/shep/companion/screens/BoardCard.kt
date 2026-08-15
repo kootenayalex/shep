@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,14 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.shep.companion.AgentRow
 import dev.shep.companion.formatAge
-import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.components.StateGlyph
+import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSize
+import dev.shep.companion.ui.theme.ShepSpace
+import dev.shep.companion.ui.theme.ShepType
 
 /**
  * One agent, laid out as the desktop board's card: identity line, placement
@@ -37,7 +36,9 @@ import dev.shep.companion.ui.components.StateGlyph
  *
  * The lines are the same lines, in the same order, as `render_card` in
  * src/ui/board.rs. That correspondence is the point — this is a companion
- * view of one screen, not a second design.
+ * view of one screen, not a second design. It now reads in the same typeface
+ * too: every line here was Roboto until this pass, on the one surface the app
+ * exists to show.
  *
  * [displayName] is the session-wide-unique name the server decides, not
  * `row.agent`: a screenful of cards all reading "claude" is the thing this
@@ -57,42 +58,51 @@ fun BoardCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(ShepShape.card)
             .background(ShepPalette.surface0)
             .combinedClickable(onLongClick = onLongClick, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+            .padding(ShepSpace.card),
+        verticalArrangement = Arrangement.spacedBy(ShepSpace.hair),
     ) {
-        // Line 1 — dot, agent, model, queued badge … location.
+        // Line 1 — state, agent, model, queued badge … location.
+        //
+        // The identity group is one weighted child and the location is not, so
+        // the location measures at its natural width and the name gets every
+        // pixel that is left. It used to be a weighted name beside a weighted
+        // spacer, which splits the row fifty-fifty however short the name is —
+        // so an agent called "claude · workmayt" ellipsised at "workm…" with
+        // half a card of empty space beside it.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StateGlyph(row.status, fontSize = 13.sp)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                displayName,
-                color = ShepPalette.text,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            row.displayAgent?.let {
-                Spacer(Modifier.width(8.dp))
-                Text(it, color = ShepPalette.teal, fontSize = 12.sp)
-            }
-            if (row.queuedInput > 0) {
-                Spacer(Modifier.width(8.dp))
-                Text("⇥${row.queuedInput}", color = ShepPalette.teal, fontSize = 12.sp)
-            }
-            Spacer(Modifier.weight(1f))
-            row.location?.let {
+            Row(
+                Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StateGlyph(row.status)
+                Spacer(Modifier.width(ShepSpace.small))
                 Text(
-                    it,
-                    color = ShepPalette.overlay0,
-                    fontSize = 12.sp,
+                    displayName,
+                    style = ShepType.agentName,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                row.displayAgent?.let {
+                    Spacer(Modifier.width(ShepSpace.small))
+                    Text(
+                        it,
+                        style = ShepType.meta.copy(color = ShepPalette.teal),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (row.queuedInput > 0) {
+                    Spacer(Modifier.width(ShepSpace.small))
+                    Text("⇥${row.queuedInput}", style = ShepType.badge.copy(color = ShepPalette.teal))
+                }
+            }
+            row.location?.let {
+                Spacer(Modifier.width(ShepSpace.small))
+                Text(it, style = ShepType.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
 
@@ -101,23 +111,21 @@ fun BoardCard(
             Text(
                 listOfNotNull(row.workspaceLabel.takeIf { it.isNotBlank() }, row.branch)
                     .joinToString(" · "),
-                color = ShepPalette.overlay0,
-                fontSize = 12.sp,
+                style = ShepType.meta,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
             row.stateAgeSeconds?.let {
-                Spacer(Modifier.width(8.dp))
-                Text(formatAge(it), color = ShepPalette.overlay0, fontSize = 12.sp)
+                Spacer(Modifier.width(ShepSpace.small))
+                Text(formatAge(it), style = ShepType.meta)
             }
         }
 
         // Line 3 — the agent's own status, in its state color.
         Text(
             row.customStatus ?: row.status,
-            color = statusColor(row.status),
-            fontSize = 13.sp,
+            style = ShepType.state.copy(color = statusColor(row.status)),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -127,9 +135,7 @@ fun BoardCard(
         row.activityLine?.let {
             Text(
                 it,
-                color = ShepPalette.overlay0,
-                fontSize = 12.sp,
-                fontStyle = FontStyle.Italic,
+                style = ShepType.meta.copy(fontStyle = FontStyle.Italic),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -141,8 +147,7 @@ fun BoardCard(
                 row.cwd?.let {
                     Text(
                         it,
-                        color = ShepPalette.overlay0,
-                        fontSize = 11.sp,
+                        style = ShepType.metaSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -173,20 +178,20 @@ fun ContextGauge(percent: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
-                .width(44.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .width(ShepSize.gaugeWidth)
+                .height(ShepSize.gaugeHeight)
+                .clip(ShepShape.bar)
                 .background(ShepPalette.surface1)
         ) {
             Box(
                 Modifier
                     .fillMaxWidth(clamped / 100f)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .height(ShepSize.gaugeHeight)
+                    .clip(ShepShape.bar)
                     .background(color)
             )
         }
-        Spacer(Modifier.width(6.dp))
-        Text("$clamped%", color = color, fontSize = 11.sp)
+        Spacer(Modifier.width(ShepSpace.snug))
+        Text("$clamped%", style = ShepType.badge.copy(color = color))
     }
 }

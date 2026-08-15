@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,8 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSize
+import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 
 /**
@@ -57,13 +58,13 @@ fun KeyBar(
         modifier
             .fillMaxWidth()
             .background(ShepPalette.surfaceDim)
-            .padding(vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(vertical = ShepSpace.snug),
+        verticalArrangement = Arrangement.spacedBy(ShepSpace.snug),
     ) {
         // Answers to agent prompts are the highest-frequency taps, so they lead.
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = ShepSpace.small),
+            horizontalArrangement = Arrangement.spacedBy(ShepSpace.snug),
         ) {
             Key("y", Modifier.weight(1f), ShepPalette.green) { onKey(TerminalKey.Text("y")) }
             Key("n", Modifier.weight(1f), ShepPalette.red) { onKey(TerminalKey.Text("n")) }
@@ -75,8 +76,8 @@ fun KeyBar(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = ShepSpace.small),
+            horizontalArrangement = Arrangement.spacedBy(ShepSpace.snug),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             StickyKey("ctrl", ctrl) {
@@ -124,10 +125,10 @@ private fun Key(
         style = ShepType.key.copy(color = color),
         modifier = modifier
             .testTag("key-$label")
-            .background(ShepPalette.surface0, RoundedCornerShape(6.dp))
-            .border(1.dp, ShepPalette.surface1, RoundedCornerShape(6.dp))
+            .background(ShepPalette.surface0, ShepShape.key)
+            .border(ShepSize.border, ShepPalette.surface1, ShepShape.key)
             .clickable { onClick() }
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
     )
 }
 
@@ -147,14 +148,14 @@ private fun StickyKey(
             .testTag("key-$label")
             .background(
                 if (active) ShepPalette.accent else ShepPalette.surface0,
-                RoundedCornerShape(6.dp),
+                ShepShape.key,
             )
             .border(
-                1.dp,
+                ShepSize.border,
                 if (active) ShepPalette.accent else ShepPalette.surface1,
-                RoundedCornerShape(6.dp),
+                ShepShape.key,
             )
             .clickable { onTap(state == ModifierState.Armed) }
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
     )
 }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -32,11 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.shep.companion.AgentRow
 import dev.shep.companion.repoName
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSpace
+import dev.shep.companion.ui.theme.ShepType
 
 /**
  * What a new session can be started as.
@@ -57,16 +57,17 @@ enum class SessionRuntime(val label: String, val argv: List<String>, val agentNa
 private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(ShepShape.pill)
             .background(if (selected) ShepPalette.accent else ShepPalette.surface0)
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
     ) {
         Text(
             text,
-            color = if (selected) ShepPalette.panelBg else ShepPalette.subtext0,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            style = ShepType.chip.copy(
+                color = if (selected) ShepPalette.panelBg else ShepPalette.subtext0,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            ),
         )
     }
 }
@@ -99,19 +100,14 @@ fun NewSessionSheet(
         sheetState = sheetState,
         containerColor = ShepPalette.surfaceDim,
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
-            Text(
-                "new session",
-                color = ShepPalette.text,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
+            Text("new session", style = ShepType.sheetTitle)
+            Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = cwd,
                 onValueChange = { cwd = it },
-                label = { Text("directory", color = ShepPalette.overlay1) },
-                placeholder = { Text("/Users/alex/vault/dev/…", color = ShepPalette.overlay0) },
+                label = { Text("directory", style = ShepType.fieldLabel) },
+                placeholder = { Text("/Users/alex/vault/dev/…", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
@@ -120,48 +116,47 @@ fun NewSessionSheet(
                     Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState())
-                        .padding(top = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(top = ShepSpace.snug),
+                    horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
                 ) {
                     recentRepos.forEach { path ->
                         Chip(repoName(path), path == cwd) { cwd = path }
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Text("run", color = ShepPalette.overlay1, fontSize = 13.sp)
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(ShepSpace.medium))
+            Text("run", style = ShepType.sectionLabel)
+            Spacer(Modifier.height(ShepSpace.snug))
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
             ) {
                 SessionRuntime.entries.forEach { option ->
                     Chip(option.label, option == runtime) { runtime = option }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("name (optional)", color = ShepPalette.overlay1) },
-                placeholder = { Text("billing fix", color = ShepPalette.overlay0) },
+                label = { Text("name (optional)", style = ShepType.fieldLabel) },
+                placeholder = { Text("billing fix", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(ShepSpace.snug))
             Text(
                 "naming it now is what makes it findable later — the board can " +
                     "only tell sessions apart by what you give it.",
-                color = ShepPalette.overlay0,
-                fontSize = 11.sp,
+                style = ShepType.metaSmall,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ShepSpace.screen))
             Button(
                 onClick = { onStart(cwd.trim(), name.trim(), runtime) },
                 enabled = cwd.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("start ${runtime.label}") }
-            Spacer(Modifier.height(8.dp))
+            ) { Text("start ${runtime.label}", style = ShepType.button) }
+            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }
@@ -181,45 +176,39 @@ fun RenameSessionSheet(row: AgentRow, onDismiss: () -> Unit, onRename: (String) 
         sheetState = sheetState,
         containerColor = ShepPalette.surfaceDim,
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
-            Text(
-                "name this session",
-                color = ShepPalette.text,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(4.dp))
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
+            Text("name this session", style = ShepType.sheetTitle)
+            Spacer(Modifier.height(ShepSpace.tight))
             Text(
                 listOfNotNull(
                     row.workspaceLabel.takeIf { it.isNotBlank() },
                     row.branch,
                     row.cwd,
                 ).joinToString(" · "),
-                color = ShepPalette.overlay0,
-                fontSize = 12.sp,
+                style = ShepType.meta,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("name", color = ShepPalette.overlay1) },
+                label = { Text("name", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ShepSpace.screen))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     onClick = { onRename(name.trim()) },
                     modifier = Modifier.weight(1f),
-                ) { Text("save") }
-                Spacer(Modifier.width(12.dp))
+                ) { Text("save", style = ShepType.button) }
+                Spacer(Modifier.width(ShepSpace.medium))
                 TextButton(onClick = { onRename("") }) {
-                    Text("reset", color = ShepPalette.overlay1)
+                    Text("reset", style = ShepType.button.copy(color = ShepPalette.overlay1))
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }
@@ -252,27 +241,22 @@ fun AssignTaskSheet(
         sheetState = sheetState,
         containerColor = ShepPalette.surfaceDim,
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(
-                "send #${task.id} to…",
-                color = ShepPalette.text,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(4.dp))
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen)) {
+            Text("send #${task.id} to…", style = ShepType.sheetTitle)
+            Spacer(Modifier.height(ShepSpace.tight))
+            // The task's own words, so sans: this is the one line in the
+            // sheet that a person wrote rather than shep generated.
             Text(
                 task.prompt,
-                color = ShepPalette.overlay0,
-                fontSize = 12.sp,
+                style = ShepType.bodySmall.copy(color = ShepPalette.overlay0),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(ShepSpace.medium))
             if (ordered.isEmpty()) {
                 Text(
                     "no sessions running — start one from the board first",
-                    color = ShepPalette.overlay1,
-                    fontSize = 13.sp,
+                    style = ShepType.emptyState,
                 )
             }
             ordered.forEach { row ->
@@ -280,39 +264,36 @@ fun AssignTaskSheet(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .padding(vertical = ShepSpace.tight)
+                        .clip(ShepShape.field)
                         .background(ShepPalette.surface0)
                         .clickable { onAssign(row) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             names[row.paneId] ?: row.agent,
-                            color = ShepPalette.text,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            style = ShepType.itemName,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
                         if (sameRepo) {
-                            Spacer(Modifier.width(8.dp))
-                            Text("same repo", color = ShepPalette.teal, fontSize = 11.sp)
+                            Spacer(Modifier.width(ShepSpace.small))
+                            Text("same repo", style = ShepType.badge.copy(color = ShepPalette.teal))
                         }
                         Spacer(Modifier.weight(1f))
-                        Text(row.status, color = ShepPalette.overlay1, fontSize = 12.sp)
+                        Text(row.status, style = ShepType.meta.copy(color = ShepPalette.overlay1))
                     }
                     Text(
                         listOfNotNull(row.cwd, row.branch).joinToString(" · "),
-                        color = ShepPalette.overlay0,
-                        fontSize = 11.sp,
+                        style = ShepType.metaSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }

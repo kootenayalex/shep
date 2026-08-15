@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,14 +27,14 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.shep.companion.Block
 import dev.shep.companion.ToolCall
 import dev.shep.companion.Transcript
 import dev.shep.companion.Turn
-import dev.shep.companion.ui.theme.JetBrainsMono
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSize
+import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 
 /**
@@ -73,7 +72,7 @@ fun TranscriptView(
                 modifier = Modifier
                     .testTag("transcript-fallback")
                     .clickable { onRawScrollback() }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
             )
         } else if (transcript?.source == "matched") {
             // Honest about the guess: nothing told us which session this pane is
@@ -86,7 +85,7 @@ fun TranscriptView(
         }
 
         if (turns.isEmpty()) {
-            Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().padding(ShepSpace.section), contentAlignment = Alignment.Center) {
                 Text(
                     if (loading) "reading the transcript…" else "nothing recorded yet",
                     style = ShepType.hint.copy(color = ShepPalette.overlay0),
@@ -99,10 +98,10 @@ fun TranscriptView(
             state = listState,
             modifier = Modifier.fillMaxWidth().testTag("transcript"),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                horizontal = 12.dp,
-                vertical = 10.dp,
+                horizontal = ShepSpace.medium,
+                vertical = ShepSpace.small,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(ShepSpace.medium),
         ) {
             if (transcript?.truncated == true) {
                 item {
@@ -133,7 +132,7 @@ private fun TranscriptNotice(message: String, ink: androidx.compose.ui.graphics.
             .testTag("transcript-notice")
             .fillMaxWidth()
             .background(bg)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
     )
 }
 
@@ -144,13 +143,13 @@ private fun UserTurn(turn: Turn) {
         Box(
             Modifier
                 .fillMaxWidth(0.88f)
-                .background(ShepPalette.accentDim, RoundedCornerShape(14.dp))
-                .border(1.dp, ShepPalette.accent.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+                .background(ShepPalette.accentDim, ShepShape.pill)
+                .border(ShepSize.border, ShepPalette.accent.copy(alpha = 0.35f), ShepShape.pill)
+                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
         ) {
             Text(
                 turn.text,
-                style = ShepType.body.copy(color = ShepPalette.text, lineHeight = 20.sp),
+                style = ShepType.body,
             )
         }
     }
@@ -162,13 +161,13 @@ private fun SystemTurn(turn: Turn) {
     Text(
         "· ${turn.text}",
         style = ShepType.hint.copy(color = ShepPalette.overlay0),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = ShepSpace.tight),
     )
 }
 
 @Composable
 private fun AssistantTurn(turn: Turn, index: Int) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(ShepSpace.snug)) {
         if (turn.thinking.isNotBlank()) {
             Expandable(
                 label = "thinking",
@@ -183,7 +182,7 @@ private fun AssistantTurn(turn: Turn, index: Int) {
             when (block) {
                 is Block.Prose -> Text(
                     renderMarkdown(block.text),
-                    style = ShepType.body.copy(color = ShepPalette.text, lineHeight = 21.sp),
+                    style = ShepType.body,
                 )
                 is Block.Tool -> ToolRow(block.call, "tool-$index-$blockIndex")
             }
@@ -213,14 +212,14 @@ private fun ToolRow(tool: ToolCall, tag: String) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(ShepPalette.surfaceDim, RoundedCornerShape(8.dp))
+            .background(ShepPalette.surfaceDim, ShepShape.button)
             .clickable(enabled = tool.preview.isNotBlank()) { open = !open }
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = ShepSpace.small, vertical = ShepSpace.small),
+        verticalArrangement = Arrangement.spacedBy(ShepSpace.snug),
     ) {
         Row(
             Modifier.fillMaxWidth().testTag(tag),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -243,12 +242,7 @@ private fun ToolRow(tool: ToolCall, tag: String) {
         if (open && tool.preview.isNotBlank()) {
             Text(
                 tool.preview,
-                style = ShepType.mono.copy(
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    color = ShepPalette.subtext0,
-                    fontFamily = JetBrainsMono,
-                ),
+                style = ShepType.codeSmall.copy(color = ShepPalette.subtext0),
             )
         }
     }
@@ -259,7 +253,7 @@ private fun Expandable(label: String, labelColor: androidx.compose.ui.graphics.C
     var open by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().clickable { open = !open }.testTag(tag),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(ShepSpace.tight),
     ) {
         Text(
             "${if (open) "▾" else "▸"} $label",
@@ -268,11 +262,7 @@ private fun Expandable(label: String, labelColor: androidx.compose.ui.graphics.C
         if (open) {
             Text(
                 body,
-                style = ShepType.body.copy(
-                    color = ShepPalette.overlay1,
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp,
-                ),
+                style = ShepType.bodySmall,
             )
         }
     }
@@ -295,7 +285,7 @@ internal fun renderMarkdown(source: String): AnnotatedString = buildAnnotatedStr
             return@forEachIndexed
         }
         if (fenced) {
-            withStyle(SpanStyle(fontFamily = JetBrainsMono, fontSize = 12.sp)) {
+            withStyle(ShepType.code.toSpanStyle()) {
                 append(raw)
             }
         } else {
@@ -324,11 +314,7 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(line: 
             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(bold) }
         } else {
             withStyle(
-                SpanStyle(
-                    fontFamily = JetBrainsMono,
-                    fontSize = 12.sp,
-                    color = ShepPalette.teal,
-                ),
+                ShepType.code.toSpanStyle().copy(color = ShepPalette.teal),
             ) { append(match.groupValues[2]) }
         }
         index = match.range.last + 1

@@ -75,13 +75,39 @@ class ShepSemanticTest {
         assertEquals(spinnerFrame(0), spinnerFrame(-32))
     }
 
+    /**
+     * Mirrors `task_appearance` in src/ui/status.rs. The shapes are the agent
+     * table's, because they mean the same things; only "done" changes tier,
+     * since a task has no notion of your having seen it.
+     */
     @Test
     fun `task states match the desktop's table`() {
-        assertEquals(ShepPalette.red, ShepSemantic.task("blocked"))
-        assertEquals(ShepPalette.yellow, ShepSemantic.task("running"))
-        assertEquals(ShepPalette.green, ShepSemantic.task("done"))
-        assertEquals(ShepPalette.overlay0, ShepSemantic.task("cancelled"))
-        assertEquals(ShepPalette.overlay1, ShepSemantic.task("todo"))
+        listOf(
+            Triple("blocked", "◉", ShepPalette.red),
+            Triple("done", "●", ShepPalette.green),
+            Triple("todo", "○", ShepPalette.overlay1),
+            Triple("cancelled", "·", ShepPalette.overlay0),
+        ).forEach { (state, glyph, color) ->
+            val it = ShepSemantic.task(state)
+            assertEquals(glyph, it.glyph)
+            assertEquals(state, it.label)
+            assertEquals(color, it.color)
+        }
+        val running = ShepSemantic.task("running", tick = 0)
+        assertEquals("◐", running.glyph)
+        assertEquals(ShepPalette.yellow, running.color)
+        assertEquals("running", running.label)
+    }
+
+    /**
+     * The queue used to draw one filled dot for all five states and differ
+     * only in hue — on both surfaces.
+     */
+    @Test
+    fun `every task state has its own glyph`() {
+        val glyphs = listOf("todo", "running", "blocked", "done", "cancelled")
+            .map { ShepSemantic.task(it).glyph }
+        assertEquals(glyphs.size, glyphs.toSet().size)
     }
 
     @Test

@@ -30,12 +30,11 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.shep.companion.ui.theme.JetBrainsMono
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepType
 import kotlin.math.max
-import kotlin.math.min
 
 /** One horizontal stretch of cells sharing a style, drawn in a single call. */
 private class Run(
@@ -70,7 +69,7 @@ private class Run(
 fun TerminalGrid(
     grid: GridState,
     modifier: Modifier = Modifier,
-    baseFontSizeSp: Float = 13f,
+    baseFontSizeSp: Float = ShepType.TERMINAL_BASE_SP,
     onTap: () -> Unit = {},
 ) {
     val measurer = rememberTextMeasurer()

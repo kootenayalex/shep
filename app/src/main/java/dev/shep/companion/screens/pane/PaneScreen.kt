@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -38,20 +36,21 @@ import dev.shep.companion.BridgeClient
 import dev.shep.companion.Transcript
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
-import dev.shep.companion.statusColorFor
 import dev.shep.companion.terminal.GridState
 import dev.shep.companion.terminal.KeyBar
 import dev.shep.companion.terminal.ShepInputView
 import dev.shep.companion.terminal.TerminalGrid
 import dev.shep.companion.terminal.TerminalKey
+import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSize
+import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import dev.shep.companion.ui.components.StateGlyph
-import androidx.compose.ui.unit.sp
 
 /** Live keystrokes, or compose-and-queue for when the agent is busy. */
 enum class InputMode { Stream, Queue }
@@ -203,7 +202,7 @@ fun PaneScreen(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 12.dp),
+                .padding(horizontal = ShepSpace.small, vertical = ShepSpace.medium),
         ) {
             if (output == OutputMode.Recorded) {
                 PaneFrame(agent = row.agent, state = status, blocked = status == "blocked") {
@@ -231,8 +230,9 @@ fun PaneScreen(
                         modifier = Modifier.fillMaxSize().testTag("terminal-grid"),
                         onTap = { if (mode == InputMode.Stream) inputView.showKeyboard() },
                     )
-                    // Zero-size: it exists only to own the IME connection.
-                    AndroidView(factory = { inputView }, modifier = Modifier.size(1.dp))
+                    // Zero-size: it exists only to own the IME connection, so
+                    // this dimension is a hack and not a design token.
+                    AndroidView(factory = { inputView }, modifier = Modifier.size(1.dp)) // not-a-token
 
                     if (!streaming && grid.isEmpty) {
                         Text(
@@ -247,8 +247,8 @@ fun PaneScreen(
                             style = ShepType.hint.copy(color = ShepPalette.red),
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .background(ShepPalette.redDim, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                                .background(ShepPalette.redDim, ShepShape.key)
+                                .padding(horizontal = ShepSpace.small, vertical = ShepSpace.tight),
                         )
                     }
                 }
@@ -259,7 +259,7 @@ fun PaneScreen(
             Text(
                 it,
                 style = ShepType.hint.copy(color = ShepPalette.peach),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = ShepSpace.medium, vertical = ShepSpace.tight),
             )
         }
 
@@ -305,22 +305,22 @@ private fun PaneTitleBar(
         Modifier
             .fillMaxWidth()
             .background(ShepPalette.surfaceDim)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.medium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
     ) {
         Text(
             "‹",
             style = ShepType.wordmark.copy(color = ShepPalette.accent),
-            modifier = Modifier.clickable { onBack() }.padding(end = 4.dp),
+            modifier = Modifier.clickable { onBack() }.padding(end = ShepSpace.tight),
         )
         Text(row.paneId, style = ShepType.agentName.copy(color = ShepPalette.accent))
         Text(row.workspaceLabel, style = ShepType.paneId, modifier = Modifier.weight(1f))
         Text("history", style = ShepType.hint.copy(color = ShepPalette.subtext0),
-            modifier = Modifier.clickable { onHistory() }.padding(4.dp))
+            modifier = Modifier.clickable { onHistory() }.padding(ShepSpace.tight))
         Text("review", style = ShepType.hint.copy(color = ShepPalette.accent),
-            modifier = Modifier.clickable { onReview() }.padding(4.dp))
-        StateGlyph(status, fontSize = 12.sp)
+            modifier = Modifier.clickable { onReview() }.padding(ShepSpace.tight))
+        StateGlyph(status, style = ShepType.stateGlyphSmall)
     }
 }
 
@@ -337,17 +337,17 @@ private fun PaneFrame(
         Box(
             Modifier
                 .fillMaxSize()
-                .border(1.5.dp, ring, RoundedCornerShape(16.dp))
-                .padding(10.dp),
+                .border(ShepSize.focusRing, ring, ShepShape.sheet)
+                .padding(ShepSpace.small),
         ) { content() }
         Text(
             "$agent · $state",
             style = ShepType.badge.copy(color = ring),
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 14.dp)
+                .padding(start = ShepSpace.medium)
                 .background(ShepPalette.panelBg)
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = ShepSpace.snug),
         )
     }
 }
@@ -365,8 +365,8 @@ private fun ToggleRow(label: String, content: @Composable () -> Unit) {
         Modifier
             .fillMaxWidth()
             .background(ShepPalette.surfaceDim)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = ShepSpace.small, vertical = ShepSpace.tight),
+        horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = ShepType.viewTitle)
@@ -402,10 +402,10 @@ private fun ModeChip(label: String, on: Boolean, side: String = "in", onClick: (
             .testTag("mode-$side-$label")
             .background(
                 if (on) ShepPalette.accent else ShepPalette.surface0,
-                RoundedCornerShape(999.dp),
+                ShepShape.pill,
             )
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
     )
 }
 
@@ -419,16 +419,16 @@ private fun QueueComposer(
         Modifier
             .fillMaxWidth()
             .background(ShepPalette.surfaceDim)
-            .padding(10.dp),
+            .padding(ShepSpace.small),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
     ) {
         Box(
             Modifier
                 .weight(1f)
-                .background(ShepPalette.surface0, RoundedCornerShape(10.dp))
-                .border(1.dp, ShepPalette.surface1, RoundedCornerShape(10.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .background(ShepPalette.surface0, ShepShape.field)
+                .border(ShepSize.border, ShepPalette.surface1, ShepShape.field)
+                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
         ) {
             if (value.isEmpty()) {
                 Text("prompt claude…", style = ShepType.hint.copy(color = ShepPalette.overlay0))
@@ -445,18 +445,18 @@ private fun QueueComposer(
             "queue",
             style = ShepType.key.copy(color = ShepPalette.teal),
             modifier = Modifier
-                .background(ShepPalette.tealDim, RoundedCornerShape(10.dp))
-                .border(1.dp, ShepPalette.teal, RoundedCornerShape(10.dp))
+                .background(ShepPalette.tealDim, ShepShape.field)
+                .border(ShepSize.border, ShepPalette.teal, ShepShape.field)
                 .clickable { onSend(true) }
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
         )
         Text(
             "send",
             style = ShepType.key.copy(color = ShepPalette.panelBg),
             modifier = Modifier
-                .background(ShepPalette.accent, RoundedCornerShape(10.dp))
+                .background(ShepPalette.accent, ShepShape.field)
                 .clickable { onSend(false) }
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
         )
     }
 }

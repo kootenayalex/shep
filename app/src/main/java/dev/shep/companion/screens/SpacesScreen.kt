@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,25 +34,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.PaneNode
 import dev.shep.companion.SpaceNode
 import dev.shep.companion.TabNode
 import dev.shep.companion.parseTree
 import dev.shep.companion.repoName
-import dev.shep.companion.statusColorFor
+import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepSemantic
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSpace
+import dev.shep.companion.ui.theme.ShepType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import dev.shep.companion.ui.components.StateGlyph
 
 /**
  * The events that change the session's shape.
@@ -167,42 +166,39 @@ fun SpacesScreen(
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(16.dp),
+            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.screen),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("spaces", color = ShepPalette.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("spaces", style = ShepType.screenTitle)
             Spacer(Modifier.weight(1f))
-            Text(status, color = ShepPalette.overlay1, fontSize = 12.sp)
-            Spacer(Modifier.width(12.dp))
+            Text(status, style = ShepType.meta)
+            Spacer(Modifier.width(ShepSpace.medium))
             Text(
                 "+ new",
-                color = ShepPalette.accent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = ShepType.actionStrong,
                 modifier = Modifier.clickable { showNewSpace = true },
             )
         }
         notice?.let {
             Text(
                 it,
-                color = ShepPalette.peach,
-                fontSize = 12.sp,
+                style = ShepType.meta.copy(color = ShepPalette.peach),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { notice = null }
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
             )
         }
         if (spaces.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("no spaces — start one with + new", color = ShepPalette.overlay1)
+                Text("no spaces — start one with + new", style = ShepType.emptyState)
             }
             return@Column
         }
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(ShepSpace.medium),
+            verticalArrangement = Arrangement.spacedBy(ShepSpace.small),
         ) {
             items(spaces.size, key = { spaces[it].workspaceId }) { index ->
                 val space = spaces[index]
@@ -365,17 +361,17 @@ fun SpacesScreen(
         AlertDialog(
             onDismissRequest = { confirming = null },
             containerColor = ShepPalette.surfaceDim,
-            title = { Text(target.title, color = ShepPalette.text) },
-            text = { Text(target.body, color = ShepPalette.overlay1, fontSize = 13.sp) },
+            title = { Text(target.title, style = ShepType.sheetTitle) },
+            text = { Text(target.body, style = ShepType.bodySmall) },
             confirmButton = {
                 TextButton(onClick = {
                     confirming = null
                     target.run()
-                }) { Text(target.action, color = ShepPalette.red) }
+                }) { Text(target.action, style = ShepType.button.copy(color = ShepPalette.red)) }
             },
             dismissButton = {
                 TextButton(onClick = { confirming = null }) {
-                    Text("keep", color = ShepPalette.overlay1)
+                    Text("keep", style = ShepType.button.copy(color = ShepPalette.overlay1))
                 }
             },
         )
@@ -402,47 +398,51 @@ private fun SpaceCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(ShepShape.card)
             .background(ShepPalette.surface0)
-            .padding(vertical = 10.dp),
+            .padding(vertical = ShepSpace.small),
     ) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .clickable { onToggle() }
-                .padding(horizontal = 14.dp, vertical = 2.dp),
+                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.hair),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StatusDot(space.status)
-            Spacer(Modifier.width(10.dp))
-            Text(
-                space.label,
-                color = ShepPalette.text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            // The desktop's own review badges, so the two read the same.
-            reviewBadge(space.reviewState)?.let {
-                Spacer(Modifier.width(6.dp))
-                Text(it, color = ShepPalette.peach, fontSize = 13.sp)
+            // The identity group is the one weighted child, so the chevron
+            // lands flush right instead of halfway across: a weighted label
+            // beside a weighted spacer splits the row evenly however short the
+            // label is, which parked ▾ in the middle of every space card.
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(space.status)
+                Spacer(Modifier.width(ShepSpace.small))
+                Text(
+                    space.label,
+                    style = ShepType.agentName,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                // The desktop's own review badges, so the two read the same —
+                // from the shared table, not a local copy of it.
+                ShepSemantic.reviewBadge(space.reviewState)?.let { (glyph, ink) ->
+                    Spacer(Modifier.width(ShepSpace.snug))
+                    Text(glyph, style = ShepType.badge.copy(color = ink))
+                }
+                if (space.isWorktree) {
+                    Spacer(Modifier.width(ShepSpace.snug))
+                    Text("worktree", style = ShepType.badge.copy(color = ShepPalette.overlay0))
+                }
             }
-            if (space.isWorktree) {
-                Spacer(Modifier.width(6.dp))
-                Text("worktree", color = ShepPalette.overlay0, fontSize = 11.sp)
-            }
-            Spacer(Modifier.weight(1f))
             if (space.focused) {
-                Text("here", color = ShepPalette.teal, fontSize = 11.sp)
-                Spacer(Modifier.width(8.dp))
+                Text("here", style = ShepType.badge.copy(color = ShepPalette.teal))
+                Spacer(Modifier.width(ShepSpace.small))
             }
-            Text(if (collapsed) "▸" else "▾", color = ShepPalette.overlay1, fontSize = 13.sp)
+            Text(if (collapsed) "▸" else "▾", style = ShepType.state.copy(color = ShepPalette.overlay1))
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.fillMaxWidth().padding(horizontal = ShepSpace.medium, vertical = ShepSpace.tight),
+            horizontalArrangement = Arrangement.spacedBy(ShepSpace.medium),
         ) {
             SmallAction("go to", ShepPalette.accent, onFocusSpace)
             SmallAction("+ tab", ShepPalette.subtext0, onNewTab)
@@ -454,23 +454,25 @@ private fun SpaceCard(
         if (collapsed) return@Column
 
         space.tabs.forEach { tab ->
-            Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 14.dp, top = 6.dp)) {
+            Column(Modifier.fillMaxWidth().padding(start = ShepSpace.indent, end = ShepSpace.medium, top = ShepSpace.snug)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusDot(tab.status)
-                    Spacer(Modifier.width(8.dp))
+                    StatusDot(tab.status, nested = true)
+                    Spacer(Modifier.width(ShepSpace.small))
+                    // Weighted and filling, with no spacer after it, so the
+                    // actions sit flush right on every row rather than
+                    // wherever this tab's name happens to end.
                     Text(
                         tab.label.ifEmpty { "tab ${tab.number}" },
-                        color = ShepPalette.subtext0,
-                        fontSize = 13.sp,
+                        style = ShepType.itemLabel,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(ShepSpace.small))
                     SmallAction("go to", ShepPalette.overlay1) { onFocusTab(tab) }
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(ShepSpace.medium))
                     SmallAction("rename", ShepPalette.overlay1) { onRenameTab(tab) }
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(ShepSpace.medium))
                     // The server refuses to close a space's last tab, so offer
                     // the thing that does work instead of a button that errors.
                     if (!space.hasOnlyOneTab) {
@@ -481,62 +483,56 @@ private fun SpaceCard(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = 18.dp, top = 4.dp)
+                            .padding(start = ShepSpace.indent, top = ShepSpace.tight)
                             .clickable { onOpenPane(pane) },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        StatusDot(pane.status, size = 6)
-                        Spacer(Modifier.width(8.dp))
+                        StatusDot(pane.status, nested = true)
+                        Spacer(Modifier.width(ShepSpace.small))
                         Column(Modifier.weight(1f)) {
                             Text(
                                 pane.agent ?: "shell",
-                                color = ShepPalette.text,
-                                fontSize = 13.sp,
+                                style = ShepType.itemLabel.copy(color = ShepPalette.text),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             pane.cwd?.let {
                                 Text(
                                     repoName(it),
-                                    color = ShepPalette.overlay0,
-                                    fontSize = 11.sp,
+                                    style = ShepType.metaSmall,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
                         SmallAction("split", ShepPalette.overlay1) { onSplitPane(pane) }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(ShepSpace.medium))
                         SmallAction("close", ShepPalette.red) { onClosePane(pane) }
                     }
                 }
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(ShepSpace.tight))
     }
 }
 
-/** `◆ ↺ ✓` — the desktop sidebar's review badges, unchanged. */
-private fun reviewBadge(state: String): String? = when (state) {
-    "needs_review" -> "◆"
-    "changes_requested" -> "↺"
-    "approved" -> "✓"
-    else -> null
-}
-
+/**
+ * A space's state glyph, or — one level in — a tab's or a pane's.
+ *
+ * Two sizes carry three levels: the space heads its card, and everything
+ * nested under it is quieter by the same step. The tree used to ask for four
+ * different dot diameters to say the same thing.
+ */
 @Composable
-private fun StatusDot(status: String, size: Int = 8) {
-    // `size` was a dot diameter and is now a type size; the two happen to read
-    // at about the same weight, so the tree's rhythm is unchanged.
-    StateGlyph(status, fontSize = (size + 4).sp)
+private fun StatusDot(status: String, nested: Boolean = false) {
+    StateGlyph(status, style = if (nested) ShepType.stateGlyphSmall else ShepType.stateGlyph)
 }
 
 @Composable
 private fun SmallAction(text: String, color: Color, onClick: () -> Unit) {
     Text(
         text,
-        color = color,
-        fontSize = 12.sp,
+        style = ShepType.chip.copy(color = color),
         modifier = Modifier.clickable { onClick() },
     )
 }
@@ -558,23 +554,23 @@ private fun RenameSheet(
         sheetState = sheetState,
         containerColor = ShepPalette.surfaceDim,
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
-            Text(title, color = ShepPalette.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
+            Text(title, style = ShepType.sheetTitle)
+            Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("name", color = ShepPalette.overlay1) },
+                label = { Text("name", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ShepSpace.screen))
             Button(
                 onClick = { onSave(name.trim()) },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("save") }
-            Spacer(Modifier.height(8.dp))
+            ) { Text("save", style = ShepType.button) }
+            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }

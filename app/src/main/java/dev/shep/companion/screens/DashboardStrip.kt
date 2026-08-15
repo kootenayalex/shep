@@ -16,12 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.shep.companion.SessionHost
 import dev.shep.companion.SessionTotals
 import dev.shep.companion.humanBytes
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepSpace
+import dev.shep.companion.ui.theme.ShepType
 
 /**
  * The two-row pulse strip from the top of the desktop session board: what the
@@ -37,8 +37,8 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
         Modifier
             .fillMaxWidth()
             .background(ShepPalette.surfaceDim)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
+        verticalArrangement = Arrangement.spacedBy(ShepSpace.tight),
     ) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -47,13 +47,14 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
             Label("agents ")
             Value(totals.agents.toString())
             if (totals.attention > 0) {
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(ShepSpace.small))
                 // The one number on this strip that is a call to action.
                 Text(
                     "${totals.attention} need you",
-                    color = ShepPalette.red,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = ShepType.meta.copy(
+                        color = ShepPalette.red,
+                        fontWeight = FontWeight.Bold,
+                    ),
                 )
             }
             listOf(
@@ -63,7 +64,7 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
                 "idle" to totals.idle,
             ).forEach { (label, count) ->
                 Separator()
-                Text("$label ", color = statusColor(label), fontSize = 12.sp)
+                Text("$label ", style = ShepType.meta.copy(color = statusColor(label)))
                 Value(count.toString())
             }
             if (totals.workspaces > 0) {
@@ -72,7 +73,7 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
             }
             if (totals.queuedInput > 0) {
                 Separator()
-                Text("⇥${totals.queuedInput} queued", color = ShepPalette.teal, fontSize = 12.sp)
+                Text("⇥${totals.queuedInput} queued", style = ShepType.meta.copy(color = ShepPalette.teal))
             }
             totals.pendingTasks?.takeIf { it > 0 }?.let {
                 Separator()
@@ -93,12 +94,13 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
             if (host.loadPercent != null) {
                 Text(
                     "${host.loadPercent}%",
-                    color = when {
-                        host.loadPercent >= 100 -> ShepPalette.red
-                        host.loadPercent >= 70 -> ShepPalette.yellow
-                        else -> ShepPalette.text
-                    },
-                    fontSize = 12.sp,
+                    style = ShepType.meta.copy(
+                        color = when {
+                            host.loadPercent >= 100 -> ShepPalette.red
+                            host.loadPercent >= 70 -> ShepPalette.yellow
+                            else -> ShepPalette.text
+                        },
+                    ),
                 )
                 host.cores?.let { Label(" of $it cores") }
             } else {
@@ -109,12 +111,13 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
             if (host.memoryPercent != null) {
                 Text(
                     "${host.memoryPercent}%",
-                    color = when {
-                        host.memoryPercent >= 90 -> ShepPalette.red
-                        host.memoryPercent >= 75 -> ShepPalette.yellow
-                        else -> ShepPalette.text
-                    },
-                    fontSize = 12.sp,
+                    style = ShepType.meta.copy(
+                        color = when {
+                            host.memoryPercent >= 90 -> ShepPalette.red
+                            host.memoryPercent >= 75 -> ShepPalette.yellow
+                            else -> ShepPalette.text
+                        },
+                    ),
                 )
                 if (host.memoryUsedBytes != null && host.memoryTotalBytes != null) {
                     Label(
@@ -131,15 +134,15 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
 
 @Composable
 private fun Label(text: String) {
-    Text(text, color = ShepPalette.overlay0, fontSize = 12.sp)
+    Text(text, style = ShepType.meta)
 }
 
 @Composable
 private fun Value(text: String) {
-    Text(text, color = ShepPalette.text, fontSize = 12.sp)
+    Text(text, style = ShepType.meta.copy(color = ShepPalette.text))
 }
 
 @Composable
 private fun Separator() {
-    Text("  ·  ", color = ShepPalette.surface1, fontSize = 12.sp)
+    Text("  ·  ", style = ShepType.meta.copy(color = ShepPalette.surface1))
 }

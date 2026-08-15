@@ -5,9 +5,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,23 +16,30 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.withStyle
+import dev.shep.companion.screens.SessionRuntime
+import dev.shep.companion.screens.pane.PaneScreen
+import dev.shep.companion.ui.components.TaskGlyph
+import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepSemantic
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSize
+import dev.shep.companion.ui.theme.ShepSpace
+import dev.shep.companion.ui.theme.ShepTheme
+import dev.shep.companion.ui.theme.ShepType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -40,17 +47,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import dev.shep.companion.screens.SessionRuntime
-import dev.shep.companion.screens.pane.PaneScreen
-import dev.shep.companion.ui.theme.ShepPalette
-import dev.shep.companion.ui.theme.ShepSemantic
-import dev.shep.companion.ui.theme.ShepTheme
-import dev.shep.companion.ui.components.StateGlyph
 
 fun statusColor(status: String): Color = ShepSemantic.agentColor(status)
-
-/** Alias for screens that live outside this file. */
-fun statusColorFor(status: String): Color = statusColor(status)
 
 class MainActivity : ComponentActivity() {
     // Pane id from a `shep://pane?pane=…` notification tap; consumed by NavShell.
@@ -248,11 +246,11 @@ fun ReconnectingScreen(error: String?, label: String = "reconnecting…") {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = ShepPalette.accent)
-            Spacer(Modifier.height(16.dp))
-            Text(label, color = ShepPalette.overlay0)
+            Spacer(Modifier.height(ShepSpace.screen))
+            Text(label, style = ShepType.emptyState)
             error?.let {
-                Spacer(Modifier.height(6.dp))
-                Text(it, color = ShepPalette.peach, fontSize = 12.sp)
+                Spacer(Modifier.height(ShepSpace.snug))
+                Text(it, style = ShepType.meta.copy(color = ShepPalette.peach))
             }
         }
     }
@@ -317,7 +315,7 @@ fun NavShell(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // iPad-class width: list and detail stay visible side-by-side (spatial
         // memory — no full-screen push). Phone: the detail pushes over, as before.
-        val wide = maxWidth >= 720.dp
+        val wide = maxWidth >= ShepSize.twoPaneWidth
         val detail = paneDetail
 
         if (detail != null && !wide) {
@@ -337,8 +335,8 @@ fun NavShell(
                         NavigationBarItem(
                             selected = tab == entry,
                             onClick = { tab = entry },
-                            icon = { Text(entry.glyph, fontSize = 18.sp) },
-                            label = { Text(entry.label, fontSize = 11.sp) },
+                            icon = { Text(entry.glyph, style = ShepType.navGlyph) },
+                            label = { Text(entry.label, style = ShepType.navLabel) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ShepPalette.accent,
                                 selectedTextColor = ShepPalette.accent,
@@ -371,7 +369,7 @@ fun NavShell(
                                 PaneScreen(client, detail, onBack = { paneDetail = null })
                             } else {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("select an agent", color = ShepPalette.overlay0)
+                                    Text("select an agent", style = ShepType.emptyState)
                                 }
                             }
                         }
@@ -425,20 +423,19 @@ fun ShepScreen() {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(16.dp),
+            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.screen),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("shep", color = ShepPalette.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("shep", style = ShepType.screenTitle)
         }
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("notify me about", color = ShepPalette.text, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(2.dp))
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen)) {
+            Text("notify me about", style = ShepType.sectionLabel)
+            Spacer(Modifier.height(ShepSpace.hair))
             Text(
                 "shep stops sending what is off here, so it costs no battery.",
-                color = ShepPalette.overlay0,
-                fontSize = 11.sp,
+                style = ShepType.bodySmall.copy(color = ShepPalette.overlay0),
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(ShepSpace.small))
             NotifyKind.entries.forEach { kind ->
                 Row(
                     Modifier
@@ -448,16 +445,13 @@ fun ShepScreen() {
                             kinds = next
                             FcmManager.setKinds(context, next) { status = it }
                         }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = ShepSpace.small),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(kind.label, color = ShepPalette.text, fontSize = 14.sp)
-                        Text(
-                            kind.description,
-                            color = ShepPalette.overlay0,
-                            fontSize = 11.sp,
-                        )
+                        Text(kind.label, style = ShepType.itemName)
+                        // What the toggle actually costs you, in prose.
+                        Text(kind.description, style = ShepType.bodySmall.copy(color = ShepPalette.overlay0))
                     }
                     Switch(
                         checked = kind in kinds,
@@ -476,17 +470,18 @@ fun ShepScreen() {
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-            Text("delivery", color = ShepPalette.text, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(6.dp))
-            Text(status, color = ShepPalette.overlay0, fontSize = 13.sp)
+            Spacer(Modifier.height(ShepSpace.section))
+            Text("delivery", style = ShepType.sectionLabel)
+            Spacer(Modifier.height(ShepSpace.snug))
+            Text(status, style = ShepType.state.copy(color = ShepPalette.overlay0))
             Text(
                 if (token != null) "registered with FCM" else "no FCM token yet",
-                color = if (token != null) ShepPalette.green else ShepPalette.peach,
-                fontSize = 12.sp,
+                style = ShepType.meta.copy(
+                    color = if (token != null) ShepPalette.green else ShepPalette.peach,
+                ),
             )
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Spacer(Modifier.height(ShepSpace.medium))
+            Row(horizontalArrangement = Arrangement.spacedBy(ShepSpace.medium)) {
                 Button(
                     onClick = {
                         testing = true
@@ -497,28 +492,29 @@ fun ShepScreen() {
                         }
                     },
                     enabled = !testing,
-                ) { Text(if (testing) "sending…" else "Send test notification") }
+                ) { Text(if (testing) "sending…" else "Send test notification", style = ShepType.button) }
                 TextButton(onClick = {
                     FcmManager.register(context, kinds)
                     status = "registering…"
                     token = prefs.getString("fcm_token", null)
-                }) { Text("Re-register", color = ShepPalette.overlay0) }
+                }) { Text("Re-register", style = ShepType.button.copy(color = ShepPalette.overlay0)) }
             }
             testResult?.let {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(ShepSpace.small))
                 Text(
                     it,
-                    color = if (it.startsWith("sent to")) ShepPalette.green else ShepPalette.peach,
-                    fontSize = 12.sp,
+                    style = ShepType.meta.copy(
+                        color = if (it.startsWith("sent to")) ShepPalette.green else ShepPalette.peach,
+                    ),
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(ShepSpace.section))
         }
     }
 }
 
 /** Color for a task lifecycle state, reusing the shep attention vocabulary. */
-fun taskStateColor(state: String): Color = ShepSemantic.task(state)
+fun taskStateColor(state: String): Color = ShepSemantic.taskColor(state)
 
 /**
  * Tasks tab (A4): the queue with states, an add-task sheet (repo/runtime/
@@ -568,51 +564,47 @@ fun TasksScreen(
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(16.dp),
+            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.screen),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("tasks", color = ShepPalette.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("tasks", style = ShepType.screenTitle)
             Spacer(Modifier.weight(1f))
             if (status.isNotEmpty()) {
-                Text(status, color = ShepPalette.overlay0, fontSize = 12.sp)
-                Spacer(Modifier.width(12.dp))
+                Text(status, style = ShepType.meta)
+                Spacer(Modifier.width(ShepSpace.medium))
             }
             if (tasks.any { !taskIsOpen(it.state) && it.state != "running" }) {
                 Text(
                     "clear done",
-                    color = ShepPalette.overlay0,
-                    fontSize = 13.sp,
+                    style = ShepType.actionQuiet,
                     modifier = Modifier.clickable {
                         act("cleared finished tasks", "task.clear", JSONObject())
                     },
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(ShepSpace.medium))
             }
             Text(
                 "+ new",
-                color = ShepPalette.accent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = ShepType.actionStrong,
                 modifier = Modifier.clickable { onShowAddChange(true) },
             )
         }
         notice?.let {
             Text(
                 it,
-                color = ShepPalette.peach,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                style = ShepType.meta.copy(color = ShepPalette.peach),
+                modifier = Modifier.padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
             )
         }
         if (tasks.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("no tasks — queue one with + new", color = ShepPalette.overlay0)
+                Text("no tasks — queue one with + new", style = ShepType.emptyState)
             }
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(ShepSpace.medium),
+                verticalArrangement = Arrangement.spacedBy(ShepSpace.small),
             ) {
                 items(tasks, key = { it.id }) { task ->
                     TaskCard(
@@ -701,66 +693,65 @@ fun TaskCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(ShepPalette.surfaceDim)
-            .padding(14.dp),
+            .clip(ShepShape.card)
+            .background(ShepPalette.surface0)
+            .padding(ShepSpace.card),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(taskStateColor(task.state)))
-            Spacer(Modifier.width(8.dp))
-            Text("#${task.id}", color = ShepPalette.overlay0, fontSize = 12.sp)
-            Spacer(Modifier.width(8.dp))
-            Text(task.state, color = taskStateColor(task.state), fontSize = 12.sp)
+            TaskGlyph(task.state, style = ShepType.stateGlyphSmall)
+            Spacer(Modifier.width(ShepSpace.small))
+            Text("#${task.id}", style = ShepType.meta)
+            Spacer(Modifier.width(ShepSpace.small))
+            Text(task.state, style = ShepType.meta.copy(color = taskStateColor(task.state)))
             Spacer(Modifier.weight(1f))
-            if (task.useWorktree) Text("⑂", color = ShepPalette.accent, fontSize = 13.sp)
+            if (task.useWorktree) Text("⑂", style = ShepType.badge.copy(color = ShepPalette.accent))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(task.prompt, color = ShepPalette.text, fontSize = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(ShepSpace.snug))
+        // The task in the words someone typed, so sans.
+        Text(task.prompt, style = ShepType.body, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(ShepSpace.snug))
         Text(
             "${repoName(task.repo)} · ${task.runtime}" + (task.workspaceId?.let { " · $it" } ?: ""),
-            color = ShepPalette.overlay0,
-            fontSize = 12.sp,
+            style = ShepType.meta,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(ShepSpace.small))
+        Row(horizontalArrangement = Arrangement.spacedBy(ShepSpace.small)) {
             if (taskIsOpen(task.state)) {
                 // "send to" leads: handing work to an agent already sitting in
                 // the right repo is the cheaper move, and dispatch — which
                 // spawns a whole new pane — is the fallback, not the default.
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(ShepShape.button)
                         .background(ShepPalette.accent)
                         .clickable { onAssign() }
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                ) { Text("send to…", color = ShepPalette.panelBg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                        .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
+                ) { Text("send to…", style = ShepType.action.copy(color = ShepPalette.panelBg)) }
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(ShepShape.button)
                         .background(ShepPalette.surface0)
                         .clickable { onDispatch() }
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                ) { Text("new pane", color = ShepPalette.overlay0, fontSize = 13.sp) }
+                        .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
+                ) { Text("new pane", style = ShepType.actionQuiet) }
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(ShepShape.button)
                         .background(ShepPalette.surface0)
                         .clickable { onCancel() }
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                ) { Text("cancel", color = ShepPalette.overlay0, fontSize = 13.sp) }
+                        .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
+                ) { Text("cancel", style = ShepType.actionQuiet) }
             }
             Spacer(Modifier.weight(1f))
             // Always removable. A queue you cannot empty stops being a queue.
             Text(
                 "remove",
-                color = ShepPalette.overlay0,
-                fontSize = 13.sp,
+                style = ShepType.actionQuiet,
                 modifier = Modifier
                     .clickable { onRemove() }
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = ShepSpace.small, vertical = ShepSpace.snug),
             )
         }
     }
@@ -795,17 +786,15 @@ fun AddTaskSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ShepPalette.surfaceDim) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("new task", color = ShepPalette.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("new task", style = ShepType.sheetTitle)
                 Spacer(Modifier.weight(1f))
                 Text(
                     "voice",
-                    color = ShepPalette.accent,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    style = ShepType.actionStrong,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(ShepShape.pill)
                         .background(ShepPalette.surface0)
                         .clickable {
                             voiceError = null
@@ -820,82 +809,88 @@ fun AddTaskSheet(
                                 )
                             }.onFailure { voiceError = "no speech recognizer on this device" }
                         }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
                 )
             }
             voiceError?.let {
-                Spacer(Modifier.height(4.dp))
-                Text(it, color = ShepPalette.peach, fontSize = 12.sp)
+                Spacer(Modifier.height(ShepSpace.tight))
+                Text(it, style = ShepType.meta.copy(color = ShepPalette.peach))
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = prompt,
                 onValueChange = { prompt = it },
-                placeholder = { Text("prompt for the agent…", color = ShepPalette.overlay0) },
+                placeholder = { Text("prompt for the agent…", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 4,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(ShepSpace.small))
             OutlinedTextField(
                 value = repo,
                 onValueChange = { repo = it },
-                label = { Text("repo path", color = ShepPalette.overlay0) },
-                placeholder = { Text("/Users/alex/vault/dev/…", color = ShepPalette.overlay0) },
+                label = { Text("repo path", style = ShepType.fieldLabel) },
+                placeholder = { Text("/Users/alex/vault/dev/…", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             if (knownRepos.isNotEmpty()) {
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = ShepSpace.snug),
+                    horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
                 ) {
                     knownRepos.forEach { r ->
                         Box(
                             Modifier
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(ShepShape.pill)
                                 .background(if (r == repo) ShepPalette.accent else ShepPalette.surface0)
                                 .clickable { repo = r }
-                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                                .padding(horizontal = ShepSpace.small, vertical = ShepSpace.snug),
                         ) {
                             Text(
                                 repoName(r),
-                                color = if (r == repo) ShepPalette.panelBg else ShepPalette.overlay0,
-                                fontSize = 12.sp,
+                                style = ShepType.chip.copy(
+                                    color = if (r == repo) ShepPalette.panelBg else ShepPalette.subtext0,
+                                ),
                             )
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(ShepSpace.medium))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("runtime", color = ShepPalette.overlay0, fontSize = 13.sp)
-                Spacer(Modifier.width(12.dp))
+                Text("runtime", style = ShepType.sectionLabel)
+                Spacer(Modifier.width(ShepSpace.medium))
                 listOf("claude", "opencode").forEach { rt ->
                     Box(
                         Modifier
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(ShepShape.pill)
                             .background(if (rt == runtime) ShepPalette.accent else ShepPalette.surface0)
                             .clickable { runtime = rt }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
                     ) {
-                        Text(rt, color = if (rt == runtime) ShepPalette.panelBg else ShepPalette.overlay0, fontSize = 12.sp)
+                        Text(
+                            rt,
+                            style = ShepType.chip.copy(
+                                color = if (rt == runtime) ShepPalette.panelBg else ShepPalette.subtext0,
+                            ),
+                        )
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(ShepSpace.small))
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(ShepSpace.small))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = worktree, onCheckedChange = { worktree = it })
-                Spacer(Modifier.width(8.dp))
-                Text("isolate in a worktree", color = ShepPalette.text, fontSize = 14.sp)
+                Spacer(Modifier.width(ShepSpace.small))
+                Text("isolate in a worktree", style = ShepType.itemName)
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ShepSpace.screen))
             Button(
                 onClick = { onSubmit(prompt.trim(), repo.trim(), runtime, worktree) },
                 enabled = prompt.isNotBlank() && repo.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("queue task") }
-            Spacer(Modifier.height(8.dp))
+            ) { Text("queue task", style = ShepType.button) }
+            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }
@@ -929,55 +924,72 @@ fun MemoryScreen(client: BridgeClient) {
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(16.dp),
+            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.screen),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("memory", color = ShepPalette.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(8.dp))
-            Text("· user", color = ShepPalette.overlay0, fontSize = 13.sp)
+            Text("memory", style = ShepType.screenTitle)
+            Spacer(Modifier.width(ShepSpace.small))
+            Text("· user", style = ShepType.meta)
             Spacer(Modifier.weight(1f))
             Text(
                 "+ add",
-                color = ShepPalette.accent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = ShepType.actionStrong,
                 modifier = Modifier.clickable { editing = "" },
             )
         }
         val v = view
         if (v != null) {
             val overCap = v.percent >= 80
-            Column(Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(horizontal = 16.dp, vertical = 8.dp)) {
-                LinearProgressIndicator(
-                    progress = { (v.percent / 100f).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                    color = if (overCap) ShepPalette.peach else ShepPalette.accent,
-                    trackColor = ShepPalette.surface0,
-                )
-                Spacer(Modifier.height(4.dp))
+            Column(Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(horizontal = ShepSpace.screen, vertical = ShepSpace.small)) {
+                // Two boxes rather than a LinearProgressIndicator: Material's
+                // draws a "stop indicator" dot at the track end, so an empty
+                // memory rendered a copper mark at 100% and read as full. This
+                // is also the same bar the board card's context gauge draws,
+                // which is the point — one meter, one look.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(ShepSize.meterHeight)
+                        .clip(ShepShape.bar)
+                        .background(ShepPalette.surface0),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth((v.percent / 100f).coerceIn(0f, 1f))
+                            .height(ShepSize.meterHeight)
+                            .clip(ShepShape.bar)
+                            .background(if (overCap) ShepPalette.peach else ShepPalette.accent),
+                    )
+                }
+                Spacer(Modifier.height(ShepSpace.tight))
                 Text(
                     "${v.used}/${v.cap} chars · ${v.percent}%" + if (overCap) " — consolidate soon" else "",
-                    color = if (overCap) ShepPalette.peach else ShepPalette.overlay0,
-                    fontSize = 12.sp,
+                    style = ShepType.meta.copy(
+                        color = if (overCap) ShepPalette.peach else ShepPalette.overlay0,
+                    ),
                 )
             }
         }
         notice?.let {
-            Text(it, color = ShepPalette.peach, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            Text(
+                it,
+                style = ShepType.meta.copy(color = ShepPalette.peach),
+                modifier = Modifier.padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
+            )
         }
         if (v == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(if (status.isEmpty()) "loading…" else status, color = ShepPalette.overlay0)
+                Text(if (status.isEmpty()) "loading…" else status, style = ShepType.emptyState)
             }
         } else if (v.entries.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("no entries yet — add one with + add", color = ShepPalette.overlay0)
+                Text("no entries yet — add one with + add", style = ShepType.emptyState)
             }
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(ShepSpace.medium),
+                verticalArrangement = Arrangement.spacedBy(ShepSpace.small),
             ) {
                 items(v.entries, key = { it }) { entry ->
                     MemoryCard(
@@ -1009,13 +1021,14 @@ fun MemoryScreen(client: BridgeClient) {
 @Composable
 fun MemoryCard(entry: String, onEdit: () -> Unit, onRemove: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ShepPalette.surfaceDim).padding(14.dp),
+        Modifier.fillMaxWidth().clip(ShepShape.card).background(ShepPalette.surface0).padding(ShepSpace.card),
     ) {
-        Text(entry, color = ShepPalette.text, fontSize = 14.sp)
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("edit", color = ShepPalette.accent, fontSize = 13.sp, modifier = Modifier.clickable { onEdit() })
-            Text("remove", color = ShepPalette.overlay0, fontSize = 13.sp, modifier = Modifier.clickable { onRemove() })
+        // A memory entry is a sentence a person wrote. Sans.
+        Text(entry, style = ShepType.body)
+        Spacer(Modifier.height(ShepSpace.small))
+        Row(horizontalArrangement = Arrangement.spacedBy(ShepSpace.screen)) {
+            Text("edit", style = ShepType.action.copy(color = ShepPalette.accent), modifier = Modifier.clickable { onEdit() })
+            Text("remove", style = ShepType.actionQuiet, modifier = Modifier.clickable { onRemove() })
         }
     }
 }
@@ -1026,28 +1039,26 @@ fun MemoryEditSheet(initial: String, onDismiss: () -> Unit, onSave: (String) -> 
     val sheetState = rememberModalBottomSheetState()
     var text by remember { mutableStateOf(initial) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ShepPalette.surfaceDim) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
             Text(
                 if (initial.isEmpty()) "add entry" else "edit entry",
-                color = ShepPalette.text,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
+                style = ShepType.sheetTitle,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = { Text("one fact, present tense…", color = ShepPalette.overlay0) },
+                placeholder = { Text("one fact, present tense…", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 6,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ShepSpace.screen))
             Button(
                 onClick = { onSave(text.trim()) },
                 enabled = text.isNotBlank() && text.trim() != initial,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (initial.isEmpty()) "add" else "save") }
-            Spacer(Modifier.height(8.dp))
+            ) { Text(if (initial.isEmpty()) "add" else "save", style = ShepType.button) }
+            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }
@@ -1095,14 +1106,14 @@ fun PairingScreen(
     }
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
+        Modifier.fillMaxSize().padding(ShepSpace.section).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("shep", color = ShepPalette.accent, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+        Text("shep", style = ShepType.hero)
         Text(
             "the cockpit in your pocket",
-            color = ShepPalette.overlay0,
-            modifier = Modifier.padding(bottom = 24.dp),
+            style = ShepType.meta,
+            modifier = Modifier.padding(bottom = ShepSpace.section),
         )
         Button(
             onClick = {
@@ -1117,21 +1128,20 @@ fun PairingScreen(
                 )
             },
             enabled = !busy,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(ShepSize.buttonHeight),
         ) {
-            Text("Scan QR to pair", fontSize = 16.sp)
+            Text("Scan QR to pair", style = ShepType.button)
         }
         Text(
             "— or enter manually —",
-            color = ShepPalette.overlay0,
-            fontSize = 12.sp,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+            style = ShepType.meta,
+            modifier = Modifier.fillMaxWidth().padding(vertical = ShepSpace.screen),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            label = { Text("Bridge URL") },
+            label = { Text("Bridge URL", style = ShepType.fieldLabel) },
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
@@ -1139,11 +1149,11 @@ fun PairingScreen(
             ),
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(ShepSpace.medium))
         OutlinedTextField(
             value = token,
             onValueChange = { token = it },
-            label = { Text("Token") },
+            label = { Text("Token", style = ShepType.fieldLabel) },
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
@@ -1151,17 +1161,16 @@ fun PairingScreen(
             ),
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(ShepSpace.small))
         Text(
             "Run `shep bridge pair --host <tailnet-ip>` on the server for these values.",
-            color = ShepPalette.overlay0,
-            fontSize = 12.sp,
+            style = ShepType.meta,
         )
         error?.let {
-            Spacer(Modifier.height(12.dp))
-            Text(it, color = ShepPalette.red)
+            Spacer(Modifier.height(ShepSpace.medium))
+            Text(it, style = ShepType.meta.copy(color = ShepPalette.red))
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(ShepSpace.indent))
         Button(
             onClick = {
                 busy = true
@@ -1172,9 +1181,9 @@ fun PairingScreen(
                 }
             },
             enabled = !busy && url.isNotBlank() && token.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(ShepSize.buttonHeight),
         ) {
-            Text(if (busy) "Connecting..." else "Connect", fontSize = 16.sp)
+            Text(if (busy) "Connecting..." else "Connect", style = ShepType.button)
         }
     }
 }
@@ -1238,63 +1247,71 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(14.dp),
+            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("←", color = ShepPalette.accent, fontSize = 22.sp, modifier = Modifier.clickable { onBack() }.padding(end = 14.dp))
+            Text(
+                "←",
+                style = ShepType.screenTitle.copy(color = ShepPalette.accent),
+                modifier = Modifier.clickable { onBack() }.padding(end = ShepSpace.medium),
+            )
             Column(Modifier.weight(1f)) {
-                Text("review · ${row.workspaceLabel}", color = ShepPalette.text, fontWeight = FontWeight.SemiBold)
+                Text("review · ${row.workspaceLabel}", style = ShepType.agentName)
                 Text(
                     row.worktreeRepo?.let { "$it${if (row.isWorktree) " · worktree" else ""}" } ?: "working tree",
-                    color = ShepPalette.overlay0,
-                    fontSize = 12.sp,
+                    style = ShepType.meta,
                 )
             }
         }
         notice?.let {
-            Text(it, color = ShepPalette.peach, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp))
+            Text(
+                it,
+                style = ShepType.meta.copy(color = ShepPalette.peach),
+                modifier = Modifier.padding(horizontal = ShepSpace.medium, vertical = ShepSpace.tight),
+            )
         }
         if (stat.isNotEmpty()) {
             Text(
                 stat,
-                color = ShepPalette.overlay0,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                modifier = Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(10.dp),
+                style = ShepType.codeSmall.copy(color = ShepPalette.overlay0),
+                modifier = Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.small),
             )
         }
         Box(Modifier.weight(1f).fillMaxWidth().background(ShepPalette.panelBg)) {
             if (diff.text.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(status.ifEmpty { "no changes" }, color = ShepPalette.overlay0)
+                    Text(status.ifEmpty { "no changes" }, style = ShepType.emptyState)
                 }
             } else {
                 Text(
                     diff,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    modifier = Modifier.fillMaxSize().verticalScroll(scroll).padding(10.dp),
+                    style = ShepType.codeSmall,
+                    modifier = Modifier.fillMaxSize().verticalScroll(scroll).padding(ShepSpace.small),
                 )
             }
         }
         Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.small),
+            horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(ShepPalette.surface0)
-                    .clickable { requesting = true }.padding(vertical = 10.dp),
+                Modifier.weight(1f).clip(ShepShape.button).background(ShepPalette.surface0)
+                    .clickable { requesting = true }.padding(vertical = ShepSpace.small),
                 contentAlignment = Alignment.Center,
-            ) { Text("request changes", color = ShepPalette.peach, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+            ) { Text("request changes", style = ShepType.action.copy(color = ShepPalette.peach)) }
             if (row.isWorktree) {
                 Box(
-                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                    Modifier.weight(1f).clip(ShepShape.button)
                         .background(if (shipping) ShepPalette.surface0 else ShepPalette.accent)
-                        .clickable(enabled = !shipping) { confirmShip = true }.padding(vertical = 10.dp),
+                        .clickable(enabled = !shipping) { confirmShip = true }.padding(vertical = ShepSpace.small),
                     contentAlignment = Alignment.Center,
-                ) { Text(if (shipping) "shipping…" else "ship ⑂", color = ShepPalette.panelBg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                ) {
+                    Text(
+                        if (shipping) "shipping…" else "ship ⑂",
+                        style = ShepType.action.copy(color = ShepPalette.panelBg),
+                    )
+                }
             }
         }
     }
@@ -1325,20 +1342,18 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmShip = false },
             containerColor = ShepPalette.surfaceDim,
-            title = { Text("Ship this worktree?", color = ShepPalette.text) },
+            title = { Text("Ship this worktree?", style = ShepType.sheetTitle) },
             text = {
                 Text(
                     "Merge ${row.worktreeRepo ?: "this worktree"}'s branch into its base checkout, then remove the worktree. " +
                         "Refuses if either side is dirty or the merge conflicts. This can't be undone.",
-                    color = ShepPalette.overlay0,
-                    fontSize = 13.sp,
+                    style = ShepType.bodySmall,
                 )
             },
             confirmButton = {
                 Text(
                     "Merge & ship",
-                    color = ShepPalette.accent,
-                    fontWeight = FontWeight.SemiBold,
+                    style = ShepType.button.copy(color = ShepPalette.accent),
                     modifier = Modifier.clickable {
                         confirmShip = false
                         shipping = true
@@ -1356,11 +1371,15 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
                             shipping = false
                             result.onSuccess { notice = "✓ $it"; onBack() }.onFailure { notice = "ship failed: ${it.message}" }
                         }
-                    }.padding(8.dp),
+                    }.padding(ShepSpace.small),
                 )
             },
             dismissButton = {
-                Text("Cancel", color = ShepPalette.overlay0, modifier = Modifier.clickable { confirmShip = false }.padding(8.dp))
+                Text(
+                    "Cancel",
+                    style = ShepType.button.copy(color = ShepPalette.overlay0),
+                    modifier = Modifier.clickable { confirmShip = false }.padding(ShepSpace.small),
+                )
             },
         )
     }
@@ -1372,23 +1391,26 @@ fun RequestChangesSheet(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
     val sheetState = rememberModalBottomSheetState()
     var text by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = ShepPalette.surfaceDim) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).imePadding()) {
-            Text("request changes", color = ShepPalette.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text("goes straight into the agent's pane and flags the workspace.", color = ShepPalette.overlay0, fontSize = 12.sp)
-            Spacer(Modifier.height(12.dp))
+        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
+            Text("request changes", style = ShepType.sheetTitle)
+            Spacer(Modifier.height(ShepSpace.snug))
+            Text(
+                "goes straight into the agent's pane and flags the workspace.",
+                style = ShepType.bodySmall.copy(color = ShepPalette.overlay0),
+            )
+            Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = { Text("what needs to change…", color = ShepPalette.overlay0) },
+                placeholder = { Text("what needs to change…", style = ShepType.fieldLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 6,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ShepSpace.screen))
             Button(onClick = { onSubmit(text.trim()) }, enabled = text.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                Text("send to agent")
+                Text("send to agent", style = ShepType.button)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }
@@ -1561,25 +1583,22 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(16.dp),
+            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.screen),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("board", color = ShepPalette.text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("board", style = ShepType.screenTitle)
             Spacer(Modifier.weight(1f))
-            Text(status, color = ShepPalette.overlay0, fontSize = 12.sp)
-            Spacer(Modifier.width(12.dp))
+            Text(status, style = ShepType.meta)
+            Spacer(Modifier.width(ShepSpace.medium))
             Text(
                 "+ new",
-                color = ShepPalette.accent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = ShepType.actionStrong,
                 modifier = Modifier.clickable { showNew = true },
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(ShepSpace.medium))
             Text(
                 "unpair",
-                color = ShepPalette.overlay0,
-                fontSize = 12.sp,
+                style = ShepType.meta,
                 modifier = Modifier.clickable { onUnpair() },
             )
         }
@@ -1588,23 +1607,21 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
             Text(
                 "⚠ server protocol $serverProtocol · app built for $EXPECTED_PROTOCOL — " +
                     if (serverProtocol > EXPECTED_PROTOCOL) "update the app" else "update the server",
-                color = ShepPalette.panelBg,
-                fontSize = 12.sp,
+                style = ShepType.meta.copy(color = ShepPalette.panelBg),
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(ShepPalette.peach)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
             )
         }
         notice?.let {
             Text(
                 it,
-                color = ShepPalette.peach,
-                fontSize = 12.sp,
+                style = ShepType.meta.copy(color = ShepPalette.peach),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { notice = null }
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
             )
         }
         dev.shep.companion.screens.DashboardStrip(totals, host) { statusColor(it) }
@@ -1614,14 +1631,14 @@ fun HomeScreen(client: BridgeClient, onOpenPane: (AgentRow) -> Unit, onUnpair: (
                 Text(
                     if (rows.isEmpty()) "no sessions — start one with + new"
                     else "nothing ${filter.label}",
-                    color = ShepPalette.overlay0,
+                    style = ShepType.emptyState,
                 )
             }
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(ShepSpace.medium),
+                verticalArrangement = Arrangement.spacedBy(ShepSpace.small),
             ) {
                 items(visibleRows, key = { it.paneId }) { row ->
                     dev.shep.companion.screens.BoardCard(
@@ -1682,24 +1699,25 @@ fun FilterChips(selected: HomeFilter, rows: List<AgentRow>, onSelect: (HomeFilte
             .fillMaxWidth()
             .background(ShepPalette.surfaceDim)
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
+        horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
     ) {
         HomeFilter.entries.forEach { entry ->
             val count = rows.count { entry.accepts(it.status) }
             val active = entry == selected
             Box(
                 Modifier
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(ShepShape.pill)
                     .background(if (active) ShepPalette.accent else ShepPalette.surface0)
                     .clickable { onSelect(entry) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
             ) {
                 Text(
                     "${entry.label} $count",
-                    color = if (active) ShepPalette.panelBg else ShepPalette.overlay0,
-                    fontSize = 12.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    style = ShepType.chip.copy(
+                        color = if (active) ShepPalette.panelBg else ShepPalette.subtext0,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    ),
                 )
             }
         }

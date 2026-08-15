@@ -96,18 +96,52 @@ object ShepSemantic {
     fun agentColor(status: String): Color = agent(status).color
 
     /**
-     * Task-queue states, matching `task_state_color` in `src/ui/board.rs`.
+     * Task-queue states, matching `task_appearance` in `src/ui/status.rs`.
+     *
+     * The shapes tell the same story as an agent's, because they mean the same
+     * things: a ring is stopped, movement is working, filled is finished,
+     * hollow is waiting, a speck is nothing. Only "done" takes a different
+     * colour — green rather than blue — because a task has no notion of your
+     * having seen it, so it is simply settled.
      *
      * A queued task is dimmer than a running one on purpose: the queue is a
      * backlog, and the eye should land on what is actually moving.
      */
-    fun task(state: String): Color = when (state) {
-        "blocked" -> ShepPalette.red
-        "running" -> ShepPalette.yellow
-        "done" -> ShepPalette.green
-        "cancelled" -> ShepPalette.overlay0
-        else -> ShepPalette.overlay1 // todo
+    fun task(state: String, tick: Int = 0): StateAppearance = when (state) {
+        "blocked" -> StateAppearance(
+            glyph = "◉",
+            label = "blocked",
+            color = ShepPalette.red,
+            description = "task blocked",
+        )
+        "running" -> StateAppearance(
+            glyph = spinnerFrame(tick),
+            label = "running",
+            color = ShepPalette.yellow,
+            description = "task running",
+        )
+        "done" -> StateAppearance(
+            glyph = "●",
+            label = "done",
+            color = ShepPalette.green,
+            description = "task done",
+        )
+        "cancelled" -> StateAppearance(
+            glyph = "·",
+            label = "cancelled",
+            color = ShepPalette.overlay0,
+            description = "task cancelled",
+        )
+        else -> StateAppearance(
+            glyph = "○",
+            label = state.ifBlank { "todo" },
+            color = ShepPalette.overlay1,
+            description = "task waiting to start",
+        )
     }
+
+    /** Just the ink, for the label beside the glyph. */
+    fun taskColor(state: String): Color = task(state).color
 
     /**
      * The review-lifecycle badge, or `null` when there is nothing to say.

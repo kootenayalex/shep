@@ -8,12 +8,18 @@ import androidx.compose.ui.graphics.Color
  * These are the desktop TUI's own colors, not an approximation of them — the
  * companion only reads as part of shep because it renders in the same ink.
  *
- * Semantics carried over from the desktop:
- *  - [accent] copper: focus, selection, the working state
- *  - [peach] warning tier: git-behind, memory pressure, "changes requested"
- *  - [red] blocked or destructive ONLY, so red always means "stop"
- *  - [teal] queued input
- *  - [mauve] review requested
+ * Every colour has exactly one job, and `docs/DESIGN-LANGUAGE.md` in the shep
+ * repo is the contract both surfaces implement:
+ *  - [red] **stop**: blocked, or destructive. Nothing else, ever.
+ *  - [peach] **warning**: git-behind, memory pressure, "changes requested".
+ *  - [yellow] **working**: an agent is running.
+ *  - [blue] **done, unseen**: finished, and you have not looked yet.
+ *  - [green] **settled**: idle, approved, ahead of upstream.
+ *  - [teal] **queued**: input waiting for an agent to go idle.
+ *  - [mauve] **review**: review requested; also branch identity.
+ *  - [accent] copper — **focus**: selection, the focused pane, the active tab.
+ *    Never a state: a selected row and a working agent must not share ink.
+ *  - [overlay0] **absent**: unknown state, dim metadata, disabled affordances.
  */
 object ShepPalette {
     val accent = Color(0xFFE09A55) // copper

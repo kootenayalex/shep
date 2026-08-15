@@ -21,13 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.shep.companion.AgentRow
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.ansiToAnnotated
-import dev.shep.companion.ui.theme.JetBrainsMono
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -77,14 +75,14 @@ fun HistoryView(
             Modifier
                 .fillMaxWidth()
                 .background(ShepPalette.surfaceDim)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.medium),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
         ) {
             Text(
                 "‹",
                 style = ShepType.wordmark.copy(color = ShepPalette.accent),
-                modifier = Modifier.clickable { onBack() }.padding(end = 4.dp),
+                modifier = Modifier.clickable { onBack() }.padding(end = ShepSpace.tight),
             )
             Text("history", style = ShepType.agentName.copy(color = ShepPalette.accent))
             Text("${row.paneId} · last $lines lines", style = ShepType.paneId)
@@ -93,22 +91,17 @@ fun HistoryView(
             Text(
                 it,
                 style = ShepType.hint.copy(color = ShepPalette.red),
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(ShepSpace.medium),
             )
         }
         Text(
             text,
-            style = ShepType.mono.copy(
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
-                color = ShepPalette.text,
-                fontFamily = JetBrainsMono,
-            ),
+            style = ShepType.codeSmall.copy(color = ShepPalette.text),
             modifier = Modifier
                 .testTag("history-text")
                 .fillMaxSize()
                 .verticalScroll(scroll)
-                .padding(10.dp),
+                .padding(ShepSpace.small),
         )
     }
 }
