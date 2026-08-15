@@ -5,8 +5,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import dev.shep.companion.ui.theme.ShepPalette
@@ -25,6 +28,7 @@ import dev.shep.companion.ui.theme.ShepShape
 import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
+import androidx.compose.material3.minimumInteractiveComponentSize
 
 /**
  * Keys a phone keyboard doesn't have but a terminal needs.
@@ -113,6 +117,14 @@ enum class ModifierState { Off, Armed, Locked;
     }
 }
 
+/**
+ * One key.
+ *
+ * Clipped before it is clickable, so the ripple follows the rounded corner
+ * instead of flashing a rectangle over it, and the padding sits inside the
+ * touch target rather than outside — this bar is the app's primary terminal
+ * input and every key was about 30dp tall.
+ */
 @Composable
 private fun Key(
     label: String,
@@ -120,15 +132,13 @@ private fun Key(
     color: Color = ShepPalette.text,
     onClick: () -> Unit,
 ) {
-    Text(
-        label,
-        style = ShepType.key.copy(color = color),
-        modifier = modifier
-            .testTag("key-$label")
-            .background(ShepPalette.surface0, ShepShape.key)
-            .border(ShepSize.border, ShepPalette.surface1, ShepShape.key)
-            .clickable { onClick() }
-            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
+    KeyFace(
+        label = label,
+        ink = color,
+        background = ShepPalette.surface0,
+        outline = ShepPalette.surface1,
+        modifier = modifier,
+        onClick = onClick,
     )
 }
 
@@ -139,23 +149,37 @@ private fun StickyKey(
     onTap: (doubleTap: Boolean) -> Unit,
 ) {
     val active = state != ModifierState.Off
-    Text(
-        if (state == ModifierState.Locked) "$label•" else label,
-        style = ShepType.key.copy(
-            color = if (active) ShepPalette.panelBg else ShepPalette.text,
-        ),
-        modifier = Modifier
-            .testTag("key-$label")
-            .background(
-                if (active) ShepPalette.accent else ShepPalette.surface0,
-                ShepShape.key,
-            )
-            .border(
-                ShepSize.border,
-                if (active) ShepPalette.accent else ShepPalette.surface1,
-                ShepShape.key,
-            )
-            .clickable { onTap(state == ModifierState.Armed) }
-            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
+    KeyFace(
+        label = if (state == ModifierState.Locked) "$label•" else label,
+        tag = label,
+        ink = if (active) ShepPalette.panelBg else ShepPalette.text,
+        background = if (active) ShepPalette.accent else ShepPalette.surface0,
+        outline = if (active) ShepPalette.accent else ShepPalette.surface1,
+        onClick = { onTap(state == ModifierState.Armed) },
     )
+}
+
+@Composable
+private fun KeyFace(
+    label: String,
+    ink: Color,
+    background: Color,
+    outline: Color,
+    modifier: Modifier = Modifier,
+    tag: String = label,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .testTag("key-$tag")
+            .minimumInteractiveComponentSize()
+            .clip(ShepShape.key)
+            .background(background)
+            .border(ShepSize.border, outline, ShepShape.key)
+            .clickable(onClick = onClick)
+            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = ShepType.key.copy(color = ink))
+    }
 }

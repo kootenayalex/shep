@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -25,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -36,11 +38,14 @@ import dev.shep.companion.BridgeClient
 import dev.shep.companion.Transcript
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
+import dev.shep.companion.screens.ReviewScreen
 import dev.shep.companion.terminal.GridState
 import dev.shep.companion.terminal.KeyBar
 import dev.shep.companion.terminal.ShepInputView
 import dev.shep.companion.terminal.TerminalGrid
 import dev.shep.companion.terminal.TerminalKey
+import dev.shep.companion.ui.components.ActionText
+import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepShape
@@ -51,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import androidx.compose.material3.minimumInteractiveComponentSize
 
 /** Live keystrokes, or compose-and-queue for when the agent is busy. */
 enum class InputMode { Stream, Queue }
@@ -77,7 +83,6 @@ fun PaneScreen(
     client: BridgeClient,
     row: AgentRow,
     onBack: () -> Unit,
-    onReview: () -> Unit = {},
 ) {
     val grid = remember(row.paneId) { GridState() }
     var status by remember { mutableStateOf(row.status) }
@@ -87,6 +92,7 @@ fun PaneScreen(
     var output by remember { mutableStateOf(OutputMode.Live) }
     var composer by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
+    var showReview by remember { mutableStateOf(false) }
     var streaming by remember { mutableStateOf(false) }
     var transcript by remember(row.paneId) { mutableStateOf<Transcript?>(null) }
     var transcriptError by remember(row.paneId) { mutableStateOf<String?>(null) }
@@ -115,6 +121,17 @@ fun PaneScreen(
     if (showHistory) {
         BackHandler { showHistory = false }
         HistoryView(client, row, onBack = { showHistory = false })
+        return
+    }
+
+    // Review is a full-screen push over the pane, exactly as history is, so it
+    // belongs here rather than threaded up through the nav shell. The screen
+    // and its `workspace.diff` / `workspace.ship` calls were finished months
+    // ago; the title bar's "review" was visible, tappable and rippling, and
+    // did nothing, because no caller ever passed the callback.
+    if (showReview) {
+        BackHandler { showReview = false }
+        ReviewScreen(client, row, onBack = { showReview = false })
         return
     }
 
@@ -188,7 +205,13 @@ fun PaneScreen(
     }
 
     Column(Modifier.fillMaxSize().background(ShepPalette.panelBg).imePadding()) {
-        PaneTitleBar(row, status, onBack = onBack, onReview = onReview, onHistory = { showHistory = true })
+        PaneTitleBar(
+            row,
+            status,
+            onBack = onBack,
+            onReview = { showReview = true },
+            onHistory = { showHistory = true },
+        )
 
         OutputToggle(output) {
             output = it
@@ -309,17 +332,16 @@ private fun PaneTitleBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
     ) {
-        Text(
+        ActionText(
             "‹",
             style = ShepType.wordmark.copy(color = ShepPalette.accent),
-            modifier = Modifier.clickable { onBack() }.padding(end = ShepSpace.tight),
+            description = "back to the board",
+            onClick = onBack,
         )
         Text(row.paneId, style = ShepType.agentName.copy(color = ShepPalette.accent))
         Text(row.workspaceLabel, style = ShepType.paneId, modifier = Modifier.weight(1f))
-        Text("history", style = ShepType.hint.copy(color = ShepPalette.subtext0),
-            modifier = Modifier.clickable { onHistory() }.padding(ShepSpace.tight))
-        Text("review", style = ShepType.hint.copy(color = ShepPalette.accent),
-            modifier = Modifier.clickable { onReview() }.padding(ShepSpace.tight))
+        ActionText("history", style = ShepType.hint.copy(color = ShepPalette.subtext0), onClick = onHistory)
+        ActionText("review", style = ShepType.hint.copy(color = ShepPalette.accent), onClick = onReview)
         StateGlyph(status, style = ShepType.stateGlyphSmall)
     }
 }
@@ -392,21 +414,8 @@ private fun ModeToggle(mode: InputMode, onMode: (InputMode) -> Unit) {
 
 @Composable
 private fun ModeChip(label: String, on: Boolean, side: String = "in", onClick: () -> Unit) {
-    Text(
-        label,
-        style = ShepType.chip.copy(
-            color = if (on) ShepPalette.panelBg else ShepPalette.subtext0,
-        ),
-        modifier = Modifier
-            // Both rows have a chip called "live"; the side keeps the tags apart.
-            .testTag("mode-$side-$label")
-            .background(
-                if (on) ShepPalette.accent else ShepPalette.surface0,
-                ShepShape.pill,
-            )
-            .clickable { onClick() }
-            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
-    )
+    // Both rows have a chip called "live"; the side keeps the tags apart.
+    ShepChip(label, on, modifier = Modifier.testTag("mode-$side-$label"), onClick = onClick)
 }
 
 @Composable
@@ -426,7 +435,8 @@ private fun QueueComposer(
         Box(
             Modifier
                 .weight(1f)
-                .background(ShepPalette.surface0, ShepShape.field)
+                .clip(ShepShape.field)
+                .background(ShepPalette.surface0)
                 .border(ShepSize.border, ShepPalette.surface1, ShepShape.field)
                 .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
         ) {
@@ -441,22 +451,24 @@ private fun QueueComposer(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Text(
-            "queue",
-            style = ShepType.key.copy(color = ShepPalette.teal),
-            modifier = Modifier
-                .background(ShepPalette.tealDim, ShepShape.field)
+        Box(
+            Modifier
+                .minimumInteractiveComponentSize()
+                .clip(ShepShape.field)
+                .background(ShepPalette.tealDim)
                 .border(ShepSize.border, ShepPalette.teal, ShepShape.field)
                 .clickable { onSend(true) }
                 .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
-        )
-        Text(
-            "send",
-            style = ShepType.key.copy(color = ShepPalette.panelBg),
-            modifier = Modifier
-                .background(ShepPalette.accent, ShepShape.field)
+            contentAlignment = Alignment.Center,
+        ) { Text("queue", style = ShepType.key.copy(color = ShepPalette.teal)) }
+        Box(
+            Modifier
+                .minimumInteractiveComponentSize()
+                .clip(ShepShape.field)
+                .background(ShepPalette.accent)
                 .clickable { onSend(false) }
                 .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
-        )
+            contentAlignment = Alignment.Center,
+        ) { Text("send", style = ShepType.key.copy(color = ShepPalette.panelBg)) }
     }
 }

@@ -345,6 +345,30 @@ data class PaneNode(
     val focused: Boolean,
 )
 
+/**
+ * What the pane view needs, from what the tree knows.
+ *
+ * `session.snapshot` answers with agents, so a plain shell is simply not in it
+ * — and the tree lists shells. This fills in the facts a tree node cannot know
+ * (branch, context, review state) with the same nulls a snapshot-only server
+ * would give, which the pane view already handles.
+ */
+fun PaneNode.asAgentRow(workspaceLabel: String? = null): AgentRow = AgentRow(
+    terminalId = "",
+    paneId = paneId,
+    workspaceId = tabId.substringBefore(":"),
+    workspaceLabel = workspaceLabel ?: tabId.substringBefore(":"),
+    agent = agent ?: "shell",
+    status = status,
+    contextPercent = null,
+    reviewState = "none",
+    customStatus = null,
+    worktreeRepo = null,
+    isWorktree = false,
+    memoryPercent = null,
+    cwd = cwd,
+)
+
 data class TabNode(
     val tabId: String,
     val workspaceId: String,

@@ -1,13 +1,13 @@
 package dev.shep.companion
 
 import androidx.compose.ui.graphics.Color
-import dev.shep.companion.terminal.PackedColor
-import dev.shep.companion.ui.theme.ShepPalette
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import dev.shep.companion.terminal.PackedColor
+import dev.shep.companion.ui.theme.ShepPalette
 
 /**
  * Read-only ANSI → AnnotatedString renderer for the pane view (A2 decision:

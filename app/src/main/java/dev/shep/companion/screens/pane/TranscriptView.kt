@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -36,6 +38,7 @@ import dev.shep.companion.ui.theme.ShepShape
 import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
+import androidx.compose.material3.minimumInteractiveComponentSize
 
 /**
  * A pane's conversation, read like a chat.
@@ -212,9 +215,11 @@ private fun ToolRow(tool: ToolCall, tag: String) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(ShepPalette.surfaceDim, ShepShape.button)
+            .minimumInteractiveComponentSize()
+            .clip(ShepShape.button)
+            .background(ShepPalette.surfaceDim)
             .clickable(enabled = tool.preview.isNotBlank()) { open = !open }
-            .padding(horizontal = ShepSpace.small, vertical = ShepSpace.small),
+            .padding(ShepSpace.small),
         verticalArrangement = Arrangement.spacedBy(ShepSpace.snug),
     ) {
         Row(

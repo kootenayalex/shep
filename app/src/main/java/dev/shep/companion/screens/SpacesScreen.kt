@@ -1,28 +1,22 @@
 package dev.shep.companion.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,7 +26,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import dev.shep.companion.BridgeClient
@@ -41,10 +34,17 @@ import dev.shep.companion.SpaceNode
 import dev.shep.companion.TabNode
 import dev.shep.companion.parseTree
 import dev.shep.companion.repoName
+import dev.shep.companion.ui.components.ActionText
+import dev.shep.companion.ui.components.EmptyState
+import dev.shep.companion.ui.components.Notice
+import dev.shep.companion.ui.components.ScreenHeader
+import dev.shep.companion.ui.components.ShepButton
+import dev.shep.companion.ui.components.ShepCard
+import dev.shep.companion.ui.components.ShepSheet
 import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepSemantic
-import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +53,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import androidx.compose.material3.minimumInteractiveComponentSize
 
 /**
  * The events that change the session's shape.
@@ -95,7 +96,7 @@ private data class Renaming(
 @Composable
 fun SpacesScreen(
     client: BridgeClient,
-    onOpenPane: (PaneNode) -> Unit,
+    onOpenPane: (PaneNode, String) -> Unit,
 ) {
     var spaces by remember { mutableStateOf<List<SpaceNode>>(emptyList()) }
     var status by remember { mutableStateOf("connecting") }
@@ -165,34 +166,14 @@ fun SpacesScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().background(ShepPalette.surfaceDim).padding(ShepSpace.screen),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("spaces", style = ShepType.screenTitle)
-            Spacer(Modifier.weight(1f))
+        ScreenHeader("spaces") {
             Text(status, style = ShepType.meta)
-            Spacer(Modifier.width(ShepSpace.medium))
-            Text(
-                "+ new",
-                style = ShepType.actionStrong,
-                modifier = Modifier.clickable { showNewSpace = true },
-            )
+            Spacer(Modifier.width(ShepSpace.small))
+            ActionText("+ new", style = ShepType.actionStrong) { showNewSpace = true }
         }
-        notice?.let {
-            Text(
-                it,
-                style = ShepType.meta.copy(color = ShepPalette.peach),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { notice = null }
-                    .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
-            )
-        }
+        notice?.let { Notice(it, onDismiss = { notice = null }) }
         if (spaces.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("no spaces — start one with + new", style = ShepType.emptyState)
-            }
+            EmptyState("no spaces — start one with + new")
             return@Column
         }
         LazyColumn(
@@ -364,15 +345,16 @@ fun SpacesScreen(
             title = { Text(target.title, style = ShepType.sheetTitle) },
             text = { Text(target.body, style = ShepType.bodySmall) },
             confirmButton = {
-                TextButton(onClick = {
+                ActionText(
+                    target.action,
+                    style = ShepType.action.copy(color = ShepPalette.red),
+                ) {
                     confirming = null
                     target.run()
-                }) { Text(target.action, style = ShepType.button.copy(color = ShepPalette.red)) }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { confirming = null }) {
-                    Text("keep", style = ShepType.button.copy(color = ShepPalette.overlay1))
-                }
+                ActionText("keep") { confirming = null }
             },
         )
     }
@@ -393,20 +375,15 @@ private fun SpaceCard(
     onCloseTab: (TabNode) -> Unit,
     onSplitPane: (PaneNode) -> Unit,
     onClosePane: (PaneNode) -> Unit,
-    onOpenPane: (PaneNode) -> Unit,
+    onOpenPane: (PaneNode, String) -> Unit,
 ) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(ShepShape.card)
-            .background(ShepPalette.surface0)
-            .padding(vertical = ShepSpace.small),
-    ) {
+    ShepCard(padding = ShepSpace.none) {
         Row(
             Modifier
                 .fillMaxWidth()
+                .minimumInteractiveComponentSize()
                 .clickable { onToggle() }
-                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.hair),
+                .padding(horizontal = ShepSpace.card, vertical = ShepSpace.snug),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // The identity group is the one weighted child, so the chevron
@@ -441,8 +418,8 @@ private fun SpaceCard(
             Text(if (collapsed) "▸" else "▾", style = ShepType.state.copy(color = ShepPalette.overlay1))
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = ShepSpace.medium, vertical = ShepSpace.tight),
-            horizontalArrangement = Arrangement.spacedBy(ShepSpace.medium),
+            Modifier.fillMaxWidth().padding(horizontal = ShepSpace.snug),
+            horizontalArrangement = Arrangement.spacedBy(ShepSpace.tight),
         ) {
             SmallAction("go to", ShepPalette.accent, onFocusSpace)
             SmallAction("+ tab", ShepPalette.subtext0, onNewTab)
@@ -451,10 +428,8 @@ private fun SpaceCard(
             SmallAction("close", ShepPalette.red, onCloseSpace)
         }
 
-        if (collapsed) return@Column
-
-        space.tabs.forEach { tab ->
-            Column(Modifier.fillMaxWidth().padding(start = ShepSpace.indent, end = ShepSpace.medium, top = ShepSpace.snug)) {
+        if (!collapsed) space.tabs.forEach { tab ->
+            Column(Modifier.fillMaxWidth().padding(start = ShepSpace.medium, end = ShepSpace.snug)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusDot(tab.status, nested = true)
                     Spacer(Modifier.width(ShepSpace.small))
@@ -470,9 +445,7 @@ private fun SpaceCard(
                     )
                     Spacer(Modifier.width(ShepSpace.small))
                     SmallAction("go to", ShepPalette.overlay1) { onFocusTab(tab) }
-                    Spacer(Modifier.width(ShepSpace.medium))
                     SmallAction("rename", ShepPalette.overlay1) { onRenameTab(tab) }
-                    Spacer(Modifier.width(ShepSpace.medium))
                     // The server refuses to close a space's last tab, so offer
                     // the thing that does work instead of a button that errors.
                     if (!space.hasOnlyOneTab) {
@@ -483,8 +456,9 @@ private fun SpaceCard(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = ShepSpace.indent, top = ShepSpace.tight)
-                            .clickable { onOpenPane(pane) },
+                            .minimumInteractiveComponentSize()
+                            .clickable { onOpenPane(pane, space.label) }
+                            .padding(start = ShepSpace.indent, top = ShepSpace.tight, bottom = ShepSpace.tight),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         StatusDot(pane.status, nested = true)
@@ -506,13 +480,11 @@ private fun SpaceCard(
                             }
                         }
                         SmallAction("split", ShepPalette.overlay1) { onSplitPane(pane) }
-                        Spacer(Modifier.width(ShepSpace.medium))
                         SmallAction("close", ShepPalette.red) { onClosePane(pane) }
                     }
                 }
             }
         }
-        Spacer(Modifier.height(ShepSpace.tight))
     }
 }
 
@@ -528,13 +500,16 @@ private fun StatusDot(status: String, nested: Boolean = false) {
     StateGlyph(status, style = if (nested) ShepType.stateGlyphSmall else ShepType.stateGlyph)
 }
 
+/**
+ * One word in a row of them: "go to", "rename", "close".
+ *
+ * Up to five share a row here, so they use the shared [ActionText] for its
+ * 48dp minimum height rather than being 16dp of bare text — which is what
+ * every one of them was.
+ */
 @Composable
 private fun SmallAction(text: String, color: Color, onClick: () -> Unit) {
-    Text(
-        text,
-        style = ShepType.chip.copy(color = color),
-        modifier = Modifier.clickable { onClick() },
-    )
+    ActionText(text, style = ShepType.chip.copy(color = color), onClick = onClick)
 }
 
 /** One text field and a save button — renaming a space, a tab or a pane. */
@@ -546,31 +521,21 @@ private fun RenameSheet(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
     var name by remember { mutableStateOf(current) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = ShepPalette.surfaceDim,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
-            Text(title, style = ShepType.sheetTitle)
-            Spacer(Modifier.height(ShepSpace.medium))
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("name", style = ShepType.fieldLabel) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            Spacer(Modifier.height(ShepSpace.screen))
-            Button(
-                onClick = { onSave(name.trim()) },
-                enabled = name.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("save", style = ShepType.button) }
-            Spacer(Modifier.height(ShepSpace.small))
-        }
+    ShepSheet(title = title, onDismiss = onDismiss) {
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("name", style = ShepType.fieldLabel) },
+            textStyle = ShepType.field,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        Spacer(Modifier.height(ShepSpace.medium))
+        ShepButton(
+            "save",
+            enabled = name.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) { onSave(name.trim()) }
     }
 }

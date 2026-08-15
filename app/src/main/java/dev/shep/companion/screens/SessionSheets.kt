@@ -1,26 +1,17 @@
 package dev.shep.companion.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,11 +19,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import dev.shep.companion.AgentRow
 import dev.shep.companion.repoName
+import dev.shep.companion.ui.components.ButtonTone
+import dev.shep.companion.ui.components.ShepButton
+import dev.shep.companion.ui.components.ShepCard
+import dev.shep.companion.ui.components.ShepChip
+import dev.shep.companion.ui.components.ShepSheet
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepShape
 import dev.shep.companion.ui.theme.ShepSpace
@@ -50,26 +44,6 @@ enum class SessionRuntime(val label: String, val argv: List<String>, val agentNa
     Opencode("opencode", listOf("opencode"), "opencode"),
     Grok("grok", listOf("grok"), "grok"),
     Terminal("terminal", emptyList(), "shell");
-}
-
-/** A pill that reads as selected or not, the app's one chip shape. */
-@Composable
-private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .clip(ShepShape.pill)
-            .background(if (selected) ShepPalette.accent else ShepPalette.surface0)
-            .clickable { onClick() }
-            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.snug),
-    ) {
-        Text(
-            text,
-            style = ShepType.chip.copy(
-                color = if (selected) ShepPalette.panelBg else ShepPalette.subtext0,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            ),
-        )
-    }
 }
 
 /**
@@ -90,19 +64,11 @@ fun NewSessionSheet(
     onDismiss: () -> Unit,
     onStart: (cwd: String, name: String, runtime: SessionRuntime) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
     var cwd by remember { mutableStateOf(recentRepos.firstOrNull() ?: "") }
     var name by remember { mutableStateOf("") }
     var runtime by remember { mutableStateOf(SessionRuntime.Claude) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = ShepPalette.surfaceDim,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
-            Text("new session", style = ShepType.sheetTitle)
-            Spacer(Modifier.height(ShepSpace.medium))
+    ShepSheet(title = "new session", onDismiss = onDismiss) {
             OutlinedTextField(
                 value = cwd,
                 onValueChange = { cwd = it },
@@ -120,7 +86,7 @@ fun NewSessionSheet(
                     horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
                 ) {
                     recentRepos.forEach { path ->
-                        Chip(repoName(path), path == cwd) { cwd = path }
+                        ShepChip(repoName(path), path == cwd) { cwd = path }
                     }
                 }
             }
@@ -132,7 +98,7 @@ fun NewSessionSheet(
                 horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
             ) {
                 SessionRuntime.entries.forEach { option ->
-                    Chip(option.label, option == runtime) { runtime = option }
+                    ShepChip(option.label, option == runtime) { runtime = option }
                 }
             }
             Spacer(Modifier.height(ShepSpace.medium))
@@ -151,13 +117,11 @@ fun NewSessionSheet(
                 style = ShepType.metaSmall,
             )
             Spacer(Modifier.height(ShepSpace.screen))
-            Button(
-                onClick = { onStart(cwd.trim(), name.trim(), runtime) },
+            ShepButton(
+                "start ${runtime.label}",
                 enabled = cwd.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("start ${runtime.label}", style = ShepType.button) }
-            Spacer(Modifier.height(ShepSpace.small))
-        }
+            ) { onStart(cwd.trim(), name.trim(), runtime) }
     }
 }
 
@@ -168,17 +132,9 @@ fun NewSessionSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RenameSessionSheet(row: AgentRow, onDismiss: () -> Unit, onRename: (String) -> Unit) {
-    val sheetState = rememberModalBottomSheetState()
     var name by remember { mutableStateOf(row.agent) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = ShepPalette.surfaceDim,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen).imePadding()) {
-            Text("name this session", style = ShepType.sheetTitle)
-            Spacer(Modifier.height(ShepSpace.tight))
+    ShepSheet(title = "name this session", onDismiss = onDismiss) {
             Text(
                 listOfNotNull(
                     row.workspaceLabel.takeIf { it.isNotBlank() },
@@ -198,18 +154,15 @@ fun RenameSessionSheet(row: AgentRow, onDismiss: () -> Unit, onRename: (String) 
                 singleLine = true,
             )
             Spacer(Modifier.height(ShepSpace.screen))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Button(
-                    onClick = { onRename(name.trim()) },
-                    modifier = Modifier.weight(1f),
-                ) { Text("save", style = ShepType.button) }
-                Spacer(Modifier.width(ShepSpace.medium))
-                TextButton(onClick = { onRename("") }) {
-                    Text("reset", style = ShepType.button.copy(color = ShepPalette.overlay1))
-                }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ShepSpace.medium),
+            ) {
+                ShepButton("save", modifier = Modifier.weight(1f)) { onRename(name.trim()) }
+                // Clearing the field restores shep's own label, which is why
+                // the empty string is submitted rather than blocked.
+                ShepButton("reset", tone = ButtonTone.Quiet) { onRename("") }
             }
-            Spacer(Modifier.height(ShepSpace.small))
-        }
     }
 }
 
@@ -230,20 +183,12 @@ fun AssignTaskSheet(
     onDismiss: () -> Unit,
     onAssign: (AgentRow) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
     val wanted = repoName(task.repo)
     val ordered = sessions.sortedByDescending { row ->
         row.cwd?.let { repoName(it) == wanted } == true
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = ShepPalette.surfaceDim,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(ShepSpace.screen)) {
-            Text("send #${task.id} to…", style = ShepType.sheetTitle)
-            Spacer(Modifier.height(ShepSpace.tight))
+    ShepSheet(title = "send #${task.id} to…", onDismiss = onDismiss) {
             // The task's own words, so sans: this is the one line in the
             // sheet that a person wrote rather than shep generated.
             Text(
@@ -261,15 +206,8 @@ fun AssignTaskSheet(
             }
             ordered.forEach { row ->
                 val sameRepo = row.cwd?.let { repoName(it) == wanted } == true
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = ShepSpace.tight)
-                        .clip(ShepShape.field)
-                        .background(ShepPalette.surface0)
-                        .clickable { onAssign(row) }
-                        .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
-                ) {
+                Spacer(Modifier.height(ShepSpace.small))
+                ShepCard(shape = ShepShape.field, onClick = { onAssign(row) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             names[row.paneId] ?: row.agent,
@@ -291,9 +229,7 @@ fun AssignTaskSheet(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
             }
-            Spacer(Modifier.height(ShepSpace.small))
         }
     }
 }

@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
  *    layout is probably wrong before the spacing is.
  */
 object ShepSpace {
+    /** No gap. Named so a component can be told to add none. */
+    val none = 0.dp
+
     /** Two facts on one line-run; the gap under a heading before its subtitle. */
     val hair = 2.dp
 
