@@ -2,7 +2,7 @@
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                             workmayt · 1                      ● 1 blocked
+ shep                             workmayt · 1                      ◉ 1 blocked
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ session board · what are my agents doing                                     │
 │ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  3 │
@@ -13,13 +13,13 @@
 │  workmayt · fix… 2m  emberline · ma… 6m  workmayt · f… 20s  shep · feat/d… 1h│
 │  blocked             done                working            idle             │
 │  may I run the str…  pushed 3 commits …  Metamorphosing…                     │
-│  …rkmayt ████░░ 72%  …erline █████░ 88%  …/site ██░░░░ 41%  …/shep █░░░░░ 12%│
+│  …rkmayt ████▍░ 72%  …erline █████▎ 88%  …/site ██▌░░░ 41%  …/shep ▊░░░░░ 12%│
 │                                                                              │
 │                                         ⠹ codex p2                           │
 │                                          shep · feat/d… 2m                   │
 │                                          working                             │
 │                                          reading src/ui/b…                   │
-│                                          …-pass ███░░░ 55%                   │
+│                                          …-pass ███▎░░ 55%                   │
 │                                                                              │
 │                                                                              │
 │                                                                              │

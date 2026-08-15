@@ -18,6 +18,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::sidebar::{agent_panel_entries, format_event_age};
 use super::status::{agent_icon, state_label};
 use super::text::{truncate_end, truncate_start};
@@ -142,23 +143,24 @@ fn contract_home(path: &std::path::Path) -> String {
     }
 }
 
-/// A tiny inline gauge for the context window: `████░░ 62%`.
+/// A tiny inline gauge for the context window: `███▍░░ 62%`.
 ///
 /// Rendered as a bar because the number alone doesn't read at a glance — the
 /// thing worth seeing across eight cards is *which agent is nearly full*.
+///
+/// Drawn in eighths. Six whole cells give seven states for a hundred and one
+/// percentages, so 60% and 74% were the same picture; eighths give the same
+/// six columns forty-nine, which is the difference between a gauge that
+/// reports and one that rounds.
 fn context_gauge(percent: u8) -> String {
     const WIDTH: usize = 6;
+    const TRACK: &str = "\u{2591}";
     let percent = percent.min(100);
-    // Round rather than ceil, so only a genuinely full context fills the bar —
-    // with six cells, ceil made 84% and 100% look identical. Any nonzero
-    // reading still lights one cell so "barely used" outranks "unknown".
-    let filled = ((percent as usize * WIDTH) as f64 / 100.0).round() as usize;
-    let filled = if percent > 0 { filled.max(1) } else { 0 };
-    format!(
-        "{}{} {percent}%",
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(WIDTH.saturating_sub(filled))
-    )
+    // Any nonzero reading lights something, so "barely used" still outranks
+    // "unknown" — which is a different claim and draws nothing.
+    let smallest = 1.0 / (WIDTH * 8) as f32;
+    let fraction = (f32::from(percent) / 100.0).max(if percent > 0 { smallest } else { 0.0 });
+    format!("{} {percent}%", super::glyphs::bar(fraction, WIDTH, TRACK))
 }
 
 /// Human-readable "where is this agent" tag.
@@ -194,7 +196,7 @@ fn location_label(
         .unwrap_or(false);
     let pane_part = pane_number.filter(|_| multi_pane).map(|n| format!("p{n}"));
     match (tab_part, pane_part) {
-        (Some(tab), Some(pane)) => format!("{tab}·{pane}"),
+        (Some(tab), Some(pane)) => format!("{tab}{}{pane}", glyphs::SEP),
         (Some(tab), None) => tab,
         (None, Some(pane)) => pane,
         (None, None) => String::new(),
@@ -308,7 +310,10 @@ fn assign_distinct_names(model: &mut BoardModel) {
             // does, and is the last resort precisely because `w2:p1` is the
             // unreadable thing this exists to avoid.
             let fallback = names.last().cloned().unwrap_or_default();
-            resolved.insert(*pane_id, format!("{fallback} · {}", pane_id.raw()));
+            resolved.insert(
+                *pane_id,
+                format!("{fallback} {} {}", glyphs::SEP, pane_id.raw()),
+            );
         }
     }
 
@@ -331,7 +336,7 @@ fn name_candidates(card: &BoardCard) -> Vec<String> {
         Some(card.location.clone()).filter(|l| !l.is_empty()),
     ];
     for extra in extras.into_iter().flatten() {
-        accumulated = format!("{accumulated} · {extra}");
+        accumulated = format!("{accumulated} {} {extra}", glyphs::SEP);
         names.push(accumulated.clone());
     }
     names
@@ -690,7 +695,7 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
     let p = &app.palette;
     let dim = Style::default().fg(p.overlay0);
     let value = Style::default().fg(p.text);
-    let sep = || Span::styled("  ·  ", Style::default().fg(p.surface0));
+    let sep = || Span::styled(glyphs::SEP_WIDE, Style::default().fg(p.surface0));
 
     // Row 1 — agents and session shape.
     let mut row1 = vec![
@@ -720,8 +725,11 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
     row1.push(sep());
     row1.push(Span::styled(
         format!(
-            "{} ws · {} tabs · {} panes",
-            summary.workspaces, summary.tabs, summary.panes
+            "{} ws {s} {} tabs {s} {} panes",
+            summary.workspaces,
+            summary.tabs,
+            summary.panes,
+            s = glyphs::SEP
         ),
         dim,
     ));
@@ -867,7 +875,7 @@ fn render_title(app: &AppState, frame: &mut Frame, area: Rect) {
     let line = match app.board.view {
         BoardView::Columns => Line::from(vec![
             Span::styled(" session board ", title),
-            Span::styled("· what are my agents doing", dim),
+            Span::styled(format!("{} what are my agents doing", glyphs::SEP), dim),
         ]),
         BoardView::Agent => Line::from(vec![
             Span::styled(" session board ", dim),
@@ -894,7 +902,7 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
         BoardView::Columns => &[
             ("enter", " focus  "),
             ("i", " inspect  "),
-            ("hjkl/↑↓←→", " move  "),
+            (glyphs::KEYS_ARROWS, " move  "),
             ("t", " tasks  "),
             ("esc/q", " close"),
         ],
@@ -903,7 +911,10 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
             ("t", " tasks  "),
             ("esc/q", " back to board"),
         ],
-        BoardView::Tasks => &[("jk/↑↓", " move  "), ("esc/q/t", " back to board")],
+        BoardView::Tasks => &[
+            (glyphs::KEYS_VERTICAL, " move  "),
+            ("esc/q/t", " back to board"),
+        ],
     };
     let mut spans = vec![Span::raw(" ")];
     for (k, label) in hints {
@@ -993,7 +1004,7 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         }
     }
     let (dot, dot_style) = agent_icon(card.state, card.seen, app.spinner_tick, p);
-    let marker = if selected { "▌" } else { " " };
+    let marker = if selected { glyphs::MARKER } else { " " };
     let marker_style = if selected {
         Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
     } else {
@@ -1062,7 +1073,7 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     let age = card_age(app, card).unwrap_or_default();
     let mut meta = card.workspace_label.clone();
     if let Some(branch) = &card.branch {
-        meta.push_str(" · ");
+        meta.push_str(glyphs::SEP_SPACED);
         meta.push_str(branch);
     }
     let meta_budget = width
@@ -1216,15 +1227,15 @@ fn render_agent_detail(
 
     let mut sub = card.workspace_label.clone();
     if let Some(branch) = &card.branch {
-        sub.push_str(" · ");
+        sub.push_str(glyphs::SEP_SPACED);
         sub.push_str(branch);
     }
     if !card.location.is_empty() {
-        sub.push_str(" · ");
+        sub.push_str(glyphs::SEP_SPACED);
         sub.push_str(&card.location);
     }
     if let Some(age) = card_age(app, card) {
-        sub.push_str(" · last activity ");
+        sub.push_str(&format!(" {} last activity ", glyphs::SEP));
         sub.push_str(&age);
     }
     row(
@@ -1239,7 +1250,11 @@ fn render_agent_detail(
     let queued = app.queued_input_count_for_pane(card.pane_id);
     let mut state_value = state_label(card.state, card.seen).to_string();
     if queued > 0 {
-        state_value.push_str(&format!(" · \u{21e5}{queued} queued"));
+        state_value.push_str(&format!(
+            " {} {}{queued} queued",
+            glyphs::SEP,
+            glyphs::QUEUED
+        ));
     }
     let value_width = width.saturating_sub(DETAIL_KEY_WIDTH);
     let kv = |frame: &mut Frame, y: &mut u16, key: &str, value: String, style: Style| {
@@ -1388,7 +1403,10 @@ fn render_task_queue(app: &AppState, frame: &mut Frame, body: Rect) {
 
     if !app.task_queue.sampled {
         frame.render_widget(
-            Paragraph::new(Line::from(Span::styled("reading queue…", dim))),
+            Paragraph::new(Line::from(Span::styled(
+                format!("reading queue{}", glyphs::ELLIPSIS),
+                dim,
+            ))),
             Rect::new(body.x, body.y, body.width, 1),
         );
         return;
@@ -1412,9 +1430,9 @@ fn render_task_queue(app: &AppState, frame: &mut Frame, body: Rect) {
         .count();
     let header = Line::from(vec![
         Span::styled(rows.len().to_string(), Style::default().fg(p.text)),
-        Span::styled(" in queue  ·  ", dim),
+        Span::styled(format!(" in queue{}", glyphs::SEP_WIDE), dim),
         Span::styled(running.to_string(), Style::default().fg(p.yellow)),
-        Span::styled(" running  ·  ", dim),
+        Span::styled(format!(" running{}", glyphs::SEP_WIDE), dim),
         Span::styled(waiting.to_string(), Style::default().fg(p.overlay1)),
         Span::styled(" waiting", dim),
     ]);
@@ -1499,15 +1517,21 @@ fn render_task_row(
         return;
     }
     // Line 2: where it will run.
-    let mut meta = format!("{} · {}", row.repo_label, row.runtime.as_str());
+    let mut meta = format!(
+        "{} {} {}",
+        row.repo_label,
+        glyphs::SEP,
+        row.runtime.as_str()
+    );
     if row.use_worktree {
-        meta.push_str(" · worktree");
+        meta.push_str(&format!(" {} worktree", glyphs::SEP));
     }
     if row.dispatched {
-        meta.push_str(" · dispatched");
+        meta.push_str(&format!(" {} dispatched", glyphs::SEP));
     }
     meta.push_str(&format!(
-        " · {}",
+        " {} {}",
+        glyphs::SEP,
         format_event_age(std::time::Duration::from_secs(row.age_secs.max(0) as u64))
     ));
     frame.render_widget(
@@ -2126,17 +2150,34 @@ mod tests {
 
     #[test]
     fn context_gauge_fills_proportionally_and_clamps() {
+        // Empty draws only track.
         assert!(context_gauge(0).starts_with("\u{2591}"));
         assert_eq!(
             context_gauge(100),
             "\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588} 100%"
         );
-        // Any nonzero percentage shows at least one filled cell, so a barely
-        // used context is still visibly distinct from an unknown one.
-        assert!(context_gauge(1).starts_with("\u{2588}"));
+        // Any nonzero percentage lights something, so a barely used context is
+        // still visibly distinct from an unknown one — an eighth now, rather
+        // than a whole cell, because a whole cell overstated 1% by sixteen.
+        assert!(!context_gauge(1).starts_with("\u{2591}"));
         // Only a full context fills the bar: a nearly-full agent must stay
         // visually distinguishable from a finished one.
         assert_ne!(context_gauge(88), context_gauge(100));
+    }
+
+    /// What eighths buy: six whole cells give seven states across a hundred
+    /// and one percentages, so 60% and 74% used to be the same picture.
+    #[test]
+    fn the_context_gauge_resolves_within_a_cell() {
+        assert_ne!(context_gauge(60), context_gauge(74));
+        let distinct: std::collections::HashSet<String> = (0..=100)
+            .map(|percent| {
+                let g = context_gauge(percent);
+                g.split(' ').next().unwrap_or_default().to_string()
+            })
+            .collect();
+        // Forty-eight eighths plus empty.
+        assert_eq!(distinct.len(), 49);
     }
 
     #[test]

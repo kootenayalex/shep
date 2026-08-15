@@ -6,10 +6,11 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::text::{display_width_u16, truncate_end};
 use super::widgets::{
     action_button_row_rects, centered_popup_rect, panel_contrast_fg, render_action_button,
-    render_modal_header, render_modal_shell, render_panel_shell, ActionButtonSpec,
+    render_modal_header, render_modal_or_notice, render_panel_shell, ActionButtonSpec,
 };
 use crate::app::{state::WorktreeOpenState, AppState, Mode};
 
@@ -21,7 +22,7 @@ pub(crate) fn rename_button_rects(inner: Rect) -> (Rect, Rect, Rect) {
         inner,
         &[
             ActionButtonSpec {
-                hint: Some("↵"),
+                hint: Some(glyphs::ENTER),
                 label: "save",
             },
             ActionButtonSpec {
@@ -52,12 +53,11 @@ pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rec
         _ => return,
     };
 
-    let Some(inner) = render_modal_shell(frame, area, 56, 7, &app.palette) else {
+    let Some(inner) =
+        render_modal_or_notice(frame, area, (56, 7), (20, 4), "this prompt", &app.palette)
+    else {
         return;
     };
-    if inner.height < 4 {
-        return;
-    }
 
     let rows = Layout::vertical([
         Constraint::Length(1),
@@ -86,7 +86,7 @@ pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rec
     render_action_button(
         frame,
         save_rect,
-        Some("↵"),
+        Some(glyphs::ENTER),
         "save",
         Style::default()
             .fg(panel_contrast_fg(&app.palette))
@@ -136,7 +136,7 @@ pub(crate) fn new_linked_worktree_button_rects(inner: Rect) -> (Rect, Rect) {
         inner,
         &[
             ActionButtonSpec {
-                hint: Some("↵"),
+                hint: Some(glyphs::ENTER),
                 label: "create and open",
             },
             ActionButtonSpec {
@@ -164,7 +164,7 @@ pub(crate) fn remove_worktree_button_rects(inner: Rect, force_confirmation: bool
         inner,
         &[
             ActionButtonSpec {
-                hint: Some("↵"),
+                hint: Some(glyphs::ENTER),
                 label: primary_label,
             },
             ActionButtonSpec {
@@ -215,7 +215,7 @@ pub(crate) fn open_existing_worktree_button_rects(inner: Rect) -> (Rect, Rect) {
         inner,
         &[
             ActionButtonSpec {
-                hint: Some("↵"),
+                hint: Some(glyphs::ENTER),
                 label: "open",
             },
             ActionButtonSpec {
@@ -235,18 +235,19 @@ pub(super) fn render_new_linked_worktree_overlay(app: &AppState, frame: &mut Fra
     };
 
     super::dim_background(frame, area);
-    let Some(inner) = render_modal_shell(
+    let Some(inner) = render_modal_or_notice(
         frame,
         area,
-        NEW_LINKED_WORKTREE_POPUP_WIDTH,
-        NEW_LINKED_WORKTREE_POPUP_HEIGHT,
+        (
+            NEW_LINKED_WORKTREE_POPUP_WIDTH,
+            NEW_LINKED_WORKTREE_POPUP_HEIGHT,
+        ),
+        (24, 9),
+        "the new-worktree form",
         &app.palette,
     ) else {
         return;
     };
-    if inner.height < 9 {
-        return;
-    }
 
     let rows = Layout::vertical([
         Constraint::Length(1),
@@ -289,7 +290,8 @@ pub(super) fn render_new_linked_worktree_overlay(app: &AppState, frame: &mut Fra
 
     if create.creating {
         frame.render_widget(
-            Paragraph::new(" creating…").style(Style::default().fg(app.palette.overlay0)),
+            Paragraph::new(format!(" creating{}", glyphs::ELLIPSIS))
+                .style(Style::default().fg(app.palette.overlay0)),
             rows[5],
         );
     } else if let Some(error) = &create.error {
@@ -305,7 +307,7 @@ pub(super) fn render_new_linked_worktree_overlay(app: &AppState, frame: &mut Fra
     render_action_button(
         frame,
         create_rect,
-        Some("↵"),
+        Some(glyphs::ENTER),
         "create and open",
         Style::default()
             .fg(panel_contrast_fg(&app.palette))
@@ -383,7 +385,8 @@ pub(super) fn render_remove_worktree_overlay(app: &AppState, frame: &mut Frame, 
     }
     if remove.removing {
         frame.render_widget(
-            Paragraph::new(" removing…").style(Style::default().fg(app.palette.overlay0)),
+            Paragraph::new(format!(" removing{}", glyphs::ELLIPSIS))
+                .style(Style::default().fg(app.palette.overlay0)),
             rows[5],
         );
     } else if let Some(error) = &remove.error {
@@ -402,7 +405,7 @@ pub(super) fn render_remove_worktree_overlay(app: &AppState, frame: &mut Frame, 
     render_action_button(
         frame,
         remove_rect,
-        Some("↵"),
+        Some(glyphs::ENTER),
         remove_label,
         Style::default()
             .fg(panel_contrast_fg(&app.palette))
@@ -431,12 +434,16 @@ pub(super) fn render_open_existing_worktree_overlay(app: &AppState, frame: &mut 
         .saturating_mul(2)
         .saturating_add(7)
         .clamp(12, 26);
-    let Some(inner) = render_modal_shell(frame, area, 96, height, &app.palette) else {
+    let Some(inner) = render_modal_or_notice(
+        frame,
+        area,
+        (96, height),
+        (24, 8),
+        "this dialog",
+        &app.palette,
+    ) else {
         return;
     };
-    if inner.height < 8 {
-        return;
-    }
 
     render_modal_header(
         frame,
@@ -465,7 +472,7 @@ pub(super) fn render_open_existing_worktree_overlay(app: &AppState, frame: &mut 
         };
         let selected = Some(*entry_idx) == open.selected_entry_index();
         let y = inner.y.saturating_add(3 + (visible_idx as u16 * 2));
-        let marker = if selected { "›" } else { " " };
+        let marker = if selected { glyphs::LEADS_TO } else { " " };
         let row_style = if selected {
             Style::default()
                 .fg(app.palette.text)
@@ -537,7 +544,7 @@ pub(super) fn render_open_existing_worktree_overlay(app: &AppState, frame: &mut 
     render_action_button(
         frame,
         open_rect,
-        Some("↵"),
+        Some(glyphs::ENTER),
         "open",
         Style::default()
             .fg(panel_contrast_fg(&app.palette))
@@ -678,15 +685,21 @@ pub(super) fn render_confirm_close_overlay(app: &AppState, frame: &mut Frame, ar
 
     let detail_line = Line::from(vec![
         Span::styled(
-            format!(" {}", detail.split(" — ").next().unwrap_or(&detail)),
+            format!(
+                " {}",
+                detail
+                    .split(&format!(" {} ", glyphs::DASH))
+                    .next()
+                    .unwrap_or(&detail)
+            ),
             Style::default()
                 .fg(app.palette.text)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             detail
-                .split_once(" — ")
-                .map(|(_, rest)| format!(" — {rest}"))
+                .split_once(&format!(" {} ", glyphs::DASH))
+                .map(|(_, rest)| format!(" {} {rest}", glyphs::DASH))
                 .unwrap_or_default(),
             dim,
         ),
@@ -713,7 +726,7 @@ pub(super) fn render_confirm_close_overlay(app: &AppState, frame: &mut Frame, ar
         render_action_button(
             frame,
             confirm_rect,
-            Some("↵"),
+            Some(glyphs::ENTER),
             "confirm",
             Style::default()
                 .fg(panel_contrast_fg(&app.palette))
@@ -742,7 +755,7 @@ pub(crate) fn confirm_close_button_rects(inner: Rect) -> (Rect, Rect) {
         inner,
         &[
             ActionButtonSpec {
-                hint: Some("↵"),
+                hint: Some(glyphs::ENTER),
                 label: "confirm",
             },
             ActionButtonSpec {

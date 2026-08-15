@@ -5,6 +5,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::text::display_width_u16;
 use super::widgets::panel_contrast_fg;
 use crate::app::AppState;
@@ -375,7 +376,7 @@ pub(super) fn render_tab_bar(app: &AppState, frame: &mut Frame, area: Rect) {
         };
         if x < area.x + area.width {
             frame.buffer_mut()[(x, area.y)]
-                .set_symbol("…")
+                .set_symbol(glyphs::ELLIPSIS)
                 .set_style(Style::default().fg(p.overlay0));
         }
     }
@@ -387,7 +388,7 @@ pub(super) fn render_tab_bar(app: &AppState, frame: &mut Frame, area: Rect) {
         };
         if x >= area.x && x < area.x + area.width {
             frame.buffer_mut()[(x, area.y)]
-                .set_symbol("…")
+                .set_symbol(glyphs::ELLIPSIS)
                 .set_style(Style::default().fg(p.overlay0));
         }
     }

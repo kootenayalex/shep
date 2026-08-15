@@ -2,7 +2,7 @@
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                                                 workmayt · 1                                          ● 1 blocked
+ shep                                                 workmayt · 1                                          ◉ 1 blocked
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ session board · what are my agents doing                                                                             │
 │ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  3 ws · 3 tabs · 5 panes  ·  ⇥2 queued  ·  │
@@ -13,13 +13,13 @@
 │  workmayt · fix/stripe-we… 2m  emberline · master 6m         workmayt · fix/stripe-… 20s  shep · feat/design-pass 1h │
 │  blocked                       done                          working                      idle                       │
 │  may I run the stripe integr…  pushed 3 commits to master    Metamorphosing…                                         │
-│  …ult/dev/workmayt ████░░ 72%  …lt/dev/emberline █████░ 88%  …kmayt/apps/site ██░░░░ 41%  ~/vault/dev/shep █░░░░░ 12%│
+│  …ult/dev/workmayt ████▍░ 72%  …lt/dev/emberline █████▎ 88%  …kmayt/apps/site ██▌░░░ 41%  ~/vault/dev/shep ▊░░░░░ 12%│
 │                                                                                                                      │
 │                                                             ⠹ codex p2                                               │
 │                                                              shep · feat/design-pass 2m                              │
 │                                                              working                                                 │
 │                                                              reading src/ui/board.rs                                 │
-│                                                              …ees/design-pass ███░░░ 55%                             │
+│                                                              …ees/design-pass ███▎░░ 55%                             │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │

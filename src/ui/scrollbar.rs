@@ -4,6 +4,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use crate::app::AppState;
 use crate::layout::PaneInfo;
 
@@ -151,7 +152,7 @@ pub(super) fn render_scrollbar(
     let buf = frame.buffer_mut();
     for y in track.y..track.y + track.height {
         let cell = &mut buf[(track.x, y)];
-        cell.set_symbol("▕");
+        cell.set_symbol(glyphs::RULE_LEFT);
         cell.set_style(Style::default().fg(track_color));
     }
     for y in thumb.top..thumb.top + thumb.len {
@@ -175,9 +176,17 @@ pub(super) fn render_pane_scrollbar(
     };
 
     let (track_color, thumb_color, thumb_symbol) = if info.is_focused {
-        (app.palette.overlay0, app.palette.overlay1, "▐")
+        (
+            app.palette.overlay0,
+            app.palette.overlay1,
+            glyphs::RULE_RIGHT,
+        )
     } else {
-        (app.palette.surface_dim, app.palette.overlay0, "▕")
+        (
+            app.palette.surface_dim,
+            app.palette.overlay0,
+            glyphs::RULE_LEFT,
+        )
     };
 
     render_scrollbar(

@@ -2,7 +2,7 @@
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                                                                                         workmayt · 1                                                                                  ● 1 blocked
+ shep                                                                                         workmayt · 1                                                                                  ◉ 1 blocked
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ session board · what are my agents doing                                                                                                                                                             │
 │ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  3 ws · 3 tabs · 5 panes  ·  ⇥2 queued  ·  2 tasks                                                                         │
@@ -13,13 +13,13 @@
 │  workmayt · fix/stripe-webhook 2m                  emberline · master 6m                             workmayt · fix/stripe-webhook 20s                shep · feat/design-pass 1h                     │
 │  blocked                                           done                                              working                                          idle                                           │
 │  may I run the stripe integration tests?           pushed 3 commits to master                        Metamorphosing…                                                                                 │
-│  ~/vault/dev/workmayt ████░░ 72%                   ~/vault/dev/emberline █████░ 88%                  ~/vault/dev/workmayt/apps/site ██░░░░ 41%        ~/vault/dev/shep █░░░░░ 12%                    │
+│  ~/vault/dev/workmayt ████▍░ 72%                   ~/vault/dev/emberline █████▎ 88%                  ~/vault/dev/workmayt/apps/site ██▌░░░ 41%        ~/vault/dev/shep ▊░░░░░ 12%                    │
 │                                                                                                                                                                                                      │
 │                                                                                                     ⠹ codex p2                                                                                       │
 │                                                                                                      shep · feat/design-pass 2m                                                                      │
 │                                                                                                      working                                                                                         │
 │                                                                                                      reading src/ui/board.rs                                                                         │
-│                                                                                                      …ault/dev/shep-worktrees/design-pass ███░░░ 55%                                                 │
+│                                                                                                      …ault/dev/shep-worktrees/design-pass ███▎░░ 55%                                                 │
 │                                                                                                                                                                                                      │
 │                                                                                                                                                                                                      │
 │                                                                                                                                                                                                      │

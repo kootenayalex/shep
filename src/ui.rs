@@ -8,6 +8,7 @@ use ratatui::{
 pub(crate) mod board;
 mod chrome;
 mod dialogs;
+mod glyphs;
 mod keybind_help;
 mod menus;
 mod mobile;

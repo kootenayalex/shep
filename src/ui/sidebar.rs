@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::scrollbar::{render_scrollbar, should_show_scrollbar};
 use super::status::{agent_icon, state_label, state_label_color};
 use super::text::{display_width, display_width_u16, truncate_end};
@@ -170,7 +171,7 @@ fn format_agent_panel_primary_label(entry: &AgentPanelEntry, max_width: usize) -
         return truncate_end(&entry.primary_label, max_width);
     };
 
-    let separator = " · ";
+    let separator = glyphs::SEP_SPACED;
     let separator_width = display_width(separator);
     if max_width <= separator_width + 2 {
         return truncate_end(
@@ -938,7 +939,7 @@ fn render_workspace_list(
             // replaces the leading pad cell so row content never shifts.
             if selected && row_y < list_bottom {
                 buf[(card.rect.x, row_y)]
-                    .set_symbol("▌")
+                    .set_symbol(glyphs::MARKER)
                     .set_style(Style::default().fg(p.accent).bg(bg));
             }
         }
@@ -956,7 +957,11 @@ fn render_workspace_list(
         if card.indented {
             line1.push(Span::styled("   ", Style::default()));
         } else if let Some((key, collapsed)) = workspace_parent_group_state(app, i) {
-            let icon = if collapsed { "▸" } else { "▾" };
+            let icon = if collapsed {
+                glyphs::COLLAPSED
+            } else {
+                glyphs::EXPANDED
+            };
             let (state_icon, state_style) = if collapsed {
                 let (state, seen) = space_aggregate_state(app, &key);
                 agent_icon(state, seen, app.spinner_tick, p)
@@ -1016,10 +1021,10 @@ fn render_workspace_list(
                 let upstream_label = ws.git_ahead_behind().and_then(|(ahead, behind)| {
                     let mut parts = Vec::new();
                     if ahead > 0 {
-                        parts.push((format!("↑{}", ahead), p.green));
+                        parts.push((format!("{}{ahead}", glyphs::AHEAD), p.green));
                     }
                     if behind > 0 {
-                        parts.push((format!("↓{}", behind), p.peach));
+                        parts.push((format!("{}{behind}", glyphs::BEHIND), p.peach));
                     }
                     (!parts.is_empty()).then_some(parts)
                 });
@@ -1099,7 +1104,14 @@ fn render_workspace_list(
     }
 
     if let Some(track) = scrollbar_rect {
-        render_scrollbar(frame, metrics, track, p.surface_dim, p.overlay0, "▕");
+        render_scrollbar(
+            frame,
+            metrics,
+            track,
+            p.surface_dim,
+            p.overlay0,
+            glyphs::RULE_LEFT,
+        );
     }
 
     if app.mouse_capture && list_bottom > area.y {
@@ -1113,7 +1125,7 @@ fn render_workspace_list(
         let menu_line = if app.global_menu_attention_badge_visible() {
             Line::from(vec![
                 Span::styled(
-                    "● ",
+                    format!("{} ", glyphs::DOT),
                     Style::default().fg(p.accent).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled("menu", Style::default().fg(p.overlay0)),
@@ -1228,15 +1240,15 @@ fn render_agent_detail(
             Span::styled(label, status_style),
         ];
         if let Some(agent_label) = &detail.agent_label {
-            status_spans.push(Span::styled(" · ", agent_style));
+            status_spans.push(Span::styled(glyphs::SEP_SPACED, agent_style));
             status_spans.push(Span::styled(agent_label, agent_style));
         }
         if let Some(custom_status) = &detail.custom_status {
-            status_spans.push(Span::styled(" · ", agent_style));
+            status_spans.push(Span::styled(glyphs::SEP_SPACED, agent_style));
             status_spans.push(Span::styled(custom_status.clone(), agent_style));
         }
         if let Some(percent) = detail.context_percent {
-            status_spans.push(Span::styled(" · ", agent_style));
+            status_spans.push(Span::styled(glyphs::SEP_SPACED, agent_style));
             status_spans.push(Span::styled(format!("{percent}%"), agent_style));
         }
         frame.render_widget(
@@ -1251,7 +1263,14 @@ fn render_agent_detail(
     }
 
     if let Some(track) = scrollbar_rect {
-        render_scrollbar(frame, metrics, track, p.surface_dim, p.overlay0, "▕");
+        render_scrollbar(
+            frame,
+            metrics,
+            track,
+            p.surface_dim,
+            p.overlay0,
+            glyphs::RULE_LEFT,
+        );
     }
 }
 

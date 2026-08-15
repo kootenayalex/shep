@@ -6,6 +6,8 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
+use super::text::display_width_u16;
 use crate::app::state::Palette;
 
 pub(super) fn render_panel_shell(
@@ -48,15 +50,104 @@ pub(crate) fn centered_popup_rect(area: Rect, popup_w: u16, popup_h: u16) -> Opt
     Some(Rect::new(popup_x, popup_y, popup_w, popup_h))
 }
 
-pub(super) fn render_modal_shell(
+/// A modal that could not fit, and what it needed.
+///
+/// Five modals used to `return` on a rect they could not fill, which drew
+/// nothing at all. Pressing a key and seeing the screen not change is
+/// indistinguishable from a keybinding that does not exist — and on an 80x24
+/// terminal the 88-column announcement modal was already in exactly that
+/// state, so the message it existed to deliver simply never arrived.
+///
+/// This replaces silence with one line saying which modal it was and how much
+/// room it wants, which is a thing the reader can act on.
+pub(super) fn render_too_small(
     frame: &mut Frame,
     area: Rect,
-    popup_w: u16,
-    popup_h: u16,
+    label: &str,
+    needs: (u16, u16),
+    p: &Palette,
+) {
+    if area.width < 2 || area.height < 1 {
+        return;
+    }
+    // Longest form that fits, rather than one form truncated. A message that
+    // ends "— t" is worse than a short one that ends where it means to; and a
+    // terminal too small for a modal is by definition too small for prose.
+    let candidates = [
+        format!(
+            " {label} needs {}x{} — this terminal is {}x{} ",
+            needs.0, needs.1, area.width, area.height
+        ),
+        format!(" {label} needs {}x{} ", needs.0, needs.1),
+        format!(" needs {}x{} ", needs.0, needs.1),
+        " too small ".to_string(),
+    ];
+    let text = candidates
+        .iter()
+        .find(|candidate| display_width_u16(candidate) <= area.width)
+        .cloned()
+        .unwrap_or_else(|| candidates.last().cloned().unwrap_or_default());
+    let width = display_width_u16(&text).min(area.width);
+    let rect = Rect::new(
+        area.x + area.width.saturating_sub(width) / 2,
+        area.y + area.height / 2,
+        width,
+        1,
+    );
+    frame.render_widget(Clear, rect);
+    frame.render_widget(
+        Paragraph::new(Span::styled(
+            text,
+            Style::default()
+                .fg(panel_contrast_fg(p))
+                .bg(p.peach)
+                .add_modifier(Modifier::BOLD),
+        ))
+        .alignment(Alignment::Center),
+        rect,
+    );
+}
+
+/// One modal frame, or one line explaining why there is not one.
+///
+/// `want` is the size the modal would like; `needs_inner` is what its content
+/// genuinely cannot do without. Both live here rather than as a `return` at
+/// each of eight call sites, so "too small" is a single policy with a single
+/// look — and so that adding a modal cannot reintroduce the silent version.
+pub(super) fn render_modal_or_notice(
+    frame: &mut Frame,
+    area: Rect,
+    want: (u16, u16),
+    needs_inner: (u16, u16),
+    label: &str,
     p: &Palette,
 ) -> Option<Rect> {
-    let popup = centered_popup_rect(area, popup_w, popup_h)?;
-    render_panel_shell(frame, popup, p.accent, p.panel_bg)
+    // Borders cost two columns and two rows on each axis.
+    let needs_outer = (
+        needs_inner.0.saturating_add(2),
+        needs_inner.1.saturating_add(2),
+    );
+    let inner = centered_popup_rect(area, want.0, want.1)
+        .filter(|popup| popup.width >= needs_outer.0 && popup.height >= needs_outer.1)
+        .and_then(|popup| render_panel_shell(frame, popup, p.accent, p.panel_bg));
+    match inner {
+        Some(inner) => Some(inner),
+        None => {
+            // `centered_popup_rect` insets by 4 columns and 2 rows, so report
+            // what the *terminal* has to be rather than what the popup is.
+            render_too_small(
+                frame,
+                area,
+                label,
+                (
+                    needs_outer.0.saturating_add(4),
+                    needs_outer.1.saturating_add(2),
+                ),
+                p,
+            );
+            None
+        }
+    }
 }
 
 pub(super) fn render_modal_header(frame: &mut Frame, area: Rect, title: &str, p: &Palette) {
@@ -231,7 +322,7 @@ pub(crate) fn render_modal_choice_list<T>(
     for (idx, ((label, value), row)) in options.iter().zip(rows.iter()).enumerate() {
         let is_active = *value == current_value;
         let is_selected = idx == selected_idx;
-        let marker = if is_active { " ✓" } else { "" };
+        let marker = if is_active { glyphs::TICK_MARKER } else { "" };
         let style = if is_selected {
             Style::default()
                 .bg(p.surface0)

@@ -8,11 +8,12 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::release_notes::release_notes_close_button_rect;
 use super::scrollbar::{release_notes_scrollbar_rect, render_scrollbar};
 use super::widgets::{
     modal_stack_areas, panel_contrast_fg, render_action_button, render_modal_header,
-    render_modal_shell,
+    render_modal_or_notice,
 };
 use crate::app::AppState;
 
@@ -226,12 +227,16 @@ pub(crate) fn keybind_help_lines(app: &AppState) -> Vec<(usize, Line<'static>)> 
 pub(super) fn render_keybind_help_overlay(app: &AppState, frame: &mut Frame) {
     super::dim_background(frame, frame.area());
 
-    let Some(inner) = render_modal_shell(frame, frame.area(), 76, 22, &app.palette) else {
+    let Some(inner) = render_modal_or_notice(
+        frame,
+        frame.area(),
+        (76, 22),
+        (20, 6),
+        "the keybinding list",
+        &app.palette,
+    ) else {
         return;
     };
-    if inner.height < 6 || inner.width < 20 {
-        return;
-    }
 
     let stack = modal_stack_areas(inner, 2, 1, 0, 1);
     let header_rows =
@@ -290,18 +295,18 @@ pub(super) fn render_keybind_help_overlay(app: &AppState, frame: &mut Frame) {
             track,
             app.palette.overlay0,
             app.palette.overlay1,
-            "▐",
+            glyphs::RULE_RIGHT,
         );
     }
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(" scroll ", Style::default().fg(app.palette.overlay0)),
-            Span::styled("wheel ↑↓", Style::default().fg(app.palette.text)),
-            Span::styled("  ·  ", Style::default().fg(app.palette.overlay0)),
+            Span::styled(glyphs::KEYS_WHEEL, Style::default().fg(app.palette.text)),
+            Span::styled(glyphs::SEP_WIDE, Style::default().fg(app.palette.overlay0)),
             Span::styled("jump", Style::default().fg(app.palette.overlay0)),
             Span::styled(" pgup / pgdn ", Style::default().fg(app.palette.text)),
-            Span::styled("  ·  ", Style::default().fg(app.palette.overlay0)),
+            Span::styled(glyphs::SEP_WIDE, Style::default().fg(app.palette.overlay0)),
             Span::styled("close", Style::default().fg(app.palette.overlay0)),
             Span::styled(" esc / enter ", Style::default().fg(app.palette.text)),
         ])),

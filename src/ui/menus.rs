@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::widgets::{panel_contrast_fg, render_panel_shell};
 use crate::app::AppState;
 
@@ -130,7 +131,7 @@ pub(super) fn render_navigate_overlay(app: &AppState, frame: &mut Frame, area: R
         Span::styled(" back  ", dim),
         Span::styled(workspace_nav, key),
         Span::styled(" ws  ", dim),
-        Span::styled("⇥", key),
+        Span::styled(glyphs::QUEUED, key),
         Span::styled(" pane  ", dim),
         Span::styled(goto, key),
         Span::styled(" navigator  ", dim),
@@ -215,7 +216,7 @@ pub(super) fn render_global_launcher_menu(app: &AppState, frame: &mut Frame) {
 
         let line = if app.global_menu_item_has_badge(item) {
             Line::from(vec![
-                Span::styled(" ●", badge_style),
+                Span::styled(format!(" {}", glyphs::DOT), badge_style),
                 Span::styled(format!(" {item} "), item_style),
             ])
         } else {

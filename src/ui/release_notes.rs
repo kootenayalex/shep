@@ -6,10 +6,11 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::scrollbar::{release_notes_scrollbar_rect, render_scrollbar};
 use super::widgets::{
     action_button_width, modal_stack_areas, panel_contrast_fg, render_action_button,
-    render_modal_header, render_modal_shell,
+    render_modal_header, render_modal_or_notice,
 };
 use crate::app::{
     state::{Palette, ProductAnnouncementState, ReleaseNotesState},
@@ -26,18 +27,16 @@ pub(super) fn render_release_notes_overlay(app: &AppState, frame: &mut Frame, ar
 
     super::dim_background(frame, area);
 
-    let Some(inner) = render_modal_shell(
+    let Some(inner) = render_modal_or_notice(
         frame,
         area,
-        RELEASE_NOTES_MODAL_SIZE.0,
-        RELEASE_NOTES_MODAL_SIZE.1,
+        RELEASE_NOTES_MODAL_SIZE,
+        (20, 8),
+        "the release notes",
         &app.palette,
     ) else {
         return;
     };
-    if inner.height < 8 || inner.width < 20 {
-        return;
-    }
 
     let stack = modal_stack_areas(inner, 2, 1, 0, 1);
     let header_rows =
@@ -118,15 +117,15 @@ pub(super) fn render_release_notes_overlay(app: &AppState, frame: &mut Frame, ar
             track,
             app.palette.overlay0,
             app.palette.overlay1,
-            "▐",
+            glyphs::RULE_RIGHT,
         );
     }
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(" scroll ", Style::default().fg(app.palette.overlay0)),
-            Span::styled("wheel ↑↓", Style::default().fg(app.palette.text)),
-            Span::styled("  ·  ", Style::default().fg(app.palette.overlay0)),
+            Span::styled(glyphs::KEYS_WHEEL, Style::default().fg(app.palette.text)),
+            Span::styled(glyphs::SEP_WIDE, Style::default().fg(app.palette.overlay0)),
             Span::styled("close", Style::default().fg(app.palette.overlay0)),
             Span::styled(" esc / enter ", Style::default().fg(app.palette.text)),
         ])),
@@ -141,18 +140,16 @@ pub(super) fn render_product_announcement_overlay(app: &AppState, frame: &mut Fr
 
     super::dim_background(frame, area);
 
-    let Some(inner) = render_modal_shell(
+    let Some(inner) = render_modal_or_notice(
         frame,
         area,
-        PRODUCT_ANNOUNCEMENT_MODAL_SIZE.0,
-        PRODUCT_ANNOUNCEMENT_MODAL_SIZE.1,
+        PRODUCT_ANNOUNCEMENT_MODAL_SIZE,
+        (20, 8),
+        "this announcement",
         &app.palette,
     ) else {
         return;
     };
-    if inner.height < 8 || inner.width < 20 {
-        return;
-    }
 
     let stack = modal_stack_areas(inner, 2, 1, 0, 1);
     let header_rows =
@@ -178,8 +175,12 @@ pub(super) fn render_product_announcement_overlay(app: &AppState, frame: &mut Fr
         "product announcement"
     };
     frame.render_widget(
-        Paragraph::new(format!("{subtitle} · v{}", announcement.version))
-            .style(Style::default().fg(app.palette.overlay1)),
+        Paragraph::new(format!(
+            "{subtitle} {} v{}",
+            glyphs::SEP,
+            announcement.version
+        ))
+        .style(Style::default().fg(app.palette.overlay1)),
         header_subtitle_area,
     );
     render_action_button(
@@ -229,15 +230,15 @@ pub(super) fn render_product_announcement_overlay(app: &AppState, frame: &mut Fr
             track,
             app.palette.overlay0,
             app.palette.overlay1,
-            "▐",
+            glyphs::RULE_RIGHT,
         );
     }
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(" scroll ", Style::default().fg(app.palette.overlay0)),
-            Span::styled("wheel ↑↓", Style::default().fg(app.palette.text)),
-            Span::styled("  ·  ", Style::default().fg(app.palette.overlay0)),
+            Span::styled(glyphs::KEYS_WHEEL, Style::default().fg(app.palette.text)),
+            Span::styled(glyphs::SEP_WIDE, Style::default().fg(app.palette.overlay0)),
             Span::styled("close", Style::default().fg(app.palette.overlay0)),
             Span::styled(" esc / enter ", Style::default().fg(app.palette.text)),
         ])),
@@ -320,7 +321,7 @@ pub(crate) fn release_notes_lines<'a>(body: &'a str, p: &Palette) -> Vec<(usize,
             let code_style = Style::default().fg(p.text).bg(code_bg);
             let width = 2 + trimmed.chars().count();
             let mut spans = vec![
-                Span::styled("▏", gutter_style),
+                Span::styled(glyphs::RULE_THIN, gutter_style),
                 Span::styled(" ", code_style),
             ];
             if !trimmed.is_empty() {
@@ -359,7 +360,10 @@ pub(crate) fn release_notes_lines<'a>(body: &'a str, p: &Palette) -> Vec<(usize,
             let (text_width, mut spans) =
                 release_notes_inline_spans(rest, text_style, inline_code_style);
             let width = 3 + text_width;
-            let mut line_spans = vec![Span::styled(" • ", Style::default().fg(p.accent))];
+            let mut line_spans = vec![Span::styled(
+                format!(" {} ", glyphs::BULLET),
+                Style::default().fg(p.accent),
+            )];
             line_spans.append(&mut spans);
             lines.push((width, Line::from(line_spans)));
             continue;
@@ -397,7 +401,7 @@ fn release_notes_preview_line_entries<'a>(
             Line::from(vec![
                 Span::raw(" "),
                 Span::styled(
-                    "●",
+                    glyphs::DOT,
                     Style::default().fg(p.accent).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(" update ready", title_style),

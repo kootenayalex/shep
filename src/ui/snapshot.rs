@@ -620,6 +620,19 @@ fn snapshot_settings_small() {
     assert_screen(&mut state, "settings-small", SMALL.0, SMALL.1);
 }
 
+/// A terminal too small for the modal it was asked to draw.
+///
+/// This used to render *nothing*: `centered_popup_rect` returned `None`, the
+/// caller returned, and the screen did not change — which from the outside is
+/// exactly what a keybinding that does not exist looks like. The 88-column
+/// announcement modal was already in that state on a standard 80x24.
+#[test]
+fn snapshot_settings_too_small() {
+    let mut state = fixture::session();
+    state.mode = Mode::Settings;
+    assert_screen(&mut state, "settings-too-small", 24, 7);
+}
+
 #[test]
 fn snapshot_keybind_help_small() {
     let mut state = fixture::session();

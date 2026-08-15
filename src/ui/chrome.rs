@@ -11,6 +11,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use crate::app::AppState;
 use crate::config::ActionKeybinds;
 use crate::detect::AgentState;
@@ -69,7 +70,10 @@ pub(super) fn render_titlebar(
         (blocked > 0).then(|| {
             Line::from(vec![
                 Span::styled(
-                    format!("● {blocked} blocked"),
+                    format!(
+                        "{} {blocked} blocked",
+                        super::status::state_glyph(AgentState::Blocked)
+                    ),
                     Style::default().fg(p.red).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" "),
@@ -98,7 +102,7 @@ pub(super) fn render_titlebar(
             ws_name,
             Style::default().fg(p.text).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" · ", dim),
+        Span::styled(glyphs::SEP_SPACED, dim),
         Span::styled(tab_name, Style::default().fg(p.subtext0)),
     ]);
     let center_w = line_width(&center);

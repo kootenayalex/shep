@@ -6,9 +6,10 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::widgets::{
     action_button_width, modal_stack_areas, panel_contrast_fg, render_action_button,
-    render_modal_shell,
+    render_modal_or_notice,
 };
 use crate::app::AppState;
 
@@ -23,13 +24,20 @@ pub(crate) fn onboarding_welcome_continue_rect(area: Rect) -> Rect {
     Rect::new(
         area.x,
         area.y,
-        action_button_width(Some("↵"), "continue"),
+        action_button_width(Some(glyphs::ENTER), "continue"),
         1,
     )
 }
 
 fn render_onboarding_welcome(app: &AppState, frame: &mut Frame, area: Rect) {
-    let Some(inner) = render_modal_shell(frame, area, 64, 16, &app.palette) else {
+    let Some(inner) = render_modal_or_notice(
+        frame,
+        area,
+        (64, 16),
+        (20, 6),
+        "the welcome screen",
+        &app.palette,
+    ) else {
         return;
     };
     if inner.height < 11 {
@@ -78,7 +86,7 @@ fn render_onboarding_welcome(app: &AppState, frame: &mut Frame, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            " enters prefix mode · ",
+            format!(" enters prefix mode {} ", glyphs::SEP),
             Style::default().fg(app.palette.overlay1),
         ),
         Span::styled(
@@ -104,7 +112,7 @@ fn render_onboarding_welcome(app: &AppState, frame: &mut Frame, area: Rect) {
     render_action_button(
         frame,
         continue_rect,
-        Some("↵"),
+        Some(glyphs::ENTER),
         "continue",
         Style::default()
             .fg(panel_contrast_fg(&app.palette))

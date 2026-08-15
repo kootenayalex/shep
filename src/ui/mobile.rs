@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::sidebar::{
     agent_panel_entries, agent_panel_entries_from, grouped_child_display_label,
     next_entry_is_indented_workspace, workspace_list_entries_expanded, AgentPanelEntry,
@@ -251,7 +252,7 @@ pub(crate) fn render_mobile_toast_banner(
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(" ", Style::default().bg(bg)),
-            Span::styled("●", Style::default().fg(dot_color).bg(bg)),
+            Span::styled(glyphs::DOT, Style::default().fg(dot_color).bg(bg)),
             Span::styled(" ", Style::default().bg(bg)),
             Span::styled(
                 mobile_toast_title(toast),
@@ -260,7 +261,7 @@ pub(crate) fn render_mobile_toast_banner(
                     .bg(bg)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" · ", Style::default().fg(p.overlay0).bg(bg)),
+            Span::styled(glyphs::SEP_SPACED, Style::default().fg(p.overlay0).bg(bg)),
             Span::styled(&toast.context, Style::default().fg(p.overlay0).bg(bg)),
         ])),
         banner,
@@ -368,7 +369,12 @@ fn mobile_tab_status(ws: &crate::workspace::Workspace) -> String {
     if ws.tabs.len() <= 1 {
         format!("tab {tab_label}")
     } else {
-        format!("tab {tab_label} · {}/{}", ws.active_tab + 1, ws.tabs.len())
+        format!(
+            "tab {tab_label} {} {}/{}",
+            glyphs::SEP,
+            ws.active_tab + 1,
+            ws.tabs.len()
+        )
     }
 }
 
@@ -401,7 +407,9 @@ fn render_switch_button(app: &AppState, frame: &mut Frame, area: Rect) {
     if global_agent_counts(app).blocked > 0 {
         let bx = area.x + area.width.saturating_sub(1);
         frame.buffer_mut()[(bx, area.y)]
-            .set_symbol("●")
+            .set_symbol(super::status::state_glyph(
+                crate::detect::AgentState::Blocked,
+            ))
             .set_style(Style::default().fg(p.red).bg(p.surface0));
     }
 }
@@ -612,8 +620,9 @@ fn render_mobile_switcher_content(
         ));
 
         let detail = format!(
-            "{detail_prefix}{} · {}",
+            "{detail_prefix}{} {} {}",
             ws.branch().unwrap_or_else(|| "shell".into()),
+            glyphs::SEP,
             mobile_tab_status(ws)
         );
         render_two_line_item(
@@ -660,7 +669,7 @@ fn render_mobile_switcher_content(
             let label = if tab.is_auto_named() {
                 format!("tab {display_name}")
             } else {
-                format!("{} · {display_name}", idx + 1)
+                format!("{} {} {display_name}", idx + 1, glyphs::SEP)
             };
             let title = Line::from(vec![
                 Span::styled("  ", Style::default().bg(bg)),
@@ -728,7 +737,7 @@ fn mobile_agent_detail(entry: &AgentPanelEntry) -> String {
         parts.push(custom_status.to_string());
     }
 
-    format!("  {}", parts.join(" · "))
+    format!("  {}", parts.join(glyphs::SEP_SPACED))
 }
 
 fn render_section_title_at(
@@ -887,7 +896,7 @@ fn render_left_scrollbar(
     for y in track.y..track.y + track.height {
         let is_thumb = y >= thumb_top && y < thumb_top + thumb_len;
         frame.buffer_mut()[(track.x, y)]
-            .set_symbol(if is_thumb { "▌" } else { "│" })
+            .set_symbol(if is_thumb { glyphs::MARKER } else { "│" })
             .set_style(
                 Style::default()
                     .fg(if is_thumb { p.accent } else { p.surface_dim })
@@ -998,12 +1007,23 @@ fn agent_summary_segments(counts: GlobalAgentCounts) -> Vec<(String, SummaryTone
     let mut segments = Vec::new();
     if counts.blocked > 0 {
         segments.push((
-            format!("◉ {} blocked", counts.blocked),
+            format!(
+                "{} {} blocked",
+                super::status::state_glyph(crate::detect::AgentState::Blocked),
+                counts.blocked
+            ),
             SummaryTone::Blocked,
         ));
     }
     if counts.done > 0 {
-        segments.push((format!("● {} done", counts.done), SummaryTone::Done));
+        segments.push((
+            format!(
+                "{} {} done",
+                super::status::state_glyph(crate::detect::AgentState::Idle),
+                counts.done
+            ),
+            SummaryTone::Done,
+        ));
     }
     if counts.working > 0 {
         segments.push((format!("{} working", counts.working), SummaryTone::Working));
@@ -1015,7 +1035,7 @@ fn agent_summary_segments(counts: GlobalAgentCounts) -> Vec<(String, SummaryTone
 }
 
 /// Greedily keep the most-urgent segments that fit `max_width` (counting the
-/// leading space and " · " separators) and report whether any were dropped.
+/// leading space and glyphs::SEP_SPACED separators) and report whether any were dropped.
 /// Segments are ordered by urgency, so the dropped tail is always the least
 /// important state.
 fn fit_summary_segments(
@@ -1025,7 +1045,7 @@ fn fit_summary_segments(
     let mut shown = Vec::new();
     let mut used = 1usize; // leading space
     for (idx, segment) in segments.iter().enumerate() {
-        let sep = if idx > 0 { 3 } else { 0 }; // " · "
+        let sep = if idx > 0 { 3 } else { 0 }; // glyphs::SEP_SPACED
         let seg_w = segment.0.chars().count();
         if used + sep + seg_w > max_width {
             break;
@@ -1046,7 +1066,7 @@ fn agent_summary_line(app: &AppState, p: &Palette, max_width: u16) -> Line<'stat
     for (idx, (text, tone)) in shown.into_iter().enumerate() {
         if idx > 0 {
             spans.push(Span::styled(
-                " · ",
+                glyphs::SEP_SPACED,
                 Style::default().fg(p.overlay0).bg(p.panel_bg),
             ));
             used += 3;
@@ -1074,7 +1094,7 @@ fn agent_summary_line(app: &AppState, p: &Palette, max_width: u16) -> Line<'stat
     }
     if truncated && used + 2 <= max_width as usize {
         spans.push(Span::styled(
-            " …",
+            format!(" {}", glyphs::ELLIPSIS),
             Style::default().fg(p.overlay0).bg(p.panel_bg),
         ));
     }

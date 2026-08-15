@@ -112,10 +112,20 @@ Badges sit beside a name and answer a different question from state.
 | git ahead | `↑N` | green | commits to push |
 | git behind | `↓N` | peach | commits to pull |
 | memory pressure | `mem NN%` | peach | at or over 80% of the cap |
-| worktree | `⑂` | accent | a linked worktree, not the main checkout |
+| worktree | `⑂` (phone) / `· worktree` (desktop) | accent | a linked worktree, not the main checkout |
 
 `✓` means approved and nothing else. It used to be idle's glyph too, which is why
 idle is now `○`.
+
+The worktree badge is the one entry that reads differently on the two surfaces,
+and deliberately: the phone puts it in a card header beside an id, where a
+one-column glyph is right, and the desktop puts it in a prose meta line —
+`workmayt · claude · worktree · dispatched · 4m` — where a glyph among words
+reads as a typo. Same fact, different sentence.
+
+Every other non-ASCII mark the desktop draws lives in `src/ui/glyphs.rs`, with
+a test pinning each one to a single column. A mark that measures two shifts
+everything after it on the row.
 
 ## Rules that have bitten us
 

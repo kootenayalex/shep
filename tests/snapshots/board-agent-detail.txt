@@ -2,7 +2,7 @@
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                                                 workmayt · 1                                          ● 1 blocked
+ shep                                                 workmayt · 1                                          ◉ 1 blocked
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ session board / agent                                                                                                │
 │                                                                                                                      │
@@ -12,7 +12,7 @@
 │ state        blocked · ⇥2 queued                                                                                     │
 │ activity     may I run the stripe integration tests?                                                                 │
 │ working dir  ~/vault/dev/workmayt                                                                                    │
-│ context      ████░░ 72%                                                                                              │
+│ context      ████▍░ 72%                                                                                              │
 │                                                                                                                      │
 │ live screen                                                                                                          │
 │   (no live screen for this pane)                                                                                     │

@@ -284,6 +284,19 @@ pub(super) fn task_appearance(state: crate::tasks::TaskState, tick: u32) -> Stat
     StateAppearance { glyph, label, ink }
 }
 
+/// One state's mark, without a palette.
+///
+/// For the places that draw a state's glyph beside a *count* rather than
+/// beside a name — a title-bar badge, a mobile summary. Those used to write
+/// the literal `●` for blocked, which is the done-unseen mark: a red `●` is a
+/// glyph and a colour from two different rows of the table.
+///
+/// `seen` is false, so `Idle` reads as "done" — which is the right default for
+/// a badge counting agents that finished while you were elsewhere.
+pub(super) fn state_glyph(state: AgentState) -> &'static str {
+    state_appearance(state, false, 0).glyph
+}
+
 pub(super) fn agent_icon(
     state: AgentState,
     seen: bool,

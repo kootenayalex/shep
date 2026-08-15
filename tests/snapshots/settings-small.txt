@@ -2,7 +2,7 @@
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                             workmayt · 1                      ● 1 blocked
+ shep                             workmayt · 1                      ◉ 1 blocked
  s╭──────────────────────────────────────────────────────────────────────────╮
   │ settings                                                                 │─╮
  ◉│ theme   sound   toasts   pane labels   integrations   experiments        │ │

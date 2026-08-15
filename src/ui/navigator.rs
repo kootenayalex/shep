@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::{
     scrollbar::{render_scrollbar, should_show_scrollbar},
     status::{agent_icon, state_label_color},
@@ -185,9 +186,9 @@ fn render_row(app: &AppState, frame: &mut Frame, rect: Rect, row: &NavigatorRow,
 
     let prefix = if row.is_workspace {
         if row.expanded {
-            "▾"
+            glyphs::EXPANDED
         } else {
-            "▸"
+            glyphs::COLLAPSED
         }
     } else if row.depth > 0 {
         "├─"
@@ -195,7 +196,7 @@ fn render_row(app: &AppState, frame: &mut Frame, rect: Rect, row: &NavigatorRow,
         "  "
     };
     let current = if row.is_current { "◆" } else { " " };
-    let marker = if selected { "→" } else { " " };
+    let marker = if selected { glyphs::ARROW_RIGHT } else { " " };
     let indent = "  ".repeat(row.depth as usize);
     let left_fixed = format!(" {indent}{prefix} {marker} {current} ");
     let meta_width = metadata_width(rect.width);
@@ -269,7 +270,7 @@ fn render_navigator_scrollbar(
         track,
         app.palette.surface_dim,
         app.palette.overlay0,
-        "▕",
+        glyphs::RULE_LEFT,
     );
 }
 
@@ -338,7 +339,7 @@ fn workspace_detail(
     if !rowless_workspace_activity(app, terminal_runtimes, ws_idx).is_empty() {
         parts.push(rowless_workspace_activity(app, terminal_runtimes, ws_idx));
     }
-    parts.join(" · ")
+    parts.join(glyphs::SEP_SPACED)
 }
 
 fn tab_detail(
@@ -371,7 +372,7 @@ fn tab_detail(
     {
         parts.push(meta);
     }
-    parts.join(" · ")
+    parts.join(glyphs::SEP_SPACED)
 }
 
 fn pane_detail(
@@ -432,7 +433,7 @@ fn pane_detail(
             }
         }
     }
-    parts.join(" · ")
+    parts.join(glyphs::SEP_SPACED)
 }
 
 fn rowless_workspace_activity(
@@ -473,7 +474,7 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
         Line::from(vec![
             Span::styled(" enter", key),
             Span::styled(" switch  ", dim),
-            Span::styled("↑↓", key),
+            Span::styled(glyphs::UP_DOWN, key),
             Span::styled(" move  ", dim),
             Span::styled("ctrl+u", key),
             Span::styled(" clear  ", dim),
@@ -488,7 +489,7 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
             Span::styled(" search  ", dim),
             Span::styled("b/w/i/d/a", key),
             Span::styled(" states  ", dim),
-            Span::styled("j/k/↑↓", key),
+            Span::styled(glyphs::KEYS_VERTICAL_SLASHED, key),
             Span::styled(" move  ", dim),
             Span::styled("esc", key),
             Span::styled(" close", dim),

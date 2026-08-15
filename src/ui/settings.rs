@@ -6,9 +6,10 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::widgets::{
-    action_button_row_rects, centered_popup_rect, modal_stack_areas, panel_contrast_fg,
-    render_action_button, render_modal_choice_list, render_panel_shell, ActionButtonSpec,
+    action_button_row_rects, modal_stack_areas, panel_contrast_fg, render_action_button,
+    render_modal_choice_list, render_modal_or_notice, ActionButtonSpec,
 };
 use crate::{
     app::{
@@ -21,36 +22,62 @@ use crate::{
 pub(crate) const SETTINGS_POPUP_WIDTH: u16 = 76;
 pub(crate) const SETTINGS_POPUP_BASE_HEIGHT: u16 = 22;
 
+// ── The modal's own chrome, in rows.
+//
+// These are read by `settings_popup_height` *and* by the layouts that consume
+// them, so the size the popup asks for and the size its contents need cannot
+// drift apart. The height used to be a literal `14` with a comment listing
+// eight numbers that added up to it, spread over two functions in this file —
+// correct, and one edit away from silently not being.
+const BORDER_ROWS: u16 = 2;
+const HEADER_ROWS: u16 = 3;
+const FOOTER_ROWS: u16 = 2;
+const STACK_GAP: u16 = 1;
+/// A header gap and a footer gap.
+const STACK_GAPS: u16 = STACK_GAP * 2;
+
+// ── The integrations section's own chrome, above and below its list.
+const INTEGRATIONS_TITLE_ROWS: u16 = 1;
+const INTEGRATIONS_DESC_ROWS: u16 = 2;
+/// One above the list, one below.
+const INTEGRATIONS_SPACER_ROWS: u16 = 2;
+
+/// Everything the integrations view spends before its list gets a row.
+const INTEGRATIONS_CHROME_ROWS: u16 = BORDER_ROWS
+    + HEADER_ROWS
+    + FOOTER_ROWS
+    + STACK_GAPS
+    + INTEGRATIONS_TITLE_ROWS
+    + INTEGRATIONS_DESC_ROWS
+    + INTEGRATIONS_SPACER_ROWS;
+
 pub(crate) fn settings_popup_height(app: &AppState) -> u16 {
     if app.settings.section != crate::app::state::SettingsSection::Integrations {
         return SETTINGS_POPUP_BASE_HEIGHT;
     }
     let list_rows = app.integration_recommendations.len().max(1) as u16;
-    let footer_rows = integrations_footer_height(app, SETTINGS_POPUP_WIDTH - 2);
-    // borders 2 + header 3 + stack gaps 2 + modal footer 2
-    // + section title 1 + description 2 + spacers 2
-    (14 + list_rows + footer_rows).max(SETTINGS_POPUP_BASE_HEIGHT)
+    let footer_rows = integrations_footer_height(app, SETTINGS_POPUP_WIDTH - BORDER_ROWS);
+    (INTEGRATIONS_CHROME_ROWS + list_rows + footer_rows).max(SETTINGS_POPUP_BASE_HEIGHT)
 }
 
 pub(super) fn render_settings_overlay(app: &AppState, frame: &mut Frame, area: Rect) {
     use crate::app::state::SettingsSection;
 
     let p = &app.palette;
-    let Some(popup) = centered_popup_rect(area, SETTINGS_POPUP_WIDTH, settings_popup_height(app))
-    else {
-        return;
-    };
-
     super::dim_background(frame, area);
 
-    let Some(inner) = render_panel_shell(frame, popup, p.accent, p.panel_bg) else {
+    let Some(inner) = render_modal_or_notice(
+        frame,
+        area,
+        (SETTINGS_POPUP_WIDTH, settings_popup_height(app)),
+        (10, 4),
+        "settings",
+        p,
+    ) else {
         return;
     };
-    if inner.height < 4 || inner.width < 10 {
-        return;
-    }
 
-    let stack = modal_stack_areas(inner, 3, 2, 0, 1);
+    let stack = modal_stack_areas(inner, HEADER_ROWS, FOOTER_ROWS, 0, STACK_GAP);
     let header_rows = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
@@ -70,7 +97,7 @@ pub(super) fn render_settings_overlay(app: &AppState, frame: &mut Frame, area: R
         if app.settings_section_has_badge(*section) {
             Line::from(vec![
                 Span::styled(
-                    "● ",
+                    glyphs::DOT_SPACED,
                     Style::default().fg(p.accent).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(section.label()),
@@ -168,7 +195,7 @@ pub(super) fn render_settings_overlay(app: &AppState, frame: &mut Frame, area: R
             render_action_button(
                 frame,
                 apply_rect,
-                Some("↵"),
+                Some(glyphs::ENTER),
                 primary_label,
                 Style::default()
                     .fg(panel_contrast_fg(p))
@@ -240,7 +267,7 @@ pub(crate) fn settings_button_rects(
         inner,
         &[
             ActionButtonSpec {
-                hint: Some("↵"),
+                hint: Some(glyphs::ENTER),
                 label: settings_primary_button_label(section),
             },
             ActionButtonSpec {
@@ -298,11 +325,11 @@ fn render_settings_integrations(app: &AppState, frame: &mut Frame, area: Rect) {
     let footer_height = integrations_footer_height(app, area.width);
 
     let rows = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Length(2),
-        Constraint::Length(1),
+        Constraint::Length(INTEGRATIONS_TITLE_ROWS),
+        Constraint::Length(INTEGRATIONS_DESC_ROWS),
+        Constraint::Length(INTEGRATIONS_SPACER_ROWS / 2),
         Constraint::Min(0),
-        Constraint::Length(1),
+        Constraint::Length(INTEGRATIONS_SPACER_ROWS / 2),
         Constraint::Length(footer_height),
     ])
     .areas::<6>(area);
@@ -324,10 +351,10 @@ fn render_settings_integrations(app: &AppState, frame: &mut Frame, area: Rect) {
     let mut lines = Vec::new();
     for item in &app.integration_recommendations {
         let marker = match item.state {
-            crate::integration::IntegrationStatusKind::Current => "✓",
-            crate::integration::IntegrationStatusKind::Outdated => "↻",
+            crate::integration::IntegrationStatusKind::Current => glyphs::TICK,
+            crate::integration::IntegrationStatusKind::Outdated => glyphs::RESET,
             crate::integration::IntegrationStatusKind::NotInstalled if item.available => "+",
-            crate::integration::IntegrationStatusKind::NotInstalled => "–",
+            crate::integration::IntegrationStatusKind::NotInstalled => glyphs::EN_DASH,
         };
         let marker_style = match item.state {
             crate::integration::IntegrationStatusKind::Current => Style::default().fg(p.green),
@@ -369,7 +396,7 @@ fn render_settings_theme(app: &AppState, frame: &mut Frame, area: Rect) {
         .map(|name| {
             let is_current = name.to_lowercase().replace([' ', '_'], "-")
                 == app.theme_name.to_lowercase().replace([' ', '_'], "-");
-            let marker = if is_current { " ✓" } else { "" };
+            let marker = if is_current { glyphs::TICK_MARKER } else { "" };
             ListItem::new(Line::from(vec![
                 Span::styled(*name, Style::default().fg(p.subtext0)),
                 Span::styled(marker, Style::default().fg(p.green)),
@@ -384,7 +411,7 @@ fn render_settings_theme(app: &AppState, frame: &mut Frame, area: Rect) {
                 .fg(p.text)
                 .add_modifier(Modifier::BOLD),
         )
-        .highlight_symbol(" ▸ ")
+        .highlight_symbol(glyphs::COLLAPSED_MARKER)
         .style(Style::default().fg(p.subtext0));
 
     let mut state = ListState::default().with_selected(Some(app.settings.list.selected));
@@ -430,7 +457,11 @@ fn render_settings_experiments(app: &AppState, frame: &mut Frame, area: Rect) {
     );
 
     for (idx, setting) in ExperimentSetting::ALL.iter().copied().enumerate() {
-        let marker = if setting.enabled(app) { "[✓]" } else { "[ ]" };
+        let marker = if setting.enabled(app) {
+            glyphs::CHECKED
+        } else {
+            glyphs::UNCHECKED
+        };
         let style = if app.settings.list.selected == idx {
             Style::default()
                 .bg(p.surface0)

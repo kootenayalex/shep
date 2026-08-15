@@ -1,3 +1,4 @@
+use super::glyphs;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub(crate) fn display_width(text: &str) -> usize {
@@ -16,11 +17,11 @@ pub(crate) fn truncate_end(text: &str, max_width: usize) -> String {
         return String::new();
     }
     if max_width == 1 {
-        return "…".to_string();
+        return glyphs::ELLIPSIS.to_string();
     }
 
     let prefix = take_prefix_width(text, max_width.saturating_sub(1));
-    format!("{prefix}…")
+    format!("{prefix}{}", glyphs::ELLIPSIS)
 }
 
 /// Truncate from the front, keeping the tail: `…/vault/dev/shep`.
@@ -35,11 +36,11 @@ pub(crate) fn truncate_start(text: &str, max_width: usize) -> String {
         return String::new();
     }
     if max_width == 1 {
-        return "…".to_string();
+        return glyphs::ELLIPSIS.to_string();
     }
 
     let suffix = take_suffix_width(text, max_width.saturating_sub(1));
-    format!("…{suffix}")
+    format!("{}{suffix}", glyphs::ELLIPSIS)
 }
 
 pub(crate) fn middle_elide(text: &str, max_width: usize) -> String {
@@ -47,7 +48,7 @@ pub(crate) fn middle_elide(text: &str, max_width: usize) -> String {
         return text.to_string();
     }
     if max_width <= 1 {
-        return "…".to_string();
+        return glyphs::ELLIPSIS.to_string();
     }
 
     let content_width = max_width.saturating_sub(1);
@@ -55,7 +56,7 @@ pub(crate) fn middle_elide(text: &str, max_width: usize) -> String {
     let right_width = content_width.saturating_sub(left_width);
     let prefix = take_prefix_width(text, left_width);
     let suffix = take_suffix_width(text, right_width);
-    format!("{prefix}…{suffix}")
+    format!("{prefix}{}{suffix}", glyphs::ELLIPSIS)
 }
 
 fn take_prefix_width(text: &str, max_width: usize) -> String {

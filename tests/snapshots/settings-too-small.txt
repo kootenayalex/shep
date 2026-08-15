@@ -1,0 +1,36 @@
+# settings-too-small 24x7 · 13 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ ◉ wo…  tab 1 │        ◉
+ ◉ 1 blocked  │ switch
+╭───────────┬──────────╮
+│ settings needs 16x8  │
+│           │          │
+│           │          │
+╰───────────┴──────────╯
+
+--- styles ---
+gegkkkgbbbbbbgjiiiiiiiif
+gdddddddddddggjlllllllll
+aaaaaaaaaaaaammmmmmmmmmm
+accccccccccccccccccccchm
+ahhhhhhhhhhhahhhhhhhhhhm
+ahhhhhhhhhhhahhhhhhhhhhm
+aaaaaaaaaaaaammmmmmmmmmm
+
+--- legend ---
+. = (unstyled)
+a = fg:accent bg:reset dim
+b = fg:overlay1 bg:panel_bg dim
+c = fg:panel_bg bg:peach bold
+d = fg:red bg:panel_bg bold+dim
+e = fg:red bg:panel_bg dim
+f = fg:red bg:surface0 dim
+g = fg:reset bg:panel_bg dim
+h = fg:reset bg:reset dim
+i = fg:reset bg:surface0 dim
+j = fg:surface_dim bg:surface0 dim
+k = fg:text bg:panel_bg bold+dim
+l = fg:text bg:surface0 bold+dim
+m = fg:yellow bg:reset dim

@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 
+use super::glyphs;
 use super::scrollbar::{render_pane_scrollbar, should_show_scrollbar};
 #[cfg(test)]
 use super::text::display_width;
@@ -642,7 +643,13 @@ fn render_pane_border_titles(app: &AppState, ws: &crate::workspace::Workspace, f
             pane.seen,
             &app.palette,
         ));
-        buf.set_stringn(suffix_x, y, format!("· {state} "), max, suffix_style);
+        buf.set_stringn(
+            suffix_x,
+            y,
+            format!("{} {state} ", glyphs::SEP),
+            max,
+            suffix_style,
+        );
     }
 }
 
