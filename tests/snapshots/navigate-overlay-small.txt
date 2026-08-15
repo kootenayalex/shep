@@ -5,7 +5,7 @@
  shep                             workmayt · 1                      ● 1 blocked
  spaces                  │ 1       +
                          │╭──────────────────────────┬─────────────────────────╮
- ● workmayt ◆ ⇥2        ▕││                          │                         │
+ ◉ workmayt ◆ ⇥2        ▕││                          │                         │
     ↑2 ↓1 20s mem 87%   ▕││                          │                         │
                         ▕││                          │                         │
  ● emberline            ▕││                          │                         │
@@ -28,63 +28,63 @@
  NAVIGATE  esc back  up / down ws  ⇥ pane  g navigator  c new tab  v split│  - s
 
 --- styles ---
-raaaarrrrrrrrrrrrrrrrrrrrrrrrrrrrrBBBBBBBBeeeurrrrrrrrrrrrrrrrrrrrrrooooooooooor
-ggggggg..................bllllllllkkkrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
-.........................bbbbbbbbbbbbbbbbbbbbbbbbbbbbbEEEEEEEEEEEEEEEEEEEEEEEEEE
-cpsCCCCCCCCsGsAAssssssssfbb..........................b.........................E
-ssssddsnnsiiisnnnnnnnsssfbb..........................b.........................E
-........................fbb..........................b.........................E
-.y.vvvvvvvvv............fbb..........................b.........................E
-...ffffff.hh............fbb..........................b.........................E
-........................xbb..........................b.........................E
-........................xbb..........................b.........................E
-........................xbb..........................b.........................E
-ffff.................ffffbb..........................b.........................E
-xxxxxxxxxxxxxxxxxxxxxxxxxbb..........................b.........................E
-ggggggg...........gggggggbb..........................b.........................E
-.........................bb..........................b.........................E
-tqtDDDDDDDDtttttttttttttfbb..........................b.........................E
-tttqqqqqqqjjjjjjjjjjjjjjfbb..........................b.........................E
-........................fbb..........................b.........................E
-.E.wwwwwwww.............fbb..........................b.........................E
-...FFFFFFFhhhhhhhhhhhhhhfbb..........................b.........................E
-........................xbb..........................b.........................E
-.y.wwwwwwwww............xbb..........................b.........................E
-...zzzzhhhhhhhhhhhhhhh..fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbEEEEEEEEEEEEEEEEEEEEEEEEEE
-mmmmmmmmmmraaaeeeeeeeaaaaaaaaaeeeeeaeeeeeeeaeeeeeeeeeeeeaeeeeeeeeeeaeeeeeeeeeaee
+uaaaauuuuuuuuuuuuuuuuuuuuuuuuuuuuuCCCCCCCChhhxuuuuuuuuuuuuuuuuuuuuuurrrrrrrrrrru
+jjjjjjj..................boooooooonnnuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+.........................bbbbbbbbbbbbbbbbbbbbbbbbbbbbbFFFFFFFFFFFFFFFFFFFFFFFFFF
+csvDDDDDDDDvgvBBvvvvvvvvibb..........................b.........................F
+vvvvffvqqvlllvqqqqqqqvvvibb..........................b.........................F
+........................ibb..........................b.........................F
+.d.yyyyyyyyy............ibb..........................b.........................F
+...iiiiii.kk............ibb..........................b.........................F
+........................Abb..........................b.........................F
+........................Abb..........................b.........................F
+........................Abb..........................b.........................F
+iiii.................iiiibb..........................b.........................F
+AAAAAAAAAAAAAAAAAAAAAAAAAbb..........................b.........................F
+jjjjjjj...........jjjjjjjbb..........................b.........................F
+.........................bb..........................b.........................F
+wtwEEEEEEEEwwwwwwwwwwwwwibb..........................b.........................F
+wwwtttttttmmmmmmmmmmmmmmibb..........................b.........................F
+........................ibb..........................b.........................F
+.F.zzzzzzzz.............ibb..........................b.........................F
+...GGGGGGGkkkkkkkkkkkkkkibb..........................b.........................F
+........................Abb..........................b.........................F
+.d.zzzzzzzzz............Abb..........................b.........................F
+...eeeekkkkkkkkkkkkkkk..ibbbbbbbbbbbbbbbbbbbbbbbbbbbbbFFFFFFFFFFFFFFFFFFFFFFFFFF
+ppppppppppuaaahhhhhhhaaaaaaaaahhhhhahhhhhhhahhhhhhhhhhhhahhhhhhhhhhahhhhhhhhhahh
 
 --- legend ---
 . = (unstyled)
-A = fg:teal bg:surface0
-B = fg:text bg:panel_bg bold
-C = fg:text bg:surface0 bold
-D = fg:text bg:surface_dim bold
-E = fg:yellow bg:reset
-F = fg:yellow bg:reset dim
-G = fg:yellow bg:surface0
+A = fg:surface_dim bg:reset
+B = fg:teal bg:surface0
+C = fg:text bg:panel_bg bold
+D = fg:text bg:surface0 bold
+E = fg:text bg:surface_dim bold
+F = fg:yellow bg:reset
+G = fg:yellow bg:reset dim
 a = fg:accent bg:panel_bg bold
 b = fg:accent bg:reset
 c = fg:accent bg:surface0
-d = fg:green bg:surface0
-e = fg:overlay0 bg:panel_bg
-f = fg:overlay0 bg:reset
-g = fg:overlay0 bg:reset bold
-h = fg:overlay0 bg:reset dim
-i = fg:overlay0 bg:surface0 dim
-j = fg:overlay0 bg:surface_dim dim
-k = fg:overlay1 bg:panel_bg
-l = fg:panel_bg bg:accent
-m = fg:panel_bg bg:accent bold
-n = fg:peach bg:surface0
-o = fg:red bg:panel_bg bold
-p = fg:red bg:surface0
-q = fg:red bg:surface_dim
-r = fg:reset bg:panel_bg
-s = fg:reset bg:surface0
-t = fg:reset bg:surface_dim
-u = fg:subtext0 bg:panel_bg
-v = fg:subtext0 bg:reset
-w = fg:subtext0 bg:reset bold
-x = fg:surface_dim bg:reset
-y = fg:teal bg:reset
-z = fg:teal bg:reset dim
+d = fg:blue bg:reset
+e = fg:blue bg:reset dim
+f = fg:green bg:surface0
+g = fg:mauve bg:surface0
+h = fg:overlay0 bg:panel_bg
+i = fg:overlay0 bg:reset
+j = fg:overlay0 bg:reset bold
+k = fg:overlay0 bg:reset dim
+l = fg:overlay0 bg:surface0 dim
+m = fg:overlay0 bg:surface_dim dim
+n = fg:overlay1 bg:panel_bg
+o = fg:panel_bg bg:accent
+p = fg:panel_bg bg:accent bold
+q = fg:peach bg:surface0
+r = fg:red bg:panel_bg bold
+s = fg:red bg:surface0
+t = fg:red bg:surface_dim
+u = fg:reset bg:panel_bg
+v = fg:reset bg:surface0
+w = fg:reset bg:surface_dim
+x = fg:subtext0 bg:panel_bg
+y = fg:subtext0 bg:reset
+z = fg:subtext0 bg:reset bold

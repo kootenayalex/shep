@@ -5,7 +5,7 @@
  shep                             workmayt · 1                      ● 1 blocked
  spaces                  │ 1       +
                          │╭──────────────────────────┬─────────────────────────╮
- ● workmayt ◆ ⇥2        ▕││                          │                         │
+ ◉ workmayt ◆ ⇥2        ▕││                          │                         │
     ↑2 ↓1 20s mem 87%   ▕││                          │                         │
                         ▕││                          │                         │
  ● emberline            ▕││                          │                         │
@@ -28,57 +28,57 @@
  ctrl+b prefix  w spaces  c tab  ? keys  q detach
 
 --- styles ---
-naaaannnnnnnnnnnnnnnnnnnnnnnnnnnnnwwwwwwwwdddpnnnnnnnnnnnnnnnnnnnnnnllllllllllln
-fffffff..................sjjjjjjjjiiinnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
-.........................sbbbbbbbbbbbbbbbbbbbbbbbbbbbbyyyyyyyyyyyyyyyyyyyyyyyyyy
-omoxxxxxxxxoAovvooooooooesb..........................b.........................y
-ooooccokkohhhokkkkkkkoooesb..........................b.........................y
-........................esb..........................b.........................y
-.t.qqqqqqqqq............esb..........................b.........................y
-...eeeeee.gg............esb..........................b.........................y
-........................ssb..........................b.........................y
-........................ssb..........................b.........................y
-........................ssb..........................b.........................y
-eeee.................eeeesb..........................b.........................y
-ssssssssssssssssssssssssssb..........................b.........................y
-fffffff...........fffffffsb..........................b.........................y
-.........................sb..........................b.........................y
-omoxxxxxxxxoooooooooooooesb..........................b.........................y
-ooommmmmmmhhhhhhhhhhhhhhesb..........................b.........................y
-........................esb..........................b.........................y
-.y.rrrrrrrr.............esb..........................b.........................y
-...zzzzzzzggggggggggggggesb..........................b.........................y
-........................ssb..........................b.........................y
-.t.rrrrrrrrr............ssb..........................b.........................y
-...uuuuggggggggggggggg..esbbbbbbbbbbbbbbbbbbbbbbbbbbbbyyyyyyyyyyyyyyyyyyyyyyyyyy
-naaaaaadddddddddadddddddddaddddddadddddddadddddddnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+qaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqxxxxxxxxgggsqqqqqqqqqqqqqqqqqqqqqqoooooooooooq
+iiiiiii..................vmmmmmmmmlllqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+.........................vbbbbbbbbbbbbbbbbbbbbbbbbbbbbzzzzzzzzzzzzzzzzzzzzzzzzzz
+rpryyyyyyyyrfrwwrrrrrrrrhvb..........................b.........................z
+rrrreernnrkkkrnnnnnnnrrrhvb..........................b.........................z
+........................hvb..........................b.........................z
+.c.ttttttttt............hvb..........................b.........................z
+...hhhhhh.jj............hvb..........................b.........................z
+........................vvb..........................b.........................z
+........................vvb..........................b.........................z
+........................vvb..........................b.........................z
+hhhh.................hhhhvb..........................b.........................z
+vvvvvvvvvvvvvvvvvvvvvvvvvvb..........................b.........................z
+iiiiiii...........iiiiiiivb..........................b.........................z
+.........................vb..........................b.........................z
+rpryyyyyyyyrrrrrrrrrrrrrhvb..........................b.........................z
+rrrpppppppkkkkkkkkkkkkkkhvb..........................b.........................z
+........................hvb..........................b.........................z
+.z.uuuuuuuu.............hvb..........................b.........................z
+...AAAAAAAjjjjjjjjjjjjjjhvb..........................b.........................z
+........................vvb..........................b.........................z
+.c.uuuuuuuuu............vvb..........................b.........................z
+...ddddjjjjjjjjjjjjjjj..hvbbbbbbbbbbbbbbbbbbbbbbbbbbbbzzzzzzzzzzzzzzzzzzzzzzzzzz
+qaaaaaagggggggggagggggggggaggggggagggggggagggggggqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
 
 --- legend ---
 . = (unstyled)
-A = fg:yellow bg:surface_dim
+A = fg:yellow bg:reset dim
 a = fg:accent bg:panel_bg bold
 b = fg:accent bg:reset
-c = fg:green bg:surface_dim
-d = fg:overlay0 bg:panel_bg
-e = fg:overlay0 bg:reset
-f = fg:overlay0 bg:reset bold
-g = fg:overlay0 bg:reset dim
-h = fg:overlay0 bg:surface_dim dim
-i = fg:overlay1 bg:panel_bg
-j = fg:panel_bg bg:accent
-k = fg:peach bg:surface_dim
-l = fg:red bg:panel_bg bold
-m = fg:red bg:surface_dim
-n = fg:reset bg:panel_bg
-o = fg:reset bg:surface_dim
-p = fg:subtext0 bg:panel_bg
-q = fg:subtext0 bg:reset
-r = fg:subtext0 bg:reset bold
-s = fg:surface_dim bg:reset
-t = fg:teal bg:reset
-u = fg:teal bg:reset dim
-v = fg:teal bg:surface_dim
-w = fg:text bg:panel_bg bold
-x = fg:text bg:surface_dim bold
-y = fg:yellow bg:reset
-z = fg:yellow bg:reset dim
+c = fg:blue bg:reset
+d = fg:blue bg:reset dim
+e = fg:green bg:surface_dim
+f = fg:mauve bg:surface_dim
+g = fg:overlay0 bg:panel_bg
+h = fg:overlay0 bg:reset
+i = fg:overlay0 bg:reset bold
+j = fg:overlay0 bg:reset dim
+k = fg:overlay0 bg:surface_dim dim
+l = fg:overlay1 bg:panel_bg
+m = fg:panel_bg bg:accent
+n = fg:peach bg:surface_dim
+o = fg:red bg:panel_bg bold
+p = fg:red bg:surface_dim
+q = fg:reset bg:panel_bg
+r = fg:reset bg:surface_dim
+s = fg:subtext0 bg:panel_bg
+t = fg:subtext0 bg:reset
+u = fg:subtext0 bg:reset bold
+v = fg:surface_dim bg:reset
+w = fg:teal bg:surface_dim
+x = fg:text bg:panel_bg bold
+y = fg:text bg:surface_dim bold
+z = fg:yellow bg:reset

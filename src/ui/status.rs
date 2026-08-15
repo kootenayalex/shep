@@ -196,14 +196,67 @@ pub(super) fn render_config_diagnostic(frame: &mut Frame, area: Rect, message: &
     }
 }
 
-pub(super) fn state_dot(state: AgentState, seen: bool, p: &Palette) -> (&'static str, Style) {
-    match (state, seen) {
-        (AgentState::Blocked, _) => ("●", Style::default().fg(p.red)),
-        (AgentState::Working, _) => ("●", Style::default().fg(p.yellow)),
-        (AgentState::Idle, false) => ("●", Style::default().fg(p.teal)),
-        (AgentState::Idle, true) => ("○", Style::default().fg(p.green)),
-        (AgentState::Unknown, _) => ("·", Style::default().fg(p.overlay0)),
+/// Everything a surface needs to draw one agent's state.
+///
+/// One table so the glyph and the colour cannot drift apart. They used to live
+/// in four separate `match`es and did drift: the board card, the sidebar row and
+/// the phone each picked their own, and three of the five states ended up
+/// sharing a filled `●` that differed only in hue.
+pub(super) struct StateAppearance {
+    pub glyph: &'static str,
+    pub label: &'static str,
+    pub ink: StateInk,
+}
+
+impl StateAppearance {
+    pub fn color(&self, p: &Palette) -> Color {
+        self.ink.resolve(p)
     }
+
+    pub fn style(&self, p: &Palette) -> Style {
+        Style::default().fg(self.color(p))
+    }
+}
+
+/// Which palette tier a state draws from. Named rather than resolved so the
+/// label and glyph can be asked for without a palette in hand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum StateInk {
+    Stop,
+    Working,
+    DoneUnseen,
+    Settled,
+    Absent,
+}
+
+impl StateInk {
+    fn resolve(self, p: &Palette) -> Color {
+        match self {
+            StateInk::Stop => p.red,
+            StateInk::Working => p.yellow,
+            StateInk::DoneUnseen => p.blue,
+            StateInk::Settled => p.green,
+            StateInk::Absent => p.overlay0,
+        }
+    }
+}
+
+/// The agent-state vocabulary. See `docs/DESIGN-LANGUAGE.md`; the companion
+/// implements the same table in `ui/theme/ShepSemantic.kt`.
+///
+/// `seen` splits idle in two on purpose — an agent that finished while you were
+/// away is a different claim from one you have already looked at.
+pub(super) fn state_appearance(state: AgentState, seen: bool, tick: u32) -> StateAppearance {
+    let (glyph, label, ink) = match (state, seen) {
+        (AgentState::Blocked, _) => ("◉", "blocked", StateInk::Stop),
+        (AgentState::Working, _) => (super::spinner_frame(tick), "working", StateInk::Working),
+        (AgentState::Idle, false) => ("●", "done", StateInk::DoneUnseen),
+        // Hollow, not `✓`: that glyph is the approved review badge and nothing
+        // else. A state and a badge sharing a mark made both ambiguous.
+        (AgentState::Idle, true) => ("○", "idle", StateInk::Settled),
+        (AgentState::Unknown, _) => ("·", "idle", StateInk::Absent),
+    };
+    StateAppearance { glyph, label, ink }
 }
 
 pub(super) fn agent_icon(
@@ -212,39 +265,119 @@ pub(super) fn agent_icon(
     tick: u32,
     p: &Palette,
 ) -> (&'static str, Style) {
-    match (state, seen) {
-        (AgentState::Blocked, _) => ("◉", Style::default().fg(p.red)),
-        (AgentState::Working, _) => (super::spinner_frame(tick), Style::default().fg(p.yellow)),
-        (AgentState::Idle, false) => ("●", Style::default().fg(p.teal)),
-        (AgentState::Idle, true) => ("✓", Style::default().fg(p.green)),
-        (AgentState::Unknown, _) => ("○", Style::default().fg(p.overlay0)),
-    }
+    let it = state_appearance(state, seen, tick);
+    (it.glyph, it.style(p))
+}
+
+/// The review-lifecycle badge, or `None` when there is nothing to say.
+///
+/// Kept beside the state table because badges and states share a palette and
+/// used to fight over it: `◆` was yellow, which is the working tier, so a space
+/// waiting for review looked like a space that was running. `✓` is the approved
+/// badge and nothing else — see `docs/DESIGN-LANGUAGE.md`.
+pub(super) fn review_badge(
+    state: crate::api::schema::ReviewState,
+    p: &Palette,
+) -> Option<(&'static str, Style)> {
+    use crate::api::schema::ReviewState;
+    let (glyph, color) = match state {
+        ReviewState::None => return None,
+        ReviewState::NeedsReview => ("\u{25c6}", p.mauve),
+        ReviewState::ChangesRequested => ("\u{21ba}", p.peach),
+        ReviewState::Approved => ("\u{2713}", p.green),
+    };
+    Some((glyph, Style::default().fg(color)))
 }
 
 pub(super) fn state_label(state: AgentState, seen: bool) -> &'static str {
-    match (state, seen) {
-        (AgentState::Blocked, _) => "blocked",
-        (AgentState::Working, _) => "working",
-        (AgentState::Idle, false) => "done",
-        (AgentState::Idle, true) => "idle",
-        (AgentState::Unknown, _) => "idle",
-    }
+    state_appearance(state, seen, 0).label
 }
 
 pub(super) fn state_label_color(state: AgentState, seen: bool, p: &Palette) -> Color {
-    match (state, seen) {
-        (AgentState::Blocked, _) => p.red,
-        (AgentState::Working, _) => p.yellow,
-        (AgentState::Idle, false) => p.teal,
-        (AgentState::Idle, true) => p.green,
-        (AgentState::Unknown, _) => p.overlay0,
-    }
+    state_appearance(state, seen, 0).color(p)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::{ToastClipboardPosition, ToastShepPosition};
+
+    /// The state table from `docs/DESIGN-LANGUAGE.md`, spelled out.
+    ///
+    /// The companion has the same table in `ShepSemanticTest.kt`. If you change
+    /// one, change the other and the doc — a phone that disagrees with the
+    /// desktop about what yellow means is the bug this pins.
+    #[test]
+    fn state_vocabulary_matches_the_design_language() {
+        let p = Palette::shep();
+        let row = |state, seen| {
+            let it = state_appearance(state, seen, 0);
+            (it.glyph, it.label, it.color(&p))
+        };
+        assert_eq!(row(AgentState::Blocked, true), ("◉", "blocked", p.red));
+        assert_eq!(row(AgentState::Blocked, false), ("◉", "blocked", p.red));
+        // Frame 0 of the spinner; the glyph animates, the label and ink do not.
+        assert_eq!(row(AgentState::Working, true), ("⠋", "working", p.yellow));
+        assert_eq!(row(AgentState::Idle, false), ("●", "done", p.blue));
+        assert_eq!(row(AgentState::Idle, true), ("○", "idle", p.green));
+        assert_eq!(row(AgentState::Unknown, true), ("·", "idle", p.overlay0));
+    }
+
+    /// Every state must be told apart without colour — a monochrome themed icon
+    /// and a colour-blind reader both have to work. Three board-card states
+    /// once shared a filled `●` and differed only in hue.
+    #[test]
+    fn every_state_has_its_own_glyph() {
+        let mut glyphs = vec![
+            state_appearance(AgentState::Blocked, true, 0).glyph,
+            state_appearance(AgentState::Working, true, 0).glyph,
+            state_appearance(AgentState::Idle, false, 0).glyph,
+            state_appearance(AgentState::Idle, true, 0).glyph,
+            state_appearance(AgentState::Unknown, true, 0).glyph,
+        ];
+        let total = glyphs.len();
+        glyphs.sort_unstable();
+        glyphs.dedup();
+        assert_eq!(glyphs.len(), total, "states share a glyph: {glyphs:?}");
+    }
+
+    #[test]
+    fn review_badges_do_not_borrow_a_state_colour() {
+        use crate::api::schema::ReviewState;
+        let p = Palette::shep();
+        assert!(review_badge(ReviewState::None, &p).is_none());
+        let ink = |state| {
+            review_badge(state, &p)
+                .expect("badge should render")
+                .1
+                .fg
+                .expect("badge should have a foreground")
+        };
+        // Needs-review must not be yellow: that is the working tier.
+        assert_eq!(ink(ReviewState::NeedsReview), p.mauve);
+        assert_ne!(ink(ReviewState::NeedsReview), p.yellow);
+        assert_eq!(ink(ReviewState::ChangesRequested), p.peach);
+        assert_eq!(ink(ReviewState::Approved), p.green);
+    }
+
+    /// `✓` belongs to the approved badge alone. It used to be idle's glyph too.
+    #[test]
+    fn the_approved_tick_is_not_also_a_state() {
+        use crate::api::schema::ReviewState;
+        let p = Palette::shep();
+        let tick = review_badge(ReviewState::Approved, &p)
+            .expect("approved renders")
+            .0;
+        for (state, seen) in [
+            (AgentState::Blocked, true),
+            (AgentState::Working, true),
+            (AgentState::Idle, false),
+            (AgentState::Idle, true),
+            (AgentState::Unknown, true),
+        ] {
+            assert_ne!(state_appearance(state, seen, 0).glyph, tick);
+        }
+    }
 
     fn toast() -> ToastNotification {
         ToastNotification {

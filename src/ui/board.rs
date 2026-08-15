@@ -19,7 +19,7 @@ use ratatui::{
 };
 
 use super::sidebar::{agent_panel_entries, format_event_age};
-use super::status::{state_dot, state_label};
+use super::status::{agent_icon, state_label};
 use super::text::{truncate_end, truncate_start};
 use super::widgets::render_panel_shell;
 use crate::app::state::{AppState, BoardView, TaskQueueRow};
@@ -992,7 +992,7 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
             }
         }
     }
-    let (dot, dot_style) = state_dot(card.state, card.seen, p);
+    let (dot, dot_style) = agent_icon(card.state, card.seen, app.spinner_tick, p);
     let marker = if selected { "▌" } else { " " };
     let marker_style = if selected {
         Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
@@ -1200,7 +1200,7 @@ fn render_agent_detail(
     };
 
     // Heading: the same dot/name/model identity the card leads with, at rest.
-    let (dot, dot_style) = state_dot(card.state, card.seen, p);
+    let (dot, dot_style) = agent_icon(card.state, card.seen, app.spinner_tick, p);
     let mut heading = vec![
         Span::styled(dot, dot_style),
         Span::raw(" "),

@@ -5,7 +5,7 @@
  shep                             workmayt · 1                      ● 1 blocked
  s╭──────────────────────────────────────────────────────────────────────────╮
   │ settings                                                                 │─╮
- ●│ theme   sound   toasts   pane labels   integrations   experiments        │ │
+ ◉│ theme   sound   toasts   pane labels   integrations   experiments        │ │
   │──────────────────────────────────────────────────────────────────────────│ │
   │                                                                          │ │
  ●│ ▸ shep                                                                   │ │
@@ -28,53 +28,53 @@
  ctrl+b prefix  w spaces  c tab  ? keys  q detach
 
 --- styles ---
-mbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmvvvvvvvveeeqmmmmmmmmmmmmmmmmmmmmmmjjjjjjjjjjjm
-ffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaamm
-nnauuuuuuuuulllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllaxx
-okahiiiiihhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhanx
-ooarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrranx
-nnallllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllanx
-ntawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwanx
-nnapppppppppppppccpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-nnappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-nnappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-nnappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-ggappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-ssappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-ffappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-nnappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-okappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-ooappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-nnappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-nxappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppanx
-nnallllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllanx
-nnadddhhhhhhhhhdddhhhhhhhhlllllllllllllllllllllllllllllllllllllllllllllllllllanx
-ntalllllllllllllllllllllllllliiiiiiiiillwwwwwwwwwwwllllllllllllllllllllllllllanx
-nnaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxx
-mbbbbbbeeeeeeeeebeeeeeeeeebeeeeeebeeeeeeebeeeeeeemmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+nbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnvvvvvvvvfffrnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkn
+ggaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaann
+ooauuuuuuuuummmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaxx
+plaijjjjjiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiaox
+ppassssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssaox
+ooammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaox
+ocawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwaox
+ooaqqqqqqqqqqqqqddqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ooaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ooaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ooaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+hhaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ttaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ggaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ooaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+plaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ppaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ooaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+oxaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqaox
+ooammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaox
+ooaeeeiiiiiiiiieeeiiiiiiiimmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaox
+ocammmmmmmmmmmmmmmmmmmmmmmmmmjjjjjjjjjmmwwwwwwwwwwwmmmmmmmmmmmmmmmmmmmmmmmmmmaox
+ooaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxx
+nbbbbbbfffffffffbfffffffffbffffffbfffffffbfffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 
 --- legend ---
 . = (unstyled)
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold+dim
-c = fg:green bg:panel_bg
-d = fg:overlay0 bg:panel_bg
-e = fg:overlay0 bg:panel_bg dim
-f = fg:overlay0 bg:reset bold+dim
-g = fg:overlay0 bg:reset dim
-h = fg:overlay1 bg:panel_bg
-i = fg:panel_bg bg:accent bold
-j = fg:red bg:panel_bg bold+dim
-k = fg:red bg:surface_dim dim
-l = fg:reset bg:panel_bg
-m = fg:reset bg:panel_bg dim
-n = fg:reset bg:reset dim
-o = fg:reset bg:surface_dim dim
-p = fg:subtext0 bg:panel_bg
-q = fg:subtext0 bg:panel_bg dim
-r = fg:surface0 bg:panel_bg
-s = fg:surface_dim bg:reset dim
-t = fg:teal bg:reset dim
+c = fg:blue bg:reset dim
+d = fg:green bg:panel_bg
+e = fg:overlay0 bg:panel_bg
+f = fg:overlay0 bg:panel_bg dim
+g = fg:overlay0 bg:reset bold+dim
+h = fg:overlay0 bg:reset dim
+i = fg:overlay1 bg:panel_bg
+j = fg:panel_bg bg:accent bold
+k = fg:red bg:panel_bg bold+dim
+l = fg:red bg:surface_dim dim
+m = fg:reset bg:panel_bg
+n = fg:reset bg:panel_bg dim
+o = fg:reset bg:reset dim
+p = fg:reset bg:surface_dim dim
+q = fg:subtext0 bg:panel_bg
+r = fg:subtext0 bg:panel_bg dim
+s = fg:surface0 bg:panel_bg
+t = fg:surface_dim bg:reset dim
 u = fg:text bg:panel_bg bold
 v = fg:text bg:panel_bg bold+dim
 w = fg:text bg:surface0 bold

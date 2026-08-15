@@ -420,9 +420,9 @@ fn pane_detail(
                 let state = row_state(app, ws_idx, tab_idx, pane_id);
                 let status = presentation
                     .state_labels
-                    .get(display_state(state, seen))
+                    .get(super::status::state_label(state, seen))
                     .cloned()
-                    .unwrap_or_else(|| display_state(state, seen).to_string());
+                    .unwrap_or_else(|| super::status::state_label(state, seen).to_string());
                 parts.push(status);
             } else {
                 parts.push("shell".to_string());
@@ -460,16 +460,6 @@ fn row_state(
         .and_then(|terminal_id| app.terminals.get(terminal_id))
         .map(|terminal| terminal.state)
         .unwrap_or(crate::detect::AgentState::Unknown)
-}
-
-fn display_state(state: crate::detect::AgentState, seen: bool) -> &'static str {
-    match (state, seen) {
-        (crate::detect::AgentState::Blocked, _) => "blocked",
-        (crate::detect::AgentState::Working, _) => "working",
-        (crate::detect::AgentState::Idle, false) => "done",
-        (crate::detect::AgentState::Idle, true) => "idle",
-        (crate::detect::AgentState::Unknown, _) => "unknown",
-    }
 }
 
 fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {

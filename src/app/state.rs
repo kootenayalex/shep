@@ -78,19 +78,19 @@ pub struct Palette {
     pub text: Color,
     /// Subdued text (workspace numbers, dim labels).
     pub subtext0: Color,
-    /// Branch name / special label color.
+    /// Review tier: review requested, and branch identity.
     pub mauve: Color,
-    /// Done / idle states.
+    /// Settled tier: idle, approved, ahead of upstream.
     pub green: Color,
-    /// Working / running states.
+    /// Working tier: an agent is running.
     pub yellow: Color,
-    /// Needs attention / blocked states.
+    /// Stop tier: blocked agents and destructive actions. Nothing else.
     pub red: Color,
-    /// Unseen / done notification accent.
+    /// Done-unseen tier: finished, and you have not looked yet.
     pub blue: Color,
-    /// Notification accent / unseen markers.
+    /// Queued tier: input waiting for an agent to go idle.
     pub teal: Color,
-    /// Interrupted / warning states.
+    /// Warning tier: behind upstream, memory pressure, changes requested.
     pub peach: Color,
 }
 

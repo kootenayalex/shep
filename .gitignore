@@ -25,6 +25,7 @@ __pycache__/
 !/docs/reference/
 !/docs/reference/**
 !/docs/BUILD-macos.md
+!/docs/DESIGN-LANGUAGE.md
 
 graphify-out/
 .serena/

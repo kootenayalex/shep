@@ -1,4 +1,4 @@
-# board-small 80x24 · 17 styles
+# board-small 80x24 · 18 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
@@ -9,13 +9,13 @@
 │ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G               │
 │ blocked 1           done 1              working 2          idle 1            │
 │                                                                              │
-│ ● claude · w… ⇥2 p1 ● claude · emberl…  ● opencode p2      ○ claude · shep p1│
+│ ◉ claude · w… ⇥2 p1 ● claude · emberl…  ⠹ opencode p2      ○ claude · shep p1│
 │  workmayt · fix… 2m  emberline · ma… 6m  workmayt · f… 20s  shep · feat/d… 1h│
 │  blocked             done                working            idle             │
 │  may I run the str…  pushed 3 commits …  Metamorphosing…                     │
 │  …rkmayt ████░░ 72%  …erline █████░ 88%  …/site ██░░░░ 41%  …/shep █░░░░░ 12%│
 │                                                                              │
-│                                         ● codex p2                           │
+│                                         ⠹ codex p2                           │
 │                                          shep · feat/d… 2m                   │
 │                                          working                             │
 │                                          reading src/ui/b…                   │
@@ -28,47 +28,48 @@
  ctrl+b prefix  w spaces  c tab  ? keys  q detach
 
 --- styles ---
-ibbbbiiiiiiiiiiiiiiiiiiiiiiiiiiiiiooooooooeeejiiiiiiiiiiiiiiiiiiiiiihhhhhhhhhhhi
+kbbbbkkkkkkkkkkkkkkkkkkkkkkkkkkkkkppppppppggglkkkkkkkkkkkkkkkkkkkkkkjjjjjjjjjjjk
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-abbbbbbbbbbbbbbbeeeeeeeeeeeeeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aeeeeeeeenhhhhhhhhhhhhkkkkkggggggggnkkkkklllllnkkkkkppppppppnkkkkkcccccnkkkkkeea
-aeeeeeennnnnkkkkkeeeeennneeeeeeeeeeeekkkkkeeeennneeeeeeeeeeeeeeeiiiiiiiiiiiiiiia
-ahhhhhhhheeiiiiiiiiiiqqqqqeeiiiiiiiiiiiiimmmmmmmmeeiiiiiiiiidddddeeiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aeginnnnnnnnnnnllleeeelinnnnnnnnnnnnnnnniepinnnnnnnneeeiiiiiecinnnnnnnnnnnnneeea
-aiieeeeeeeeeeeeeeeeeeiieeeeeeeeeeeeeeeeeeiieeeeeeeeeeeeeeeeeiieeeeeeeeeeeeeeeeea
-agggggggggiiiiiiiiiiilllllliiiiiiiiiiiiiipppppppppiiiiiiiiiicccccciiiiiiiiiiiiia
-afffffffffffffffffffffffffffffffffffffffffffffffffffffffffiiiiiiiiiiiiiiiiiiiiia
-aiieeeeeeepppppppppppiieeeeeeegggggggggggiieeeeeeeeeeeeeeeeeiieeeeeeeeeeeeeeeeea
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiepinnnnneeeiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiieeeeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiipppppppppiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiifffffffffffffffffffiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiieeeeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
-aibbbbbeeeeeeeebeeeeeeeeeebbbbbbbbbeeeeeeebeeeeeeeebbbbbeeeeeeiiiiiiiiiiiiiiiiia
+abbbbbbbbbbbbbbbggggggggggggggggggggggggggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+aggggggggojjjjjjjjjjjjmmmmmiiiiiiiiommmmmcccccommmmmqqqqqqqqommmmmeeeeeommmmmgga
+aggggggooooommmmmgggggoooggggggggggggmmmmmggggooogggggggggggggggkkkkkkkkkkkkkkka
+ajjjjjjjjggkkkkkkkkkkrrrrrggkkkkkkkkkkkkkddddddddggkkkkkkkkkfffffggkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+agikooooooooooonnnggggckooooooooooooooookgqkoooooooogggkkkkkgekoooooooooooooggga
+akkggggggggggggggggggkkggggggggggggggggggkkgggggggggggggggggkkggggggggggggggggga
+aiiiiiiiiikkkkkkkkkkkcccccckkkkkkkkkkkkkkqqqqqqqqqkkkkkkkkkkeeeeeekkkkkkkkkkkkka
+ahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhkkkkkkkkkkkkkkkkkkkkka
+akkgggggggqqqqqqqqqqqkkgggggggiiiiiiiiiiikkgggggggggggggggggkkggggggggggggggggga
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkgqkooooogggkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkgggggggggggggggggkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkqqqqqqqqqkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkhhhhhhhhhhhhhhhhhhhkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkgggggggggggggggggkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
+akbbbbbggggggggbggggggggggbbbbbbbbbgggggggbggggggggbbbbbggggggkkkkkkkkkkkkkkkkka
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-ibbbbbbeeeeeeeeebeeeeeeeeebeeeeeebeeeeeeebeeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+kbbbbbbgggggggggbgggggggggbggggggbgggggggbgggggggkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
 
 --- legend ---
 . = (unstyled)
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
-c = fg:green bg:panel_bg
-d = fg:green bg:panel_bg bold
-e = fg:overlay0 bg:panel_bg
-f = fg:overlay0 bg:panel_bg italic
-g = fg:red bg:panel_bg
-h = fg:red bg:panel_bg bold
-i = fg:reset bg:panel_bg
-j = fg:subtext0 bg:panel_bg
-k = fg:surface0 bg:panel_bg
-l = fg:teal bg:panel_bg
-m = fg:teal bg:panel_bg bold
-n = fg:text bg:panel_bg
-o = fg:text bg:panel_bg bold
-p = fg:yellow bg:panel_bg
-q = fg:yellow bg:panel_bg bold
+c = fg:blue bg:panel_bg
+d = fg:blue bg:panel_bg bold
+e = fg:green bg:panel_bg
+f = fg:green bg:panel_bg bold
+g = fg:overlay0 bg:panel_bg
+h = fg:overlay0 bg:panel_bg italic
+i = fg:red bg:panel_bg
+j = fg:red bg:panel_bg bold
+k = fg:reset bg:panel_bg
+l = fg:subtext0 bg:panel_bg
+m = fg:surface0 bg:panel_bg
+n = fg:teal bg:panel_bg
+o = fg:text bg:panel_bg
+p = fg:text bg:panel_bg bold
+q = fg:yellow bg:panel_bg
+r = fg:yellow bg:panel_bg bold

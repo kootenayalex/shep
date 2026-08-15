@@ -6,7 +6,7 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ session board / agent                                                                                                │
 │                                                                                                                      │
-│ ● claude · workmayt                                                                                                  │
+│ ◉ claude · workmayt                                                                                                  │
 │ workmayt · fix/stripe-webhook · p1 · last activity 2m                                                                │
 │                                                                                                                      │
 │ state        blocked · ⇥2 queued                                                                                     │
