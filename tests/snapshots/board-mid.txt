@@ -1,0 +1,106 @@
+# board-mid 120x40 · 17 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                                                 workmayt · 1                                          ● 1 blocked
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ session board · what are my agents doing                                                                             │
+│ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  3 ws · 3 tabs · 5 panes  ·  ⇥2 queued  ·  │
+│ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G                                                       │
+│ blocked 1                     done 1                        working 2                    idle 1                      │
+│                                                                                                                      │
+│ ● claude · workmayt ⇥2 p1     ● claude · emberline          ● opencode p2                ○ claude · shep p1          │
+│  workmayt · fix/stripe-we… 2m  emberline · master 6m         workmayt · fix/stripe-… 20s  shep · feat/design-pass 1h │
+│  blocked                       done                          working                      idle                       │
+│  may I run the stripe integr…  pushed 3 commits to master    Metamorphosing…                                         │
+│  …ult/dev/workmayt ████░░ 72%  …lt/dev/emberline █████░ 88%  …kmayt/apps/site ██░░░░ 41%  ~/vault/dev/shep █░░░░░ 12%│
+│                                                                                                                      │
+│                                                             ● codex p2                                               │
+│                                                              shep · feat/design-pass 2m                              │
+│                                                              working                                                 │
+│                                                              reading src/ui/board.rs                                 │
+│                                                              …ees/design-pass ███░░░ 55%                             │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│ enter focus  i inspect  hjkl/↑↓←→ move  t tasks  esc/q close                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ctrl+b prefix  w spaces  c tab  ? keys  q detach
+
+--- styles ---
+ibbbbiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiooooooooeeejiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiihhhhhhhhhhhi
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+abbbbbbbbbbbbbbbeeeeeeeeeeeeeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aeeeeeeeenhhhhhhhhhhhhkkkkkggggggggnkkkkklllllnkkkkkppppppppnkkkkkcccccnkkkkkeeeeeeeeeeeeeeeeeeeeeeekkkkklllllllllkkkkka
+aeeeeeennnnnkkkkkeeeeennneeeeeeeeeeeekkkkkeeeennneeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+ahhhhhhhheeiiiiiiiiiiiiiiiiiiiiqqqqqeeiiiiiiiiiiiiiiiiiiiiiiimmmmmmmmeeiiiiiiiiiiiiiiiiiiidddddeeiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aeginnnnnnnnnnnnnnnnnllleeeiiiielinnnnnnnnnnnnnnnnnniiiiiiiiiepinnnnnnnneeeiiiiiiiiiiiiiiiecinnnnnnnnnnnnneeeiiiiiiiiiia
+aiieeeeeeeeeeeeeeeeeeeeeeeeeeeeiieeeeeeeeeeeeeeeeeeeeeiiiiiiiiieeeeeeeeeeeeeeeeeeeeeeeeeeeiieeeeeeeeeeeeeeeeeeeeeeeeeeia
+agggggggggiiiiiiiiiiiiiiiiiiiiilllllliiiiiiiiiiiiiiiiiiiiiiiipppppppppiiiiiiiiiiiiiiiiiiiicccccciiiiiiiiiiiiiiiiiiiiiiia
+affffffffffffffffffffffffffffffffffffffffffffffffffffffffffiifffffffffffffffffiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiieeeeeeeeeeeeeeeeepppppppppppiieeeeeeeeeeeeeeeeegggggggggggiieeeeeeeeeeeeeeeeeeeeeeeeeeeiieeeeeeeeeeeeeeeeeeeeeeeeeeea
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiepinnnnneeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiieeeeeeeeeeeeeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiipppppppppiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiifffffffffffffffffffffffffiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiieeeeeeeeeeeeeeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aibbbbbeeeeeeeebeeeeeeeeeebbbbbbbbbeeeeeeebeeeeeeeebbbbbeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ibbbbbbeeeeeeeeebeeeeeeeeebeeeeeebeeeeeeebeeeeeeeiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+
+--- legend ---
+. = (unstyled)
+a = fg:accent bg:panel_bg
+b = fg:accent bg:panel_bg bold
+c = fg:green bg:panel_bg
+d = fg:green bg:panel_bg bold
+e = fg:overlay0 bg:panel_bg
+f = fg:overlay0 bg:panel_bg italic
+g = fg:red bg:panel_bg
+h = fg:red bg:panel_bg bold
+i = fg:reset bg:panel_bg
+j = fg:subtext0 bg:panel_bg
+k = fg:surface0 bg:panel_bg
+l = fg:teal bg:panel_bg
+m = fg:teal bg:panel_bg bold
+n = fg:text bg:panel_bg
+o = fg:text bg:panel_bg bold
+p = fg:yellow bg:panel_bg
+q = fg:yellow bg:panel_bg bold

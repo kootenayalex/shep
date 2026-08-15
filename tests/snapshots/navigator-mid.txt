@@ -1,0 +1,122 @@
+# navigator-mid 120x40 · 33 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                                                 workmayt · 1                                          ● 1 blocked
+ spaces                  │ 1       +
+                         │╭──────────────────────────────────────────────┬─────────────────────────────────────────────╮
+ ● workmayt ◆ ⇥2         ││                                              │                                             │
+    ↑2 ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮      │
+       │ / search panes                                                                                       5 │      │
+ ● embe│────────────────────────────────────────────────────────────────────────────────────────────────────────│      │
+   mast│ ▸ → ◆ ◉ workmayt (2)                                                        1 blocked · 1 working      │      │
+       │ ▸     ● emberline (1)                                                       1 done                     │      │
+ ● shep│ ▸     ⠹ shep (2)                                                            1 working                  │      │
+   feat│                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+ new   │                                                                                                        │      │
+───────│                                                                                                        │      │
+ agents│                                                                                                        │      │
+       │                                                                                                        │      │
+ ◉ work│                                                                                                        │      │
+   bloc│                                                                                                        │      │
+       │                                                                                                        │      │
+ ⠹ work│                                                                                                        │      │
+   work│                                                                                                        │      │
+       │                                                                                                        │      │
+ ● embe│                                                                                                        │      │
+   done│                                                                                                        │      │
+       │                                                                                                        │      │
+ ✓ shep│                                                                                                        │      │
+   idle│ workmayt · 2 panes · 1 blocked · 1 working─────────────────────────────────────────────────────────────│      │
+       │ enter switch  / search  b/w/i/d/a states  j/k/↑↓ move  esc close                                       │      │
+ ⠹ shep╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯      │
+   working · codex · 55% ││                                              │                                             │
+                         ││                                              │                                             │
+                        «│╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
+ ctrl+b prefix  w spaces  c tab  ? keys  q detach
+
+--- styles ---
+pbbbbpppppppppppppppppppppppppppppppppppppppppppppppppBBBBBBBBgggrppppppppppppppppppppppppppppppppppppppppppnnnnnnnnnnnp
+iiiiiii..................vllllllllkkkppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp
+.........................vccccccccccccccccccccccccccccccccccccccccccccccccEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+qoqCCCCCCCCqGqzzqqqqqqqqqvc..............................................c.............................................E
+qqqqffqaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......E
+.......agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga......E
+.x.ssssauuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuua......E
+...hhhhalllllllmlmmmmmmmmmmmmllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla......E
+.......agggggggwArrrrrrrrrrrrrAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgggggggggggggggggggggggggggga......E
+.E.ssssagggggggDArrrrrrrrAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgggggggggggggggggggggggggggga......E
+...hhhhappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+hhhh...appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+vvvvvvvappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+iiiiiiiappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+qoqCCCCappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+qqqooooappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.E.ttttappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+...FFFFappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.x.ttttappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+...yyyyappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.......appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+.d.ttttappppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......E
+...eeeeagggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga......E
+.......abbbbbbgggggggggbgggggggggbbbbbbbbbgggggggggbbbbbbgggggggbbbggggggpppppppppppppppppppppppppppppppppppppppa......E
+.E.ttttaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......E
+...FFFFFFFjjjjjjjjjjjjjj.vc..............................................c.............................................E
+.........................vc..............................................c.............................................E
+........................hvccccccccccccccccccccccccccccccccccccccccccccccccEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+pbbbbbbgggggggggbgggggggggbggggggbgggggggbgggggggppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp
+
+--- legend ---
+. = (unstyled)
+A = fg:text bg:panel_bg
+B = fg:text bg:panel_bg bold
+C = fg:text bg:surface_dim bold
+D = fg:yellow bg:panel_bg
+E = fg:yellow bg:reset
+F = fg:yellow bg:reset dim
+G = fg:yellow bg:surface_dim
+a = fg:accent bg:panel_bg
+b = fg:accent bg:panel_bg bold
+c = fg:accent bg:reset
+d = fg:green bg:reset
+e = fg:green bg:reset dim
+f = fg:green bg:surface_dim
+g = fg:overlay0 bg:panel_bg
+h = fg:overlay0 bg:reset
+i = fg:overlay0 bg:reset bold
+j = fg:overlay0 bg:reset dim
+k = fg:overlay1 bg:panel_bg
+l = fg:panel_bg bg:accent
+m = fg:panel_bg bg:accent bold
+n = fg:red bg:panel_bg bold
+o = fg:red bg:surface_dim
+p = fg:reset bg:panel_bg
+q = fg:reset bg:surface_dim
+r = fg:subtext0 bg:panel_bg
+s = fg:subtext0 bg:reset
+t = fg:subtext0 bg:reset bold
+u = fg:surface1 bg:panel_bg
+v = fg:surface_dim bg:reset
+w = fg:teal bg:panel_bg
+x = fg:teal bg:reset
+y = fg:teal bg:reset dim
+z = fg:teal bg:surface_dim

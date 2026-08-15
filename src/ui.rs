@@ -18,6 +18,8 @@ mod release_notes;
 mod scrollbar;
 mod settings;
 mod sidebar;
+#[cfg(test)]
+mod snapshot;
 mod status;
 mod tabs;
 mod text;

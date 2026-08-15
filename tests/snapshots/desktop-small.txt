@@ -1,0 +1,84 @@
+# desktop-small 80x24 · 27 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                             workmayt · 1                      ● 1 blocked
+ spaces                  │ 1       +
+                         │╭──────────────────────────┬─────────────────────────╮
+ ● workmayt ◆ ⇥2        ▕││                          │                         │
+    ↑2 ↓1 20s mem 87%   ▕││                          │                         │
+                        ▕││                          │                         │
+ ● emberline            ▕││                          │                         │
+   master 6m            ▕││                          │                         │
+                        ▕││                          │                         │
+                        ▕││                          │                         │
+                        ▕││                          │                         │
+ new                 menu││                          │                         │
+─────────────────────────││                          │                         │
+ agents           grouped││                          │                         │
+                         ││                          │                         │
+ ◉ workmayt             ▕││                          │                         │
+   blocked · claude · 72▕││                          │                         │
+                        ▕││                          │                         │
+ ⠹ workmayt             ▕││                          │                         │
+   working · opencode · ▕││                          │                         │
+                        ▕││                          │                         │
+ ● emberline            ▕││                          │                         │
+   done · claude · 88%  «│╰──────────────────────────┴─────────────────────────╯
+ ctrl+b prefix  w spaces  c tab  ? keys  q detach
+
+--- styles ---
+naaaannnnnnnnnnnnnnnnnnnnnnnnnnnnnwwwwwwwwdddpnnnnnnnnnnnnnnnnnnnnnnllllllllllln
+fffffff..................sjjjjjjjjiiinnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+.........................sbbbbbbbbbbbbbbbbbbbbbbbbbbbbyyyyyyyyyyyyyyyyyyyyyyyyyy
+omoxxxxxxxxoAovvooooooooesb..........................b.........................y
+ooooccokkohhhokkkkkkkoooesb..........................b.........................y
+........................esb..........................b.........................y
+.t.qqqqqqqqq............esb..........................b.........................y
+...eeeeee.gg............esb..........................b.........................y
+........................ssb..........................b.........................y
+........................ssb..........................b.........................y
+........................ssb..........................b.........................y
+eeee.................eeeesb..........................b.........................y
+ssssssssssssssssssssssssssb..........................b.........................y
+fffffff...........fffffffsb..........................b.........................y
+.........................sb..........................b.........................y
+omoxxxxxxxxoooooooooooooesb..........................b.........................y
+ooommmmmmmhhhhhhhhhhhhhhesb..........................b.........................y
+........................esb..........................b.........................y
+.y.rrrrrrrr.............esb..........................b.........................y
+...zzzzzzzggggggggggggggesb..........................b.........................y
+........................ssb..........................b.........................y
+.t.rrrrrrrrr............ssb..........................b.........................y
+...uuuuggggggggggggggg..esbbbbbbbbbbbbbbbbbbbbbbbbbbbbyyyyyyyyyyyyyyyyyyyyyyyyyy
+naaaaaadddddddddadddddddddaddddddadddddddadddddddnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+
+--- legend ---
+. = (unstyled)
+A = fg:yellow bg:surface_dim
+a = fg:accent bg:panel_bg bold
+b = fg:accent bg:reset
+c = fg:green bg:surface_dim
+d = fg:overlay0 bg:panel_bg
+e = fg:overlay0 bg:reset
+f = fg:overlay0 bg:reset bold
+g = fg:overlay0 bg:reset dim
+h = fg:overlay0 bg:surface_dim dim
+i = fg:overlay1 bg:panel_bg
+j = fg:panel_bg bg:accent
+k = fg:peach bg:surface_dim
+l = fg:red bg:panel_bg bold
+m = fg:red bg:surface_dim
+n = fg:reset bg:panel_bg
+o = fg:reset bg:surface_dim
+p = fg:subtext0 bg:panel_bg
+q = fg:subtext0 bg:reset
+r = fg:subtext0 bg:reset bold
+s = fg:surface_dim bg:reset
+t = fg:teal bg:reset
+u = fg:teal bg:reset dim
+v = fg:teal bg:surface_dim
+w = fg:text bg:panel_bg bold
+x = fg:text bg:surface_dim bold
+y = fg:yellow bg:reset
+z = fg:yellow bg:reset dim
