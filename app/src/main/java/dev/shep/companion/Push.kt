@@ -231,7 +231,7 @@ fun showShepNotification(context: Context, notification: ShepNotification) {
         if (notification.workspace.isNotEmpty()) "$agent · ${notification.workspace}" else agent
     }
     val builder = NotificationCompat.Builder(context, kind.channelId)
-        .setSmallIcon(android.R.drawable.stat_sys_warning)
+        .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(title)
         .setContentText(body)
         .setStyle(NotificationCompat.BigTextStyle().bigText(body))

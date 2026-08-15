@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="shep"
-            android:textColor="#E09A55"
+            android:textColor="@color/shep_accent"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:padding="4dp"
             android:text="↻"
-            android:textColor="#9C948A"
+            android:textColor="@color/shep_overlay_0"
             android:textSize="16sp" />
     </LinearLayout>
 
@@ -39,7 +39,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:text="—"
-        android:textColor="#EDE7DF"
+        android:textColor="@color/shep_text"
         android:textSize="22sp"
         android:textStyle="bold" />
 
@@ -51,6 +51,6 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:text=""
-        android:textColor="#9C948A"
+        android:textColor="@color/shep_overlay_0"
         android:textSize="12sp" />
 </LinearLayout>

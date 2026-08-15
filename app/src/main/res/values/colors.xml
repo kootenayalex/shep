@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The palette, for the parts of the app that are not Compose.
+
+  `ShepPalette` in ui/theme/Color.kt is the source; these are its mirror for
+  the launcher icon, the window theme and the widget, which are all resolved
+  by the platform before any Kotlin runs. The widget used to carry its own
+  near-misses — #1E1B18 against panelBg #1D1813, #9C948A against overlay0
+  #8C8278, #EDE7DF against text #ECE6DF — three colours that were almost but
+  not quite shep's, on the one surface that sits on a home screen next to
+  everything else.
+-->
+<resources>
+    <color name="shep_root_bg">#FF120F0C</color>
+    <color name="shep_panel_bg">#FF1D1813</color>
+    <color name="shep_surface_dim">#FF241E17</color>
+    <color name="shep_surface_0">#FF2E2720</color>
+    <color name="shep_surface_1">#FF3A3128</color>
+    <color name="shep_accent">#FFE09A55</color>
+    <color name="shep_text">#FFECE6DF</color>
+    <color name="shep_subtext_0">#FFC8BFB4</color>
+    <color name="shep_overlay_0">#FF8C8278</color>
+    <color name="shep_red">#FFE66A5E</color>
+</resources>

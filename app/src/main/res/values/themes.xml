@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  shep's own window theme.
+
+  The app ran on `@android:style/Theme.Material.NoActionBar`, so a cold start
+  flashed stock Material chrome — a light window and a purple accent — before
+  Compose drew a single pixel. `windowBackground` is the one property that
+  fixes it: the window is shep-coloured from the first frame.
+
+  The splash screen is the platform's own (androidx.core:core-splashscreen),
+  which on API 31+ *is* the system's launch animation rather than an extra
+  activity, so there is no added time-to-first-frame.
+-->
+<resources>
+    <style name="Theme.Shep" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/shep_panel_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Shep.Main</item>
+    </style>
+
+    <style name="Theme.Shep.Main" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/shep_panel_bg</item>
+        <item name="android:colorBackground">@color/shep_panel_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Dark chrome: the status-bar glyphs stay light against panelBg. -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

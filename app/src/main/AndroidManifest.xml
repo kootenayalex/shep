@@ -11,12 +11,14 @@
     <!-- Bridge is ws:// over the tailnet (WireGuard-encrypted); no public TLS. -->
     <application
         android:label="Shep"
-        android:icon="@android:drawable/ic_menu_manage"
-        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.Shep.Main"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:theme="@style/Theme.Shep"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

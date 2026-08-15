@@ -5,7 +5,7 @@
     <shortcut
         android:shortcutId="new_task"
         android:enabled="true"
-        android:icon="@android:drawable/ic_input_add"
+        android:icon="@drawable/ic_shortcut_new_task"
         android:shortcutShortLabel="@string/shortcut_new_task"
         android:shortcutLongLabel="@string/shortcut_new_task_long">
         <intent

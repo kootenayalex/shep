@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dev.shep.companion.screens.BoardScreen
 import dev.shep.companion.screens.MemoryScreen
 import dev.shep.companion.screens.PairingScreen
@@ -69,6 +70,13 @@ class MainActivity : ComponentActivity() {
     private val deepLinkNewTask = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before super: this is what swaps Theme.Shep (the splash) for
+        // Theme.Shep.Main. Without the call the activity keeps the splash
+        // theme for its whole life, and the splash theme's window background
+        // is the platform default — which is white, and shows through
+        // everywhere Compose does not paint: behind the status bar, and in
+        // the recents card.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         deepLinkPane.value = paneFromIntent(intent)
         deepLinkNewTask.value = newTaskFromIntent(intent)
