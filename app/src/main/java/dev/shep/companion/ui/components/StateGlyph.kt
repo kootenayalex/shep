@@ -49,16 +49,17 @@ fun StateGlyph(
 }
 
 /**
- * The desktop's spinner cadence: one frame every 125ms.
+ * One frame every 180ms — about two-thirds of a second per turn.
  *
- * `spinnerFrame` divides by eight, matching the TUI's 60fps tick, so stepping
- * by eight here advances exactly one frame per step and both surfaces rotate
- * at the same speed.
+ * `spinnerFrame` divides by eight, so stepping by eight advances exactly one
+ * frame. The desktop runs ten braille frames at 125ms; four half-circles at
+ * that rate would spin twice a second, which reads as agitation rather than
+ * as work getting done.
  */
 @Composable
 private fun rememberSpinnerTick(): State<Int> = produceState(0) {
     while (true) {
-        delay(125)
+        delay(180)
         value += 8
     }
 }

@@ -29,7 +29,7 @@ class ShepSemanticTest {
         }
         // Working animates, so pin the ink and the first frame separately.
         val working = ShepSemantic.agent("working", tick = 0)
-        assertEquals("⠋", working.glyph)
+        assertEquals("◐", working.glyph)
         assertEquals(ShepPalette.yellow, working.color)
     }
 
@@ -66,13 +66,13 @@ class ShepSemanticTest {
 
     @Test
     fun `the spinner rotates at the desktop's cadence`() {
-        // spinnerFrame divides by eight, matching the TUI's 60fps tick, so eight
-        // steps is one frame and eighty is a full turn.
+        // spinnerFrame divides by eight, so eight steps is one frame and thirty-two
+        // is a full turn of the four-frame circle.
         assertEquals(spinnerFrame(0), spinnerFrame(7))
         assertNotEquals(spinnerFrame(0), spinnerFrame(8))
-        assertEquals(spinnerFrame(0), spinnerFrame(80))
+        assertEquals(spinnerFrame(0), spinnerFrame(32))
         // Negative ticks cannot happen, but modulo on a negative would crash.
-        assertEquals(spinnerFrame(0), spinnerFrame(-80))
+        assertEquals(spinnerFrame(0), spinnerFrame(-32))
     }
 
     @Test

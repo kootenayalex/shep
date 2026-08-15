@@ -23,14 +23,24 @@ data class StateAppearance(
 )
 
 /**
- * Braille spinner frames, matching `SPINNERS` in `src/ui.rs`.
+ * Working, as a filling circle.
  *
- * The same rotation on both surfaces means a working agent looks like the same
- * agent whichever screen you are looking at.
+ * The desktop spins braille, and this deliberately does not. Two reasons, and
+ * the first is not cosmetic: a terminal cell must be exactly one column, and
+ * `◐`/`◑` are East-Asian-Ambiguous while `◓`/`◒` are Neutral — on a terminal
+ * configured for wide ambiguous glyphs that set would change width every frame
+ * and shift the whole row. Braille is uniformly Neutral, so it is the correct
+ * choice there. A phone has no column grid, so the constraint does not apply.
+ *
+ * The second reason is that braille loses at phone sizes. At 13sp those dots
+ * render as a scatter of specks beside a solid `●`, which made the one mark
+ * that says "this is alive" the faintest thing on the card. A half-filled
+ * circle carries the same optical weight as `●` and `○`, so the five states
+ * finally read as one family: ring, filling, full, empty, speck.
  */
-private val SPINNER = listOf("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+private val SPINNER = listOf("◐", "◓", "◑", "◒")
 
-/** The frame for an animation tick. Divides by 8 for ~8 updates/sec, as the desktop does. */
+/** The frame for an animation tick. Divides by 8, matching the desktop's tick math. */
 fun spinnerFrame(tick: Int): String = SPINNER[(tick / 8).mod(SPINNER.size)]
 
 object ShepSemantic {
