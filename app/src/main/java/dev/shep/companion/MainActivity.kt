@@ -227,7 +227,12 @@ fun ShepApp(
         }
     }
 
-    Surface(Modifier.fillMaxSize().statusBarsPadding(), color = ShepColors.bg) {
+    // Nav bar as well as status bar: API 35 draws edge-to-edge whether the app
+    // asks or not, and without this the gesture pill sits on top of the key bar.
+    Surface(
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
+        color = ShepColors.bg,
+    ) {
         if (!paired) {
             if (firstConnect && connectError == null) {
                 ReconnectingScreen(null, label = "connecting…")

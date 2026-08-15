@@ -447,3 +447,98 @@ fun parseTree(result: JSONObject): List<SpaceNode> {
     }
     return spaces
 }
+
+// --------------------------------------------------------------------------
+// Transcript — the recorded view of a pane
+// --------------------------------------------------------------------------
+
+/** One tool the agent reached for, with what came back. */
+data class ToolCall(
+    val name: String,
+    val summary: String,
+    /** null when the call is still outstanding — the agent is mid-turn. */
+    val ok: Boolean?,
+    val preview: String,
+)
+
+/**
+ * A piece of an assistant reply, in the order it happened.
+ *
+ * Prose and tool calls interleave — "I'll check the logs", run Bash, "found
+ * it" — and a reply rendered as a paragraph followed by a list of tools loses
+ * which sentence each call belongs to.
+ */
+sealed interface Block {
+    data class Prose(val text: String) : Block
+    data class Tool(val call: ToolCall) : Block
+}
+
+data class Turn(
+    val role: String,
+    val ts: String,
+    val text: String,
+    val thinking: String,
+    val blocks: List<Block>,
+)
+
+/**
+ * A pane's conversation.
+ *
+ * [source] is how sure the server is that this is the right session:
+ * `reported` (the agent said so), `only` (nothing else has run in this
+ * directory), or `matched` (fingerprinted against the pane's screen). The UI
+ * shows the difference — a matched transcript is a good guess, not a fact.
+ */
+data class Transcript(
+    val sessionId: String?,
+    val source: String,
+    val truncated: Boolean,
+    val turns: List<Turn>,
+)
+
+fun parseTranscript(result: JSONObject): Transcript? {
+    val t = result.optJSONObject("transcript") ?: return null
+    val arr = t.optJSONArray("turns")
+    val turns = mutableListOf<Turn>()
+    for (i in 0 until (arr?.length() ?: 0)) {
+        val turn = arr?.optJSONObject(i) ?: continue
+        val blocksArr = turn.optJSONArray("blocks")
+        val blocks = mutableListOf<Block>()
+        for (j in 0 until (blocksArr?.length() ?: 0)) {
+            val block = blocksArr?.optJSONObject(j) ?: continue
+            when (block.optString("kind")) {
+                "text" -> block.optString("text")
+                    .takeIf { it.isNotBlank() }
+                    ?.let { blocks.add(Block.Prose(it)) }
+                "tool" -> {
+                    val res = if (block.isNull("result")) null else block.optJSONObject("result")
+                    blocks.add(
+                        Block.Tool(
+                            ToolCall(
+                                name = block.optString("name", "tool"),
+                                summary = block.optString("summary"),
+                                ok = res?.optBoolean("ok"),
+                                preview = res?.optString("preview").orEmpty(),
+                            )
+                        )
+                    )
+                }
+            }
+        }
+        turns.add(
+            Turn(
+                role = turn.optString("role", "assistant"),
+                ts = turn.optString("ts"),
+                text = turn.optString("text"),
+                thinking = turn.optString("thinking"),
+                blocks = blocks,
+            )
+        )
+    }
+    return Transcript(
+        sessionId = t.optStringOrNull("session_id"),
+        source = t.optString("source", "matched"),
+        truncated = t.optBoolean("truncated"),
+        turns = turns,
+    )
+}

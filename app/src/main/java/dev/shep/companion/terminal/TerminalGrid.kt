@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,13 @@ private class Run(
  * the whole canvas, so pinching is free and never re-measures text. The default
  * scale fits the pane's full width — the point of the companion is to mirror
  * what the desktop shows, not to reflow it.
+ *
+ * The viewport *follows the cursor* unless the user has panned away. That is
+ * what makes the pane usable with the keyboard up: the IME halves the visible
+ * height, and without following, the line being typed sits below the fold and
+ * the only way back to it is to zoom all the way out. Opening or closing the
+ * keyboard also resumes following, so the answer to "where did my prompt go" is
+ * always "on screen".
  */
 @OptIn(ExperimentalTextApi::class)
 @Composable
@@ -75,7 +83,9 @@ fun TerminalGrid(
     val cellH = cell.size.height.toFloat().coerceAtLeast(1f)
 
     var scale by remember { mutableFloatStateOf(0f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    // Null means "following the cursor". A pan pins it; the viewport changing
+    // size (the keyboard) releases it again.
+    var panned by remember { mutableStateOf<Offset?>(null) }
 
     BoxWithConstraints(modifier) {
         val viewW = constraints.maxWidth.toFloat()
@@ -86,6 +96,10 @@ fun TerminalGrid(
         val fitScale = if (gridW > 0f) viewW / gridW else 1f
         val effective = if (scale <= 0f) fitScale else scale
 
+        // The IME opening or closing is the case this whole mechanism exists
+        // for, and it arrives as a height change.
+        LaunchedEffect(viewH) { panned = null }
+
         val description = remember(grid.revision.intValue) { grid.plainText() }
 
         Canvas(
@@ -95,25 +109,26 @@ fun TerminalGrid(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onTap = { onTap() },
-                        // Snap between "see everything" and native size.
+                        // Snap between "see everything" and native size, and
+                        // hand the viewport back to the cursor either way.
                         onDoubleTap = {
                             scale = if (scale > fitScale * 1.05f) fitScale else 1f
-                            offset = Offset.Zero
+                            panned = null
                         },
                     )
                 }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
-                        val next = (if (scale <= 0f) fitScale else scale) * zoom
-                        scale = next.coerceIn(fitScale.coerceAtMost(1f), 4f)
-                        val scaledW = gridW * scale
-                        val scaledH = gridH * scale
-                        // Clamp so the grid can never be dragged off-screen.
-                        val maxX = max(0f, scaledW - viewW)
-                        val maxY = max(0f, scaledH - viewH)
-                        offset = Offset(
-                            (offset.x + pan.x).coerceIn(-maxX, 0f),
-                            (offset.y + pan.y).coerceIn(-maxY, 0f),
+                        val before = if (scale <= 0f) fitScale else scale
+                        scale = (before * zoom).coerceIn(fitScale.coerceAtMost(1f), 4f)
+                        // Start from wherever the follower had us, so grabbing
+                        // the grid never makes it jump.
+                        val from = panned ?: followOffset(
+                            grid.cursor, cellW, cellH, scale, gridW, gridH, viewW, viewH,
+                        )
+                        panned = clampOffset(
+                            Offset(from.x + pan.x, from.y + pan.y),
+                            gridW * scale, gridH * scale, viewW, viewH,
                         )
                     }
                 },
@@ -123,6 +138,13 @@ fun TerminalGrid(
             @Suppress("UNUSED_EXPRESSION")
             grid.revision.intValue
             if (grid.isEmpty) return@Canvas
+
+            // Resolved per frame rather than in composition: following has to
+            // track the cursor at terminal update rates, and recomposing that
+            // often would undo the whole flat-array design.
+            val offset = panned?.let {
+                clampOffset(it, gridW * effective, gridH * effective, viewW, viewH)
+            } ?: followOffset(grid.cursor, cellW, cellH, effective, gridW, gridH, viewW, viewH)
 
             // Only draw rows that can actually land on screen. Beyond the perf
             // win, drawing a row far below the viewport asks Compose for a
@@ -140,6 +162,48 @@ fun TerminalGrid(
             }
         }
     }
+}
+
+/** Keep the grid inside the viewport; never let it be dragged off-screen. */
+internal fun clampOffset(
+    offset: Offset,
+    scaledW: Float,
+    scaledH: Float,
+    viewW: Float,
+    viewH: Float,
+): Offset = Offset(
+    offset.x.coerceIn(-max(0f, scaledW - viewW), 0f),
+    offset.y.coerceIn(-max(0f, scaledH - viewH), 0f),
+)
+
+/**
+ * Where to park the viewport so the cursor is visible.
+ *
+ * Anchors on the cursor's *row* with a couple of rows of headroom below it —
+ * for an agent TUI the cursor sits in the input box, so this keeps what you are
+ * typing on screen along with as much of the conversation above it as fits.
+ * When the whole grid fits, this is the top-left corner, i.e. the old
+ * behaviour.
+ */
+internal fun followOffset(
+    cursor: Cursor?,
+    cellW: Float,
+    cellH: Float,
+    scale: Float,
+    gridW: Float,
+    gridH: Float,
+    viewW: Float,
+    viewH: Float,
+): Offset {
+    val scaledW = gridW * scale
+    val scaledH = gridH * scale
+    if (cursor == null) return clampOffset(Offset.Zero, scaledW, scaledH, viewW, viewH)
+    val rowSpan = cellH * scale
+    val colSpan = cellW * scale
+    // Two rows of breathing room below the cursor, clamped by what exists.
+    val wantY = (cursor.y + 1) * rowSpan + rowSpan * 2 - viewH
+    val wantX = (cursor.x + 1) * colSpan + colSpan * 4 - viewW
+    return clampOffset(Offset(-max(0f, wantX), -max(0f, wantY)), scaledW, scaledH, viewW, viewH)
 }
 
 @OptIn(ExperimentalTextApi::class)

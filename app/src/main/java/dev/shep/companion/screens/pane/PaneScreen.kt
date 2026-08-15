@@ -36,6 +36,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.shep.companion.AgentRow
 import dev.shep.companion.BridgeClient
+import dev.shep.companion.Transcript
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
 import dev.shep.companion.statusColorFor
@@ -53,6 +54,15 @@ import org.json.JSONObject
 
 /** Live keystrokes, or compose-and-queue for when the agent is busy. */
 enum class InputMode { Stream, Queue }
+
+/**
+ * The pane's screen as it is right now, or the conversation that produced it.
+ *
+ * Live mirrors the pty — right for driving an agent. Recorded reads the agent's
+ * own session log and lays it out as a chat — right for catching up on what it
+ * did while you were away.
+ */
+enum class OutputMode { Live, Recorded }
 
 /**
  * A live pane: the terminal as it looks on the desktop, and a way to type into
@@ -74,9 +84,13 @@ fun PaneScreen(
     var notice by remember { mutableStateOf<String?>(null) }
     var ended by remember { mutableStateOf<String?>(null) }
     var mode by remember { mutableStateOf(InputMode.Stream) }
+    var output by remember { mutableStateOf(OutputMode.Live) }
     var composer by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     var streaming by remember { mutableStateOf(false) }
+    var transcript by remember(row.paneId) { mutableStateOf<Transcript?>(null) }
+    var transcriptError by remember(row.paneId) { mutableStateOf<String?>(null) }
+    var transcriptLoading by remember(row.paneId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Held so the key bar and the IME can both reach the open channel.
@@ -102,6 +116,35 @@ fun PaneScreen(
         BackHandler { showHistory = false }
         HistoryView(client, row, onBack = { showHistory = false })
         return
+    }
+
+    // Only polled while the recorded view is on screen: it is a whole-file read
+    // on the other end, and the live stream is the expensive thing to keep warm.
+    LaunchedEffect(row.paneId, client, output, active) {
+        if (output != OutputMode.Recorded || !active) return@LaunchedEffect
+        transcriptLoading = transcript == null
+        while (true) {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    client.call(
+                        "pane.transcript",
+                        JSONObject().put("target", row.paneId).put("limit", 200),
+                    )
+                }
+            }
+            transcriptLoading = false
+            result
+                .onSuccess {
+                    transcript = dev.shep.companion.parseTranscript(it)
+                    transcriptError = null
+                }
+                .onFailure {
+                    // Keep whatever we already showed; a poll failing is not a
+                    // reason to blank the conversation.
+                    if (transcript == null) transcriptError = it.message ?: "no transcript"
+                }
+            kotlinx.coroutines.delay(5000)
+        }
     }
 
     LaunchedEffect(row.paneId, client, active) {
@@ -147,12 +190,32 @@ fun PaneScreen(
     Column(Modifier.fillMaxSize().background(ShepPalette.panelBg).imePadding()) {
         PaneTitleBar(row, status, onBack = onBack, onReview = onReview, onHistory = { showHistory = true })
 
+        OutputToggle(output) {
+            output = it
+            // The two halves pair by default: a chat wants a composer, a live
+            // terminal wants keystrokes. The input toggle stays right there, so
+            // this is a default rather than a decision.
+            mode = if (it == OutputMode.Recorded) InputMode.Queue else InputMode.Stream
+        }
+
         Box(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 12.dp),
         ) {
+            if (output == OutputMode.Recorded) {
+                PaneFrame(agent = row.agent, state = status, blocked = status == "blocked") {
+                    TranscriptView(
+                        transcript = transcript,
+                        error = transcriptError,
+                        loading = transcriptLoading,
+                        onRawScrollback = { showHistory = true },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                return@Box
+            }
             PaneFrame(agent = row.agent, state = status, blocked = status == "blocked") {
                 Box(Modifier.fillMaxSize()) {
                     val context = androidx.compose.ui.platform.LocalContext.current
@@ -288,8 +351,15 @@ private fun PaneFrame(
     }
 }
 
+/**
+ * Two toggles, one shape.
+ *
+ * Output and input each have a live mode and a considered one, and they read as
+ * a pair; the `out`/`in` labels are what stop two chips called "live" from
+ * being ambiguous.
+ */
 @Composable
-private fun ModeToggle(mode: InputMode, onMode: (InputMode) -> Unit) {
+private fun ToggleRow(label: String, content: @Composable () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -298,20 +368,37 @@ private fun ModeToggle(mode: InputMode, onMode: (InputMode) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ModeChip("live", mode == InputMode.Stream) { onMode(InputMode.Stream) }
-        ModeChip("⇥ queue", mode == InputMode.Queue) { onMode(InputMode.Queue) }
+        Text(label, style = ShepType.viewTitle)
+        content()
     }
 }
 
 @Composable
-private fun ModeChip(label: String, on: Boolean, onClick: () -> Unit) {
+private fun OutputToggle(mode: OutputMode, onMode: (OutputMode) -> Unit) {
+    ToggleRow("out") {
+        ModeChip("live", mode == OutputMode.Live, "out") { onMode(OutputMode.Live) }
+        ModeChip("recorded", mode == OutputMode.Recorded, "out") { onMode(OutputMode.Recorded) }
+    }
+}
+
+@Composable
+private fun ModeToggle(mode: InputMode, onMode: (InputMode) -> Unit) {
+    ToggleRow("in") {
+        ModeChip("live", mode == InputMode.Stream, "in") { onMode(InputMode.Stream) }
+        ModeChip("⇥ queue", mode == InputMode.Queue, "in") { onMode(InputMode.Queue) }
+    }
+}
+
+@Composable
+private fun ModeChip(label: String, on: Boolean, side: String = "in", onClick: () -> Unit) {
     Text(
         label,
         style = ShepType.chip.copy(
             color = if (on) ShepPalette.panelBg else ShepPalette.subtext0,
         ),
         modifier = Modifier
-            .testTag("mode-$label")
+            // Both rows have a chip called "live"; the side keeps the tags apart.
+            .testTag("mode-$side-$label")
             .background(
                 if (on) ShepPalette.accent else ShepPalette.surface0,
                 RoundedCornerShape(999.dp),
