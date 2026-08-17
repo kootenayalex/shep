@@ -83,10 +83,9 @@ fun TerminalGrid(
     val style = remember(baseFontSizeSp) {
         TextStyle(fontFamily = JetBrainsMono, fontSize = baseFontSizeSp.sp)
     }
-    // Monospace: one measurement generalizes to every cell.
-    val cell = remember(style) { measurer.measure("M", style) }
-    val cellW = cell.size.width.toFloat().coerceAtLeast(1f)
-    val cellH = cell.size.height.toFloat().coerceAtLeast(1f)
+    val cell = rememberTerminalCell(baseFontSizeSp)
+    val cellW = cell.width
+    val cellH = cell.height
 
     var scale by remember { mutableFloatStateOf(0f) }
     // Null means "following the cursor". A pan pins it; the viewport changing
@@ -186,6 +185,52 @@ fun TerminalGrid(
             }
         }
     }
+}
+
+/**
+ * One terminal cell, in pixels, at [baseFontSizeSp].
+ *
+ * Monospace, so one measurement generalizes to every cell. Exposed rather than
+ * kept inside [TerminalGrid] because the layout *around* the grid needs it too:
+ * a box that wants to be exactly as tall as the terminal has to measure with
+ * the same ruler the terminal draws with.
+ */
+@OptIn(ExperimentalTextApi::class)
+@Composable
+internal fun rememberTerminalCell(baseFontSizeSp: Float = ShepType.TERMINAL_BASE_SP): Size {
+    val measurer = rememberTextMeasurer()
+    val style = remember(baseFontSizeSp) {
+        TextStyle(fontFamily = JetBrainsMono, fontSize = baseFontSizeSp.sp)
+    }
+    return remember(style) {
+        val cell = measurer.measure("M", style)
+        Size(
+            cell.size.width.toFloat().coerceAtLeast(1f),
+            cell.size.height.toFloat().coerceAtLeast(1f),
+        )
+    }
+}
+
+/**
+ * How tall a `cols`×`rows` grid draws once it has been fitted to [width].
+ *
+ * Fitting to the width is what mirroring the desktop means, and it fixes the
+ * scale — so the height is only the grid's shape carried across, and a terminal
+ * is much wider than it is tall while a phone is the other way round. A 167×54
+ * pane on a phone comes out barely half as tall as the space available, which
+ * is the pane's shape rather than a layout that failed to fill.
+ *
+ * Zero when nothing has been streamed yet, which is not a height to size to.
+ */
+internal fun fittedGridHeight(
+    cols: Int,
+    rows: Int,
+    cellW: Float,
+    cellH: Float,
+    width: Float,
+): Float {
+    if (cols <= 0 || rows <= 0 || cellW <= 0f || width <= 0f) return 0f
+    return rows * cellH * (width / (cols * cellW))
 }
 
 /**

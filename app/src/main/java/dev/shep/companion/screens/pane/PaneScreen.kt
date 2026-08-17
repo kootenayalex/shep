@@ -6,11 +6,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -45,6 +48,8 @@ import dev.shep.companion.terminal.KeyBar
 import dev.shep.companion.terminal.ShepInputView
 import dev.shep.companion.terminal.TerminalGrid
 import dev.shep.companion.terminal.TerminalKey
+import dev.shep.companion.terminal.fittedGridHeight
+import dev.shep.companion.terminal.rememberTerminalCell
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.StateGlyph
@@ -94,6 +99,9 @@ fun PaneScreen(
     onBack: () -> Unit,
 ) {
     val grid = remember(row.paneId) { GridState() }
+    // Measured here as well as inside the grid, because the frame around it is
+    // sized to what the grid will draw.
+    val cellSize = rememberTerminalCell()
     var status by remember { mutableStateOf(row.status) }
     var notice by remember { mutableStateOf<String?>(null) }
     var ended by remember { mutableStateOf<String?>(null) }
@@ -248,7 +256,7 @@ fun PaneScreen(
             mode = if (it == OutputMode.Recorded) InputMode.Queue else InputMode.Stream
         }
 
-        Box(
+        BoxWithConstraints(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -264,9 +272,33 @@ fun PaneScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                return@Box
+                return@BoxWithConstraints
             }
-            PaneFrame(agent = row.agent, state = status, blocked = status == "blocked") {
+            // The frame is only as tall as the terminal actually draws, and it
+            // sits against the keys. Fitted to the width — which is what
+            // mirroring the desktop means — a 167x54 pane fills a little over
+            // half the height a phone offers, and a border drawn around the
+            // empty rest reads as a window that failed rather than as a pane
+            // whose shape is simply not the phone's. With the keyboard up the
+            // terminal is the taller of the two and this changes nothing.
+            val inset = ShepSpace.small * 2
+            val fitted = with(LocalDensity.current) {
+                fittedGridHeight(
+                    grid.cols, grid.rows, cellSize.width, cellSize.height,
+                    (maxWidth - inset).toPx(),
+                ).toDp()
+            }
+            val frameHeight =
+                if (fitted.value <= 0f) maxHeight else (fitted + inset).coerceAtMost(maxHeight)
+            PaneFrame(
+                agent = row.agent,
+                state = status,
+                blocked = status == "blocked",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(frameHeight)
+                    .align(Alignment.BottomCenter),
+            ) {
                 Box(Modifier.fillMaxSize()) {
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val inputView = remember(context) {
@@ -378,10 +410,11 @@ private fun PaneFrame(
     agent: String,
     state: String,
     blocked: Boolean,
+    modifier: Modifier = Modifier.fillMaxSize(),
     content: @Composable () -> Unit,
 ) {
     val ring = if (blocked) ShepPalette.red else ShepPalette.accent
-    Box(Modifier.fillMaxSize()) {
+    Box(modifier) {
         Box(
             Modifier
                 .fillMaxSize()
