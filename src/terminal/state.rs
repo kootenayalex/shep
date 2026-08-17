@@ -91,9 +91,10 @@ pub struct TerminalState {
     /// via a manifest value-extractor (e.g. claude's context-remaining %).
     /// Neutral runtime fact; `None` when the agent exposes no such value.
     pub context_percent: Option<u8>,
-    /// Best-effort last line of real screen content, for "what is it saying"
-    /// display. Neutral runtime fact; `None` when nothing has been observed.
-    pub activity_line: Option<String>,
+    /// Best-effort last lines of real screen content, in reading order, for
+    /// "what is it saying" display. Neutral runtime fact; empty when nothing
+    /// has been observed.
+    pub activity_lines: Vec<String>,
     pub last_agent_state_change_seq: Option<u64>,
     /// Wall-clock instant of the most recent effective agent-state change.
     /// Server-side runtime fact; the sidebar renders it as a short "age" hint.
@@ -125,7 +126,7 @@ impl TerminalState {
             metadata_report_sequences: HashMap::new(),
             state: AgentState::Unknown,
             context_percent: None,
-            activity_line: None,
+            activity_lines: Vec::new(),
             last_agent_state_change_seq: None,
             last_agent_state_change_at: None,
             revision: 0,
@@ -146,13 +147,13 @@ impl TerminalState {
         true
     }
 
-    /// Update the best-effort activity line. Returns whether it changed.
+    /// Update the best-effort activity lines. Returns whether they changed.
     /// Ephemeral runtime fact — not part of session persistence.
-    pub fn set_activity_line(&mut self, line: Option<String>) -> bool {
-        if self.activity_line == line {
+    pub fn set_activity_lines(&mut self, lines: Vec<String>) -> bool {
+        if self.activity_lines == lines {
             return false;
         }
-        self.activity_line = line;
+        self.activity_lines = lines;
         true
     }
 

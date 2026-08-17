@@ -263,33 +263,92 @@ pub fn extract_context_percent(
     )
 }
 
-/// The last line of real content on the pane's screen — a one-line answer to
-/// "what is this agent actually saying right now".
+/// How many lines of screen content shep publishes as a pane's activity.
 ///
-/// This is deliberately dumb: it takes the bottom-most line that carries
-/// letters or digits. Agent TUIs frame their input box in box-drawing runes and
-/// pad with blanks, so a naive "last non-empty line" would almost always return
-/// `╰────────╯`. It is a display hint only — never detection evidence, and
-/// never a substitute for an agent's own reported status.
+/// Three: enough for a phone row to show what an agent is doing rather than
+/// only the last thing it printed, and few enough that a session's worth of
+/// them is a screenful rather than a transcript.
+pub const ACTIVITY_LINES: usize = 3;
+
+/// How many rows at the bottom of a screen can be the agent's own chrome.
+///
+/// A rule inside this window is the input box's border or the separator above
+/// a status bar. One further up is content — a table, or a divider the agent
+/// drew in its own output — and cutting there would throw away the answer.
+const CHROME_WINDOW: usize = 8;
+
+/// The last lines of real content on the pane's screen — an answer to "what is
+/// this agent actually saying right now", in reading order.
+///
+/// Agent TUIs frame their input box in box-drawing runes, pad with blanks, and
+/// print a hint bar underneath it, so the bottom-most line with letters in it
+/// is almost always the hint — every claude pane reported `bypass permissions
+/// on (shift+tab to cycle)`, which says nothing about what the agent is doing.
+/// So the input box and everything below it is cut first, and the lines are
+/// taken from what is left. It is a display hint only — never detection
+/// evidence, and never a substitute for an agent's own reported status.
 // Called only from the unix-only screen-detection task; unused on Windows.
 #[cfg_attr(not(unix), allow(dead_code))]
-pub fn extract_activity_line(screen_content: &str) -> Option<String> {
-    screen_content
-        .lines()
+pub fn extract_activity_lines(screen_content: &str, max: usize) -> Vec<String> {
+    let mut lines: Vec<&str> = screen_content.lines().map(str::trim).collect();
+    while lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    let chrome_from = lines.len().saturating_sub(CHROME_WINDOW);
+    if let Some(cut) = (chrome_from..lines.len()).find(|&idx| is_rule(lines[idx])) {
+        // Only if there is something left to say. A short screen whose every
+        // content line sits below its first rule is better answered with the
+        // chrome than with nothing.
+        if lines[..cut].iter().any(|line| has_text(line)) {
+            lines.truncate(cut);
+        }
+    }
+    let mut collected: Vec<String> = lines
+        .iter()
         .rev()
-        .map(str::trim)
-        .find(|line| line.chars().any(|c| c.is_alphanumeric()))
+        .filter(|line| has_text(line))
+        .take(max)
         .map(|line| {
-            // Strip leading decoration — the box-drawing rune a bordered input
-            // line starts with, a prompt caret, a spinner glyph. Enumerating
-            // the runes is a losing game across agents, so drop anything that
-            // is not alphanumeric until the text starts.
+            // Strip leading decoration — the box-drawing rune a bordered line
+            // starts with, a prompt caret, a bullet, a spinner glyph.
+            // Enumerating the runes is a losing game across agents, so drop
+            // anything that is not alphanumeric until the text starts.
             line.trim_start_matches(|c: char| !c.is_alphanumeric())
                 .trim()
                 .chars()
                 .take(200)
                 .collect()
         })
+        .collect();
+    collected.reverse();
+    collected
+}
+
+fn has_text(line: &str) -> bool {
+    line.chars().any(|c| c.is_alphanumeric())
+}
+
+/// A frame line: a run of box-drawing runes long enough to be a border rather
+/// than punctuation.
+///
+/// It cannot require the line to be textless. claude bakes a label into the top
+/// border of its input box — `───────── clear-chat-history ──` — and reading
+/// that as content is how `clear-chat-history ──` ended up quoted as an agent's
+/// most recent line.
+fn is_rule(line: &str) -> bool {
+    const FRAME_RUN: usize = 4;
+    let mut run = 0usize;
+    for c in line.chars() {
+        if matches!(c, '\u{2500}'..='\u{257f}') {
+            run += 1;
+            if run >= FRAME_RUN {
+                return true;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    false
 }
 
 pub(crate) fn full_lifecycle_hook_authority(source: &str, agent_label: &str) -> bool {
@@ -624,6 +683,11 @@ fn is_generic_runtime_or_shell(name: &str) -> bool {
 mod tests {
     use super::*;
 
+    /// The single-line case, which several of these assert on directly.
+    fn extract_activity_line(screen_content: &str) -> Option<String> {
+        extract_activity_lines(screen_content, 1).pop()
+    }
+
     #[test]
     fn activity_line_skips_the_input_box_frame() {
         // The realistic failure: a naive "last non-empty line" returns the
@@ -667,6 +731,98 @@ mod tests {
         let long = "x".repeat(500);
         let line = extract_activity_line(&long).expect("content");
         assert_eq!(line.chars().count(), 200);
+    }
+
+    /// A real claude screen, trimmed. Every pane on the phone said the same
+    /// thing — `bypass permissions on (shift+tab to cycle)` — because that hint
+    /// bar is the bottom-most line with letters in it on every claude pane in
+    /// the session. It is chrome, and it is the same chrome on all of them.
+    #[test]
+    fn activity_lines_skip_the_hint_bar_under_the_input_box() {
+        let rule = "\u{2500}".repeat(40);
+        let screen = format!(
+            "Your 52 files remain the complete series minus this one program.\n\
+             \u{273b} Crunched for 6m 41s\n\
+             \u{203b} recap: retrying the Internet Archive once it is reachable\n\
+             {rule}\n\
+             \u{276f}\n\
+             {rule}\n  \
+             \u{23f5}\u{23f5} bypass permissions on (shift+tab to cycle) \u{b7} \u{2190} for agents\n"
+        );
+        assert_eq!(
+            extract_activity_lines(&screen, 3),
+            vec![
+                "Your 52 files remain the complete series minus this one program.".to_string(),
+                "Crunched for 6m 41s".to_string(),
+                "recap: retrying the Internet Archive once it is reachable".to_string(),
+            ]
+        );
+    }
+
+    /// claude bakes the branch name into the *top* border of its input box.
+    /// Requiring a rule to be textless stopped the cut at the bottom border
+    /// instead, so the phone quoted `clear-chat-history ──` as what the agent
+    /// was saying. A configured status line above the box is not chrome we can
+    /// name — it is arbitrary user text — so it stays.
+    #[test]
+    fn a_labelled_border_is_still_the_input_box() {
+        let rule = "\u{2500}".repeat(40);
+        let screen = format!(
+            "\u{2726} Wiring oracles into CI (2h 51m \u{b7} \u{2193} 508.8k tokens)\n  \
+             \u{2ffb} \u{25fc} Oracles in required CI, demo seed, org export\n     \
+             \u{2026} +4 completed\n                 \
+             11% until auto-compact \u{b7} \u{25ce} /goal active (2h)\n\
+             {rule} clear-chat-history \u{2500}\u{2500}\n\
+             \u{276f}\n\
+             {rule}\n  \
+             \u{23f5}\u{23f5} bypass permissions on (shift+tab to cycle)\n"
+        );
+        assert_eq!(
+            extract_activity_lines(&screen, 3),
+            vec![
+                "Oracles in required CI, demo seed, org export".to_string(),
+                // The leading `… +` goes with the rest of the decoration.
+                "4 completed".to_string(),
+                "11% until auto-compact \u{b7} \u{25ce} /goal active (2h)".to_string(),
+            ],
+            "nothing from the box down survives"
+        );
+    }
+
+    /// Reading order, so a surface with three rows renders them the way they
+    /// appeared on the screen rather than upside down.
+    #[test]
+    fn activity_lines_come_back_oldest_first() {
+        let screen = "first\nsecond\nthird\nfourth\n";
+        assert_eq!(
+            extract_activity_lines(screen, 3),
+            vec![
+                "second".to_string(),
+                "third".to_string(),
+                "fourth".to_string()
+            ]
+        );
+        assert_eq!(extract_activity_line(screen).as_deref(), Some("fourth"));
+    }
+
+    /// A divider in the agent's own output is content, not chrome — cutting at
+    /// the first rule anywhere on the screen would throw the answer away.
+    #[test]
+    fn a_rule_far_above_the_bottom_is_not_chrome() {
+        let rule = "\u{2500}".repeat(20);
+        let screen = format!(
+            "{rule}\nline a\nline b\nline c\nline d\nline e\nline f\nline g\nline h\nline i\n"
+        );
+        assert_eq!(
+            extract_activity_lines(&screen, 2),
+            vec!["line h".to_string(), "line i".to_string()]
+        );
+    }
+
+    #[test]
+    fn activity_lines_are_empty_without_real_content() {
+        assert!(extract_activity_lines("", 3).is_empty());
+        assert!(extract_activity_lines("   \n\u{2500}\u{2500}\u{2500}\n", 3).is_empty());
     }
 
     fn foreground_process(

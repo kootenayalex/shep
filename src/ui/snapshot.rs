@@ -332,7 +332,7 @@ mod fixture {
         terminal.state = f.state;
         terminal.agent_name = Some(f.name.to_string());
         terminal.cwd = PathBuf::from(f.cwd);
-        terminal.activity_line = f.activity.map(str::to_string);
+        terminal.activity_lines = f.activity.map(str::to_string).into_iter().collect();
         terminal.context_percent = f.context;
         terminal.last_agent_state_change_seq = Some(f.seq);
         terminal.last_agent_state_change_at =

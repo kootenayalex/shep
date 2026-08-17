@@ -110,6 +110,8 @@ pub(crate) struct BoardCard {
     pub model: Option<String>,
     /// Last line of real screen content; "what is it saying right now".
     pub activity: Option<String>,
+    /// The last few of them, in reading order, for a surface with the room.
+    pub activity_lines: Vec<String>,
     sort_seq: Option<u64>,
 }
 
@@ -294,7 +296,10 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             .and_then(|terminal| terminal.effective_display_agent())
             .filter(|model| Some(model.as_str()) != entry.agent_label.as_deref());
         let cwd = terminal.map(|terminal| contract_home(&terminal.cwd));
-        let activity = terminal.and_then(|terminal| terminal.activity_line.clone());
+        let activity_lines = terminal
+            .map(|terminal| terminal.activity_lines.clone())
+            .unwrap_or_default();
+        let activity = activity_lines.last().cloned();
         let agent_label = entry.agent_label.unwrap_or_else(|| "agent".to_string());
         model.columns[col].push(BoardCard {
             ws_idx: entry.ws_idx,
@@ -311,6 +316,7 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             cwd,
             model: agent_model,
             activity,
+            activity_lines,
             sort_seq: entry.last_agent_state_change_seq,
         });
     }
@@ -2115,7 +2121,7 @@ mod tests {
             .expect("terminal")
             .clone();
         let t = state.terminals.get_mut(&tid).expect("terminal");
-        t.set_activity_line(Some("? Do you want to make this edit to webhook.ts".into()));
+        t.set_activity_lines(vec!["? Do you want to make this edit to webhook.ts".into()]);
         t.set_context_percent(Some(74));
         t.cwd = std::path::PathBuf::from("/Users/alex/vault/dev/workmayt");
 
@@ -2172,14 +2178,12 @@ mod tests {
                 .expect("terminal")
                 .clone();
             let t = state.terminals.get_mut(&tid).expect("terminal");
-            t.set_activity_line(Some(
-                [
-                    "Metamorphosing… (3s · thinking)",
-                    "waiting for your approval",
-                    "done — 4 files changed",
-                ][i]
-                    .into(),
-            ));
+            t.set_activity_lines(vec![[
+                "Metamorphosing… (3s · thinking)",
+                "waiting for your approval",
+                "done — 4 files changed",
+            ][i]
+                .into()]);
             t.set_context_percent(Some([88, 41, 12][i]));
             t.cwd = std::path::PathBuf::from(
                 [
@@ -2258,7 +2262,7 @@ mod tests {
             .expect("terminal")
             .clone();
         let terminal = state.terminals.get_mut(&terminal_id).expect("terminal");
-        terminal.set_activity_line(Some("running the migration".into()));
+        terminal.set_activity_lines(vec!["running the migration".into()]);
         terminal.set_context_percent(Some(62));
         terminal.cwd = std::path::PathBuf::from("/tmp/deep/nested/repo");
 
@@ -2494,6 +2498,7 @@ mod tests {
             cwd: None,
             model: None,
             activity: None,
+            activity_lines: Vec::new(),
             sort_seq: None,
         }
     }

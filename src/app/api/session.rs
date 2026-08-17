@@ -118,6 +118,7 @@ impl App {
                 unseen: !card.seen,
                 custom_status: card.status.clone(),
                 activity_line: card.activity.clone(),
+                activity_lines: card.activity_lines.clone(),
                 context_percent: card.context_percent,
                 cwd: card.cwd.clone(),
                 state_age_seconds,
@@ -192,7 +193,11 @@ mod tests {
             let terminal = app.state.terminals.get_mut(&terminal_id).expect("terminal");
             terminal.detected_agent = Some(Agent::Claude);
             terminal.state = AgentState::Blocked;
-            terminal.set_activity_line(Some("waiting for approval".into()));
+            terminal.set_activity_lines(vec![
+                "reading src/webhook.ts".into(),
+                "? Do you want to make this edit".into(),
+                "waiting for approval".into(),
+            ]);
             terminal.set_context_percent(Some(62));
         }
 
@@ -216,9 +221,19 @@ mod tests {
             .first()
             .expect("blocked agent sorts to the front");
         assert_eq!(blocked.tab_name, "review", "tab name, not its number");
+        // A client with one line of room reads the last one; a client with
+        // more reads them in the order the agent printed them.
         assert_eq!(
             blocked.activity_line.as_deref(),
             Some("waiting for approval")
+        );
+        assert_eq!(
+            blocked.activity_lines,
+            vec![
+                "reading src/webhook.ts".to_string(),
+                "? Do you want to make this edit".to_string(),
+                "waiting for approval".to_string(),
+            ]
         );
         assert_eq!(blocked.context_percent, Some(62));
         assert!(!blocked.pane_id.is_empty());

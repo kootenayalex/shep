@@ -8924,6 +8924,13 @@
                 "null"
               ]
             },
+            "activity_lines": {
+              "description": "The last few lines of it, in reading order, for a client with room for\nmore than one. The last entry is `activity_line`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "agent_status": {
               "$ref": "#/schemas/success_response/$defs/AgentStatus"
             },

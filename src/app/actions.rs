@@ -2618,13 +2618,13 @@ impl AppState {
                 }
                 Vec::new()
             }
-            AppEvent::AgentActivityLineReported { pane_id, line } => {
+            AppEvent::AgentActivityReported { pane_id, lines } => {
                 if let Some(terminal_id) = self.workspaces.iter().find_map(|ws| {
                     ws.pane_state(pane_id)
                         .map(|pane| pane.attached_terminal_id.clone())
                 }) {
                     if let Some(terminal) = self.terminals.get_mut(&terminal_id) {
-                        terminal.set_activity_line(line);
+                        terminal.set_activity_lines(lines);
                     }
                 }
                 Vec::new()

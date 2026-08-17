@@ -58,6 +58,10 @@ pub struct SessionOverviewAgent {
     /// Last line of real content on the pane's screen; a display hint only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity_line: Option<String>,
+    /// The last few lines of it, in reading order, for a client with room for
+    /// more than one. The last entry is `activity_line`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub activity_lines: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_percent: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
