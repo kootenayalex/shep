@@ -236,6 +236,25 @@ pub struct PaneSendKeysParams {
     pub keys: Vec<String>,
 }
 
+/// Scroll a pane the way a wheel over it scrolls it.
+///
+/// Deliberately *not* "set the scroll offset". Where the scroll goes is the
+/// pane's business, not the caller's: a shell has terminal scrollback and
+/// scrolls in place, while a full-screen program on the alternate screen has
+/// none and has to be sent the scroll as input so it can move its own view.
+/// A client that picked one of those would work with half the panes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PaneScrollParams {
+    pub pane_id: String,
+    /// How far to scroll from where the pane is now, in rows.
+    ///
+    /// Positive goes back into history, the direction a wheel goes when it is
+    /// pushed away from you; negative comes forward toward the present. Rows
+    /// even when the pane forwards the scroll to the program running in it,
+    /// because a client that draws a grid measures its gesture in rows.
+    pub rows: i32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PaneSendInputParams {
     pub pane_id: String,

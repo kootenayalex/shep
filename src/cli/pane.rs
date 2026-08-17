@@ -3,9 +3,9 @@ use crate::api::schema::{
     PaneLayoutParams, PaneListParams, PaneMoveDestination, PaneMoveParams, PaneNeighborParams,
     PaneProcessInfoParams, PaneReadParams, PaneReleaseAgentParams, PaneRenameParams,
     PaneReportAgentParams, PaneReportAgentSessionParams, PaneReportMetadataParams,
-    PaneResizeParams, PaneSendInputParams, PaneSendKeysParams, PaneSendTextParams, PaneSplitParams,
-    PaneSwapParams, PaneTarget, PaneZoomMode, PaneZoomParams, ReadFormat, ReadSource, Request,
-    SplitDirection,
+    PaneResizeParams, PaneScrollParams, PaneSendInputParams, PaneSendKeysParams,
+    PaneSendTextParams, PaneSplitParams, PaneSwapParams, PaneTarget, PaneZoomMode, PaneZoomParams,
+    ReadFormat, ReadSource, Request, SplitDirection,
 };
 
 pub(super) fn run_pane_command(args: &[String]) -> std::io::Result<i32> {
@@ -33,6 +33,7 @@ pub(super) fn run_pane_command(args: &[String]) -> std::io::Result<i32> {
         "close" => pane_close(&args[1..]),
         "send-text" => pane_send_text(&args[1..]),
         "send-keys" => pane_send_keys(&args[1..]),
+        "scroll" => pane_scroll(&args[1..]),
         "report-agent" => pane_report_agent(&args[1..]),
         "report-agent-session" => pane_report_agent_session(&args[1..]),
         "release-agent" => pane_release_agent(&args[1..]),
@@ -925,6 +926,25 @@ fn pane_send_keys(args: &[String]) -> std::io::Result<i32> {
     super::send_ok_request(Method::PaneSendKeys(PaneSendKeysParams { pane_id, keys }))
 }
 
+/// `shep pane scroll <pane_id> <rows>`.
+///
+/// Rows rather than an offset, and signed rather than a direction flag,
+/// because the thing on the other end is a wheel: positive is back into
+/// history, negative is forward toward the present.
+fn pane_scroll(args: &[String]) -> std::io::Result<i32> {
+    if args.len() != 2 {
+        eprintln!("usage: shep pane scroll <pane_id> <rows>");
+        return Ok(2);
+    }
+
+    let pane_id = super::normalize_pane_id(&args[0]);
+    let Ok(rows) = args[1].parse::<i32>() else {
+        eprintln!("rows must be a whole number of rows, positive to scroll back");
+        return Ok(2);
+    };
+    super::send_ok_request(Method::PaneScroll(PaneScrollParams { pane_id, rows }))
+}
+
 fn pane_run(args: &[String]) -> std::io::Result<i32> {
     if args.len() < 2 {
         eprintln!("usage: shep pane run <pane_id> <command>");
@@ -1434,6 +1454,7 @@ fn print_pane_help() {
     eprintln!("  shep pane close <pane_id>");
     eprintln!("  shep pane send-text <pane_id> <text>");
     eprintln!("  shep pane send-keys <pane_id> <key> [key ...]");
+    eprintln!("  shep pane scroll <pane_id> <rows>   (positive scrolls back)");
     eprintln!("  shep pane report-agent <pane_id> --source ID --agent LABEL --state idle|working|blocked|unknown [--message TEXT] [--custom-status TEXT] [--seq N] [--agent-session-id ID] [--agent-session-path PATH]");
     eprintln!("  shep pane report-agent-session <pane_id> --source ID --agent LABEL [--seq N] [--agent-session-id ID] [--agent-session-path PATH]");
     eprintln!("  shep pane release-agent <pane_id> --source ID --agent LABEL [--seq N]");

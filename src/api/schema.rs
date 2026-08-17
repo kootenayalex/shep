@@ -169,6 +169,8 @@ pub enum Method {
     PaneSendKeys(PaneSendKeysParams),
     #[serde(rename = "pane.send_input")]
     PaneSendInput(PaneSendInputParams),
+    #[serde(rename = "pane.scroll")]
+    PaneScroll(PaneScrollParams),
     #[serde(rename = "pane.read")]
     PaneRead(PaneReadParams),
     #[serde(rename = "pane.report_agent")]

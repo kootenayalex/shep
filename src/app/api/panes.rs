@@ -9,9 +9,9 @@ use crate::api::schema::{
     PaneProcessInfo, PaneProcessInfoParams, PaneProcessInfoProcess, PaneReadParams, PaneReadResult,
     PaneReleaseAgentParams, PaneRenameParams, PaneReportAgentParams, PaneReportAgentSessionParams,
     PaneReportMetadataParams, PaneResizeParams, PaneResizeReason, PaneResizeResult,
-    PaneSendInputParams, PaneSendKeysParams, PaneSendTextParams, PaneSplitParams, PaneSwapParams,
-    PaneSwapReason, PaneSwapResult, PaneTarget, PaneZoomMode, PaneZoomParams, PaneZoomReason,
-    PaneZoomResult, ReadFormat, ReadSource, ResponseResult,
+    PaneScrollParams, PaneSendInputParams, PaneSendKeysParams, PaneSendTextParams, PaneSplitParams,
+    PaneSwapParams, PaneSwapReason, PaneSwapResult, PaneTarget, PaneZoomMode, PaneZoomParams,
+    PaneZoomReason, PaneZoomResult, ReadFormat, ReadSource, ResponseResult,
 };
 use crate::app::actions::{PaneZoomCommand, PaneZoomNoopReason};
 use crate::app::App;
@@ -24,6 +24,14 @@ use super::super::api_helpers::{
     normalize_reported_agent_label,
 };
 use super::responses::{encode_error, encode_success};
+
+/// The most rows one `pane.scroll` call may move.
+///
+/// A fling on a touchscreen arrives as a single number, and an unbounded one
+/// becomes thousands of wheel events written into a pty that has to parse every
+/// one of them. Two screens of travel per call is already more than a wheel
+/// gives you in a flick.
+const SCROLL_ROWS_MAX: i32 = 128;
 
 const METADATA_SOURCE_MAX_CHARS: usize = 80;
 const METADATA_TTL_MIN_MS: u64 = 1;
@@ -1549,6 +1557,74 @@ impl App {
 
         encode_success(id, ResponseResult::Ok {})
     }
+
+    /// Scroll a pane the way the wheel does over it.
+    ///
+    /// The routing is the whole point, and it is the same decision the TUI
+    /// makes for a wheel event: a pane running a plain shell has terminal
+    /// scrollback and moves its own viewport, while one running a full-screen
+    /// program has none — the alternate screen keeps no history — so the only
+    /// thing that can scroll it is the program itself, and the scroll has to be
+    /// written into the pty as input. A remote client cannot make that call: it
+    /// has no way to see which kind of pane it is looking at.
+    pub(super) fn handle_pane_scroll(&mut self, id: String, params: PaneScrollParams) -> String {
+        let Some((ws_idx, pane_id)) = self.parse_pane_id(&params.pane_id) else {
+            return pane_not_found(id, &params.pane_id);
+        };
+        let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
+            return pane_not_found(id, &params.pane_id);
+        };
+        let rows = params.rows.clamp(-SCROLL_ROWS_MAX, SCROLL_ROWS_MAX);
+        if rows == 0 {
+            return encode_success(id, ResponseResult::Ok {});
+        }
+        let count = rows.unsigned_abs() as usize;
+        let kind = if rows > 0 {
+            crossterm::event::MouseEventKind::ScrollUp
+        } else {
+            crossterm::event::MouseEventKind::ScrollDown
+        };
+
+        let forwarded = match runtime.wheel_routing() {
+            Some(crate::pane::WheelRouting::MouseReport) => {
+                // A wheel event carries a position, and a program that scrolls
+                // only the region under the pointer would ignore one parked in
+                // a corner. The middle of the pane is where a person would have
+                // put it.
+                let (pty_rows, pty_cols) = runtime.current_size();
+                runtime.encode_mouse_wheel(
+                    kind,
+                    pty_cols / 2,
+                    pty_rows / 2,
+                    crossterm::event::KeyModifiers::empty(),
+                )
+            }
+            Some(crate::pane::WheelRouting::AlternateScroll) => {
+                runtime.encode_alternate_scroll(kind)
+            }
+            Some(crate::pane::WheelRouting::HostScroll) | None => None,
+        };
+
+        let Some(bytes) = forwarded else {
+            if rows > 0 {
+                runtime.scroll_up(count);
+            } else {
+                runtime.scroll_down(count);
+            }
+            return encode_success(id, ResponseResult::Ok {});
+        };
+
+        // Forwarding means the pane is showing the program's own view, so any
+        // host scroll offset left over from before is a second, contradictory
+        // viewport. The TUI resets it for the same reason.
+        runtime.scroll_reset();
+        for _ in 0..count {
+            if let Err(err) = runtime.try_send_bytes(Bytes::from(bytes.clone())) {
+                return encode_error(id, "pane_send_failed", err.to_string());
+            }
+        }
+        encode_success(id, ResponseResult::Ok {})
+    }
 }
 
 fn normalize_metadata_source(value: String) -> Result<String, &'static str> {
@@ -1974,6 +2050,120 @@ mod tests {
         // Cols come from the pty size, not the scrollbar. Clients that mirror a
         // pane size their render surface from this.
         assert_eq!(scroll.viewport_cols, 20);
+    }
+
+    fn scroll_offset(app: &mut App, public_pane_id: &str) -> u64 {
+        let response = app.handle_pane_get(
+            "req_offset".into(),
+            PaneTarget {
+                pane_id: public_pane_id.to_string(),
+            },
+        );
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        let ResponseResult::PaneInfo { pane } = success.result else {
+            panic!("expected pane info response");
+        };
+        pane.scroll.expect("scroll metrics").offset_from_bottom
+    }
+
+    fn scroll_request(pane_id: &str, rows: i32) -> crate::api::schema::Request {
+        crate::api::schema::Request {
+            id: "req".into(),
+            method: crate::api::schema::Method::PaneScroll(PaneScrollParams {
+                pane_id: pane_id.to_string(),
+                rows,
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn api_pane_scroll_moves_the_viewport_when_the_pane_owns_its_scrollback() {
+        let (mut app, public_pane_id, _) = app_with_scrollback_runtime();
+
+        let response = app.handle_api_request(scroll_request(&public_pane_id, 3));
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(success.result, ResponseResult::Ok {});
+        assert_eq!(scroll_offset(&mut app, &public_pane_id), 3);
+
+        // Negative comes back toward the present, from wherever it was.
+        app.handle_api_request(scroll_request(&public_pane_id, -2));
+        assert_eq!(scroll_offset(&mut app, &public_pane_id), 1);
+    }
+
+    #[tokio::test]
+    async fn api_pane_scroll_is_written_to_the_pty_when_the_program_owns_the_view() {
+        let (mut app, public_pane_id) = app_with_test_workspace();
+        let pane_id = app.state.workspaces[0].tabs[0].root_pane;
+        // What a full-screen program asks for on startup: report mouse events,
+        // in SGR. From here the terminal's own scrollback is not the view.
+        let (runtime, mut rx) =
+            crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(
+                20,
+                5,
+                1000,
+                b"\x1b[?1000h\x1b[?1006h",
+                8,
+            );
+        app.state.insert_test_runtime(pane_id, runtime);
+
+        let response = app.handle_api_request(scroll_request(&public_pane_id, 2));
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(success.result, ResponseResult::Ok {});
+
+        // Wheel-up (button 64) at the middle of a 20x5 pane, in SGR's 1-based
+        // coordinates. Aiming at the middle is what makes a program that only
+        // scrolls the region under the pointer act on it.
+        let wheel = bytes::Bytes::from_static(b"\x1b[<64;11;3M");
+        assert_eq!(rx.try_recv().unwrap(), wheel);
+        assert_eq!(rx.try_recv().unwrap(), wheel);
+        assert!(rx.try_recv().is_err());
+        // And the pane's own viewport was left alone: it has no history to show.
+        assert_eq!(scroll_offset(&mut app, &public_pane_id), 0);
+    }
+
+    #[tokio::test]
+    async fn api_pane_scroll_caps_a_fling() {
+        let (mut app, public_pane_id) = app_with_test_workspace();
+        let pane_id = app.state.workspaces[0].tabs[0].root_pane;
+        let (runtime, mut rx) =
+            crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(
+                20,
+                5,
+                1000,
+                b"\x1b[?1000h\x1b[?1006h",
+                1024,
+            );
+        app.state.insert_test_runtime(pane_id, runtime);
+
+        let response = app.handle_api_request(scroll_request(&public_pane_id, 10_000));
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(success.result, ResponseResult::Ok {});
+
+        let mut written = 0;
+        while rx.try_recv().is_ok() {
+            written += 1;
+        }
+        assert_eq!(written, SCROLL_ROWS_MAX);
+    }
+
+    #[tokio::test]
+    async fn api_pane_scroll_of_nothing_writes_nothing() {
+        let (mut app, public_pane_id) = app_with_test_workspace();
+        let pane_id = app.state.workspaces[0].tabs[0].root_pane;
+        let (runtime, mut rx) =
+            crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(
+                20,
+                5,
+                1000,
+                b"\x1b[?1000h\x1b[?1006h",
+                8,
+            );
+        app.state.insert_test_runtime(pane_id, runtime);
+
+        let response = app.handle_api_request(scroll_request(&public_pane_id, 0));
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(success.result, ResponseResult::Ok {});
+        assert!(rx.try_recv().is_err());
     }
 
     #[tokio::test]

@@ -997,6 +997,7 @@ impl App {
             }
             Method::PaneClose(target) => return self.handle_pane_close(request.id, target),
             Method::PaneSendKeys(params) => return self.handle_pane_send_keys(request.id, params),
+            Method::PaneScroll(params) => return self.handle_pane_scroll(request.id, params),
             Method::IntegrationInstall(params) => {
                 return self.handle_integration_install(request.id, params);
             }

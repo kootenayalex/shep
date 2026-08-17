@@ -2495,6 +2495,24 @@
           ],
           "type": "object"
         },
+        "PaneScrollParams": {
+          "description": "Scroll a pane the way a wheel over it scrolls it.\n\nDeliberately *not* \"set the scroll offset\". Where the scroll goes is the\npane's business, not the caller's: a shell has terminal scrollback and\nscrolls in place, while a full-screen program on the alternate screen has\nnone and has to be sent the scroll as input so it can move its own view.\nA client that picked one of those would work with half the panes.",
+          "properties": {
+            "pane_id": {
+              "type": "string"
+            },
+            "rows": {
+              "description": "How far to scroll from where the pane is now, in rows.\n\nPositive goes back into history, the direction a wheel goes when it is\npushed away from you; negative comes forward toward the present. Rows\neven when the pane forwards the scroll to the program running in it,\nbecause a client that draws a grid measures its gesture in rows.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "pane_id",
+            "rows"
+          ],
+          "type": "object"
+        },
         "PaneSendInputParams": {
           "properties": {
             "keys": {
@@ -4791,6 +4809,22 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/PaneSendInputParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "pane.scroll",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PaneScrollParams"
             }
           },
           "required": [
