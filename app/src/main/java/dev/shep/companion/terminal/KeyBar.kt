@@ -47,15 +47,34 @@ fun KeyBar(
 ) {
     var ctrl by remember { mutableStateOf(ModifierState.Off) }
     var alt by remember { mutableStateOf(ModifierState.Off) }
+    var shift by remember { mutableStateOf(ModifierState.Off) }
 
-    fun fire(name: String) {
-        val prefix = buildString {
-            if (ctrl != ModifierState.Off) append("ctrl+")
-            if (alt != ModifierState.Off) append("alt+")
-        }
-        onKey(TerminalKey.Named(prefix + name))
+    fun consumeArmed() {
         if (ctrl == ModifierState.Armed) ctrl = ModifierState.Off
         if (alt == ModifierState.Armed) alt = ModifierState.Off
+        if (shift == ModifierState.Armed) shift = ModifierState.Off
+    }
+
+    /** A named key with whatever modifiers are held; [withShift] forces one on. */
+    fun fire(name: String, withShift: Boolean = false) {
+        val shifted = withShift || shift != ModifierState.Off
+        onKey(TerminalKey.Named(keyCombo(name, ctrl, alt, shifted)))
+        consumeArmed()
+    }
+
+    /**
+     * A literal character, unless a modifier is held — then it is a chord.
+     *
+     * `shift+y` is not the text "y" with a flag; the server resolves it to `Y`,
+     * the same as `ctrl+y` resolves to a control byte. Sending the raw text
+     * instead would drop the modifier on the floor while leaving it lit.
+     */
+    fun fireText(text: String) {
+        val plain = ctrl == ModifierState.Off &&
+            alt == ModifierState.Off &&
+            shift == ModifierState.Off
+        if (plain) onKey(TerminalKey.Text(text)) else fire(text)
+        consumeArmed()
     }
 
     Column(
@@ -65,16 +84,19 @@ fun KeyBar(
             .padding(vertical = ShepSpace.snug),
         verticalArrangement = Arrangement.spacedBy(ShepSpace.snug),
     ) {
-        // Answers to agent prompts are the highest-frequency taps, so they lead.
+        // Answers to agent prompts are the highest-frequency taps, so they lead
+        // — and so does ⇧⇥, which is how you change claude's mode. A phone
+        // keyboard has no shift+tab at all, so reaching it through the sticky
+        // modifier below would make the app's most-wanted key a two-tap.
         Row(
             Modifier.fillMaxWidth().padding(horizontal = ShepSpace.small),
             horizontalArrangement = Arrangement.spacedBy(ShepSpace.snug),
         ) {
-            Key("y", Modifier.weight(1f), ShepPalette.green) { onKey(TerminalKey.Text("y")) }
-            Key("n", Modifier.weight(1f), ShepPalette.red) { onKey(TerminalKey.Text("n")) }
+            Key("y", Modifier.weight(1f), ShepPalette.green) { fireText("y") }
+            Key("n", Modifier.weight(1f), ShepPalette.red) { fireText("n") }
             Key("↵", Modifier.weight(1f)) { fire("enter") }
             Key("esc", Modifier.weight(1f)) { fire("esc") }
-            Key("⇥", Modifier.weight(1f)) { fire("tab") }
+            Key("⇧⇥", Modifier.weight(1f), tag = "shift-tab") { fire("tab", withShift = true) }
         }
         Row(
             Modifier
@@ -90,6 +112,10 @@ fun KeyBar(
             StickyKey("alt", alt) {
                 alt = alt.advance(it)
             }
+            StickyKey("shift", shift) {
+                shift = shift.advance(it)
+            }
+            Key("⇥") { fire("tab") }
             Key("↑") { fire("up") }
             Key("↓") { fire("down") }
             Key("←") { fire("left") }
@@ -105,6 +131,25 @@ fun KeyBar(
             Key("del") { fire("delete") }
         }
     }
+}
+
+/**
+ * Build the combo string for a key pressed with these modifiers.
+ *
+ * Pulled out of the composable so it can be pinned by a unit test: every name
+ * here has to survive `parse_key_combo` on the other end, and a combo the
+ * server rejects fails as a keypress that quietly does nothing.
+ */
+fun keyCombo(
+    name: String,
+    ctrl: ModifierState = ModifierState.Off,
+    alt: ModifierState = ModifierState.Off,
+    shift: Boolean = false,
+): String = buildString {
+    if (ctrl != ModifierState.Off) append("ctrl+")
+    if (alt != ModifierState.Off) append("alt+")
+    if (shift) append("shift+")
+    append(name)
 }
 
 enum class ModifierState { Off, Armed, Locked;
@@ -130,6 +175,7 @@ private fun Key(
     label: String,
     modifier: Modifier = Modifier,
     color: Color = ShepPalette.text,
+    tag: String = label,
     onClick: () -> Unit,
 ) {
     KeyFace(
@@ -138,6 +184,7 @@ private fun Key(
         background = ShepPalette.surface0,
         outline = ShepPalette.surface1,
         modifier = modifier,
+        tag = tag,
         onClick = onClick,
     )
 }
