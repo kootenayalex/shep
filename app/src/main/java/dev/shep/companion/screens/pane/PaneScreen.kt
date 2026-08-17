@@ -178,6 +178,9 @@ fun PaneScreen(
                 is StreamEvent.Size -> streaming = true
                 is StreamEvent.Frame -> {
                     streaming = true
+                    // A frame is proof the stream works, so any complaint left
+                    // over from the drop that preceded it is no longer true.
+                    notice = null
                     grid.apply(event.json)
                 }
                 is StreamEvent.Ping -> {}

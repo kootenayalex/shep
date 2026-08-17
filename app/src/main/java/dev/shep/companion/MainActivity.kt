@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,16 +36,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import dev.shep.companion.screens.BoardScreen
-import dev.shep.companion.screens.MemoryScreen
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import dev.shep.companion.screens.ChannelsScreen
 import dev.shep.companion.screens.PairingScreen
-import dev.shep.companion.screens.ServerScreen
-import dev.shep.companion.screens.SpacesScreen
 import dev.shep.companion.screens.TasksScreen
+import dev.shep.companion.screens.YouScreen
 import dev.shep.companion.screens.pane.PaneScreen
 import dev.shep.companion.ui.components.EmptyState
 import dev.shep.companion.ui.components.LoadingState
+import dev.shep.companion.ui.components.Notice
+import dev.shep.companion.ui.components.NoticeTone
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepSemantic
 import dev.shep.companion.ui.theme.ShepSize
@@ -65,6 +70,22 @@ const val EXPECTED_PROTOCOL = 16
 
 /** An agent state's colour, for the places that tint a label rather than draw a glyph. */
 fun statusColor(status: String): Color = ShepSemantic.agentColor(status)
+
+/**
+ * What to say on the offline banner.
+ *
+ * A transport error is the wrong thing to put in front of someone whose only
+ * available action is to wait — `timed out connecting to ws://100.83.179.75:7431/`
+ * reads as a fault when the app is already handling it. The one error worth
+ * naming is the one that will never heal on its own: a rejected token needs
+ * hands on a keyboard.
+ */
+fun offlineNotice(error: String?): String =
+    if (error != null && error.contains("unauthorized", ignoreCase = true)) {
+        "pairing rejected — re-pair from `shep bridge pair`"
+    } else {
+        "offline · reconnecting…"
+    }
 
 class MainActivity : ComponentActivity() {
     // Pane id from a `shep://pane?pane=…` notification tap; consumed by NavShell.
@@ -116,13 +137,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Bottom-nav destinations. Glyphs mirror the TUI vocabulary (no icon dep). */
+/**
+ * Bottom-nav destinations. Glyphs mirror the TUI vocabulary (no icon dep).
+ *
+ * Three, not five. The board and the spaces tree listed the same agents twice
+ * and are now one list; memory and settings are both "about you" and share a
+ * switch. Five peers in a bar is a menu you read — three is one you aim at.
+ */
 enum class Tab(val label: String, val glyph: String) {
-    Agents("board", "◫"),
-    Spaces("spaces", "❏"),
+    Chats("chats", "◫"),
     Tasks("tasks", "☰"),
-    Memory("memory", "✦"),
-    Shep("shep", "⚙"),
+    You("you", "⚙"),
 }
 
 @Composable
@@ -139,10 +164,28 @@ fun ShepApp(
     // True while the first auto-connect with a saved pairing is in flight —
     // shows a connecting spinner instead of flashing the manual pairing form.
     var firstConnect by remember { mutableStateOf(prefs.getString("token", null) != null) }
+    // Whether the socket we are holding is believed good. A drop no longer
+    // unmounts the shell, so this drives a banner rather than a whole screen.
+    var online by remember { mutableStateOf(false) }
     // Bumped by a dropped socket to kick the reconnect loop below.
     var reconnectSignal by remember { mutableStateOf(0) }
+    // A live socket is only worth holding while somebody is looking at it.
+    var foreground by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> foreground = true
+                Lifecycle.Event.ON_STOP -> foreground = false
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
 
     // Ask for POST_NOTIFICATIONS (Android 13+) so A3 pages can show.
     val notifPermission = rememberLauncherForActivityResult(
@@ -178,11 +221,19 @@ fun ShepApp(
         }
         if (error != null) return error
         fresh.onDisconnect = { reason ->
+            online = false
             connectError = reason ?: "disconnected"
             reconnectSignal += 1
         }
-        client?.close()
+        // Retire the old socket without letting its own close callback run: it
+        // would report a disconnect we caused deliberately, and send the loop
+        // below round again immediately after it had just succeeded.
+        client?.let {
+            it.onDisconnect = null
+            it.close()
+        }
         client = fresh
+        online = true
         return null
     }
 
@@ -207,13 +258,40 @@ fun ShepApp(
         }
     }
 
-    // Reconnect loop: on a drop, retry with exponential backoff until the
-    // socket is back or the user unpairs.
-    LaunchedEffect(reconnectSignal) {
-        if (reconnectSignal == 0 || !paired) return@LaunchedEffect
-        client = null
-        var backoff = 1000L
-        while (paired && isActive) {
+    // One place decides whether a socket should exist, and dials until it does.
+    //
+    // Leaving the app used to strand this. The socket died while the phone was
+    // away, the retry loop kept dialling a sleeping radio with a backoff that
+    // grew to 15s, and coming back showed you the stale timeout from an attempt
+    // made while the screen was off — every single time. Retrying is now a
+    // foreground activity, and returning to the app *checks* the socket rather
+    // than trusting it.
+    LaunchedEffect(paired, foreground, reconnectSignal) {
+        if (!paired || !foreground) return@LaunchedEffect
+
+        // An open-looking socket can be dead: a connection broken while the
+        // phone dozed stays "open" to OkHttp until a ping eventually times out.
+        // Asking the server is the only answer worth acting on, and when it
+        // answers — the common case for a short absence — there is nothing to
+        // reconnect and no banner to show.
+        val held = client
+        if (held != null && held.isOpen) {
+            val alive = withContext(Dispatchers.IO) {
+                runCatching { held.call("ping", timeoutSeconds = 3) }.isSuccess
+            }
+            if (alive) {
+                online = true
+                connectError = null
+                return@LaunchedEffect
+            }
+        }
+
+        online = false
+        // Starts short: the first dial after you return is the one that decides
+        // whether the app feels alive, and the long waits only earn their keep
+        // once several attempts have already failed.
+        var backoff = 400L
+        while (isActive) {
             val error = establish()
             if (error == null) {
                 connectError = null
@@ -221,7 +299,7 @@ fun ShepApp(
             }
             connectError = error
             delay(backoff)
-            backoff = (backoff * 2).coerceAtMost(15000L)
+            backoff = (backoff * 2).coerceAtMost(10000L)
         }
     }
 
@@ -247,26 +325,37 @@ fun ShepApp(
             if (active == null) {
                 LoadingState("reconnecting…", detail = connectError)
             } else {
-                NavShell(
-                    client = active,
-                    deepLinkPane = deepLinkPane,
-                    onDeepLinkConsumed = onDeepLinkConsumed,
-                    newTask = newTask,
-                    onNewTaskConsumed = onNewTaskConsumed,
-                    onUnpair = {
-                        paired = false
-                        active.close()
-                        client = null
-                    },
-                )
+                // The shell stays mounted through a drop. Screens keep the last
+                // thing they read, which is stale but true-as-of-a-moment-ago;
+                // unmounting threw you out of whatever pane you were reading
+                // and back to the board, which is a worse answer to a blip.
+                Column(Modifier.fillMaxSize()) {
+                    if (!online) {
+                        Notice(offlineNotice(connectError), tone = NoticeTone.Alert)
+                    }
+                    NavShell(
+                        client = active,
+                        deepLinkPane = deepLinkPane,
+                        onDeepLinkConsumed = onDeepLinkConsumed,
+                        newTask = newTask,
+                        onNewTaskConsumed = onNewTaskConsumed,
+                        onUnpair = {
+                            paired = false
+                            online = false
+                            active.onDisconnect = null
+                            active.close()
+                            client = null
+                        },
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * The paired experience: a bottom-nav Scaffold over the five destinations, with
- * the pane view pushed as a full-screen detail over the Agents tab on phones, or
+ * The paired experience: a bottom-nav Scaffold over the three destinations, with
+ * the pane view pushed as a full-screen detail over the Chats tab on phones, or
  * docked side-by-side on iPad-class widths (A6 two-pane). A3 deep-links route
  * here by setting the tab + selecting a pane; the A6 `shep://tasks/new`
  * deep-link opens the Tasks tab with the add sheet already up.
@@ -280,40 +369,26 @@ fun NavShell(
     newTask: Boolean = false,
     onNewTaskConsumed: () -> Unit = {},
 ) {
-    var tab by remember { mutableStateOf(Tab.Agents) }
+    var tab by remember { mutableStateOf(Tab.Chats) }
     var paneDetail by remember { mutableStateOf<AgentRow?>(null) }
-    // A tree node waiting to be resolved into the row the pane view needs.
-    var openPaneNode by remember { mutableStateOf<Pair<PaneNode, String>?>(null) }
     // Hoisted from TasksScreen so the new-task deep-link can pre-open the sheet.
     var tasksShowAdd by remember { mutableStateOf(false) }
+    // Hoisted out of the list for a different reason: opening a pane replaces
+    // the whole scaffold on a phone, so a space collapsed in the list itself is
+    // re-expanded the moment you look at an agent and come back.
+    var collapsedSpaces by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     // A notification tap (shep://pane?pane=…) resolves the pane id to its row via
-    // a one-shot snapshot and pushes the pane detail; falls back to the Agents
+    // a one-shot snapshot and pushes the pane detail; falls back to the Chats
     // tab if the pane is gone.
     LaunchedEffect(deepLinkPane) {
         val target = deepLinkPane ?: return@LaunchedEffect
-        tab = Tab.Agents
+        tab = Tab.Chats
         val row = withContext(Dispatchers.IO) {
             runCatching { parseSnapshot(client.call("session.snapshot")) }.getOrNull()
         }?.find { it.paneId == target }
         if (row != null) paneDetail = row
         onDeepLinkConsumed()
-    }
-
-    // Same resolution, from the spaces tree. It stays on the Spaces tab, so
-    // closing the pane view returns you to where you were.
-    //
-    // The snapshot only answers with *agents*, so a plain shell — which the
-    // tree happily lists and ripples — resolved to nothing and the tap did
-    // nothing at all. Falling back to the node means every row in the tree
-    // opens something, which is the only honest reading of a tappable row.
-    LaunchedEffect(openPaneNode) {
-        val (node, spaceLabel) = openPaneNode ?: return@LaunchedEffect
-        val row = withContext(Dispatchers.IO) {
-            runCatching { parseSnapshot(client.call("session.snapshot")) }.getOrNull()
-        }?.find { it.paneId == node.paneId }
-        paneDetail = row ?: node.asAgentRow(spaceLabel)
-        openPaneNode = null
     }
 
     // Launcher shortcut / widget (shep://tasks/new): Tasks tab, sheet open.
@@ -367,13 +442,15 @@ fun NavShell(
             },
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                if (wide && tab == Tab.Agents) {
+                if (wide && tab == Tab.Chats) {
                     Row(Modifier.fillMaxSize()) {
                         Box(Modifier.weight(1f)) {
-                            BoardScreen(
+                            ChannelsScreen(
                                 client = client,
                                 onOpenPane = { paneDetail = it },
                                 onUnpair = onUnpair,
+                                collapsed = collapsedSpaces,
+                                onCollapsedChange = { collapsedSpaces = it },
                             )
                         }
                         Box(
@@ -390,36 +467,29 @@ fun NavShell(
                         }
                     }
                 } else {
-                    // A crossfade, not a slide: these are five peers, not a
-                    // stack, and a directional transition would claim an order
-                    // the nav bar does not have. Short enough that switching
-                    // tabs still feels like switching, not like waiting.
+                    // A crossfade, not a slide: these are peers, not a stack,
+                    // and a directional transition would claim an order the nav
+                    // bar does not have. Short enough that switching tabs still
+                    // feels like switching, not like waiting.
                     Crossfade(
                         targetState = tab,
                         animationSpec = tween(ShepMotion.ENTER_MS),
                         label = "tab",
                     ) { current ->
                         when (current) {
-                            Tab.Agents -> BoardScreen(
+                            Tab.Chats -> ChannelsScreen(
                                 client = client,
                                 onOpenPane = { paneDetail = it },
                                 onUnpair = onUnpair,
-                            )
-                            Tab.Spaces -> SpacesScreen(
-                                client = client,
-                                // The tree knows a pane; the pane view wants
-                                // the board's row for it, so resolve through
-                                // the same path a notification tap uses rather
-                                // than inventing a second, thinner pane view.
-                                onOpenPane = { node, label -> openPaneNode = node to label },
+                                collapsed = collapsedSpaces,
+                                onCollapsedChange = { collapsedSpaces = it },
                             )
                             Tab.Tasks -> TasksScreen(
                                 client = client,
                                 showAdd = tasksShowAdd,
                                 onShowAddChange = { tasksShowAdd = it },
                             )
-                            Tab.Memory -> MemoryScreen(client)
-                            Tab.Shep -> ServerScreen()
+                            Tab.You -> YouScreen(client)
                         }
                     }
                 }

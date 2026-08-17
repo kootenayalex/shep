@@ -31,6 +31,7 @@ class OverviewParseTest {
          "pane_number":2,"workspace_label":"shep","branch":"master","name":"claude",
          "display_agent":"opus","agent_status":"blocked","unseen":true,
          "custom_status":"waiting","activity_line":"waiting for approval",
+         "activity_lines":["reading src/webhook.ts","? make this edit","waiting for approval"],
          "context_percent":62,"cwd":"~/vault/dev/shep","state_age_seconds":240,
          "queued_input":2,"focused":true}
     """.trimIndent()
@@ -54,6 +55,10 @@ class OverviewParseTest {
         assertEquals("review", row.tabName)
         assertEquals("opus", row.displayAgent)
         assertEquals("waiting for approval", row.activityLine)
+        assertEquals(
+            listOf("reading src/webhook.ts", "? make this edit", "waiting for approval"),
+            row.activityLines,
+        )
         assertEquals(62, row.contextPercent)
         assertEquals(240L, row.stateAgeSeconds)
         assertEquals(2, row.queuedInput)
@@ -69,6 +74,21 @@ class OverviewParseTest {
 
         val noTab = """{"pane_id":"w1:p1","pane_number":3,"agent_status":"idle"}"""
         assertEquals("p3", parseOverview(payload(noTab))!!.agents.single().location)
+    }
+
+    /**
+     * `activity_lines` postdates the first phone build. A server without it
+     * must degrade to the one line it does send, not to a blank row.
+     */
+    @Test
+    fun `a server that only sends one activity line still fills the row`() {
+        val old = """
+            {"pane_id":"w1:p1","agent_status":"working",
+             "activity_line":"running the migration"}
+        """.trimIndent()
+        val row = parseOverview(payload(old))!!.agents.single()
+        assertEquals("running the migration", row.activityLine)
+        assertEquals(emptyList<String>(), row.activityLines)
     }
 
     @Test

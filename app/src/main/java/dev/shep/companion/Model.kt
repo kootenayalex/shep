@@ -33,6 +33,12 @@ data class AgentRow(
      */
     val displayName: String? = null,
     val activityLine: String? = null,
+    /**
+     * The last few lines of the agent's screen, oldest first, for a surface
+     * with room for more than one. Empty against a server too old to send it;
+     * [activityLine] is always the last entry when both are present.
+     */
+    val activityLines: List<String> = emptyList(),
     val cwd: String? = null,
     val stateAgeSeconds: Long? = null,
     val queuedInput: Int = 0,
@@ -99,6 +105,11 @@ private fun JSONObject.optLongOrNull(key: String): Long? =
 private fun JSONObject.optStringOrNull(key: String): String? =
     if (has(key) && !isNull(key)) optString(key).takeIf { it.isNotEmpty() } else null
 
+private fun JSONObject.optStringList(key: String): List<String> {
+    val array = optJSONArray(key) ?: return emptyList()
+    return (0 until array.length()).mapNotNull { array.optString(it).takeIf(String::isNotEmpty) }
+}
+
 /**
  * Parse a `session.overview` result. The server already sorts agents in
  * attention order, so this preserves array order rather than re-sorting —
@@ -134,6 +145,7 @@ fun parseOverview(result: JSONObject): SessionOverview? {
                 displayAgent = a.optStringOrNull("display_agent"),
                 displayName = a.optStringOrNull("display_name"),
                 activityLine = a.optStringOrNull("activity_line"),
+                activityLines = a.optStringList("activity_lines"),
                 cwd = a.optStringOrNull("cwd"),
                 stateAgeSeconds = a.optLongOrNull("state_age_seconds"),
                 queuedInput = a.optInt("queued_input", 0),
