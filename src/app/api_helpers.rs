@@ -10,7 +10,17 @@ pub(super) fn tab_attention_priority(state: crate::detect::AgentState, seen: boo
 
 fn parse_api_key(key: &str) -> Option<crossterm::event::KeyEvent> {
     let normalized = normalize_api_key_alias(key.trim());
-    let (code, modifiers) = crate::config::parse_key_combo(normalized)?;
+    let (code, mut modifiers) = crate::config::parse_key_combo(normalized)?;
+    // `parse_key_combo` canonicalises `shift+tab` to a bare `BackTab`, because a
+    // *binding matcher* reads the shift as implicit in the code. A pty encoder
+    // does not: it reads the modifier set, and `BackTab` with no SHIFT encodes
+    // as an ordinary tab — so `shift+tab` reached the agent as `\t` and every
+    // API caller silently pressed the wrong key. A real terminal hands crossterm
+    // `BackTab` *with* SHIFT, which is why the TUI path was always correct; put
+    // the modifier back so the child sees the event a keyboard would produce.
+    if matches!(code, crossterm::event::KeyCode::BackTab) {
+        modifiers.insert(crossterm::event::KeyModifiers::SHIFT);
+    }
     Some(crossterm::event::KeyEvent::new(code, modifiers))
 }
 

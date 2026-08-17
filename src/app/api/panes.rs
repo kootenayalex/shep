@@ -2065,6 +2065,41 @@ mod tests {
         assert!(rx.try_recv().is_err());
     }
 
+    /// `shift+tab` must reach the child as CSI Z, not as a tab.
+    ///
+    /// It parses to a bare `BackTab` — the canonical form for *binding* lookup,
+    /// where the shift is implicit in the code — and the pty encoder reads the
+    /// modifier set, so without SHIFT restored this encoded to `\t` and the
+    /// agent saw an ordinary tab. Every API caller was pressing the wrong key,
+    /// silently, because both keys are plausible in a terminal.
+    #[tokio::test]
+    async fn api_pane_send_input_shift_tab_encodes_as_backtab_not_tab() {
+        let (mut app, pane_id, mut rx) = app_with_send_key_runtime(2);
+
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "req".into(),
+            method: crate::api::schema::Method::PaneSendInput(PaneSendInputParams {
+                pane_id,
+                text: String::new(),
+                keys: vec!["shift+tab".into(), "tab".into()],
+            }),
+        });
+
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(success.result, ResponseResult::Ok {});
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            bytes::Bytes::from_static(b"\x1b[Z"),
+            "shift+tab must encode as CSI Z"
+        );
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            bytes::Bytes::from_static(b"\t"),
+            "plain tab must still encode as a tab"
+        );
+        assert!(rx.try_recv().is_err());
+    }
+
     #[tokio::test]
     async fn api_pane_send_keys_rejects_invalid_keys_before_writing() {
         let (mut app, pane_id, mut rx) = app_with_send_key_runtime(2);
