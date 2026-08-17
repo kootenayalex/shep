@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,6 +59,14 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import androidx.compose.material3.minimumInteractiveComponentSize
 
+/**
+ * How often collected scroll is sent.
+ *
+ * Three frames. Short enough that the pane keeps up with a thumb, long enough
+ * that a fling is a handful of requests rather than one per pointer event.
+ */
+private const val SCROLL_FLUSH_MS = 50L
+
 /** Live keystrokes, or compose-and-queue for when the agent is busy. */
 enum class InputMode { Stream, Queue }
 
@@ -91,7 +100,10 @@ fun PaneScreen(
     var mode by remember { mutableStateOf(InputMode.Stream) }
     var output by remember { mutableStateOf(OutputMode.Live) }
     var composer by remember { mutableStateOf("") }
-    var showHistory by remember { mutableStateOf(false) }
+    // Rows the drag gesture has asked for and the flush below has not sent yet.
+    // A fling is sixty pointer events a second; one request each would put the
+    // scroll behind the finger by the time it stopped moving.
+    var pendingScroll by remember(row.paneId) { mutableIntStateOf(0) }
     var showReview by remember { mutableStateOf(false) }
     var streaming by remember { mutableStateOf(false) }
     var transcript by remember(row.paneId) { mutableStateOf<Transcript?>(null) }
@@ -101,6 +113,30 @@ fun PaneScreen(
 
     // Held so the key bar and the IME can both reach the open channel.
     var send by remember { mutableStateOf<((TerminalKey) -> Unit)>({}) }
+
+    // Every key, from the bar or from the soft keyboard, goes through here.
+    val press: (TerminalKey) -> Unit = { key -> send(key) }
+
+    // Collected scroll goes out on a beat. `pane.scroll` routes it the way the
+    // desktop routes a wheel over the same pane: a shell moves its own
+    // viewport, an agent on the alternate screen — which keeps no terminal
+    // scrollback at all — is sent the scroll and moves its own view.
+    LaunchedEffect(row.paneId, client) {
+        while (true) {
+            kotlinx.coroutines.delay(SCROLL_FLUSH_MS)
+            val rows = pendingScroll
+            if (rows == 0) continue
+            pendingScroll = 0
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    client.call(
+                        "pane.scroll",
+                        JSONObject().put("pane_id", row.paneId).put("rows", rows),
+                    )
+                }
+            }
+        }
+    }
 
     // Pause while backgrounded: a live terminal is not worth the battery when
     // nobody is looking, and reconnecting repaints from a full frame anyway.
@@ -118,17 +154,11 @@ fun PaneScreen(
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    if (showHistory) {
-        BackHandler { showHistory = false }
-        HistoryView(client, row, onBack = { showHistory = false })
-        return
-    }
-
-    // Review is a full-screen push over the pane, exactly as history is, so it
-    // belongs here rather than threaded up through the nav shell. The screen
-    // and its `workspace.diff` / `workspace.ship` calls were finished months
-    // ago; the title bar's "review" was visible, tappable and rippling, and
-    // did nothing, because no caller ever passed the callback.
+    // Review is a full-screen push over the pane, so it belongs here rather
+    // than threaded up through the nav shell. The screen and its
+    // `workspace.diff` / `workspace.ship` calls were finished months ago; the
+    // title bar's "review" was visible, tappable and rippling, and did nothing,
+    // because no caller ever passed the callback.
     if (showReview) {
         BackHandler { showReview = false }
         ReviewScreen(client, row, onBack = { showReview = false })
@@ -208,13 +238,7 @@ fun PaneScreen(
     }
 
     Column(Modifier.fillMaxSize().background(ShepPalette.panelBg).imePadding()) {
-        PaneTitleBar(
-            row,
-            status,
-            onBack = onBack,
-            onReview = { showReview = true },
-            onHistory = { showHistory = true },
-        )
+        PaneTitleBar(row, status, onBack = onBack, onReview = { showReview = true })
 
         OutputToggle(output) {
             output = it
@@ -236,7 +260,7 @@ fun PaneScreen(
                         transcript = transcript,
                         error = transcriptError,
                         loading = transcriptLoading,
-                        onRawScrollback = { showHistory = true },
+                        onLiveTerminal = { output = OutputMode.Live },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -246,15 +270,16 @@ fun PaneScreen(
                 Box(Modifier.fillMaxSize()) {
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val inputView = remember(context) {
-                        ShepInputView(context).apply { onKey = { send(it) } }
+                        ShepInputView(context).apply { onKey = press }
                     }
                     // Keep the sink pointed at the current channel.
-                    inputView.onKey = { send(it) }
+                    inputView.onKey = press
 
                     TerminalGrid(
                         grid = grid,
                         modifier = Modifier.fillMaxSize().testTag("terminal-grid"),
                         onTap = { if (mode == InputMode.Stream) inputView.showKeyboard() },
+                        onScrollRows = { pendingScroll += it },
                     )
                     // Zero-size: it exists only to own the IME connection, so
                     // this dimension is a hack and not a design token.
@@ -292,7 +317,7 @@ fun PaneScreen(
         ModeToggle(mode) { mode = it }
 
         when (mode) {
-            InputMode.Stream -> KeyBar(onKey = { send(it) })
+            InputMode.Stream -> KeyBar(onKey = press)
             InputMode.Queue -> QueueComposer(
                 value = composer,
                 onValue = { composer = it },
@@ -325,7 +350,6 @@ private fun PaneTitleBar(
     status: String,
     onBack: () -> Unit,
     onReview: () -> Unit,
-    onHistory: () -> Unit,
 ) {
     Row(
         Modifier
@@ -343,7 +367,6 @@ private fun PaneTitleBar(
         )
         Text(row.paneId, style = ShepType.agentName.copy(color = ShepPalette.accent))
         Text(row.workspaceLabel, style = ShepType.paneId, modifier = Modifier.weight(1f))
-        ActionText("history", style = ShepType.hint.copy(color = ShepPalette.subtext0), onClick = onHistory)
         ActionText("review", style = ShepType.hint.copy(color = ShepPalette.accent), onClick = onReview)
         StateGlyph(status, style = ShepType.stateGlyphSmall)
     }

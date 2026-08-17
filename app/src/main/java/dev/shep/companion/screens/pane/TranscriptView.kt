@@ -54,7 +54,7 @@ fun TranscriptView(
     transcript: Transcript?,
     error: String?,
     loading: Boolean,
-    onRawScrollback: () -> Unit,
+    onLiveTerminal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -70,11 +70,11 @@ fun TranscriptView(
         if (error != null) {
             TranscriptNotice(error, ShepPalette.red, ShepPalette.redDim)
             Text(
-                "open raw scrollback instead",
+                "open the live terminal instead",
                 style = ShepType.hint.copy(color = ShepPalette.accent),
                 modifier = Modifier
                     .testTag("transcript-fallback")
-                    .clickable { onRawScrollback() }
+                    .clickable { onLiveTerminal() }
                     .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
             )
         } else if (transcript?.source == "matched") {

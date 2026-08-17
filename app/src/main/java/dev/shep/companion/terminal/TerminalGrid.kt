@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -71,7 +72,13 @@ fun TerminalGrid(
     modifier: Modifier = Modifier,
     baseFontSizeSp: Float = ShepType.TERMINAL_BASE_SP,
     onTap: () -> Unit = {},
+    onScrollRows: (Int) -> Unit = {},
 ) {
+    // `pointerInput(Unit)` captures its lambda once, so a callback read
+    // directly inside it is the one from the first composition — which is how
+    // tapping the grid kept opening the keyboard after the input mode changed.
+    val tap by rememberUpdatedState(onTap)
+    val scrollRows by rememberUpdatedState(onScrollRows)
     val measurer = rememberTextMeasurer()
     val style = remember(baseFontSizeSp) {
         TextStyle(fontFamily = JetBrainsMono, fontSize = baseFontSizeSp.sp)
@@ -85,6 +92,10 @@ fun TerminalGrid(
     // Null means "following the cursor". A pan pins it; the viewport changing
     // size (the keyboard) releases it again.
     var panned by remember { mutableStateOf<Offset?>(null) }
+    // Drag the clamp could not absorb, in pixels, waiting to add up to a whole
+    // row. Without it a slow drag is a run of sub-row movements that each
+    // truncate to zero and the pane never scrolls at all.
+    var scrollCarry by remember { mutableFloatStateOf(0f) }
 
     BoxWithConstraints(modifier) {
         val viewW = constraints.maxWidth.toFloat()
@@ -107,7 +118,7 @@ fun TerminalGrid(
                 .semantics { contentDescription = description }
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onTap = { onTap() },
+                        onTap = { tap() },
                         // Snap between "see everything" and native size, and
                         // hand the viewport back to the cursor either way.
                         onDoubleTap = {
@@ -125,10 +136,24 @@ fun TerminalGrid(
                         val from = panned ?: followOffset(
                             grid.cursor, cellW, cellH, scale, gridW, gridH, viewW, viewH,
                         )
-                        panned = clampOffset(
-                            Offset(from.x + pan.x, from.y + pan.y),
-                            gridW * scale, gridH * scale, viewW, viewH,
+                        val wanted = Offset(from.x + pan.x, from.y + pan.y)
+                        val to = clampOffset(
+                            wanted, gridW * scale, gridH * scale, viewW, viewH,
                         )
+                        // Vertical drag the grid had nowhere to go with. Zoomed
+                        // in that is only the part past an edge; zoomed to fit —
+                        // which is the normal case, since a pane is wider than
+                        // it is tall and a phone is not — it is the whole drag.
+                        // Either way it is the gesture asking for content that
+                        // is not on the screen, which is what scrolling is.
+                        scrollCarry += wanted.y - to.y
+                        val rowSpan = cellH * scale
+                        val rows = wholeRows(scrollCarry, rowSpan)
+                        if (rows != 0) {
+                            scrollCarry -= rows * rowSpan
+                            scrollRows(rows)
+                        }
+                        panned = to
                     }
                 },
         ) {
@@ -162,6 +187,18 @@ fun TerminalGrid(
         }
     }
 }
+
+/**
+ * Whole rows of scroll in an accumulated pixel drag.
+ *
+ * Truncates toward zero on purpose, both ways: the remainder stays on the
+ * carry, so a slow drag that never reaches a full row in one frame still
+ * scrolls once it has covered one. Positive is a drag *downward*, which reveals
+ * what is above — back into history, the direction a wheel goes when it is
+ * pushed away from you.
+ */
+internal fun wholeRows(carry: Float, rowSpan: Float): Int =
+    if (rowSpan <= 0f) 0 else (carry / rowSpan).toInt()
 
 /** Keep the grid inside the viewport; never let it be dragged off-screen. */
 internal fun clampOffset(
