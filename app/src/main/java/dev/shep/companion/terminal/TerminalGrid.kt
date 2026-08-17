@@ -4,7 +4,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -55,8 +59,11 @@ private class Run(
  *
  * Zoom is a [androidx.compose.ui.graphics.graphicsLayer]-style scale applied to
  * the whole canvas, so pinching is free and never re-measures text. The default
- * scale fits the pane's full width — the point of the companion is to mirror
- * what the desktop shows, not to reflow it.
+ * **fills the window** rather than fitting the pane's whole width: a 167x54
+ * pane fitted to a phone's width draws at about 6px per cell and still leaves
+ * nearly half the height empty, which is unreadable text *and* a wasted screen.
+ * Filling means the wide side runs off the edge — drag to follow it, pinch or
+ * double-tap to see the pane whole.
  *
  * The viewport *follows the cursor* unless the user has panned away. That is
  * what makes the pane usable with the keyboard up: the IME halves the visible
@@ -83,9 +90,22 @@ fun TerminalGrid(
     val style = remember(baseFontSizeSp) {
         TextStyle(fontFamily = JetBrainsMono, fontSize = baseFontSizeSp.sp)
     }
-    val cell = rememberTerminalCell(baseFontSizeSp)
-    val cellW = cell.width
-    val cellH = cell.height
+    // Monospace: one measurement generalizes to every cell.
+    val cell = remember(style) { measurer.measure("M", style) }
+    val cellW = cell.size.width.toFloat().coerceAtLeast(1f)
+    val cellH = cell.size.height.toFloat().coerceAtLeast(1f)
+    // How much of the viewport the keyboard is currently taking. The pane
+    // screen pads itself by the IME, so the height this composable is given
+    // halves when the keyboard opens — and a default scale computed from that
+    // would resize every glyph on the screen every time you started typing.
+    // Added back, the default is the one the resting window deserves. Minus the
+    // navigation bars, which the root already padded away: `imePadding` only
+    // applies what is left after that, and adding the whole inset back here
+    // overshoots by a nav bar's worth of height.
+    val density = LocalDensity.current
+    val imeHeight = (
+        WindowInsets.ime.getBottom(density) - WindowInsets.navigationBars.getBottom(density)
+        ).coerceAtLeast(0).toFloat()
 
     var scale by remember { mutableFloatStateOf(0f) }
     // Null means "following the cursor". A pan pins it; the viewport changing
@@ -101,9 +121,12 @@ fun TerminalGrid(
         val viewH = constraints.maxHeight.toFloat()
         val gridW = max(grid.cols, 1) * cellW
         val gridH = max(grid.rows, 1) * cellH
-        // Whole width visible: the mirror default.
+        // Whole pane visible; the floor for a pinch, and where a double-tap
+        // goes when you want to see all of it at once.
         val fitScale = if (gridW > 0f) viewW / gridW else 1f
-        val effective = if (scale <= 0f) fitScale else scale
+        // What it opens at: the window full of text.
+        val resting = coverScale(gridW, gridH, viewW, viewH + imeHeight)
+        val effective = if (scale <= 0f) resting else scale
 
         // The IME opening or closing is the case this whole mechanism exists
         // for, and it arrives as a height change.
@@ -118,17 +141,18 @@ fun TerminalGrid(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onTap = { tap() },
-                        // Snap between "see everything" and native size, and
-                        // hand the viewport back to the cursor either way.
+                        // Snap between the two sizes worth having — the
+                        // window full of text, and the whole pane at once —
+                        // and hand the viewport back to the cursor either way.
                         onDoubleTap = {
-                            scale = if (scale > fitScale * 1.05f) fitScale else 1f
+                            scale = if (scale > fitScale * 1.05f) fitScale else resting
                             panned = null
                         },
                     )
                 }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
-                        val before = if (scale <= 0f) fitScale else scale
+                        val before = if (scale <= 0f) resting else scale
                         scale = (before * zoom).coerceIn(fitScale.coerceAtMost(1f), 4f)
                         // Start from wherever the follower had us, so grabbing
                         // the grid never makes it jump.
@@ -140,11 +164,11 @@ fun TerminalGrid(
                             wanted, gridW * scale, gridH * scale, viewW, viewH,
                         )
                         // Vertical drag the grid had nowhere to go with. Zoomed
-                        // in that is only the part past an edge; zoomed to fit —
-                        // which is the normal case, since a pane is wider than
-                        // it is tall and a phone is not — it is the whole drag.
-                        // Either way it is the gesture asking for content that
-                        // is not on the screen, which is what scrolling is.
+                        // in that is only the part past an edge; at the resting
+                        // scale the grid is exactly as tall as the window, so it
+                        // is the whole drag. Either way it is the gesture asking
+                        // for content that is not on the screen, which is what
+                        // scrolling is.
                         scrollCarry += wanted.y - to.y
                         val rowSpan = cellH * scale
                         val rows = wholeRows(scrollCarry, rowSpan)
@@ -188,49 +212,25 @@ fun TerminalGrid(
 }
 
 /**
- * One terminal cell, in pixels, at [baseFontSizeSp].
+ * The scale a pane opens at: never smaller than its width fit, grown toward
+ * filling the height, and stopped at the size the font was measured for.
  *
- * Monospace, so one measurement generalizes to every cell. Exposed rather than
- * kept inside [TerminalGrid] because the layout *around* the grid needs it too:
- * a box that wants to be exactly as tall as the terminal has to measure with
- * the same ruler the terminal draws with.
+ * Fitting the whole grid means fitting its *width*, because a terminal is much
+ * wider than it is tall and a phone is the other way round. For the panes that
+ * matter — a full-screen tab reports 167x54 — that draws about 6px a cell,
+ * which is unreadable, *and* leaves nearly half the window blank. So the height
+ * gets to pull the scale up, and the far right of the pane runs off the edge:
+ * mostly the border an agent draws around its own output, and a drag, a pinch
+ * or a double-tap all go and get it.
+ *
+ * It stops at 1f because past that the text is bigger than the size chosen as
+ * comfortable, and columns would be cropped to pay for it. A short pane — a
+ * 60x21 shell — reaches its width fit and stops there with room to spare, which
+ * is right: the text is already large enough, so there is nothing to buy.
  */
-@OptIn(ExperimentalTextApi::class)
-@Composable
-internal fun rememberTerminalCell(baseFontSizeSp: Float = ShepType.TERMINAL_BASE_SP): Size {
-    val measurer = rememberTextMeasurer()
-    val style = remember(baseFontSizeSp) {
-        TextStyle(fontFamily = JetBrainsMono, fontSize = baseFontSizeSp.sp)
-    }
-    return remember(style) {
-        val cell = measurer.measure("M", style)
-        Size(
-            cell.size.width.toFloat().coerceAtLeast(1f),
-            cell.size.height.toFloat().coerceAtLeast(1f),
-        )
-    }
-}
-
-/**
- * How tall a `cols`×`rows` grid draws once it has been fitted to [width].
- *
- * Fitting to the width is what mirroring the desktop means, and it fixes the
- * scale — so the height is only the grid's shape carried across, and a terminal
- * is much wider than it is tall while a phone is the other way round. A 167×54
- * pane on a phone comes out barely half as tall as the space available, which
- * is the pane's shape rather than a layout that failed to fill.
- *
- * Zero when nothing has been streamed yet, which is not a height to size to.
- */
-internal fun fittedGridHeight(
-    cols: Int,
-    rows: Int,
-    cellW: Float,
-    cellH: Float,
-    width: Float,
-): Float {
-    if (cols <= 0 || rows <= 0 || cellW <= 0f || width <= 0f) return 0f
-    return rows * cellH * (width / (cols * cellW))
+internal fun coverScale(gridW: Float, gridH: Float, viewW: Float, viewH: Float): Float {
+    if (gridW <= 0f || gridH <= 0f || viewW <= 0f || viewH <= 0f) return 1f
+    return max(viewW / gridW, (viewH / gridH).coerceAtMost(1f))
 }
 
 /**
