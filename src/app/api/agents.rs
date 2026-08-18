@@ -188,15 +188,14 @@ impl App {
         {
             return agent_not_found(id, &params.target);
         }
-        // `\r` is Enter at the pty layer: agent CLIs submit on it. Without it
-        // the text lands in the REPL input but never executes (slash commands
-        // included) — the same convention the TUI queue modal uses
-        // (app/input/modal.rs). Strip client-supplied trailing newlines so we
-        // submit exactly once.
-        let text = format!("{}\r", params.text.trim_end_matches(['\r', '\n']));
-        if let Err(err) =
-            self.send_or_queue_pane_text(resolved.ws_idx, resolved.pane_id, text, params.queue)
-        {
+        // The prompt alone: `send_or_queue_pane_text` owns submitting it, and
+        // how that is encoded is a fact about the pane rather than the caller.
+        if let Err(err) = self.send_or_queue_pane_text(
+            resolved.ws_idx,
+            resolved.pane_id,
+            params.text,
+            params.queue,
+        ) {
             return encode_error(id, "agent_send_failed", err);
         }
 
@@ -275,24 +274,35 @@ mod tests {
         assert_eq!(agent.agent_status, AgentStatus::Idle);
     }
 
-    #[tokio::test]
-    async fn agent_send_appends_submit_enter_before_queueing() {
+    /// Set the pane up so `agent.send` has somewhere to write, and hand back
+    /// the bytes channel the pty would have been reading.
+    fn app_with_sendable_agent(
+        state: AgentState,
+    ) -> (
+        App,
+        crate::layout::PaneId,
+        tokio::sync::mpsc::Receiver<bytes::Bytes>,
+    ) {
         let mut app = app_with_agent();
         let pane_id = app.state.workspaces[0].tabs[0].root_pane;
         let terminal_id = app.state.workspaces[0].tabs[0].panes[&pane_id]
             .attached_terminal_id
             .clone();
         // agent.send refuses a target with no live runtime, so the pane needs
-        // one before the queue path is reachable at all.
-        app.state.workspaces[0].insert_test_runtime(
-            pane_id,
-            crate::terminal::TerminalRuntime::test_with_screen_bytes(80, 24, b""),
-        );
+        // one before either path is reachable at all.
+        let (runtime, rx) = crate::terminal::TerminalRuntime::test_with_channel_capacity(80, 24, 8);
+        app.state.workspaces[0].insert_test_runtime(pane_id, runtime);
         app.state
             .terminals
             .get_mut(&terminal_id)
             .unwrap()
-            .set_detected_state(Some(Agent::Pi), AgentState::Working);
+            .set_detected_state(Some(Agent::Pi), state);
+        (app, pane_id, rx)
+    }
+
+    #[tokio::test]
+    async fn agent_send_queues_the_prompt_and_submits_it_on_flush() {
+        let (mut app, pane_id, mut rx) = app_with_sendable_agent(AgentState::Working);
 
         let response = app.handle_agent_send(
             "req".into(),
@@ -305,9 +315,73 @@ mod tests {
 
         let success: SuccessResponse = serde_json::from_str(&response).unwrap();
         assert_eq!(success.result, ResponseResult::Ok {});
-        // `\r` is Enter at the pty layer: without it the text sat un-submitted
-        // in the REPL input and slash commands never executed.
-        let queued = &app.state.queued_pane_input[&pane_id];
-        assert_eq!(queued, &vec!["/model\r".to_string()]);
+        // The prompt is stored as a prompt. How it reaches the pty depends on
+        // what the pane has negotiated by the time it is delivered, which is
+        // not knowable when it is queued.
+        assert_eq!(
+            &app.state.queued_pane_input[&pane_id],
+            &vec!["/model".to_string()],
+        );
+        assert!(rx.try_recv().is_err(), "a queued prompt writes nothing yet");
+
+        assert_eq!(app.flush_queued_pane_input(pane_id), 1);
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"/model"));
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"\r"));
+    }
+
+    /// The Enter that submits a prompt is written on its own.
+    ///
+    /// Concatenated — `{text}\r` in one buffer — an agent CLI reads the burst
+    /// as pasted content and the carriage return becomes a newline inside its
+    /// input box, so the prompt sits there unsent. That is the "send adds a
+    /// blank line instead of submitting" report from the phone.
+    #[tokio::test]
+    async fn agent_send_submits_with_a_separate_enter() {
+        let (mut app, _pane_id, mut rx) = app_with_sendable_agent(AgentState::Idle);
+
+        let response = app.handle_agent_send(
+            "req".into(),
+            AgentSendParams {
+                target: "pi".into(),
+                text: "run the tests\r\n".into(),
+                queue: false,
+            },
+        );
+
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(success.result, ResponseResult::Ok {});
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            bytes::Bytes::from_static(b"run the tests"),
+            "client newlines are stripped, or we submit twice",
+        );
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"\r"));
+        assert!(rx.try_recv().is_err());
+    }
+
+    /// A pane that asked for bracketed paste gets one, with the Enter outside
+    /// it — the marker is what makes "this is text" unambiguous.
+    #[tokio::test]
+    async fn agent_send_brackets_the_prompt_when_the_pane_negotiated_paste() {
+        let (mut app, pane_id, mut rx) = app_with_sendable_agent(AgentState::Idle);
+        app.state
+            .runtime_for_pane_in_workspace(&app.terminal_runtimes, 0, pane_id)
+            .expect("runtime")
+            .test_process_pty_bytes(b"\x1b[?2004h");
+
+        app.handle_agent_send(
+            "req".into(),
+            AgentSendParams {
+                target: "pi".into(),
+                text: "hello".into(),
+                queue: false,
+            },
+        );
+
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            bytes::Bytes::from_static(b"\x1b[200~hello\x1b[201~"),
+        );
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"\r"));
     }
 }

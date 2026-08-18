@@ -981,10 +981,7 @@ impl App {
                 let target = self.state.queue_prompt_target.take();
                 cancel_rename_modal(&mut self.state);
                 if let (Some((ws_idx, pane_id)), false) = (target, text.is_empty()) {
-                    // `\r` submits in agent CLIs.
-                    if let Err(err) =
-                        self.send_or_queue_pane_text(ws_idx, pane_id, format!("{text}\r"), true)
-                    {
+                    if let Err(err) = self.send_or_queue_pane_text(ws_idx, pane_id, text, true) {
                         tracing::warn!(err = %err, "queue prompt failed");
                     }
                 }

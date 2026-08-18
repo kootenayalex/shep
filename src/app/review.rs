@@ -129,15 +129,20 @@ impl crate::app::App {
         let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
             return;
         };
-        // `\r` is Enter at the pty layer: agent CLIs submit on it.
-        if let Err(err) = runtime.try_send_bytes(Bytes::from(format!("{feedback}\r"))) {
+        if let Err(err) = submit_pane_text(runtime, feedback.trim_end_matches(['\r', '\n'])) {
             tracing::warn!(err = %err, "failed to send review feedback");
         }
     }
 
-    /// Send `text` into a pane now, or queue it until the agent next goes
+    /// Submit `text` to a pane now, or queue it until the agent next goes
     /// idle when `queue` is set and the agent is working/blocked (M5
-    /// tab-to-queue). Queued text is delivered verbatim.
+    /// tab-to-queue).
+    ///
+    /// Pass the prompt alone: submitting it is this function's job, and it is
+    /// [`submit_pane_text`] that decides what the pty actually sees. Queued
+    /// text is stored as the prompt and encoded when it is finally delivered,
+    /// because whether the pane wants a bracketed paste is a fact about the
+    /// pane at delivery time.
     pub(crate) fn send_or_queue_pane_text(
         &mut self,
         ws_idx: usize,
@@ -146,6 +151,8 @@ impl crate::app::App {
         queue: bool,
     ) -> Result<(), String> {
         use crate::detect::AgentState;
+        // Trailing newlines from a client would submit a second, empty time.
+        let text = text.trim_end_matches(['\r', '\n']).to_string();
         let busy = queue
             && self
                 .state
@@ -167,9 +174,7 @@ impl crate::app::App {
         let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
             return Err("pane has no runtime".to_string());
         };
-        runtime
-            .try_send_bytes(Bytes::from(text))
-            .map_err(|err| err.to_string())
+        submit_pane_text(runtime, &text)
     }
 
     /// Flush any input queued for `pane_id` (called on its transition to
@@ -191,7 +196,7 @@ impl crate::app::App {
         };
         let mut delivered = 0;
         for text in queued {
-            match runtime.try_send_bytes(Bytes::from(text)) {
+            match submit_pane_text(runtime, &text) {
                 Ok(()) => delivered += 1,
                 Err(err) => {
                     tracing::warn!(err = %err, "queued input delivery failed");
@@ -216,6 +221,30 @@ impl crate::app::App {
             target: None,
         });
     }
+}
+
+/// Write `text` into a pane as a submitted prompt: the text, then Enter.
+///
+/// The two go out as **separate writes**, and the text goes as a *paste* when
+/// the pane negotiated bracketed paste. Concatenating them — `{text}\r` in one
+/// buffer, which is what this used to do — hands an agent CLI a single burst of
+/// bytes ending in a carriage return, and the readline libraries they are built
+/// on read a burst like that as pasted content: the `\r` becomes a newline
+/// *inside* the input box instead of the keypress that submits it. Claude does
+/// exactly this, which is why prompts sent from the phone sometimes landed as
+/// an extra blank line and sat there unsent. Bracketing says "this part is
+/// text" explicitly, so the Enter after the paste-end marker is unambiguous.
+///
+/// `\r`, not `\n`: Enter at the pty layer is a carriage return, and agent CLIs
+/// submit on it.
+fn submit_pane_text(runtime: &crate::terminal::TerminalRuntime, text: &str) -> Result<(), String> {
+    let encoded = crate::app::api_helpers::encode_api_text(runtime, text);
+    runtime
+        .try_send_bytes(Bytes::from(encoded))
+        .map_err(|err| err.to_string())?;
+    runtime
+        .try_send_bytes(Bytes::from_static(b"\r"))
+        .map_err(|err| err.to_string())
 }
 
 /// The merge half of ship, separated from workspace state for testing against
