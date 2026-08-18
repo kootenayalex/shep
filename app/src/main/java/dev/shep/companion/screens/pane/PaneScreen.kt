@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,14 +21,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -45,6 +50,7 @@ import dev.shep.companion.terminal.KeyBar
 import dev.shep.companion.terminal.ShepInputView
 import dev.shep.companion.terminal.TerminalGrid
 import dev.shep.companion.terminal.TerminalKey
+import dev.shep.companion.terminal.stepFontSize
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.StateGlyph
@@ -66,6 +72,12 @@ import androidx.compose.material3.minimumInteractiveComponentSize
  * that a fling is a handful of requests rather than one per pointer event.
  */
 private const val SCROLL_FLUSH_MS = 50L
+
+/** Where the chosen terminal text size and any unsent drafts are kept. */
+private const val PREFS = "shep"
+private const val PREF_TERMINAL_SP = "terminal_sp"
+
+private fun draftKey(paneId: String) = "draft:$paneId"
 
 /** Live keystrokes, or compose-and-queue for when the agent is busy. */
 enum class InputMode { Stream, Queue }
@@ -94,12 +106,27 @@ fun PaneScreen(
     onBack: () -> Unit,
 ) {
     val grid = remember(row.paneId) { GridState() }
+    val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+    }
     var status by remember { mutableStateOf(row.status) }
     var notice by remember { mutableStateOf<String?>(null) }
     var ended by remember { mutableStateOf<String?>(null) }
     var mode by remember { mutableStateOf(InputMode.Stream) }
     var output by remember { mutableStateOf(OutputMode.Live) }
-    var composer by remember { mutableStateOf("") }
+    // The terminal's text size is a setting, not a session: picking a readable
+    // size once should not have to be redone on every pane, or after a restart.
+    var fontSizeSp by remember {
+        mutableFloatStateOf(prefs.getFloat(PREF_TERMINAL_SP, ShepType.TERMINAL_BASE_SP))
+    }
+    LaunchedEffect(fontSizeSp) { prefs.edit().putFloat(PREF_TERMINAL_SP, fontSizeSp).apply() }
+    // A half-written prompt is worth more than the app's process. Kept across a
+    // rotation by `rememberSaveable`, and across being swiped away or killed in
+    // the background by the draft below — which is how it used to vanish.
+    var composer by rememberSaveable(row.paneId) {
+        mutableStateOf(prefs.getString(draftKey(row.paneId), "").orEmpty())
+    }
     // Rows the drag gesture has asked for and the flush below has not sent yet.
     // A fling is sixty pointer events a second; one request each would put the
     // scroll behind the finger by the time it stopped moving.
@@ -152,6 +179,26 @@ fun PaneScreen(
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    // Park the draft whenever the screen stops being watched. `ON_STOP` is the
+    // last moment guaranteed to run before the process can be killed, so this
+    // is the difference between minimising the app and losing what you typed.
+    val draft by rememberUpdatedState(composer)
+    DisposableEffect(lifecycle, row.paneId) {
+        val save = {
+            prefs.edit().apply {
+                if (draft.isBlank()) remove(draftKey(row.paneId)) else putString(draftKey(row.paneId), draft)
+            }.apply()
+        }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) save()
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            save()
+        }
     }
 
     // Review is a full-screen push over the pane, so it belongs here rather
@@ -238,15 +285,13 @@ fun PaneScreen(
     }
 
     Column(Modifier.fillMaxSize().background(ShepPalette.panelBg).imePadding()) {
-        PaneTitleBar(row, status, onBack = onBack, onReview = { showReview = true })
-
-        OutputToggle(output) {
-            output = it
-            // The two halves pair by default: a chat wants a composer, a live
-            // terminal wants keystrokes. The input toggle stays right there, so
-            // this is a default rather than a decision.
-            mode = if (it == OutputMode.Recorded) InputMode.Queue else InputMode.Stream
-        }
+        PaneTitleBar(
+            row,
+            status,
+            onBack = onBack,
+            fontSizeSp = fontSizeSp,
+            onFontSizeSp = { fontSizeSp = it },
+        )
 
         Box(
             Modifier
@@ -278,6 +323,8 @@ fun PaneScreen(
                     TerminalGrid(
                         grid = grid,
                         modifier = Modifier.fillMaxSize().testTag("terminal-grid"),
+                        fontSizeSp = fontSizeSp,
+                        onFontSizeSp = { fontSizeSp = it },
                         onTap = { if (mode == InputMode.Stream) inputView.showKeyboard() },
                         onScrollRows = { pendingScroll += it },
                     )
@@ -314,7 +361,19 @@ fun PaneScreen(
             )
         }
 
-        ModeToggle(mode) { mode = it }
+        InputBar(
+            mode = mode,
+            onMode = { mode = it },
+            output = output,
+            onOutput = {
+                output = it
+                // The two halves pair by default: a chat wants a composer, a
+                // live terminal wants keystrokes. The input chips are right
+                // there, so this is a default rather than a decision.
+                mode = if (it == OutputMode.Recorded) InputMode.Queue else InputMode.Stream
+            },
+            onReview = { showReview = true },
+        )
 
         when (mode) {
             InputMode.Stream -> KeyBar(onKey = press)
@@ -349,7 +408,8 @@ private fun PaneTitleBar(
     row: AgentRow,
     status: String,
     onBack: () -> Unit,
-    onReview: () -> Unit,
+    fontSizeSp: Float,
+    onFontSizeSp: (Float) -> Unit,
 ) {
     Row(
         Modifier
@@ -367,8 +427,40 @@ private fun PaneTitleBar(
         )
         Text(row.paneId, style = ShepType.agentName.copy(color = ShepPalette.accent))
         Text(row.workspaceLabel, style = ShepType.paneId, modifier = Modifier.weight(1f))
-        ActionText("review", style = ShepType.hint.copy(color = ShepPalette.accent), onClick = onReview)
+        TextSizeControl(fontSizeSp, onFontSizeSp)
         StateGlyph(status, style = ShepType.stateGlyphSmall)
+    }
+}
+
+/**
+ * How big the terminal's text is.
+ *
+ * The most consequential control on the screen, because the size is also the
+ * wrap: bigger text means fewer of the pane's columns per line and more lines
+ * to scroll, smaller means more of the agent's own layout survives intact.
+ * Living in the title bar is the point — it is adjusted while reading, not
+ * found in a settings screen.
+ */
+@Composable
+private fun TextSizeControl(sp: Float, onSp: (Float) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ActionText(
+            "−",
+            style = ShepType.key.copy(color = ShepPalette.accent),
+            description = "smaller terminal text",
+            onClick = { onSp(stepFontSize(sp, -1)) },
+        )
+        Text(
+            sp.toInt().toString(),
+            style = ShepType.paneId,
+            modifier = Modifier.testTag("terminal-size"),
+        )
+        ActionText(
+            "+",
+            style = ShepType.key.copy(color = ShepPalette.accent),
+            description = "bigger terminal text",
+            onClick = { onSp(stepFontSize(sp, 1)) },
+        )
     }
 }
 
@@ -401,14 +493,23 @@ private fun PaneFrame(
 }
 
 /**
- * Two toggles, one shape.
+ * One row for everything that is not the terminal itself.
  *
- * Output and input each have a live mode and a considered one, and they read as
- * a pair; the `out`/`in` labels are what stop two chips called "live" from
- * being ambiguous.
+ * There used to be two: an `out` row choosing live terminal or recorded chat,
+ * and an `in` row choosing keystrokes or a composer. On a phone that is two
+ * bands of chrome between the pane and the keyboard, for one decision each. The
+ * output modes are two states, so they are one word naming where you are *not*
+ * — and switching output still carries the input with it, which is why the two
+ * ever read as a pair.
  */
 @Composable
-private fun ToggleRow(label: String, content: @Composable () -> Unit) {
+private fun InputBar(
+    mode: InputMode,
+    onMode: (InputMode) -> Unit,
+    output: OutputMode,
+    onOutput: (OutputMode) -> Unit,
+    onReview: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -417,31 +518,28 @@ private fun ToggleRow(label: String, content: @Composable () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = ShepType.viewTitle)
-        content()
+        Text("in", style = ShepType.viewTitle)
+        ModeChip("live", mode == InputMode.Stream) { onMode(InputMode.Stream) }
+        ModeChip("⇥ queue", mode == InputMode.Queue) { onMode(InputMode.Queue) }
+        Spacer(Modifier.weight(1f))
+        val recorded = output == OutputMode.Recorded
+        ActionText(
+            if (recorded) "terminal" else "recorded",
+            style = ShepType.hint.copy(color = ShepPalette.accent),
+            description = if (recorded) "back to the live terminal" else "read the recorded conversation",
+            onClick = { onOutput(if (recorded) OutputMode.Live else OutputMode.Recorded) },
+        )
+        ActionText(
+            "review",
+            style = ShepType.hint.copy(color = ShepPalette.accent),
+            onClick = onReview,
+        )
     }
 }
 
 @Composable
-private fun OutputToggle(mode: OutputMode, onMode: (OutputMode) -> Unit) {
-    ToggleRow("out") {
-        ModeChip("live", mode == OutputMode.Live, "out") { onMode(OutputMode.Live) }
-        ModeChip("recorded", mode == OutputMode.Recorded, "out") { onMode(OutputMode.Recorded) }
-    }
-}
-
-@Composable
-private fun ModeToggle(mode: InputMode, onMode: (InputMode) -> Unit) {
-    ToggleRow("in") {
-        ModeChip("live", mode == InputMode.Stream, "in") { onMode(InputMode.Stream) }
-        ModeChip("⇥ queue", mode == InputMode.Queue, "in") { onMode(InputMode.Queue) }
-    }
-}
-
-@Composable
-private fun ModeChip(label: String, on: Boolean, side: String = "in", onClick: () -> Unit) {
-    // Both rows have a chip called "live"; the side keeps the tags apart.
-    ShepChip(label, on, modifier = Modifier.testTag("mode-$side-$label"), onClick = onClick)
+private fun ModeChip(label: String, on: Boolean, onClick: () -> Unit) {
+    ShepChip(label, on, modifier = Modifier.testTag("mode-in-$label"), onClick = onClick)
 }
 
 @Composable
