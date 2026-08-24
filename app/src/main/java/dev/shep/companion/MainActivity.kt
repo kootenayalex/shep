@@ -145,9 +145,9 @@ class MainActivity : ComponentActivity() {
  * switch. Five peers in a bar is a menu you read — three is one you aim at.
  */
 enum class Tab(val label: String, val glyph: String) {
-    Chats("chats", "◫"),
+    Chats("agents", "◫"),
     Tasks("tasks", "☰"),
-    You("you", "⚙"),
+    You("more", "⚙"),
 }
 
 @Composable

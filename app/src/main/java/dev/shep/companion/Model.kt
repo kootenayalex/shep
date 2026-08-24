@@ -276,6 +276,7 @@ data class TaskRow(
     val useWorktree: Boolean,
     val state: String,
     val workspaceId: String?,
+    val assignedPaneId: String? = null,
 )
 
 /** Zeigarnik order: open loops first (running, blocked, todo), finished last. */
@@ -308,6 +309,8 @@ fun parseTasks(result: JSONObject): List<TaskRow> {
                 // so guard with isNull before falling back to empty→null.
                 workspaceId = if (t.isNull("workspace_id")) null
                 else t.optString("workspace_id").ifEmpty { null },
+                assignedPaneId = if (t.isNull("assigned_pane_id")) null
+                else t.optString("assigned_pane_id").ifEmpty { null },
             )
         )
     }

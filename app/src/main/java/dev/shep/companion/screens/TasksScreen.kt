@@ -17,8 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +36,7 @@ import dev.shep.companion.parseOverview
 import dev.shep.companion.parseTasks
 import dev.shep.companion.repoName
 import dev.shep.companion.taskIsOpen
+import dev.shep.companion.statusPriority
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.ButtonTone
 import dev.shep.companion.ui.components.EmptyState
@@ -76,6 +75,7 @@ fun TasksScreen(
 ) {
     var tasks by remember { mutableStateOf<List<TaskRow>>(emptyList()) }
     var sessions by remember { mutableStateOf<List<AgentRow>>(emptyList()) }
+    var sessionsLoaded by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("loading") }
     var notice by remember { mutableStateOf<String?>(null) }
     var assigning by remember { mutableStateOf<TaskRow?>(null) }
@@ -88,7 +88,12 @@ fun TasksScreen(
         // The board is what makes a task assignable, so it is polled alongside
         // the queue rather than fetched only when the picker opens.
         withContext(Dispatchers.IO) { runCatching { client.call("session.overview") } }
-            .onSuccess { result -> parseOverview(result)?.let { sessions = it.agents } }
+            .onSuccess { result ->
+                parseOverview(result)?.let {
+                    sessions = it.agents
+                    sessionsLoaded = true
+                }
+            }
     }
 
     // Poll so state transitions (the gate) show without a manual refresh.
@@ -131,6 +136,11 @@ fun TasksScreen(
                 items(tasks, key = { it.id }) { task ->
                     TaskCard(
                         task = task,
+                        assignedAgent = if (sessionsLoaded) {
+                            sessions.firstOrNull { it.paneId == task.assignedPaneId }
+                        } else {
+                            null
+                        },
                         onDispatch = {
                             act("dispatching #${task.id}", "task.dispatch", JSONObject().put("task_id", task.id))
                         },
@@ -173,7 +183,8 @@ fun TasksScreen(
                                 "task.assign",
                                 JSONObject()
                                     .put("id", task.id)
-                                    .put("workspace_id", row.workspaceId),
+                                    .put("workspace_id", row.workspaceId)
+                                    .put("pane_id", row.paneId),
                             )
                         }
                     }
@@ -187,18 +198,43 @@ fun TasksScreen(
     if (showAdd) {
         AddTaskSheet(
             knownRepos = knownRepos,
+            agents = sessions,
             onDismiss = { onShowAddChange(false) },
-            onSubmit = { prompt, repo, runtime, worktree ->
+            onSubmit = { prompt, repo, runtime, agent ->
                 onShowAddChange(false)
-                act(
-                    "queued task",
-                    "task.add",
-                    JSONObject()
-                        .put("prompt", prompt)
-                        .put("repo", repo)
-                        .put("runtime", runtime)
-                        .put("worktree", worktree),
-                )
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            val created = client.call(
+                                "task.add",
+                                JSONObject()
+                                    .put("prompt", prompt)
+                                    .put("repo", repo)
+                                    .put("runtime", runtime)
+                                    .put("worktree", false),
+                            )
+                            val taskId = created.getLong("id")
+                            client.call(
+                                "agent.send",
+                                JSONObject()
+                                    .put("target", agent.paneId)
+                                    .put("text", prompt)
+                                    .put("queue", true),
+                            )
+                            client.call(
+                                "task.assign",
+                                JSONObject()
+                                    .put("id", taskId)
+                                    .put("workspace_id", agent.workspaceId)
+                                    .put("pane_id", agent.paneId),
+                            )
+                            agent
+                        }
+                    }.onSuccess { target ->
+                        notice = "assigned to ${target.displayName ?: target.agent}"
+                        refresh()
+                    }.onFailure { notice = "could not assign task: ${it.message}" }
+                }
             },
         )
     }
@@ -207,6 +243,7 @@ fun TasksScreen(
 @Composable
 fun TaskCard(
     task: TaskRow,
+    assignedAgent: AgentRow? = null,
     onDispatch: () -> Unit,
     onCancel: () -> Unit,
     onAssign: () -> Unit = {},
@@ -232,6 +269,18 @@ fun TaskCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        task.assignedPaneId?.takeIf { task.state == "running" || taskIsOpen(task.state) }?.let {
+            if (assignedAgent == null) {
+                Text("agent unavailable · target disappeared", style = ShepType.meta.copy(color = ShepPalette.peach))
+            } else {
+                Text(
+                    "assigned to ${assignedAgent.displayName ?: assignedAgent.agent}",
+                    style = ShepType.meta.copy(color = ShepPalette.teal),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         Spacer(Modifier.height(ShepSpace.small))
         Row(
             Modifier.fillMaxWidth(),
@@ -256,13 +305,14 @@ fun TaskCard(
 @Composable
 fun AddTaskSheet(
     knownRepos: List<String>,
+    agents: List<AgentRow>,
     onDismiss: () -> Unit,
-    onSubmit: (prompt: String, repo: String, runtime: String, worktree: Boolean) -> Unit,
+    onSubmit: (prompt: String, repo: String, runtime: String, agent: AgentRow) -> Unit,
 ) {
     var prompt by remember { mutableStateOf("") }
     var repo by remember { mutableStateOf(knownRepos.firstOrNull() ?: "") }
     var runtime by remember { mutableStateOf("claude") }
-    var worktree by remember { mutableStateOf(false) }
+    var selectedAgent by remember(agents) { mutableStateOf(agents.firstOrNull()) }
     var voiceError by remember { mutableStateOf<String?>(null) }
 
     // A6 voice add-task: the system recognizer app does the recording, so we
@@ -329,6 +379,24 @@ fun AddTaskSheet(
             }
         }
         Spacer(Modifier.height(ShepSpace.small))
+        Text("assign to agent", style = ShepType.sectionLabel)
+        if (agents.isEmpty()) {
+            Text("no live agents available", style = ShepType.meta.copy(color = ShepPalette.peach))
+        } else {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
+            ) {
+                agents.sortedWith(compareBy({ statusPriority(it.status) }, { it.workspaceLabel }))
+                    .forEach { agent ->
+                        ShepChip(
+                            (agent.displayName ?: agent.agent) + " · " + agent.workspaceLabel,
+                            selectedAgent?.paneId == agent.paneId,
+                        ) { selectedAgent = agent }
+                    }
+            }
+        }
+        Spacer(Modifier.height(ShepSpace.small))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("runtime", style = ShepType.sectionLabel)
             Spacer(Modifier.width(ShepSpace.medium))
@@ -338,25 +406,13 @@ fun AddTaskSheet(
                 }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(
-                checked = worktree,
-                onCheckedChange = { worktree = it },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = ShepPalette.panelBg,
-                    checkedTrackColor = ShepPalette.accent,
-                    uncheckedThumbColor = ShepPalette.overlay0,
-                    uncheckedTrackColor = ShepPalette.surface0,
-                ),
-            )
-            Spacer(Modifier.width(ShepSpace.small))
-            Text("isolate in a worktree", style = ShepType.itemName)
-        }
         Spacer(Modifier.height(ShepSpace.medium))
         ShepButton(
             "queue task",
-            onClick = { onSubmit(prompt.trim(), repo.trim(), runtime, worktree) },
-            enabled = prompt.isNotBlank() && repo.isNotBlank(),
+            onClick = {
+                selectedAgent?.let { onSubmit(prompt.trim(), repo.trim(), runtime, it) }
+            },
+            enabled = prompt.isNotBlank() && repo.isNotBlank() && selectedAgent != null,
             modifier = Modifier.fillMaxWidth(),
         )
     }

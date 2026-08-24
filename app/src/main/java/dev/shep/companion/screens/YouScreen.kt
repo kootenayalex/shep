@@ -20,7 +20,7 @@ import dev.shep.companion.ui.theme.ShepSpace
 
 /** The two things that are about you rather than about the session. */
 enum class YouSection(val label: String) {
-    Shep("shep"),
+    Shep("server"),
     Memory("memory"),
 }
 

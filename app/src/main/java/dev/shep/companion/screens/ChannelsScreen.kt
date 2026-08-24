@@ -387,7 +387,7 @@ fun ChannelsScreen(
         .flatMap { it.panes }.mapNotNull { it.cwd }).distinct()
 
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("shep") {
+        ScreenHeader("agents") {
             Text(status, style = ShepType.meta)
             Spacer(Modifier.width(ShepSpace.small))
             ActionText("+ new", style = ShepType.actionStrong) { showNew = true }
