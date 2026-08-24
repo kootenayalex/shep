@@ -79,6 +79,8 @@ pub(crate) struct TaskRecord {
     pub state: TaskState,
     /// Workspace the task was dispatched into (drives state tracking).
     pub workspace_id: Option<String>,
+    /// Exact agent pane the task was assigned to, when applicable.
+    pub assigned_pane_id: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -105,9 +107,24 @@ pub(crate) fn open_store(path: &Path) -> io::Result<Connection> {
             workspace_id TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
-        );",
+         );",
     )
     .map_err(io_err)?;
+    // Tasks databases predate exact agent assignment. Keep old queues usable
+    // while recording the pane identity for new assignments.
+    let has_pane = conn
+        .prepare("PRAGMA table_info(tasks)")
+        .map_err(io_err)?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(io_err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(io_err)?
+        .iter()
+        .any(|name| name == "assigned_pane_id");
+    if !has_pane {
+        conn.execute("ALTER TABLE tasks ADD COLUMN assigned_pane_id TEXT", [])
+            .map_err(io_err)?;
+    }
     Ok(conn)
 }
 
@@ -138,7 +155,7 @@ pub(crate) fn list_tasks(conn: &Connection) -> io::Result<Vec<TaskRecord>> {
     let mut statement = conn
         .prepare(
             "SELECT id, prompt, repo, runtime, use_worktree, state, workspace_id,
-                    created_at, updated_at
+                    assigned_pane_id, created_at, updated_at
              FROM tasks ORDER BY id",
         )
         .map_err(io_err)?;
@@ -166,14 +183,20 @@ pub(crate) fn set_task_state(
     id: i64,
     state: TaskState,
     workspace_id: Option<&str>,
+    pane_id: Option<&str>,
     now: i64,
 ) -> io::Result<()> {
-    match workspace_id {
-        Some(workspace_id) => conn.execute(
-            "UPDATE tasks SET state = ?2, workspace_id = ?3, updated_at = ?4 WHERE id = ?1",
-            rusqlite::params![id, state.as_str(), workspace_id, now],
+    match (workspace_id, pane_id) {
+        (Some(workspace_id), Some(pane_id)) => conn.execute(
+            "UPDATE tasks SET state = ?2, workspace_id = ?3, assigned_pane_id = ?4,
+             updated_at = ?5 WHERE id = ?1",
+            rusqlite::params![id, state.as_str(), workspace_id, pane_id, now],
         ),
-        None => conn.execute(
+        (Some(_workspace_id), None) => conn.execute(
+            "UPDATE tasks SET state = ?2, updated_at = ?3 WHERE id = ?1",
+            rusqlite::params![id, state.as_str(), now],
+        ),
+        (None, _) => conn.execute(
             "UPDATE tasks SET state = ?2, updated_at = ?3 WHERE id = ?1",
             rusqlite::params![id, state.as_str(), now],
         ),
@@ -225,25 +248,32 @@ pub(crate) fn assign_task(
     conn: &Connection,
     id: i64,
     workspace_id: &str,
+    pane_id: &str,
     now: i64,
 ) -> io::Result<bool> {
     let changed = conn
         .execute(
-            "UPDATE tasks SET state = 'running', workspace_id = ?2, updated_at = ?3
-             WHERE id = ?1 AND state IN ('todo', 'blocked')",
-            rusqlite::params![id, workspace_id, now],
+            "UPDATE tasks SET state = 'running', workspace_id = ?2, assigned_pane_id = ?3,
+             updated_at = ?4 WHERE id = ?1 AND state IN ('todo', 'blocked')",
+            rusqlite::params![id, workspace_id, pane_id, now],
         )
         .map_err(io_err)?;
     Ok(changed > 0)
 }
 
-/// The running task (if any) dispatched into `workspace_id`.
-pub(crate) fn task_for_workspace(
+/// The running task assigned to `pane_id`.
+///
+/// The workspace fallback upgrades queues created before exact assignment was
+/// added; once their state changes, the caller writes the exact pane id.
+pub(crate) fn task_for_pane(
     conn: &Connection,
+    pane_id: &str,
     workspace_id: &str,
 ) -> io::Result<Option<TaskRecord>> {
     Ok(list_tasks(conn)?.into_iter().find(|task| {
-        task.workspace_id.as_deref() == Some(workspace_id)
+        (task.assigned_pane_id.as_deref() == Some(pane_id)
+            || (task.assigned_pane_id.is_none()
+                && task.workspace_id.as_deref() == Some(workspace_id)))
             && matches!(task.state, TaskState::Running | TaskState::Blocked)
     }))
 }
@@ -272,8 +302,9 @@ fn row_to_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<TaskRecord> {
         use_worktree: row.get::<_, i64>(4)? != 0,
         state: TaskState::parse(&state).unwrap_or(TaskState::Todo),
         workspace_id: row.get(6)?,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
+        assigned_pane_id: row.get(7)?,
+        created_at: row.get(8)?,
+        updated_at: row.get(9)?,
     })
 }
 
@@ -345,14 +376,14 @@ mod tests {
     fn state_transitions_and_workspace_linkage() {
         let (dir, conn) = temp_store("state");
         let id = add_task(&conn, "p", Path::new("/r"), TaskRuntime::Claude, false, 1).unwrap();
-        set_task_state(&conn, id, TaskState::Running, Some("w1"), 2).unwrap();
+        set_task_state(&conn, id, TaskState::Running, Some("w1"), Some("w1:p1"), 2).unwrap();
         let task = get_task(&conn, id).unwrap().unwrap();
         assert_eq!(task.state, TaskState::Running);
         assert_eq!(task.workspace_id.as_deref(), Some("w1"));
         assert_eq!(task.updated_at, 2);
-        assert_eq!(task_for_workspace(&conn, "w1").unwrap().unwrap().id, id);
+        assert_eq!(task_for_pane(&conn, "w1:p1", "w1").unwrap().unwrap().id, id);
         // State-only update keeps the linkage.
-        set_task_state(&conn, id, TaskState::Blocked, None, 3).unwrap();
+        set_task_state(&conn, id, TaskState::Blocked, None, None, 3).unwrap();
         assert_eq!(
             get_task(&conn, id)
                 .unwrap()
@@ -377,7 +408,7 @@ mod tests {
         // Already cancelled: no-op.
         assert!(!cancel_task(&conn, id, 3).unwrap());
         let done = add_task(&conn, "q", Path::new("/r"), TaskRuntime::Claude, false, 4).unwrap();
-        set_task_state(&conn, done, TaskState::Done, None, 5).unwrap();
+        set_task_state(&conn, done, TaskState::Done, None, None, 5).unwrap();
         assert!(!cancel_task(&conn, done, 6).unwrap());
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -390,9 +421,17 @@ mod tests {
         let cancelled =
             add_task(&conn, "c", Path::new("/r"), TaskRuntime::Claude, false, 3).unwrap();
         let running = add_task(&conn, "d", Path::new("/r"), TaskRuntime::Claude, false, 4).unwrap();
-        set_task_state(&conn, done, TaskState::Done, None, 5).unwrap();
+        set_task_state(&conn, done, TaskState::Done, None, None, 5).unwrap();
         cancel_task(&conn, cancelled, 6).unwrap();
-        set_task_state(&conn, running, TaskState::Running, Some("w1"), 7).unwrap();
+        set_task_state(
+            &conn,
+            running,
+            TaskState::Running,
+            Some("w1"),
+            Some("w1:p1"),
+            7,
+        )
+        .unwrap();
 
         // Clear sweeps the two finished rows and leaves the open loops alone.
         assert_eq!(clear_finished(&conn).unwrap(), 2);
@@ -410,15 +449,15 @@ mod tests {
     fn assign_links_an_open_task_to_a_live_workspace() {
         let (dir, conn) = temp_store("assign");
         let id = add_task(&conn, "p", Path::new("/r"), TaskRuntime::Claude, false, 1).unwrap();
-        assert!(assign_task(&conn, id, "w3", 2).unwrap());
+        assert!(assign_task(&conn, id, "w3", "w3:p1", 2).unwrap());
         let task = get_task(&conn, id).unwrap().unwrap();
         assert_eq!(task.state, TaskState::Running);
         assert_eq!(task.workspace_id.as_deref(), Some("w3"));
         // The existing tracker can now find it and carry it to done.
-        assert_eq!(task_for_workspace(&conn, "w3").unwrap().unwrap().id, id);
+        assert_eq!(task_for_pane(&conn, "w3:p1", "w3").unwrap().unwrap().id, id);
         // Finished tasks are not reassignable.
-        set_task_state(&conn, id, TaskState::Done, None, 3).unwrap();
-        assert!(!assign_task(&conn, id, "w4", 4).unwrap());
+        set_task_state(&conn, id, TaskState::Done, None, None, 3).unwrap();
+        assert!(!assign_task(&conn, id, "w4", "w4:p1", 4).unwrap());
         std::fs::remove_dir_all(&dir).ok();
     }
 

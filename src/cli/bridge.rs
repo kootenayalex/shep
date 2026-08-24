@@ -1773,6 +1773,7 @@ mod task_local {
             "use_worktree": task.use_worktree,
             "state": task.state.as_str(),
             "workspace_id": task.workspace_id,
+            "assigned_pane_id": task.assigned_pane_id,
             "created_at": task.created_at,
             "updated_at": task.updated_at,
         })
@@ -1879,8 +1880,14 @@ mod task_local {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or("missing workspace_id")?;
+        let pane_id = params
+            .and_then(|params| params.get("pane_id"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or("missing pane_id")?;
         let conn = open()?;
-        let assigned = tasks::assign_task(&conn, id, workspace_id, tasks::unix_now())
+        let assigned = tasks::assign_task(&conn, id, workspace_id, pane_id, tasks::unix_now())
             .map_err(|err| err.to_string())?;
         Ok(json!({ "assigned": assigned }))
     }

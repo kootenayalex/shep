@@ -62,6 +62,9 @@ impl crate::app::App {
             task.id,
         );
         let root_pane = self.state.workspaces[ws_idx].tabs[0].root_pane;
+        let public_pane_id = self
+            .public_pane_id(ws_idx, root_pane)
+            .ok_or_else(|| "dispatched pane has no public id".to_string())?;
         let Some(runtime) = self.lookup_runtime_sender(ws_idx, root_pane) else {
             return Err("dispatched pane has no runtime".to_string());
         };
@@ -75,6 +78,7 @@ impl crate::app::App {
             task.id,
             TaskState::Running,
             Some(&workspace_id),
+            Some(&public_pane_id),
             tasks::unix_now(),
         )
         .map_err(|err| err.to_string())?;

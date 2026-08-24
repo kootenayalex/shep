@@ -1364,44 +1364,63 @@ impl HeadlessServer {
                 .find(|ws| ws.tabs.iter().any(|tab| tab.panes.contains_key(&pane_id)))
                 .map(|ws| ws.id.clone());
             if let Some(ws_id) = ws_id {
-                if let Ok(Some(task)) = crate::tasks::task_for_workspace(&conn, &ws_id) {
-                    let next = match new_state {
-                        AgentState::Blocked => Some(crate::tasks::TaskState::Blocked),
-                        AgentState::Working => Some(crate::tasks::TaskState::Running),
-                        AgentState::Idle if finished => Some(crate::tasks::TaskState::Done),
-                        _ => None,
-                    };
-                    if let Some(next) = next.filter(|next| *next != task.state) {
-                        let now = crate::tasks::unix_now();
-                        if let Err(err) =
-                            crate::tasks::set_task_state(&conn, task.id, next, None, now)
-                        {
-                            tracing::warn!(err = %err, task_id = task.id, "task state update failed");
-                        }
-                        // Already gated on a real change by the filter above,
-                        // so every arrival here is worth reporting once.
-                        notify_events.push((
-                            crate::config::NotifyKind::Task,
-                            format!("task #{} {}", task.id, next.as_str()),
-                            Some(task.id),
-                        ));
-                        if next == crate::tasks::TaskState::Done {
-                            if let Some(ws) = self
-                                .app
-                                .state
-                                .workspaces
-                                .iter_mut()
-                                .find(|ws| ws.id == ws_id)
-                            {
-                                ws.review_state = crate::api::schema::ReviewState::NeedsReview;
-                                notify_events.push((
-                                    crate::config::NotifyKind::Review,
-                                    format!(
-                                        "{} is ready for review",
-                                        ws.custom_name.as_deref().unwrap_or(&ws.id)
-                                    ),
-                                    None,
-                                ));
+                let public_pane_id = self.app.state.workspaces.iter().find_map(|ws| {
+                    if !ws.tabs.iter().any(|tab| tab.panes.contains_key(&pane_id)) {
+                        return None;
+                    }
+                    let pane_number = ws.public_pane_number(pane_id)?;
+                    Some(crate::workspace::public_pane_id_for_number(
+                        &ws.id,
+                        pane_number,
+                    ))
+                });
+                if let Some(public_pane_id) = public_pane_id {
+                    if let Ok(Some(task)) =
+                        crate::tasks::task_for_pane(&conn, &public_pane_id, &ws_id)
+                    {
+                        let next = match new_state {
+                            AgentState::Blocked => Some(crate::tasks::TaskState::Blocked),
+                            AgentState::Working => Some(crate::tasks::TaskState::Running),
+                            AgentState::Idle if finished => Some(crate::tasks::TaskState::Done),
+                            _ => None,
+                        };
+                        if let Some(next) = next.filter(|next| *next != task.state) {
+                            let now = crate::tasks::unix_now();
+                            if let Err(err) = crate::tasks::set_task_state(
+                                &conn,
+                                task.id,
+                                next,
+                                Some(&ws_id),
+                                Some(&public_pane_id),
+                                now,
+                            ) {
+                                tracing::warn!(err = %err, task_id = task.id, "task state update failed");
+                            }
+                            // Already gated on a real change by the filter above,
+                            // so every arrival here is worth reporting once.
+                            notify_events.push((
+                                crate::config::NotifyKind::Task,
+                                format!("task #{} {}", task.id, next.as_str()),
+                                Some(task.id),
+                            ));
+                            if next == crate::tasks::TaskState::Done {
+                                if let Some(ws) = self
+                                    .app
+                                    .state
+                                    .workspaces
+                                    .iter_mut()
+                                    .find(|ws| ws.id == ws_id)
+                                {
+                                    ws.review_state = crate::api::schema::ReviewState::NeedsReview;
+                                    notify_events.push((
+                                        crate::config::NotifyKind::Review,
+                                        format!(
+                                            "{} is ready for review",
+                                            ws.custom_name.as_deref().unwrap_or(&ws.id)
+                                        ),
+                                        None,
+                                    ));
+                                }
                             }
                         }
                     }
