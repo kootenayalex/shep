@@ -7,4 +7,4 @@ appId: dev.shep.companion
 - tapOn: "\\+ add"
 - assertVisible: "add entry"
 - back
-- assertVisible: "board"
+- assertVisible: "agents"

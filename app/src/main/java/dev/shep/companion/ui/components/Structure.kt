@@ -40,7 +40,8 @@ import dev.shep.companion.ui.theme.ShepMotion
 import kotlinx.coroutines.delay
 
 /**
- * The one line at the top of a tab.
+ * The one line at the top of a tab: shep's wordmark followed by the current
+ * surface, matching the desktop title bar and the mobile prototype.
  *
  * Six screens each built their own, and they disagreed about the status text's
  * colour, the gap before the actions, and whether the title had a subtitle
@@ -64,7 +65,9 @@ fun ScreenHeader(
             .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = ShepType.screenTitle)
+        Text("shep", style = ShepType.wordmark.copy(color = ShepPalette.accent))
+        Spacer(Modifier.width(ShepSpace.snug))
+        Text("· $title", style = ShepType.meta.copy(color = ShepPalette.overlay1))
         subtitle?.let {
             Spacer(Modifier.width(ShepSpace.small))
             Text(it, style = ShepType.meta)

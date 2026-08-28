@@ -36,6 +36,7 @@ import dev.shep.companion.ui.components.ButtonTone
 import dev.shep.companion.ui.components.EmptyState
 import dev.shep.companion.ui.components.Notice
 import dev.shep.companion.ui.components.ShepButton
+import dev.shep.companion.ui.components.ShepCard
 import dev.shep.companion.ui.components.ShepSheet
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepSpace
@@ -127,14 +128,11 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
         }
         notice?.let { Notice(it, onDismiss = { notice = null }) }
         if (stat.isNotEmpty()) {
-            Text(
-                stat,
-                style = ShepType.codeSmall.copy(color = ShepPalette.overlay0),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(ShepPalette.surfaceDim)
-                    .padding(ShepSpace.small),
-            )
+            ShepCard {
+                Text("stat", style = ShepType.sectionLabel)
+                Spacer(Modifier.height(ShepSpace.tight))
+                Text(stat, style = ShepType.codeSmall.copy(color = ShepPalette.overlay0))
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth().background(ShepPalette.panelBg)) {
             if (diff.text.isEmpty()) {
@@ -163,13 +161,32 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
                 tone = ButtonTone.Quiet,
                 modifier = Modifier.weight(1f),
             ) { requesting = true }
-            if (row.isWorktree) {
-                ShepButton(
-                    if (shipping) "shipping…" else "ship ⑂",
-                    enabled = !shipping,
-                    modifier = Modifier.weight(1f),
-                ) { confirmShip = true }
+            ActionText(
+                "✓ approve",
+                style = ShepType.action.copy(color = ShepPalette.green),
+            ) {
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            client.call(
+                                "workspace.set_review_state",
+                                JSONObject()
+                                    .put("workspace_id", row.workspaceId)
+                                    .put("review_state", "approved"),
+                            )
+                        }
+                    }
+                        .onSuccess { notice = "✓ approved" }
+                        .onFailure { notice = "approve failed: ${it.message}" }
+                }
             }
+        }
+        if (row.isWorktree) {
+            ShepButton(
+                if (shipping) "shipping…" else "ship ⑂",
+                enabled = !shipping,
+                modifier = Modifier.fillMaxWidth(),
+            ) { confirmShip = true }
         }
     }
 

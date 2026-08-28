@@ -16,13 +16,11 @@ widget, "New task" launcher shortcut, voice add-task, tablet two-pane) — see
 
 ## Screens
 
-- **board** — the session board, the same five card lines as `render_card` in
-  the desktop. Agent names come from the server's `display_name`, so this and
-  the desktop call the same agent the same thing.
-- **spaces** — the session's shape: spaces → tabs → panes, with open, close,
-  rename, focus and split at each level. Every action is an existing JSON API
-  method; nothing about the session lives only on the phone.
-- **tasks**, **memory**, **shep** (notification settings + push diagnostics).
+- **agents** — the session board grouped by spaces, with the same state and
+  agent naming vocabulary as the desktop. Spaces still expose open, close,
+  rename, focus and split actions from their overflow menus.
+- **tasks**, **memory**, **shep** (bridge, server, notification settings and
+  push diagnostics).
 
 ## Push notifications
 

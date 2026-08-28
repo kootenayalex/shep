@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +46,7 @@ import dev.shep.companion.Transcript
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
 import dev.shep.companion.screens.ReviewScreen
+import dev.shep.companion.statusColor
 import dev.shep.companion.terminal.GridState
 import dev.shep.companion.terminal.KeyBar
 import dev.shep.companion.terminal.ShepInputView
@@ -425,10 +427,17 @@ private fun PaneTitleBar(
             description = "back to the board",
             onClick = onBack,
         )
-        Text(row.paneId, style = ShepType.agentName.copy(color = ShepPalette.accent))
-        Text(row.workspaceLabel, style = ShepType.paneId, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(row.paneId, style = ShepType.agentName.copy(color = ShepPalette.accent))
+            Text(
+                listOfNotNull(row.workspaceLabel, row.branch).joinToString(" · "),
+                style = ShepType.paneId,
+                maxLines = 1,
+            )
+        }
         TextSizeControl(fontSizeSp, onFontSizeSp)
         StateGlyph(status, style = ShepType.stateGlyphSmall)
+        Text(status, style = ShepType.metaSmall.copy(color = statusColor(status)))
     }
 }
 
@@ -518,17 +527,22 @@ private fun InputBar(
         horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Text("out", style = ShepType.viewTitle)
+        ActionText(
+            if (output == OutputMode.Recorded) "recorded" else "live",
+            style = ShepType.hint.copy(color = ShepPalette.accent),
+            description = if (output == OutputMode.Recorded) {
+                "back to the live terminal"
+            } else {
+                "read the recorded conversation"
+            },
+            onClick = { onOutput(if (output == OutputMode.Recorded) OutputMode.Live else OutputMode.Recorded) },
+        )
+        Spacer(Modifier.width(ShepSpace.small))
         Text("in", style = ShepType.viewTitle)
         ModeChip("live", mode == InputMode.Stream) { onMode(InputMode.Stream) }
         ModeChip("⇥ queue", mode == InputMode.Queue) { onMode(InputMode.Queue) }
         Spacer(Modifier.weight(1f))
-        val recorded = output == OutputMode.Recorded
-        ActionText(
-            if (recorded) "terminal" else "recorded",
-            style = ShepType.hint.copy(color = ShepPalette.accent),
-            description = if (recorded) "back to the live terminal" else "read the recorded conversation",
-            onClick = { onOutput(if (recorded) OutputMode.Live else OutputMode.Recorded) },
-        )
         ActionText(
             "review",
             style = ShepType.hint.copy(color = ShepPalette.accent),

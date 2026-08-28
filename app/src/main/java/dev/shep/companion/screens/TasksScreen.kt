@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -200,7 +202,7 @@ fun TasksScreen(
             knownRepos = knownRepos,
             agents = sessions,
             onDismiss = { onShowAddChange(false) },
-            onSubmit = { prompt, repo, runtime, agent ->
+            onSubmit = { prompt, repo, runtime, agent, worktree ->
                 onShowAddChange(false)
                 scope.launch {
                     withContext(Dispatchers.IO) {
@@ -211,7 +213,7 @@ fun TasksScreen(
                                     .put("prompt", prompt)
                                     .put("repo", repo)
                                     .put("runtime", runtime)
-                                    .put("worktree", false),
+                                    .put("worktree", worktree),
                             )
                             val taskId = created.getLong("id")
                             client.call(
@@ -307,12 +309,13 @@ fun AddTaskSheet(
     knownRepos: List<String>,
     agents: List<AgentRow>,
     onDismiss: () -> Unit,
-    onSubmit: (prompt: String, repo: String, runtime: String, agent: AgentRow) -> Unit,
+    onSubmit: (prompt: String, repo: String, runtime: String, agent: AgentRow, worktree: Boolean) -> Unit,
 ) {
     var prompt by remember { mutableStateOf("") }
     var repo by remember { mutableStateOf(knownRepos.firstOrNull() ?: "") }
     var runtime by remember { mutableStateOf("claude") }
     var selectedAgent by remember(agents) { mutableStateOf(agents.firstOrNull()) }
+    var worktree by remember { mutableStateOf(false) }
     var voiceError by remember { mutableStateOf<String?>(null) }
 
     // A6 voice add-task: the system recognizer app does the recording, so we
@@ -397,6 +400,25 @@ fun AddTaskSheet(
             }
         }
         Spacer(Modifier.height(ShepSpace.small))
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("--worktree", style = ShepType.sectionLabel)
+            Switch(
+                checked = worktree,
+                onCheckedChange = { worktree = it },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = ShepPalette.panelBg,
+                    checkedTrackColor = ShepPalette.accent,
+                    uncheckedThumbColor = ShepPalette.overlay0,
+                    uncheckedTrackColor = ShepPalette.surface0,
+                ),
+            )
+        }
+        Text("branch task/<id>", style = ShepType.metaSmall)
+        Spacer(Modifier.height(ShepSpace.small))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("runtime", style = ShepType.sectionLabel)
             Spacer(Modifier.width(ShepSpace.medium))
@@ -410,7 +432,9 @@ fun AddTaskSheet(
         ShepButton(
             "queue task",
             onClick = {
-                selectedAgent?.let { onSubmit(prompt.trim(), repo.trim(), runtime, it) }
+                selectedAgent?.let {
+                    onSubmit(prompt.trim(), repo.trim(), runtime, it, worktree)
+                }
             },
             enabled = prompt.isNotBlank() && repo.isNotBlank() && selectedAgent != null,
             modifier = Modifier.fillMaxWidth(),

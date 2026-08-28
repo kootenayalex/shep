@@ -19,9 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,11 +38,13 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.shep.companion.screens.ChannelsScreen
+import dev.shep.companion.screens.MemoryScreen
 import dev.shep.companion.screens.PairingScreen
+import dev.shep.companion.screens.ServerScreen
 import dev.shep.companion.screens.TasksScreen
-import dev.shep.companion.screens.YouScreen
 import dev.shep.companion.screens.pane.PaneScreen
 import dev.shep.companion.ui.components.EmptyState
+import dev.shep.companion.ui.components.HintBar
 import dev.shep.companion.ui.components.LoadingState
 import dev.shep.companion.ui.components.Notice
 import dev.shep.companion.ui.components.NoticeTone
@@ -138,16 +137,16 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Bottom-nav destinations. Glyphs mirror the TUI vocabulary (no icon dep).
+ * Hint-bar destinations. Shortcuts mirror the TUI vocabulary without adding
+ * an icon dependency or making the phone carry a second navigation model.
  *
- * Three, not five. The board and the spaces tree listed the same agents twice
- * and are now one list; memory and settings are both "about you" and share a
- * switch. Five peers in a bar is a menu you read — three is one you aim at.
+ * Four is the Hick's-law ceiling used by the desktop and the prototype.
  */
-enum class Tab(val label: String, val glyph: String) {
-    Chats("agents", "◫"),
-    Tasks("tasks", "☰"),
-    You("more", "⚙"),
+enum class Tab(val label: String, val shortcut: String) {
+    Agents("agents", "a"),
+    Tasks("tasks", "t"),
+    Memory("memory", "m"),
+    Shep("shep", "s"),
 }
 
 @Composable
@@ -342,6 +341,7 @@ fun ShepApp(
                         onUnpair = {
                             paired = false
                             online = false
+                            prefs.edit().remove("url").remove("token").apply()
                             active.onDisconnect = null
                             active.close()
                             client = null
@@ -354,7 +354,7 @@ fun ShepApp(
 }
 
 /**
- * The paired experience: a bottom-nav Scaffold over the three destinations, with
+ * The paired experience: a hint-bar Scaffold over the four destinations, with
  * the pane view pushed as a full-screen detail over the Chats tab on phones, or
  * docked side-by-side on iPad-class widths (A6 two-pane). A3 deep-links route
  * here by setting the tab + selecting a pane; the A6 `shep://tasks/new`
@@ -369,7 +369,7 @@ fun NavShell(
     newTask: Boolean = false,
     onNewTaskConsumed: () -> Unit = {},
 ) {
-    var tab by remember { mutableStateOf(Tab.Chats) }
+    var tab by remember { mutableStateOf(Tab.Agents) }
     var paneDetail by remember { mutableStateOf<AgentRow?>(null) }
     // Hoisted from TasksScreen so the new-task deep-link can pre-open the sheet.
     var tasksShowAdd by remember { mutableStateOf(false) }
@@ -383,7 +383,7 @@ fun NavShell(
     // tab if the pane is gone.
     LaunchedEffect(deepLinkPane) {
         val target = deepLinkPane ?: return@LaunchedEffect
-        tab = Tab.Chats
+        tab = Tab.Agents
         val row = withContext(Dispatchers.IO) {
             runCatching { parseSnapshot(client.call("session.snapshot")) }.getOrNull()
         }?.find { it.paneId == target }
@@ -419,30 +419,11 @@ fun NavShell(
         Scaffold(
             containerColor = ShepPalette.panelBg,
             bottomBar = {
-                // No navigationBarsPadding here: the Surface above already
-                // applies it once, and applying it twice inset the bar by the
-                // gesture pill's height on top of itself.
-                NavigationBar(containerColor = ShepPalette.surfaceDim) {
-                    Tab.entries.forEach { entry ->
-                        NavigationBarItem(
-                            selected = tab == entry,
-                            onClick = { tab = entry },
-                            icon = { Text(entry.glyph, style = ShepType.navGlyph) },
-                            label = { Text(entry.label, style = ShepType.navLabel) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = ShepPalette.accent,
-                                selectedTextColor = ShepPalette.accent,
-                                unselectedIconColor = ShepPalette.overlay0,
-                                unselectedTextColor = ShepPalette.overlay0,
-                                indicatorColor = ShepPalette.surface0,
-                            ),
-                        )
-                    }
-                }
+                HintBar(tab, onSelect = { tab = it })
             },
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                if (wide && tab == Tab.Chats) {
+                if (wide && tab == Tab.Agents) {
                     Row(Modifier.fillMaxSize()) {
                         Box(Modifier.weight(1f)) {
                             ChannelsScreen(
@@ -477,7 +458,7 @@ fun NavShell(
                         label = "tab",
                     ) { current ->
                         when (current) {
-                            Tab.Chats -> ChannelsScreen(
+                            Tab.Agents -> ChannelsScreen(
                                 client = client,
                                 onOpenPane = { paneDetail = it },
                                 onUnpair = onUnpair,
@@ -489,7 +470,8 @@ fun NavShell(
                                 showAdd = tasksShowAdd,
                                 onShowAddChange = { tasksShowAdd = it },
                             )
-                            Tab.You -> YouScreen(client)
+                            Tab.Memory -> MemoryScreen(client)
+                            Tab.Shep -> ServerScreen(client = client, onRePair = onUnpair)
                         }
                     }
                 }

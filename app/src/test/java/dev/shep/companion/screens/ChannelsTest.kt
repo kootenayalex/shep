@@ -57,6 +57,8 @@ class ChannelsTest {
         agent: String = "claude",
         status: String = "idle",
         displayName: String? = null,
+        reviewState: String = "none",
+        queuedInput: Int = 0,
     ) = AgentRow(
         terminalId = "",
         paneId = paneId,
@@ -65,12 +67,13 @@ class ChannelsTest {
         agent = agent,
         status = status,
         contextPercent = null,
-        reviewState = "none",
+        reviewState = reviewState,
         customStatus = null,
         worktreeRepo = null,
         isWorktree = false,
         memoryPercent = null,
         displayName = displayName,
+        queuedInput = queuedInput,
     )
 
     @Test
@@ -177,5 +180,21 @@ class ChannelsTest {
         )
         assertEquals(3, sections.sumOf { it.channels.size })
         assertEquals(0, sections.sumOf { s -> s.channels.count { needsAttention(it.status) } })
+    }
+
+    @Test
+    fun `prototype filters keep blocked working review and queued attention visible`() {
+        val channels = listOf(
+            Channel("w:p1", "blocked", "blocked", row("w:p1", status = "blocked"), null, null),
+            Channel("w:p2", "working", "working", row("w:p2", status = "working"), null, null),
+            Channel("w:p3", "review", "idle", row("w:p3", reviewState = "needs_review"), null, null),
+            Channel("w:p4", "queued", "idle", row("w:p4", queuedInput = 2), null, null),
+            Channel("w:p5", "idle", "idle", row("w:p5"), null, null),
+        )
+
+        assertEquals(4, channels.count { matchesAgentFilter(it, AgentFilter.Attention) })
+        assertEquals(1, channels.count { matchesAgentFilter(it, AgentFilter.Review) })
+        assertEquals(1, channels.count { matchesAgentFilter(it, AgentFilter.Queued) })
+        assertEquals(5, channels.count { matchesAgentFilter(it, AgentFilter.All) })
     }
 }

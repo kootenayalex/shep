@@ -7,10 +7,11 @@
 appId: dev.shep.companion
 ---
 - launchApp
-- tapOn: "board"
-# Any agent card will do; the first one is whatever needs attention most.
+- tapOn: "agents"
+- tapOn: "all.*"
+# Any agent row will do; the accessible label is stable across runtime names.
 - tapOn:
-    text: "claude.*"
+    text: "agent.*"
     index: 0
 
 # Both toggles are present and labelled, so two chips called "live" are not

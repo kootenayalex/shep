@@ -33,6 +33,6 @@ appId: dev.shep.companion
             - tapOn: "Allow"
 # Board: header, live status, and the default attention filter chip.
 # (Maestro plain strings are full-text regexes — "attention 0" needs a wildcard.)
-- assertVisible: "board"
+- assertVisible: "agents"
 - assertVisible: "live.*"
 - assertVisible: "attention.*"

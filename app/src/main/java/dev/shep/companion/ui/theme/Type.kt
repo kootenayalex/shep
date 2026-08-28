@@ -157,7 +157,7 @@ object ShepType {
     /** A key on the terminal key bar. */
     val key = mono.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold)
 
-    /** Bottom-nav glyph and its word. */
+    /** Legacy navigation styles retained for non-shell surfaces. */
     val navGlyph = mono.copy(fontSize = 18.sp)
     val navLabel = mono.copy(fontSize = 11.sp)
 

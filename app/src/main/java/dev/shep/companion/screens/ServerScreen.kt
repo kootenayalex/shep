@@ -26,9 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import dev.shep.companion.FcmManager
 import dev.shep.companion.NotifyKind
+import dev.shep.companion.BridgeClient
 import dev.shep.companion.ui.components.ButtonTone
 import dev.shep.companion.ui.components.ScreenHeader
 import dev.shep.companion.ui.components.ShepButton
+import dev.shep.companion.ui.components.ShepCard
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
@@ -44,7 +46,10 @@ import androidx.compose.material3.minimumInteractiveComponentSize
  * like a quiet one — there is no other way to tell them apart.
  */
 @Composable
-fun ServerScreen() {
+fun ServerScreen(
+    client: BridgeClient? = null,
+    onRePair: () -> Unit = {},
+) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("shep", Context.MODE_PRIVATE) }
     var status by remember { mutableStateOf(prefs.getString("push_status", "not registered") ?: "") }
@@ -54,8 +59,25 @@ fun ServerScreen() {
     var testing by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        ScreenHeader("shep")
+        ScreenHeader("server")
         Column(Modifier.fillMaxWidth().padding(ShepSpace.screen)) {
+            ShepCard {
+                Text("bridge", style = ShepType.sectionLabel)
+                ServerInfoRow("url", prefs.getString("url", "not paired") ?: "not paired")
+                ServerInfoRow("protocol", client?.serverProtocol?.toString() ?: "unknown")
+                ServerInfoRow(
+                    "token",
+                    if (prefs.getString("token", null) != null) "prod ✓" else "not paired",
+                    if (prefs.getString("token", null) != null) ShepPalette.green else ShepPalette.peach,
+                )
+            }
+            Spacer(Modifier.height(ShepSpace.small))
+            ShepCard {
+                Text("server", style = ShepType.sectionLabel)
+                ServerInfoRow("connection", if (client?.isOpen == true) "connected" else "offline")
+                ServerInfoRow("version", client?.serverVersion ?: "unknown")
+            }
+            Spacer(Modifier.height(ShepSpace.section))
             Text("notify me about", style = ShepType.sectionLabel)
             Spacer(Modifier.height(ShepSpace.hair))
             Text(
@@ -144,7 +166,29 @@ fun ServerScreen() {
                     ),
                 )
             }
+            Spacer(Modifier.height(ShepSpace.medium))
+            ShepButton(
+                text = "re-pair (scan QR)",
+                tone = ButtonTone.Quiet,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onRePair,
+            )
             Spacer(Modifier.height(ShepSpace.section))
         }
+    }
+}
+
+@Composable
+private fun ServerInfoRow(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color = ShepPalette.text,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = ShepSpace.tight),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = ShepType.meta)
+        Text(value, style = ShepType.meta.copy(color = color), maxLines = 1)
     }
 }

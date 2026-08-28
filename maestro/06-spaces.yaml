@@ -7,16 +7,20 @@
 appId: dev.shep.companion
 ---
 - launchApp
-- tapOn: "spaces"
+- tapOn: "agents"
 # Header and the affordance for opening a session from here.
-- assertVisible: "spaces"
+- assertVisible: "agents"
+- tapOn: "all.*"
 - assertVisible: "\\+ new"
-# The tree's three levels. Every space offers these; at least one is on screen.
+# Space actions live behind the workspace overflow menu so the list stays
+# readable on a phone.
+- tapOn: "space actions"
 - assertVisible: "go to"
-- assertVisible: "\\+ tab"
-- assertVisible: "rename"
-# Pane-level controls live under the tabs.
-- assertVisible: "split"
+- assertVisible: "new tab"
+- assertVisible: "rename space"
+# Pane-level actions remain available through the row's long-press menu; this
+# flow avoids destructive or timing-sensitive gestures on the live session.
+- pressKey: back
 
 # The new-session sheet opens and asks the three things shep needs.
 - tapOn: "\\+ new"
@@ -28,4 +32,4 @@ appId: dev.shep.companion
 - assertVisible: "terminal"
 # Back dismisses the sheet (hideKeyboard is unavailable on OxygenOS).
 - pressKey: back
-- assertVisible: "spaces"
+- assertVisible: "agents"

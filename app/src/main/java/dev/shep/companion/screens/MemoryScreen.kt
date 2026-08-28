@@ -1,6 +1,5 @@
 package dev.shep.companion.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -71,18 +70,17 @@ fun MemoryScreen(client: BridgeClient) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("memory", subtitle = "· user") {
+        ScreenHeader("memory") {
             ActionText("+ add", style = ShepType.actionStrong) { editing = "" }
         }
         view?.let { v ->
             val overCap = v.percent >= 80
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .background(ShepPalette.surfaceDim)
-                    .padding(horizontal = ShepSpace.screen)
-                    .padding(bottom = ShepSpace.small),
-            ) {
+            ShepCard {
+                Text(
+                    "${v.kind.uppercase()}.md · ${v.used}/${v.cap} chars",
+                    style = ShepType.sectionLabel,
+                )
+                Spacer(Modifier.height(ShepSpace.small))
                 Meter(
                     fraction = v.percent / 100f,
                     color = if (overCap) ShepPalette.peach else ShepPalette.accent,
@@ -90,7 +88,7 @@ fun MemoryScreen(client: BridgeClient) {
                 )
                 Spacer(Modifier.height(ShepSpace.tight))
                 Text(
-                    "${v.used}/${v.cap} chars · ${v.percent}%" +
+                    "${v.percent}%" +
                         if (overCap) " — consolidate soon" else "",
                     style = ShepType.meta.copy(
                         color = if (overCap) ShepPalette.peach else ShepPalette.overlay0,

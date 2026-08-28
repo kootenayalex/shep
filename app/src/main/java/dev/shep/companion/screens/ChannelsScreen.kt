@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import dev.shep.companion.AgentRow
@@ -56,6 +60,7 @@ import dev.shep.companion.ui.components.Notice
 import dev.shep.companion.ui.components.NoticeTone
 import dev.shep.companion.ui.components.ScreenHeader
 import dev.shep.companion.ui.components.ShepButton
+import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.ShepSheet
 import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepPalette
@@ -89,6 +94,28 @@ private val CHANNEL_SUBSCRIPTIONS = listOf(
 
 /** Blocked, or finished and not yet looked at: the agents waiting on a human. */
 fun needsAttention(status: String): Boolean = status == "blocked" || status == "done"
+
+/** The compact board filters from the mobile prototype. */
+enum class AgentFilter(val label: String) {
+    Attention("attention"),
+    All("all"),
+    Working("working"),
+    Review("review ◆"),
+    Queued("queued ⇥"),
+}
+
+/** Keep filter semantics independent from the Compose list rendering. */
+fun matchesAgentFilter(channel: Channel, filter: AgentFilter): Boolean = when (filter) {
+    AgentFilter.Attention ->
+        needsAttention(channel.status) ||
+            channel.status == "working" ||
+            channel.row?.reviewState?.let { it != "none" } == true ||
+            channel.row?.queuedInput?.let { it > 0 } == true
+    AgentFilter.All -> true
+    AgentFilter.Working -> channel.status == "working"
+    AgentFilter.Review -> channel.row?.reviewState?.let { it != "none" } == true
+    AgentFilter.Queued -> channel.row?.queuedInput?.let { it > 0 } == true
+}
 
 /**
  * One row: a pane, with whatever is known about it.
@@ -380,7 +407,12 @@ fun ChannelsScreen(
         }
     }
 
+    var filter by remember { mutableStateOf(AgentFilter.Attention) }
     val sections = buildChannels(spaces, rows)
+    val filteredSections = sections.mapNotNull { section ->
+        val channels = section.channels.filter { matchesAgentFilter(it, filter) }
+        section.takeIf { channels.isNotEmpty() }?.copy(channels = channels)
+    }
     // Directories already in play seed the new-session picker, so starting a
     // second session where you are working is two taps and no typing.
     val recentRepos = (rows.mapNotNull { it.cwd } + spaces.flatMap { it.tabs }
@@ -402,15 +434,36 @@ fun ChannelsScreen(
             )
         }
         notice?.let { Notice(it, onDismiss = { notice = null }) }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = ShepSpace.screen),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ShepSpace.small),
+        ) {
+            AgentFilter.entries.forEach { entry ->
+                val count = sections.sumOf { section ->
+                    section.channels.count { matchesAgentFilter(it, entry) }
+                }
+                ShepChip(
+                    text = if (count == 0) entry.label else "${entry.label} $count",
+                    selected = filter == entry,
+                    onClick = { filter = entry },
+                )
+            }
+        }
         DashboardStrip(totals, host) { statusColor(it) }
-        if (sections.isEmpty()) {
-            EmptyState("no sessions — start one with + new")
+        if (filteredSections.isEmpty()) {
+            EmptyState(
+                if (sections.isEmpty()) "no sessions — start one with + new"
+                else "nothing matches ${filter.label}"
+            )
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = ShepSpace.section),
             ) {
-                sections.forEach { section ->
+                filteredSections.forEach { section ->
                     val channels = section.channels
                     item(key = "space:${section.workspaceId}") {
                         SectionHeader(
@@ -676,7 +729,12 @@ private fun SectionHeader(
             Text("$shown", style = ShepType.badge.copy(color = ShepPalette.overlay0))
             Spacer(Modifier.width(ShepSpace.snug))
         }
-        ActionText("⋯", style = ShepType.state.copy(color = ShepPalette.overlay1), onClick = onActions)
+        ActionText(
+            "⋯",
+            style = ShepType.state.copy(color = ShepPalette.overlay1),
+            description = "space actions",
+            onClick = onActions,
+        )
     }
 }
 
@@ -701,6 +759,7 @@ private fun ChannelRow(
     Row(
         modifier
             .fillMaxWidth()
+            .semantics { contentDescription = "agent ${channel.name}" }
             .combinedClickable(onLongClick = onLongClick, onClick = onClick)
             .padding(
                 start = ShepSpace.screen,
