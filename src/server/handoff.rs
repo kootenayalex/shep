@@ -39,6 +39,11 @@ pub(crate) struct HandoffManifest {
     pub expected_protocol: Option<u32>,
     pub snapshot: crate::persist::SessionSnapshot,
     pub panes: Vec<crate::handoff_runtime::HandoffRuntimeState>,
+    /// `(cols, rows)` of the exporting server's last foreground client, so the
+    /// importer renders at that size before any client attaches. Optional so
+    /// manifests from older servers still import.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_foreground_size: Option<(u16, u16)>,
 }
 
 #[cfg(unix)]
@@ -297,6 +302,7 @@ pub(crate) fn manifest_for(
     panes: Vec<crate::handoff_runtime::HandoffRuntimeState>,
     expected_protocol: Option<u32>,
     expected_version: Option<String>,
+    last_foreground_size: Option<(u16, u16)>,
 ) -> HandoffManifest {
     HandoffManifest {
         version: HANDOFF_VERSION,
@@ -306,6 +312,7 @@ pub(crate) fn manifest_for(
         expected_protocol,
         snapshot,
         panes,
+        last_foreground_size,
     }
 }
 

@@ -221,6 +221,10 @@ pub struct HeadlessServer {
     /// Shared pane runtime size derived from the foreground client,
     /// or MIN_COLS × MIN_ROWS when no clients are connected.
     effective_size: (u16, u16),
+    /// Size of the most recent foreground client, kept after it detaches so
+    /// frames rendered with no client attached (and the one pane resize after
+    /// a handoff import) use the real terminal size instead of MIN_COLS × MIN_ROWS.
+    last_foreground_size: Option<(u16, u16)>,
     /// Flag set when shutdown is initiated.
     shutting_down: bool,
     /// Flag set while exporting live PTYs to a replacement server.
@@ -494,6 +498,7 @@ impl HeadlessServer {
             terminal_attach_owners: HashMap::new(),
             next_activity_stamp: 1,
             effective_size: (MIN_COLS, MIN_ROWS),
+            last_foreground_size: None,
             shutting_down: false,
             handoff_in_progress: false,
             #[cfg(unix)]
@@ -988,6 +993,7 @@ impl HeadlessServer {
             .clone();
 
         self.effective_size = terminal_size;
+        self.last_foreground_size = Some(terminal_size);
         self.app.state.outer_terminal_focus = outer_terminal_focus;
         apply_keybindings(&mut self.app, &keybindings);
         self.sync_visible_server_config_diagnostic(uses_local_keybindings);
@@ -1097,6 +1103,7 @@ impl HeadlessServer {
             panes,
             params.expected_protocol,
             params.expected_version,
+            self.last_foreground_size,
         );
         let mut import_child = match crate::server::handoff::spawn_handoff_import(
             import_exe.as_deref(),
@@ -3662,7 +3669,12 @@ impl HeadlessServer {
         let render_targets = render_targets(&self.clients, self.foreground_client_id);
 
         if render_targets.is_empty() {
-            let (cols, rows) = self.effective_size;
+            // Nobody is looking, so render at the last real terminal size rather
+            // than the floor: this frame may be the one that resizes freshly
+            // imported panes (`resize_panes` below), and every agent in them
+            // would otherwise reflow to 80×24 and stay there until a client
+            // attaches.
+            let (cols, rows) = self.last_foreground_size.unwrap_or(self.effective_size);
             let area = Rect::new(0, 0, cols, rows);
             let resize_panes = self.app.state.view.pane_infos.is_empty();
             let render_started = crate::render_prof::timer();
@@ -4381,6 +4393,20 @@ fn take_startup_cwd() -> Option<PathBuf> {
     (!cwd.is_empty()).then(|| PathBuf::from(cwd))
 }
 
+/// The terminal size an imported session should keep rendering at until a
+/// client attaches: the exporting server's last foreground size, or, for a
+/// manifest from a server that did not record one, the largest imported pane.
+#[cfg(unix)]
+fn handoff_import_foreground_size(
+    manifest: &crate::server::handoff::HandoffManifest,
+) -> Option<(u16, u16)> {
+    manifest.last_foreground_size.or_else(|| {
+        let cols = manifest.panes.iter().map(|pane| pane.cols).max()?;
+        let rows = manifest.panes.iter().map(|pane| pane.rows).max()?;
+        (cols >= MIN_COLS && rows >= MIN_ROWS).then_some((cols, rows))
+    })
+}
+
 #[cfg(unix)]
 fn run_handoff_import_server(socket_path: &Path, token: &str) -> io::Result<()> {
     let loaded_config = config::Config::load();
@@ -4390,6 +4416,7 @@ fn run_handoff_import_server(socket_path: &Path, token: &str) -> io::Result<()> 
     let (api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
     let event_hub = api::EventHub::default();
 
+    let last_foreground_size = handoff_import_foreground_size(&received.manifest);
     let mut imports = HashMap::new();
     for (pane, fd) in received.manifest.panes.into_iter().zip(received.fds) {
         let pane_id = pane.pane_id;
@@ -4434,6 +4461,7 @@ fn run_handoff_import_server(socket_path: &Path, token: &str) -> io::Result<()> 
             Some(api_tx.clone()),
             Some(api_server),
         )?;
+        server.last_foreground_size = last_foreground_size;
         crate::server::handoff::report_ready(&mut received.stream)?;
         crate::server::handoff::wait_committed(&mut received.stream)?;
         server.app.assume_handoff_ownership();
@@ -4560,6 +4588,7 @@ mod tests {
             terminal_attach_owners: HashMap::new(),
             next_activity_stamp: 1,
             effective_size: (MIN_COLS, MIN_ROWS),
+            last_foreground_size: None,
             shutting_down: false,
             handoff_in_progress: false,
             #[cfg(unix)]
@@ -9019,5 +9048,144 @@ next_tab = ""
              handle_internal_event_with_forwarding (bypass risk):\n  {}",
             bypass_lines.join("\n  ")
         );
+    }
+
+    #[test]
+    fn render_and_stream_without_clients_renders_at_last_foreground_size() {
+        let mut server = test_headless_server();
+        server.app.state.workspaces = vec![crate::workspace::Workspace::test_new("imported")];
+        server.app.state.active = Some(0);
+        server.app.state.selected = 0;
+        server.app.state.mode = crate::app::Mode::Terminal;
+        server.foreground_client_id = None;
+        server.sync_foreground_client_state();
+        assert_eq!(server.effective_size, (MIN_COLS, MIN_ROWS));
+        assert!(server.app.state.view.pane_infos.is_empty());
+
+        // A freshly imported session: the last real client was 204×50, and
+        // the first frame is the one that sizes the imported panes.
+        server.last_foreground_size = Some((204, 50));
+        server.render_and_stream();
+
+        let terminal_area = server.app.state.view.terminal_area;
+        assert_eq!(terminal_area.right(), 204, "{terminal_area:?}");
+        assert!(terminal_area.bottom() > MIN_ROWS, "{terminal_area:?}");
+        let pane = server.app.state.view.pane_infos[0].rect;
+        assert!(pane.right() > MIN_COLS, "{pane:?}");
+        assert!(pane.bottom() > MIN_ROWS, "{pane:?}");
+    }
+
+    #[test]
+    fn render_and_stream_without_clients_falls_back_to_floor_size() {
+        let mut server = test_headless_server();
+        server.app.state.workspaces = vec![crate::workspace::Workspace::test_new("fresh")];
+        server.app.state.active = Some(0);
+        server.app.state.selected = 0;
+        server.app.state.mode = crate::app::Mode::Terminal;
+        server.foreground_client_id = None;
+        server.sync_foreground_client_state();
+        assert_eq!(server.last_foreground_size, None);
+
+        server.render_and_stream();
+
+        assert_eq!(server.app.state.view.terminal_area.right(), MIN_COLS);
+    }
+
+    #[test]
+    fn sync_foreground_client_state_remembers_the_size_after_detach() {
+        let mut server = test_headless_server();
+        server.clients.insert(
+            1,
+            ClientConnection::new(
+                (204, 50),
+                crate::kitty_graphics::HostCellSize::default(),
+                crate::terminal_theme::TerminalTheme::default(),
+                None,
+                1,
+                RenderEncoding::SemanticFrame,
+                None,
+            ),
+        );
+        server.foreground_client_id = Some(1);
+        server.sync_foreground_client_state();
+        assert_eq!(server.last_foreground_size, Some((204, 50)));
+
+        assert!(server.remove_client(1));
+        assert_eq!(server.foreground_client_id, None);
+        assert_eq!(server.effective_size, (MIN_COLS, MIN_ROWS));
+        assert_eq!(server.last_foreground_size, Some((204, 50)));
+    }
+
+    #[cfg(unix)]
+    fn handoff_pane(
+        pane_id: u32,
+        cols: u16,
+        rows: u16,
+    ) -> crate::handoff_runtime::HandoffRuntimeState {
+        crate::handoff_runtime::HandoffRuntimeState {
+            pane_id,
+            child_pid: 1,
+            rows,
+            cols,
+            cell_width_px: 0,
+            cell_height_px: 0,
+            keyboard_protocol_flags: 0,
+            keyboard_protocol_ansi: None,
+            input_state: None,
+            initial_history_ansi: None,
+        }
+    }
+
+    #[cfg(unix)]
+    fn handoff_manifest(
+        panes: Vec<crate::handoff_runtime::HandoffRuntimeState>,
+        last_foreground_size: Option<(u16, u16)>,
+    ) -> crate::server::handoff::HandoffManifest {
+        let snapshot = crate::persist::SessionSnapshot {
+            version: 3,
+            workspaces: vec![],
+            active: None,
+            selected: 0,
+            sidebar_width: None,
+            sidebar_section_split: None,
+            collapsed_space_keys: std::collections::HashSet::new(),
+        };
+        crate::server::handoff::manifest_for(snapshot, panes, None, None, last_foreground_size)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn handoff_import_foreground_size_prefers_the_manifest_then_the_largest_pane() {
+        let recorded = handoff_manifest(vec![handoff_pane(1, 100, 30)], Some((204, 50)));
+        assert_eq!(handoff_import_foreground_size(&recorded), Some((204, 50)));
+
+        let legacy = handoff_manifest(
+            vec![handoff_pane(1, 204, 20), handoff_pane(2, 90, 50)],
+            None,
+        );
+        assert_eq!(handoff_import_foreground_size(&legacy), Some((204, 50)));
+
+        let tiny = handoff_manifest(vec![handoff_pane(1, 40, 10)], None);
+        assert_eq!(handoff_import_foreground_size(&tiny), None);
+
+        let empty = handoff_manifest(vec![], None);
+        assert_eq!(handoff_import_foreground_size(&empty), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn handoff_manifest_without_foreground_size_still_deserializes() {
+        let manifest = handoff_manifest(vec![handoff_pane(1, 204, 50)], Some((204, 50)));
+        let mut json: serde_json::Value =
+            serde_json::to_value(&manifest).expect("manifest serializes");
+        assert_eq!(json["last_foreground_size"], serde_json::json!([204, 50]));
+
+        json.as_object_mut()
+            .expect("manifest is an object")
+            .remove("last_foreground_size");
+        let legacy: crate::server::handoff::HandoffManifest =
+            serde_json::from_value(json).expect("older manifest deserializes");
+        assert_eq!(legacy.last_foreground_size, None);
+        assert_eq!(handoff_import_foreground_size(&legacy), Some((204, 50)));
     }
 }
