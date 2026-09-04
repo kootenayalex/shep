@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -136,6 +140,16 @@ fun PairingScreen(
                 keyboardType = KeyboardType.Password,
                 autoCorrectEnabled = false,
             ),
+            // A token on this screen is one the bridge refused, or the one
+            // saved from last time; either way nobody can read it, so the way
+            // to replace it is a clear button, not a caret in the middle of it.
+            trailingIcon = {
+                if (token.isNotEmpty()) {
+                    IconButton(onClick = { token = "" }) {
+                        Icon(Icons.Filled.Close, contentDescription = "clear token")
+                    }
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(ShepSpace.small))

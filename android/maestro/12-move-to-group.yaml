@@ -1,0 +1,16 @@
+# Move an agent to a group from its long-press sheet: the picker lists the
+# other groups and "new group". Moving into a new group is idempotent (a group
+# left empty closes behind it), so this runs as often as you like.
+appId: dev.shep.companion
+---
+# -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
+- evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
+- launchApp
+- tapOn: "agents"
+- tapOn: "all.*"
+- longPressOn: "agent ${output.agent}"
+- assertVisible: "move to group"
+- tapOn: "move to group"
+- assertVisible: "move ${output.agent} to"
+- tapOn: "new group"
+- assertVisible: "agent ${output.agent}"

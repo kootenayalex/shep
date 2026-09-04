@@ -56,10 +56,24 @@ def api_method_names() -> set[str]:
     return set(re.findall(r'=> "([a-z_]+\.[a-z_]+)"', text))
 
 
+def api_namespaces() -> set[str]:
+    """The first segment of every method and event name (`pane`, `agent`, …).
+
+    Only dotted strings in one of these namespaces are method calls; the
+    companion also has dotted strings that are file names (`shep.secure`)
+    and the like, which are nothing the bridge would ever see.
+    """
+    names = api_method_names() | bridge_local_methods() | event_names()
+    return {name.split(".", 1)[0] for name in names}
+
+
 def companion_dotted_strings() -> dict[str, list[str]]:
+    namespaces = api_namespaces()
     seen: dict[str, list[str]] = {}
     for path in sorted(ANDROID_SRC.rglob("*.kt")):
         for name in DOTTED.findall(path.read_text(encoding="utf-8")):
+            if name.split(".", 1)[0] not in namespaces:
+                continue
             seen.setdefault(name, []).append(str(path.relative_to(ROOT)))
     return seen
 

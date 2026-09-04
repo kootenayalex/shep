@@ -13,8 +13,11 @@ runs against the real bridge, never a mock.
       --bind 127.0.0.1:7432 --socket ~/.config/shep/shep.sock \
       > ~/.local/state/shep/bridge-7432.log 2>&1 &`
    (**--bind must come first** — serve-mode dispatches on argv[1].)
-3. Release APK installed (`./gradlew assembleRelease`, then
-   `adb -s <serial> install -r app/build/outputs/apk/release/app-release.apk`).
+3. Debug APK installed (`just android-build` at the repo root, then
+   `adb -s <serial> install -r android/app/build/outputs/apk/debug/app-debug.apk`).
+   The release build needs a real keystore (`SHEP_ANDROID_*` or
+   `shep.*` in `local.properties`) and fails without one; for the AVD the
+   debug build is the one to use.
 
 ## Run
 
@@ -37,6 +40,38 @@ maestro --device <serial> test maestro/04-new-task-shortcut.yaml
 # Tablet two-pane (wide AVD only):
 maestro --device <tablet-serial> test maestro/05-tablet-two-pane.yaml
 
+# Groups, output/input modes, live and queued input, the key bar,
+# notification clearing, move-to-group, manual state:
+maestro --device <serial> test maestro/06-groups.yaml
+maestro --device <serial> test maestro/07-pane-output-modes.yaml
+maestro --device <serial> test maestro/08-live-input.yaml     # …13
+```
+
+Flows 08–13 type into a plain shell agent named `shell` (`-e AGENT=` to
+change it) and only see the screen. `input-checks.py` owns the other half:
+it starts that agent over the JSON socket, holds it in a manual "working"
+state around the queue flow, posts the notification the clear flow
+dismisses, and reads the pty, the agent's state and group, and the
+notification shade back afterwards. Run it against a throwaway server, not
+the one that owns your terminals:
+
+```bash
+env -u HERDR_SOCKET_PATH SHEP_SOCKET_PATH=/tmp/shep-dev/api.sock \
+  target/debug/shep server &
+target/debug/shep bridge --bind 127.0.0.1:7432 --socket /tmp/shep-dev/api.sock &
+SHEP_SOCKET_PATH=/tmp/shep-dev/api.sock MAESTRO_DEVICE=emulator-5554 \
+  android/maestro/input-checks.py            # --only 08,09 to narrow
+```
+
+Each flow's junit report lands in `/tmp/shep-dev/maestro/` (`--junit-dir`).
+The whole directory runs on a phone with the tablet flow left out:
+`maestro --device <serial> test --exclude-tags tablet -e SHEP_TOKEN=… \
+  -e SHEP_BRIDGE_URL=… --format junit --output /tmp/shep-dev/maestro.xml android/maestro/`.
+Notification checks need the debug config dir (`~/.config/shep-dev/`) to
+hold an `fcm-service-account.json` and the AVD to be a Google APIs image;
+the emulator registers its own FCM token with the bridge when it pairs.
+
+```bash
 # Physical phone (tailnet bridge; dismiss the keyguard first — a locked
 # phone shows only the splash to Maestro):
 adb -s <phone-serial> shell wm dismiss-keyguard

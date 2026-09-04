@@ -215,7 +215,10 @@ fun ShepSheet(
     titleAction: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    // Fully expanded from the start: a sheet that opens half-way hides its
+    // primary action below the fold on a phone, and back then only unfolds
+    // it to the half state instead of dismissing it.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,

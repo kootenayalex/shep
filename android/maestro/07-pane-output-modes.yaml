@@ -9,15 +9,14 @@ appId: dev.shep.companion
 - launchApp
 - tapOn: "agents"
 - tapOn: "all.*"
-# Any agent row will do; the accessible label is stable across runtime names.
+# Any agent row will do; the accessible label ("agent <name>") is stable
+# across runtime names. The space keeps the "agents" header out of it.
 - tapOn:
-    text: "agent.*"
+    text: "agent .*"
     index: 0
 
-# Both toggles are present and labelled, so two chips called "live" are not
-# ambiguous.
+# The out toggle reads as the current output mode, the in chips as a choice.
 - assertVisible: "out"
-- assertVisible: "recorded"
 - assertVisible: "in"
 # The chip is "⇥ queue"; a plain string is a full-text regex, not a substring.
 - assertVisible: ".*queue"
@@ -26,15 +25,17 @@ appId: dev.shep.companion
 - assertVisible: "esc"
 
 # Switching the output to recorded switches the input to a composer: a chat
-# wants a message box, not raw keystrokes.
-- tapOn: "recorded"
+# wants a message box, not raw keystrokes. Two chips read "live" here; the
+# out toggle comes first.
+- tapOn:
+    text: "live"
+    index: 0
+- assertVisible: "recorded"
 # The composer's buttons, not its placeholder: a BasicTextField owns the
 # semantics of the box it sits in, so the hint text is invisible to the
 # accessibility tree even though it is on screen.
 - assertVisible: "send"
 
 # And back again, with the key bar returning.
-- tapOn:
-    text: "live"
-    index: 0
+- tapOn: "recorded"
 - assertVisible: "esc"

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalComposeUiApi::class)
+
 package dev.shep.companion
 
 import android.content.Context
@@ -31,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationManagerCompat
@@ -67,7 +72,7 @@ import dev.shep.companion.ui.theme.ShepMotion
 // Bridge protocol the app was built against (shep src/protocol/wire.rs
 // PROTOCOL_VERSION at vendor time). A mismatch soft-warns; it does not brick a
 // personal sideload. Bump alongside the vendored schema (1f follow-up).
-const val EXPECTED_PROTOCOL = 16
+const val EXPECTED_PROTOCOL = 17
 
 /** An agent state's colour, for the places that tint a label rather than draw a glyph. */
 fun statusColor(status: String): Color = ShepSemantic.agentColor(status)
@@ -236,11 +241,20 @@ fun ShepApp(
 
     fun pairAndConnect(url: String, token: String, onDone: (String?) -> Unit) {
         scope.launch {
+            // establish() reads the store, so the candidate goes in first; a
+            // refused or unreachable one comes straight back out again, so
+            // the next launch does not auto-connect with a token the bridge
+            // already said no to.
+            val previous = PairingStore.load(context)
             PairingStore.save(context, url, token)
             val error = establish()
             if (error == null) {
                 paired = true
                 connectError = null
+            } else if (previous != null) {
+                PairingStore.save(context, previous.url, previous.token)
+            } else {
+                PairingStore.clear(context)
             }
             onDone(error)
         }
@@ -303,7 +317,14 @@ fun ShepApp(
     // Nav bar as well as status bar: API 35 draws edge-to-edge whether the app
     // asks or not, and without this the gesture pill sits on top of the key bar.
     Surface(
-        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            // Test tags double as view ids for UiAutomator, so the end-to-end
+            // flows can reach the pieces that have no text of their own (the
+            // terminal grid, the composer).
+            .semantics { testTagsAsResourceId = true },
         color = ShepPalette.panelBg,
     ) {
         if (!paired) {

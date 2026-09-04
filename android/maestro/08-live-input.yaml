@@ -1,0 +1,27 @@
+# Live input: what the soft keyboard types lands in the pty, and the pty's
+# reply lands back on the grid. The grid publishes its text as its accessible
+# description, so the shell's echo is a text anchor like any other — the
+# output line proves Enter went through, not just the typing.
+# Needs a paired app and a plain shell agent named ${output.agent} on the bridge's
+# server (input-checks.py starts one and reads the pty back over the socket).
+appId: dev.shep.companion
+---
+# -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
+- evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
+- evalScript: "${output.mark = typeof MARK === 'undefined' ? 'maestro' : MARK}"
+- launchApp
+- tapOn: "agents"
+- tapOn: "all.*"
+- tapOn: "agent ${output.agent}"
+# Live output pairs with the key bar.
+- assertVisible: "esc"
+# Tapping the grid focuses the pty and raises the keyboard.
+- tapOn:
+    id: "terminal-grid"
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "echo live-${output.mark}"
+- tapOn: "↵"
+# The command echoes back on the prompt line; only its output starts a line.
+- assertVisible: "(?s).*\nlive-${output.mark}\n.*"
+- pressKey: back

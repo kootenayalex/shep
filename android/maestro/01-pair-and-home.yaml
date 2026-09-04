@@ -21,6 +21,14 @@ appId: dev.shep.companion
       # Landscape/tablet: the IME covers the Token field — back dismisses it
       # (pressKey works everywhere; hideKeyboard is UNAVAILABLE on OxygenOS).
       - pressKey: back
+      # A saved-but-refused token is pre-filled and unreadable; its clear
+      # button is the only reliable way to start from an empty field
+      # (tapping the label parks the caret at the front of the old value).
+      - runFlow:
+          when:
+            visible: "clear token"
+          commands:
+            - tapOn: "clear token"
       - tapOn: "Token"
       - inputText: "${SHEP_TOKEN}"
       - pressKey: back

@@ -1,0 +1,22 @@
+# Manual state from the phone: set blocked by hand, see it reported as the
+# current override, clear it, see it gone. Ends where it started.
+appId: dev.shep.companion
+---
+# -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
+- evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
+- launchApp
+- tapOn: "agents"
+- tapOn: "all.*"
+- longPressOn: "agent ${output.agent}"
+- tapOn: "set state"
+- assertVisible: "state of ${output.agent}"
+# Rows are "<glyph> <name>"; the hint under "clear override" ends in the same
+# word, so anchor on the glyph-space-name shape.
+- tapOn: "\\S+ blocked"
+- longPressOn: "agent ${output.agent}"
+- assertVisible: "now: blocked"
+- tapOn: "set state"
+- tapOn: "clear override"
+- longPressOn: "agent ${output.agent}"
+- assertVisible: "mark it by hand"
+- pressKey: back

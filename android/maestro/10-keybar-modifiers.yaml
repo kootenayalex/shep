@@ -1,0 +1,57 @@
+# Key bar: ^C interrupts, a sticky modifier arms for one key (shift+y reaches
+# the pty as Y), a double tap locks it (the label grows a dot) and a tap on a
+# locked one clears it. Everything is checked on the grid's text.
+appId: dev.shep.companion
+---
+# -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
+- evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
+- launchApp
+- tapOn: "agents"
+- tapOn: "all.*"
+- tapOn: "agent ${output.agent}"
+- assertVisible: "esc"
+- tapOn:
+    id: "terminal-grid"
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "sleep 30"
+- tapOn: "↵"
+# The control keys live past the arrows in the bar's scrolling row.
+- swipe:
+    from:
+      text: "↓"
+    direction: LEFT
+    duration: 400
+- tapOn: "\\^C"
+# The shell echoes the interrupt and comes back to a prompt.
+- assertVisible: "(?s).*\\^C.*"
+- swipe:
+    from:
+      text: "\\^C"
+    direction: RIGHT
+    duration: 400
+# Armed: one key, then off.
+- tapOn: "shift"
+- tapOn: "y"
+- assertVisible: "(?s).*[$%] Y.*"
+- assertNotVisible: "shift•"
+# Locked: the label carries a dot until tapped again. The row may have come
+# back from the control keys short of its start; a swipe from a key that is
+# always visible settles it.
+- swipe:
+    from:
+      text: "alt"
+    direction: RIGHT
+    duration: 400
+- doubleTapOn: "ctrl"
+- assertVisible: "ctrl•"
+- tapOn: "ctrl•"
+- assertNotVisible: "ctrl•"
+# Leave the prompt line clean for the next flow.
+- swipe:
+    from:
+      text: "↓"
+    direction: LEFT
+    duration: 400
+- tapOn: "\\^C"
+- pressKey: back

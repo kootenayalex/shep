@@ -637,7 +637,8 @@ fn request_authorized(request: &WsRequest, expected: &str) -> bool {
 
 /// Length-then-xor-fold comparison: every byte is visited whenever the
 /// lengths agree, so the time taken does not depend on where they differ.
-/// (The length itself is not secret — every bridge token is 64 hex chars.)
+/// (The length itself is not secret — every token this bridge mints has the
+/// same length, 32 random bytes as unpadded base64url.)
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;

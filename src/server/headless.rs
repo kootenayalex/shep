@@ -3446,7 +3446,8 @@ impl HeadlessServer {
             let new_state = terminal_after.state;
             // A person set this state through the API; it is not the agent
             // doing anything, so no toast, sound, exec bridge, or task
-            // transition. Taken before the equality check so a set that only
+            // transition (queued input is the exception, below). Taken
+            // before the equality check so a set that only
             // changed the label cannot leave the flag behind for a later
             // detected transition to trip over.
             let terminal_id = pane_after.attached_terminal_id.clone();
@@ -3457,6 +3458,17 @@ impl HeadlessServer {
                 .get_mut(&terminal_id)
                 .is_some_and(crate::terminal::TerminalState::take_manual_transition_pending)
             {
+                // The one thing a manual change does deliver: a person who
+                // marks an agent idle is saying it is free, so the prompts
+                // queued for "when it is idle" go now. The queue follows the
+                // effective state on the way in (a manual "working" holds
+                // input back), so it follows it on the way out too.
+                if new_state == AgentState::Idle && new_state != *prev_state {
+                    let delivered = self.app.flush_queued_pane_input(*pane_id);
+                    if delivered > 0 {
+                        tracing::info!(delivered, "flushed queued pane input on manual idle");
+                    }
+                }
                 continue;
             }
             if new_state == *prev_state {
@@ -9265,6 +9277,58 @@ next_tab = ""
 
         assert!(server.notify_exec_fired.is_empty());
         assert!(server.app.state.notify_seen_requests.is_empty());
+    }
+
+    /// A person who marks an agent idle by hand releases what was queued for
+    /// "when it is idle": the queue follows the effective state on the way
+    /// out as it already did on the way in.
+    #[tokio::test]
+    async fn manual_idle_flushes_queued_pane_input() {
+        let (mut server, root) = server_with_one_pane();
+        server.app.state.ensure_test_terminals();
+        let terminal_id = server.app.state.workspaces[0].tabs[0].panes[&root]
+            .attached_terminal_id
+            .to_string();
+        let (runtime, mut rx) =
+            crate::terminal::TerminalRuntime::test_with_channel_capacity(80, 24, 8);
+        server.app.state.workspaces[0].insert_test_runtime(root, runtime);
+        server
+            .app
+            .state
+            .queued_pane_input
+            .insert(root, vec!["run it".to_string()]);
+
+        let set = |server: &mut HeadlessServer, state| {
+            let (respond_to, _response) = std::sync::mpsc::channel();
+            server.handle_api_request_with_shutdown_check(api::ApiRequestMessage {
+                request: api::schema::Request {
+                    id: "state".into(),
+                    method: api::schema::Method::AgentSetState(api::schema::AgentSetStateParams {
+                        target: terminal_id.clone(),
+                        state: Some(state),
+                        custom: None,
+                    }),
+                },
+                respond_to,
+            });
+        };
+
+        set(&mut server, api::schema::PaneAgentState::Working);
+        assert_eq!(
+            server.app.state.queued_input_count_for_pane(root),
+            1,
+            "a manual working holds the queue"
+        );
+        assert!(rx.try_recv().is_err(), "nothing is written while working");
+
+        set(&mut server, api::schema::PaneAgentState::Idle);
+        assert_eq!(
+            server.app.state.queued_input_count_for_pane(root),
+            0,
+            "a manual idle releases it"
+        );
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"run it"));
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"\r"));
     }
 
     /// The desk's own sighting counts only after the settle window, and only

@@ -1,0 +1,14 @@
+# Notification clear-on-view: opening the agent the notification was about
+# dismisses it and tells the server the pane was seen. The flow only opens
+# the agent; input-checks.py posts the notification through the bridge first
+# and reads the shade with `dumpsys notification` before and after.
+appId: dev.shep.companion
+---
+# -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
+- evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
+- launchApp
+- tapOn: "agents"
+- tapOn: "all.*"
+- tapOn: "agent ${output.agent}"
+- assertVisible: "out"
+- pressKey: back

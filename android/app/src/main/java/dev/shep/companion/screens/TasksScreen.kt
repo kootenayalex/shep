@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -335,6 +336,9 @@ fun AddTaskSheet(
     ShepSheet(
         title = "new task",
         onDismiss = onDismiss,
+        // Taller than a phone screen once the agent chips and runtime rows are
+        // in: without this the "queue task" button sat below the fold.
+        modifier = Modifier.verticalScroll(rememberScrollState()),
         titleAction = {
             ActionText("voice", style = ShepType.actionStrong) {
                 voiceError = null

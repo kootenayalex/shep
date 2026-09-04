@@ -1,0 +1,31 @@
+# Queue input: the composer queues a prompt instead of typing it. On its own
+# this flow proves the UI path (chip → composer → queue button); whether the
+# prompt waited for idle and landed as one paste + Enter is what
+# input-checks.py checks over the socket, with the agent held in a manual
+# "working" state around this flow.
+appId: dev.shep.companion
+---
+# -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
+- evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
+- evalScript: "${output.mark = typeof MARK === 'undefined' ? 'maestro' : MARK}"
+- launchApp
+- tapOn: "agents"
+- tapOn: "all.*"
+- tapOn: "agent ${output.agent}"
+# The chip is "⇥ queue"; a plain string is a full-text regex, not a substring.
+- tapOn: ".*queue"
+- assertVisible: "send"
+- assertVisible: "queue"
+- tapOn:
+    id: "composer"
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "echo queued-${output.mark}-a"
+- tapOn: "queue"
+- tapOn:
+    id: "composer"
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "echo queued-${output.mark}-b"
+- tapOn: "queue"
+- pressKey: back

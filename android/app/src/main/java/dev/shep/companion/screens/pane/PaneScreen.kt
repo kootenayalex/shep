@@ -120,6 +120,10 @@ fun PaneScreen(
     var ended by remember { mutableStateOf<String?>(null) }
     var mode by remember { mutableStateOf(InputMode.Stream) }
     var output by remember { mutableStateOf(OutputMode.Live) }
+    // True once the input mode was picked by hand. The two halves pair by
+    // default (a chat wants a composer, a live terminal wants keystrokes), but
+    // a choice someone made survives toggling the output.
+    var modePinned by remember { mutableStateOf(false) }
     // The terminal's text size is a setting, not a session: picking a readable
     // size once should not have to be redone on every pane, or after a restart.
     var fontSizeSp by remember {
@@ -169,7 +173,13 @@ fun PaneScreen(
     // to stay up over the list you had just returned to.
     val inputView = remember(context) { ShepInputView(context) }
     inputView.onKey = press
-    LaunchedEffect(mode) { if (mode != InputMode.Stream) inputView.hideKeyboard() }
+    // In stream mode the input view holds focus from the start, so a hardware
+    // keyboard (or a key that arrives in the same instant as the tap that was
+    // meant to focus it) reaches the pty without a tap on the grid first. The
+    // soft keyboard still only rises on that tap.
+    LaunchedEffect(mode) {
+        if (mode == InputMode.Stream) inputView.requestFocus() else inputView.hideKeyboard()
+    }
     DisposableEffect(inputView) { onDispose { inputView.hideKeyboard() } }
 
     // Collected scroll goes out on a beat. `pane.scroll` routes it the way the
@@ -383,15 +393,22 @@ fun PaneScreen(
 
         InputBar(
             mode = mode,
-            onMode = { mode = it },
+            onMode = {
+                mode = it
+                modePinned = true
+            },
             output = output,
             onOutput = {
                 output = it
                 // The recorded view has no grid to type into, so stream input
-                // gives way to the composer. Going back to live leaves the
-                // input mode alone: someone who chose the queue keeps it, and
-                // the keyboard does not pop up uninvited.
-                if (it == OutputMode.Recorded && mode == InputMode.Stream) mode = InputMode.Queue
+                // always gives way to the composer. The way back follows the
+                // default pairing only while nobody has chosen an input mode
+                // by hand; the keyboard never pops up on its own either way.
+                if (!modePinned) {
+                    mode = if (it == OutputMode.Recorded) InputMode.Queue else InputMode.Stream
+                } else if (it == OutputMode.Recorded && mode == InputMode.Stream) {
+                    mode = InputMode.Queue
+                }
             },
             onReview = { showReview = true },
         )
@@ -616,7 +633,7 @@ private fun QueueComposer(
                 onValueChange = onValue,
                 textStyle = ShepType.hint.copy(color = ShepPalette.text),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(ShepPalette.accent),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("composer"),
             )
         }
         Box(
