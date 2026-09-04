@@ -23,6 +23,33 @@ deliberately-diverged fork of [herdr](https://github.com/ogulcancelik/herdr)
 - Commit style: lowercase conventional subjects (kept from upstream); session
   trailers per Alex's harness conventions are fine here.
 
+## Repository layout
+
+One repo, two surfaces:
+
+- Rust crate at the root: the server, the TUI, the CLI, and `shep bridge`.
+- `android/`: the Android companion (Kotlin/Compose), imported from the former
+  `shep-android` repo with its history. It is a third client of the same JSON
+  API; the bridge relays only the methods in `BRIDGE_ALLOWED_METHODS`
+  (`src/cli/bridge.rs`), so a companion change that calls a new method ships
+  with the Rust change that allows it, in the same commit.
+- `just check` runs the Rust gate and then `just android-check` (JVM unit tests
+  + debug build; needs JDK 17 and an Android SDK, see the `android_*` variables
+  in the justfile). A missing toolchain fails the gate; it never skips.
+- Companion end-to-end flows live in `android/maestro/`; run them with
+  `just android-maestro` against a device or the AVD.
+
+### Vocabulary guardrail
+
+The user-facing model on every surface (TUI, CLI output, docs, phone) is
+**group → agent**: a group is what the wire calls a workspace, an agent is what
+the wire calls a tab (normally holding one pane). Server APIs, event names,
+config keys, and persisted ids keep the `workspace.*` / `tab.*` / `pane.*`
+nouns; only new verbs may be group-flavoured. Presentation code translates,
+the wire does not. Colours and glyphs never cross the wire: an agent state
+carries a *tier* name and each surface maps tiers to ink
+(`src/ui/status.rs::StateInk`, `android/.../ui/theme/ShepSemantic.kt`).
+
 ## Scope and Audience (upstream, legacy)
 
 These instructions are layered.

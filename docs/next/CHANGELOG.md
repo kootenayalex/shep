@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- The Android companion now lives in this repo under `android/` (its history imported from the former `shep-android` repo, which is archived). `just check` runs the companion's unit tests and debug build, and `just android-install` / `just android-maestro` cover the device loop.
 - Added a new `shep` built-in theme (warm graphite + copper) and made it the default when `[theme] name` is unset.
 - Added a full-width desktop titlebar showing the active workspace and tab plus an update/blocked attention slot (`ui.titlebar`, default on).
 - Added a persistent bottom key-hint bar derived from the live keybindings; prefix/copy/resize/navigate overlays now share its row (`ui.hint_bar`, default on).

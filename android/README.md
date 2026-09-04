@@ -2,7 +2,9 @@
 
 The cockpit in your pocket: Android client for the shep terminal ADE.
 Connects to `shep bridge` (WebSocket relay over the shep JSON API) on the
-tailnet. See `docs/ANDROID-COMPANION.md` in the shep repo for the plan.
+tailnet. Lives in the shep repo under `android/`; see `docs/ANDROID-COMPANION.md`
+for the plan. From the repo root: `just android-check` (tests + debug build),
+`just android-install`, `just android-maestro`.
 
 Pairing: run `shep bridge pair --host <tailnet-ip>` on the server, paste the
 URL + token into the app.

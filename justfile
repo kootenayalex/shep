@@ -29,10 +29,41 @@ windows-lint:
     rustup target add x86_64-pc-windows-msvc
     LIBGHOSTTY_VT_SIMD=false cargo clippy --bin shep --locked --target x86_64-pc-windows-msvc -- -D warnings
 
-# Check formatting + run unit tests + maintenance script tests
-check: ci
+# Check formatting + run unit tests + maintenance script tests, then the android companion gate
+check: ci android-check
     python3 -m unittest scripts.test_agent_detection_manifest_check scripts.test_changelog scripts.test_docs_translation_parity scripts.test_preview scripts.test_vendor_libghostty_vt scripts.test_vendor_portable_pty
     @echo "docs reminder: if this changes user-facing behavior, make sure the relevant release docs are updated or called out before release."
+
+# --- android companion (android/) -------------------------------------------
+# The companion is part of this repo; `just check` runs its gate. A missing JDK
+# or SDK fails loudly instead of silently skipping the gate.
+
+android_java_home := env_var_or_default("SHEP_ANDROID_JAVA_HOME", "/opt/homebrew/opt/openjdk@17")
+android_sdk_root := env_var_or_default("ANDROID_HOME", "/opt/homebrew/share/android-commandlinetools")
+
+# Fail unless a JDK 17 and an Android SDK are reachable
+android-env:
+    @test -x "{{android_java_home}}/bin/java" || { echo "error: no JDK at {{android_java_home}} (set SHEP_ANDROID_JAVA_HOME)"; exit 1; }
+    @test -d "{{android_sdk_root}}" || { echo "error: no Android SDK at {{android_sdk_root}} (set ANDROID_HOME)"; exit 1; }
+
+# Run the companion's JVM unit tests
+android-test: android-env
+    cd android && JAVA_HOME="{{android_java_home}}" ANDROID_HOME="{{android_sdk_root}}" ./gradlew --quiet --console=plain testDebugUnitTest
+
+# Assemble the companion's debug APK
+android-build: android-env
+    cd android && JAVA_HOME="{{android_java_home}}" ANDROID_HOME="{{android_sdk_root}}" ./gradlew --quiet --console=plain assembleDebug
+
+# Companion gate: unit tests + debug build
+android-check: android-test android-build
+
+# Install the debug APK on the connected device / running AVD
+android-install: android-env
+    cd android && JAVA_HOME="{{android_java_home}}" ANDROID_HOME="{{android_sdk_root}}" ./gradlew --quiet --console=plain installDebug
+
+# Run the companion's Maestro end-to-end flows against the connected device
+android-maestro *args:
+    maestro test android/maestro/ {{args}}
 
 # Install repo-local git hooks
 install-hooks:

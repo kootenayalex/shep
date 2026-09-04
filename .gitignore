@@ -26,6 +26,10 @@ __pycache__/
 !/docs/reference/**
 !/docs/BUILD-macos.md
 !/docs/DESIGN-LANGUAGE.md
+!/docs/ANDROID-COMPANION.md
 
 graphify-out/
 .serena/
+
+# android companion (android/ has its own .gitignore for gradle output)
+/android/local.properties

@@ -33,7 +33,7 @@ shep server (macmini)
  ├─ unix socket · API (NDJSON + JSON Schema)  ← `shep api`, event hub
  │      └── shep bridge ── WebSocket/TLS, tailnet-only, bearer token
  │                            └── Android app (Kotlin/Compose)
- └─ notify exec-bridge ── ntfy (self-hosted) ── UnifiedPush ── Android
+ └─ notify exec-bridge ── `shep bridge notify-push` ── FCM (data-only) ── Android
 ```
 
 - **`shep bridge`** (new, in-tree Rust subcommand): a thin authenticated relay
@@ -43,23 +43,28 @@ shep server (macmini)
   JSON Schema `shep api schema` already publishes. Binds the tailscale
   interface (or 127.0.0.1 behind `tailscale serve`); token file under
   `~/.config/shep/bridge-token`; never exposed publicly.
-- **Push** without Google dependency (standing no-paid/local-first rule):
-  M1's notify exec-bridge fires on `notify_on = ["blocked"]` → self-hosted
-  ntfy (unraid or OVH VPS, tailnet-only) → UnifiedPush → app. Foregrounded,
-  the app holds its own WebSocket; background wake-ups come only from ntfy —
-  no persistent connection, no battery burn.
+- **Push** is FCM, data-only (the app builds its own notification, so the
+  lock-screen Approve/Deny survives). It is the one Google dependency, taken
+  because nothing else wakes an app out of Doze reliably. The original
+  self-hosted ntfy/UnifiedPush path was removed 2026-09-03 once FCM was
+  confirmed; stale ntfy rows in `<config>/push-endpoints.json` can be deleted.
+  Foregrounded, the app holds its own WebSocket; background wake-ups come only
+  from push — no persistent connection, no battery burn.
 - **Version skew**: the bridge ships in the shep repo and reports
   `{server_version, api_schema_version}` at handshake; the app hard-gates on
   schema major, soft-warns on minor — the `shep status` compatibility story,
   phone-shaped.
 
-## Repos
+## Repo layout (one repo since 2026-09-03)
 
-- Bridge: `~/vault/dev/shep` (Rust, part of `just check`).
-- App: new repo `~/vault/dev/shep-android` (Kotlin, Jetpack Compose, Material 3,
-  minSdk 26, gitea+github dual-push per convention). Separate repo keeps
-  gradle out of the Rust workspace; the schema JSON is vendored into the app
-  at build time from a pinned shep commit.
+- Bridge: Rust crate at the repo root (part of `just check`).
+- App: `android/` in the same repo (Kotlin, Jetpack Compose, Material 3,
+  minSdk 26). The former `shep-android` repo was merged in with its history
+  (`git subtree`); `kootenayalex/shep-mobile` on GitHub is archived. One repo
+  means an API change and the companion change that uses it land in the same
+  commit, and `just check` runs the companion gate (`just android-check`).
+- Dev loop: `just android-install` puts the debug APK on a device or AVD;
+  `just android-maestro` runs `android/maestro/`.
 
 ## Surface mapping — desktop → phone
 
@@ -221,8 +226,7 @@ macmini server, never a mock (mock-pg lesson generalized).
 - **Bincode temptation** — never implement the TUI client protocol in Kotlin;
   the JSON API is the contract. If a needed capability exists only in the
   bincode plane, add it to the JSON API server-side first (guardrail-clean).
-- **Two-repo drift** — schema vendored at pinned commits + handshake gating is
-  the mitigation; CI check in shep-android compares vendored schema to the
-  pinned shep rev.
+- **Two-repo drift** — RESOLVED 2026-09-03 by merging the app into this repo
+  under `android/`; handshake gating stays as the runtime check.
 - **AGPL** — fine for a personal companion; note again if it ever ships to a
   store beyond personal sideload (Play listing would need source availability).
