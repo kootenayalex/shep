@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+
+- Review now reads as a summary of the change — who wrote it, how many files
+  and lines, one collapsible row per file — instead of a `git diff --stat`
+  block. "ship" is "merge it in", "request changes" is "ask for changes", and
+  the merge confirmation says what merging actually does. Review also asks
+  `session.snapshot` for the workspace, so "merge it in" appears on worktrees
+  reached from the board (`session.overview` cannot answer that).
 - The companion explains itself. Each tab carries one collapsed row, phrased as the question it answers — "how to read this list", "its own copy vs the main copy", "notes vs chat memory" — and every empty screen is now a title, a sentence and a way out ("start an agent", "add a task", "write your first note") instead of one grey line naming a control you have not found yet. Jargon that only meant something to git goes: a group's `worktree` badge and the add-task switch read "own copy" / "work in its own copy", a task card drops its raw workspace id, "new pane" is "start an agent", and memory's cap reads "N of M characters used — nearly full — merge or trim notes".
 - The companion says what each agent is doing in words. Every agent row on the agents list, and the pane screen's title bar, carry a plain-language "now" line above the agent's own output — `waiting for you — allow edit to src/main.rs? · 40s`, `working · cargo test · 6m`, `finished — ready for you to look at` — built from the state, a hand-set label if there is one, the newest activity line and the state's age. The raw lines stay verbatim underneath. The pane title bar now leads with the agent's display name and demotes the pane id to the meta line beside the group and branch.
 - The user-facing model is now **group → agent** on every surface: a group is what the wire calls a workspace, an agent is a tab (normally one pane). The TUI, CLI help, docs and companion say group; `workspace.*` / `tab.*` stay the wire nouns. An agent can be moved between groups: `tab.move` gains optional `workspace_id` / `new_workspace` (every pane comes along, the tab keeps its name, a zoomed tab is refused) and `insert_index` becomes optional; the TUI has a picker on `prefix+shift+m` and "Move to group..." on the pane and tab menus; the CLI has `shep agent move <target> --group <id>|--new-group [--index N]` and `shep group` as an alias of `shep workspace`; the companion has "move to group" in the agent sheet. The board's location tag no longer prints a tab number, and sidebar rows only carry a tab prefix when a tab really holds several panes. Worktree parents' "Close group" menu item is now "Close with worktrees" so it does not collide with the new noun.

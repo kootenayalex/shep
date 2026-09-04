@@ -1,6 +1,7 @@
 package dev.shep.companion.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,20 +27,28 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import dev.shep.companion.AgentRow
 import dev.shep.companion.BridgeClient
+import dev.shep.companion.parseSnapshot
 import dev.shep.companion.ui.components.ActionText
+import dev.shep.companion.ui.components.BackHeader
 import dev.shep.companion.ui.components.ButtonTone
 import dev.shep.companion.ui.components.EmptyState
+import dev.shep.companion.ui.components.ExplainLine
+import dev.shep.companion.ui.components.ExplainRow
 import dev.shep.companion.ui.components.Notice
+import dev.shep.companion.ui.components.NoticeTone
 import dev.shep.companion.ui.components.ShepButton
 import dev.shep.companion.ui.components.ShepCard
 import dev.shep.companion.ui.components.ShepSheet
 import dev.shep.companion.ui.theme.ShepPalette
+import dev.shep.companion.ui.theme.ShepShape
+import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 import kotlinx.coroutines.Dispatchers
@@ -80,11 +90,20 @@ fun colorizeDiff(diff: String): AnnotatedString =
 fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
     var stat by remember { mutableStateOf("") }
     var diff by remember { mutableStateOf(AnnotatedString("")) }
+    var rawDiff by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("loading diff…") }
     var notice by remember { mutableStateOf<String?>(null) }
+    var noticeTone by remember { mutableStateOf(NoticeTone.Info) }
     var requesting by remember { mutableStateOf(false) }
     var confirmShip by remember { mutableStateOf(false) }
     var shipping by remember { mutableStateOf(false) }
+    // `session.overview` cannot say whether a workspace is a worktree — the
+    // parser hard-codes both fields to null/false — so a row that arrived from
+    // the board would hide "merge it in" on exactly the workspaces that need
+    // it. `session.snapshot` does know, and Review is the one screen that
+    // cares, so it asks once on the way in.
+    var isWorktree by remember { mutableStateOf(row.isWorktree) }
+    var worktreeRepo by remember { mutableStateOf(row.worktreeRepo) }
     val scope = rememberCoroutineScope()
     val scroll = rememberScrollState()
     val haptics = LocalHapticFeedback.current
@@ -97,55 +116,85 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
         }.onSuccess {
             stat = it.optString("stat")
             val d = it.optString("diff")
+            rawDiff = d
             diff = if (d.isEmpty()) AnnotatedString("") else colorizeDiff(d)
             status = if (stat.isEmpty() && d.isEmpty()) "no changes to review" else ""
         }.onFailure { status = "diff failed: ${it.message}" }
+        withContext(Dispatchers.IO) {
+            runCatching { parseSnapshot(client.call("session.snapshot")) }.getOrNull()
+        }?.find { it.workspaceId == row.workspaceId }?.let {
+            isWorktree = it.isWorktree
+            worktreeRepo = it.worktreeRepo ?: worktreeRepo
+        }
     }
+    val stats = remember(stat) { parseDiffStat(stat) }
+    val hunks = remember(rawDiff) { splitDiffByFile(rawDiff) }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(ShepPalette.surfaceDim)
-                .padding(horizontal = ShepSpace.small, vertical = ShepSpace.tight),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ActionText(
-                "‹",
-                style = ShepType.screenTitle.copy(color = ShepPalette.accent),
-                description = "back to the pane",
-                onClick = onBack,
-            )
-            Spacer(Modifier.width(ShepSpace.tight))
+        BackHeader("agent", onBack) {
             Column(Modifier.weight(1f)) {
                 Text("review · ${row.workspaceLabel}", style = ShepType.agentName)
                 Text(
-                    row.worktreeRepo?.let { "$it${if (row.isWorktree) " · worktree" else ""}" }
-                        ?: "working tree",
+                    worktreeRepo?.let { "$it${if (isWorktree) " · own copy" else ""}" }
+                        ?: "the main copy",
                     style = ShepType.meta,
                 )
             }
         }
-        notice?.let { Notice(it, onDismiss = { notice = null }) }
-        if (stat.isNotEmpty()) {
-            ShepCard {
-                Text("stat", style = ShepType.sectionLabel)
-                Spacer(Modifier.height(ShepSpace.tight))
-                Text(stat, style = ShepType.codeSmall.copy(color = ShepPalette.overlay0))
-            }
+        notice?.let { Notice(it, tone = noticeTone, onDismiss = { notice = null }) }
+        ExplainRow("what does merging do?") {
+            ExplainLine(
+                "own copy",
+                "the agent worked in a separate folder, so nothing it did has touched " +
+                    "your own files yet.",
+            )
+            ExplainLine(
+                "merge it in",
+                "copies its work into your main copy and deletes the separate folder. " +
+                    "it refuses if either side has unsaved work.",
+            )
+            ExplainLine(
+                "ask for changes",
+                "sends what you type back to the agent and marks this as needing another go.",
+            )
         }
         Box(Modifier.weight(1f).fillMaxWidth().background(ShepPalette.panelBg)) {
-            if (diff.text.isEmpty()) {
+            if (stat.isEmpty() && diff.text.isEmpty()) {
                 EmptyState(status.ifEmpty { "no changes" })
             } else {
-                Text(
-                    diff,
-                    style = ShepType.codeSmall,
-                    modifier = Modifier
+                Column(
+                    Modifier
                         .fillMaxSize()
                         .verticalScroll(scroll)
                         .padding(ShepSpace.small),
-                )
+                ) {
+                    if (stats == null) {
+                        // A stat this build cannot read is still the truth; show it.
+                        ShepCard {
+                            Text("stat", style = ShepType.sectionLabel)
+                            Spacer(Modifier.height(ShepSpace.tight))
+                            Text(
+                                stat,
+                                style = ShepType.codeSmall.copy(color = ShepPalette.overlay0),
+                            )
+                        }
+                        if (diff.text.isNotEmpty()) {
+                            Spacer(Modifier.height(ShepSpace.small))
+                            Text(diff, style = ShepType.codeSmall)
+                        }
+                    } else {
+                        Text(
+                            reviewSummary(row.displayName ?: row.agent, stats),
+                            style = ShepType.summary,
+                        )
+                        Spacer(Modifier.height(ShepSpace.tight))
+                        DiffLegend()
+                        Spacer(Modifier.height(ShepSpace.small))
+                        stats.perFile.forEach { file ->
+                            FileDisclosure(file, hunks[file.path] ?: hunks[""])
+                        }
+                    }
+                }
             }
         }
         Row(
@@ -157,12 +206,12 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ShepButton(
-                "request changes",
+                "ask for changes",
                 tone = ButtonTone.Quiet,
                 modifier = Modifier.weight(1f),
             ) { requesting = true }
             ActionText(
-                "✓ approve",
+                "approve",
                 style = ShepType.action.copy(color = ShepPalette.green),
             ) {
                 scope.launch {
@@ -176,14 +225,17 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
                             )
                         }
                     }
-                        .onSuccess { notice = "✓ approved" }
-                        .onFailure { notice = "approve failed: ${it.message}" }
+                        .onSuccess { notice = "✓ approved"; noticeTone = NoticeTone.Good }
+                        .onFailure {
+                            notice = "approve failed: ${it.message}"
+                            noticeTone = NoticeTone.Bad
+                        }
                 }
             }
         }
-        if (row.isWorktree) {
+        if (isWorktree) {
             ShepButton(
-                if (shipping) "shipping…" else "ship ⑂",
+                if (shipping) "merging…" else "merge it in",
                 enabled = !shipping,
                 modifier = Modifier.fillMaxWidth(),
             ) { confirmShip = true }
@@ -212,10 +264,11 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
                         }.isSuccess
                     }
                     notice = if (ok) {
-                        "changes requested — sent to the agent"
+                        "✓ sent to the agent"
                     } else {
                         "failed to send feedback"
                     }
+                    noticeTone = if (ok) NoticeTone.Good else NoticeTone.Bad
                 }
             },
         )
@@ -225,18 +278,19 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmShip = false },
             containerColor = ShepPalette.surfaceDim,
-            title = { Text("Ship this worktree?", style = ShepType.sheetTitle) },
+            title = { Text("merge it in?", style = ShepType.sheetTitle) },
             text = {
                 Text(
-                    "Merge ${row.worktreeRepo ?: "this worktree"}'s branch into its base " +
-                        "checkout, then remove the worktree. Refuses if either side is dirty " +
-                        "or the merge conflicts. This can't be undone.",
+                    "adds ${row.displayName ?: row.agent}'s work to your main copy of " +
+                        "${worktreeRepo ?: "this project"}, and removes the separate folder it " +
+                        "worked in. refuses if either side has unsaved changes or the two " +
+                        "disagree about the same lines. can't be undone.",
                     style = ShepType.bodySmall,
                 )
             },
             confirmButton = {
                 ActionText(
-                    "Merge & ship",
+                    "merge it in",
                     style = ShepType.action.copy(color = ShepPalette.accent),
                 ) {
                         // A merge that cannot be undone. It gets a tick.
@@ -264,13 +318,16 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
                             }
                             shipping = false
                             result
-                                .onSuccess { notice = "✓ $it"; onBack() }
-                                .onFailure { notice = "ship failed: ${it.message}" }
+                                .onSuccess { notice = "✓ $it"; noticeTone = NoticeTone.Good; onBack() }
+                                .onFailure {
+                                    notice = "merge failed: ${it.message}"
+                                    noticeTone = NoticeTone.Bad
+                                }
                         }
                 }
             },
             dismissButton = {
-                ActionText("Cancel", onClick = { confirmShip = false })
+                ActionText("cancel", onClick = { confirmShip = false })
             },
         )
     }
@@ -279,9 +336,9 @@ fun ReviewScreen(client: BridgeClient, row: AgentRow, onBack: () -> Unit) {
 @Composable
 fun RequestChangesSheet(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
-    ShepSheet(title = "request changes", onDismiss = onDismiss) {
+    ShepSheet(title = "ask for changes", onDismiss = onDismiss) {
         Text(
-            "goes straight into the agent's pane and flags the workspace.",
+            "goes straight to the agent, and marks this as needing another go.",
             style = ShepType.bodySmall.copy(color = ShepPalette.overlay0),
         )
         Spacer(Modifier.height(ShepSpace.medium))
@@ -300,5 +357,71 @@ fun RequestChangesSheet(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
             enabled = text.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/** What the two colours in a file row mean, said once at the top. */
+@Composable
+private fun DiffLegend() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .width(ShepSize.legendBarWidth)
+                .height(ShepSize.gaugeHeight)
+                .clip(ShepShape.bar)
+                .background(ShepPalette.green),
+        )
+        Spacer(Modifier.width(ShepSpace.tight))
+        Text("added", style = ShepType.metaSmall)
+        Spacer(Modifier.width(ShepSpace.small))
+        Box(
+            Modifier
+                .width(ShepSize.legendBarWidth)
+                .height(ShepSize.gaugeHeight)
+                .clip(ShepShape.bar)
+                .background(ShepPalette.red),
+        )
+        Spacer(Modifier.width(ShepSpace.tight))
+        Text("removed", style = ShepType.metaSmall)
+    }
+}
+
+/**
+ * One changed file: its name and size always, its code on request.
+ *
+ * The whole diff used to arrive as one unbroken block, which is readable on a
+ * desktop and is a wall on a phone. A file at a time is the unit a person
+ * actually decides about.
+ */
+@Composable
+private fun FileDisclosure(file: FileStat, hunk: String?) {
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .minimumInteractiveComponentSize()
+                .clickable(enabled = hunk != null) { open = !open }
+                .padding(vertical = ShepSpace.tight),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(file.path, style = ShepType.bodySmall)
+                Text(
+                    if (file.binary) {
+                        "not text — nothing to read here"
+                    } else {
+                        "+${file.added} −${file.removed}"
+                    },
+                    style = ShepType.metaSmall,
+                )
+            }
+            if (hunk != null) {
+                Text(if (open) "hide the code" else "show the code", style = ShepType.explainLabel)
+            }
+        }
+        if (open && hunk != null) {
+            Text(colorizeDiff(hunk), style = ShepType.codeSmall)
+        }
     }
 }
