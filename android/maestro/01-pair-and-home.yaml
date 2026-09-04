@@ -13,6 +13,9 @@ appId: dev.shep.companion
     when:
       visible: "the cockpit in your pocket"
     commands:
+      # The two fields moved under a disclosure: the first screen is now the
+      # two steps and the scan/type buttons.
+      - tapOn: "address and token"
       # The URL field is pre-filled (default or a saved value) — the regex
       # matches either; retarget it at the host bridge.
       - tapOn: "ws://.*"
@@ -29,11 +32,13 @@ appId: dev.shep.companion
             visible: "clear token"
           commands:
             - tapOn: "clear token"
-      - tapOn: "Token"
+      - tapOn: "pairing token"
       - inputText: "${SHEP_TOKEN}"
       - pressKey: back
-      - tapOn: "Connect"
-      # Android 13+ notification permission prompt fires after pairing.
+      - tapOn: "connect"
+      # A successful link now lands on its own step, and the board (and so the
+      # Android 13+ notification prompt) comes after the button on it.
+      - tapOn: "go to agents"
       - runFlow:
           when:
             visible: "Allow"

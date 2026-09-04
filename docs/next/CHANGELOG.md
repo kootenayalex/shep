@@ -4,6 +4,15 @@
 
 ### Added
 
+- Pairing the companion is now two steps and a claim code. The first screen
+  says what to do — run `shep bridge pair`, then scan the square or enter the
+  computer's name and the 8-character code under it — and answers "why do I
+  need a computer?". A successful link is its own screen ("linked to mini",
+  "go to agents", "choose what to be notified about") instead of the board
+  simply appearing, and a failure says the phone and the computer have to be
+  on the same wi-fi or tailnet rather than printing a socket error alone. The
+  bridge URL and token fields are still there, under "address and token".
+
 - `shep bridge pair` prints an 8-character claim code beside the QR, for
   pairing a phone whose camera is not to hand: enter the computer's address
   and the code, and the phone fetches the token itself over the same

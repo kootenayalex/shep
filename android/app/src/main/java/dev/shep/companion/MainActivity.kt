@@ -88,7 +88,7 @@ fun statusColor(status: String): Color = ShepSemantic.agentColor(status)
  */
 fun offlineNotice(error: String?): String =
     if (error != null && error.contains("unauthorized", ignoreCase = true)) {
-        "pairing rejected — re-pair from `shep bridge pair`"
+        "this computer no longer accepts this phone — link it again"
     } else {
         "offline · reconnecting…"
     }
@@ -166,6 +166,9 @@ fun ShepApp(
 ) {
     var client by remember { mutableStateOf<BridgeClient?>(null) }
     var paired by remember { mutableStateOf(false) }
+    // Which tab the shell opens on. Only pairing sets it — "go to agents" and
+    // "choose what to be notified about" are the same door into two rooms.
+    var startTab by remember { mutableStateOf(Tab.Agents) }
     var connectError by remember { mutableStateOf<String?>(null) }
     // True while the first auto-connect with a saved pairing is in flight —
     // shows a connecting spinner instead of flashing the manual pairing form.
@@ -249,7 +252,9 @@ fun ShepApp(
             PairingStore.save(context, url, token)
             val error = establish()
             if (error == null) {
-                paired = true
+                // Not `paired = true`: the pairing screen owns the moment
+                // after a successful link, so it can say what just happened
+                // and where to go, instead of the board appearing.
                 connectError = null
             } else if (previous != null) {
                 PairingStore.save(context, previous.url, previous.token)
@@ -257,6 +262,17 @@ fun ShepApp(
                 PairingStore.clear(context)
             }
             onDone(error)
+        }
+    }
+
+    /** Spend a claim code for the token, then connect with it as usual. */
+    fun claimAndConnect(host: String, code: String, onDone: (String?) -> Unit) {
+        scope.launch {
+            val url = pairingUrlFromHost(host)
+            val claimed = withContext(Dispatchers.IO) { claimToken(url, code) }
+            claimed
+                .onSuccess { token -> pairAndConnect(url, token, onDone) }
+                .onFailure { onDone(it.message ?: "pairing failed") }
         }
     }
 
@@ -337,6 +353,11 @@ fun ShepApp(
                     initialToken = saved?.token ?: "",
                     lastError = connectError,
                     onConnect = { url, token, onDone -> pairAndConnect(url, token, onDone) },
+                    onClaim = { host, code, onDone -> claimAndConnect(host, code, onDone) },
+                    onEnter = { tab ->
+                        startTab = tab
+                        paired = true
+                    },
                 )
             }
         } else {
@@ -354,6 +375,7 @@ fun ShepApp(
                     }
                     NavShell(
                         client = active,
+                        initialTab = startTab,
                         deepLinkPane = deepLinkPane,
                         onDeepLinkConsumed = onDeepLinkConsumed,
                         newTask = newTask,
@@ -384,12 +406,13 @@ fun ShepApp(
 fun NavShell(
     client: BridgeClient,
     onUnpair: () -> Unit,
+    initialTab: Tab = Tab.Agents,
     deepLinkPane: String? = null,
     onDeepLinkConsumed: () -> Unit = {},
     newTask: Boolean = false,
     onNewTaskConsumed: () -> Unit = {},
 ) {
-    var tab by remember { mutableStateOf(Tab.Agents) }
+    var tab by remember { mutableStateOf(initialTab) }
     var paneDetail by remember { mutableStateOf<AgentRow?>(null) }
     // Hoisted from TasksScreen so the new-task deep-link can pre-open the sheet.
     var tasksShowAdd by remember { mutableStateOf(false) }
