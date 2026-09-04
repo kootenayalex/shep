@@ -57,6 +57,8 @@ import dev.shep.companion.statusColor
 import dev.shep.companion.totalsFromRows
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.EmptyState
+import dev.shep.companion.ui.components.ExplainLine
+import dev.shep.companion.ui.components.ExplainRow
 import dev.shep.companion.ui.components.Meter
 import dev.shep.companion.ui.components.Notice
 import dev.shep.companion.ui.components.NoticeTone
@@ -458,12 +460,27 @@ fun ChannelsScreen(
                 )
             }
         }
+        ExplainRow("how to read this list") {
+            ExplainLine(
+                "the mark",
+                "what the agent is doing — a ring means it has stopped and is waiting for you",
+            )
+            ExplainLine("the name", "which assistant it is, and the group it is working in")
+            ExplainLine("the bar", "how much of its chat memory is used up")
+            ExplainLine("◆", "it has changes waiting for you to look at")
+        }
         DashboardStrip(totals, host) { statusColor(it) }
         if (filteredSections.isEmpty()) {
-            EmptyState(
-                if (sections.isEmpty()) "no sessions — start one with + new"
-                else "nothing matches ${filter.label}"
-            )
+            if (sections.isEmpty()) {
+                EmptyState(
+                    "nothing running",
+                    body = "start an agent and it appears here, grouped by project",
+                    actionLabel = "start an agent",
+                    onAction = { showNew = true },
+                )
+            } else {
+                EmptyState("nothing matches ${filter.label}")
+            }
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
@@ -765,7 +782,7 @@ private fun SectionHeader(
             }
             if (group.isWorktree) {
                 Spacer(Modifier.width(ShepSpace.snug))
-                Text("worktree", style = ShepType.badge.copy(color = ShepPalette.overlay0))
+                Text("own copy", style = ShepType.badge.copy(color = ShepPalette.overlay0))
             }
             if (group.focused) {
                 Spacer(Modifier.width(ShepSpace.snug))
