@@ -43,6 +43,8 @@ import dev.shep.companion.statusPriority
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.ButtonTone
 import dev.shep.companion.ui.components.EmptyState
+import dev.shep.companion.ui.components.ExplainLine
+import dev.shep.companion.ui.components.ExplainRow
 import dev.shep.companion.ui.components.Notice
 import dev.shep.companion.ui.components.ScreenHeader
 import dev.shep.companion.ui.components.ShepButton
@@ -128,8 +130,25 @@ fun TasksScreen(
             ActionText("+ new", style = ShepType.actionStrong) { onShowAddChange(true) }
         }
         notice?.let { Notice(it, onDismiss = { notice = null }) }
+        ExplainRow("its own copy vs the main copy") {
+            ExplainLine(
+                "its own copy",
+                "a separate folder off the same repo, so the agent's work never " +
+                    "touches what you have open",
+            )
+            ExplainLine(
+                "the main copy",
+                "the checkout you work in yourself — untouched until you merge " +
+                    "the agent's work back in",
+            )
+        }
         if (tasks.isEmpty()) {
-            EmptyState("no tasks — queue one with + new")
+            EmptyState(
+                "no tasks waiting",
+                body = "add one and it starts as soon as an agent is free",
+                actionLabel = "add a task",
+                onAction = { onShowAddChange(true) },
+            )
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
@@ -260,14 +279,18 @@ fun TaskCard(
             Spacer(Modifier.width(ShepSpace.small))
             Text(task.state, style = ShepType.meta.copy(color = taskStateColor(task.state)))
             Spacer(Modifier.weight(1f))
-            if (task.useWorktree) Text("⑂", style = ShepType.badge.copy(color = ShepPalette.accent))
+            if (task.useWorktree) {
+                Text("⑂", style = ShepType.badge.copy(color = ShepPalette.accent))
+                Spacer(Modifier.width(ShepSpace.tight))
+                Text("own copy", style = ShepType.badge.copy(color = ShepPalette.overlay0))
+            }
         }
         Spacer(Modifier.height(ShepSpace.snug))
         // The task in the words someone typed, so sans.
         Text(task.prompt, style = ShepType.body, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(ShepSpace.snug))
         Text(
-            "${repoName(task.repo)} · ${task.runtime}" + (task.workspaceId?.let { " · $it" } ?: ""),
+            "${repoName(task.repo)} · ${task.runtime}",
             style = ShepType.meta,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -295,7 +318,7 @@ fun TaskCard(
                 // the right repo is the cheaper move, and dispatch — which
                 // spawns a whole new pane — is the fallback, not the default.
                 ShepButton("send to…", onClick = onAssign)
-                ShepButton("new pane", tone = ButtonTone.Quiet, onClick = onDispatch)
+                ShepButton("start an agent", tone = ButtonTone.Quiet, onClick = onDispatch)
                 ShepButton("cancel", tone = ButtonTone.Quiet, onClick = onCancel)
             }
             Spacer(Modifier.weight(1f))
@@ -388,7 +411,10 @@ fun AddTaskSheet(
         Spacer(Modifier.height(ShepSpace.small))
         Text("assign to agent", style = ShepType.sectionLabel)
         if (agents.isEmpty()) {
-            Text("no live agents available", style = ShepType.meta.copy(color = ShepPalette.peach))
+            Text(
+                "no agents running — start one from the agents list first",
+                style = ShepType.meta.copy(color = ShepPalette.peach),
+            )
         } else {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -409,7 +435,7 @@ fun AddTaskSheet(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("--worktree", style = ShepType.sectionLabel)
+            Text("work in its own copy", style = ShepType.sectionLabel)
             Switch(
                 checked = worktree,
                 onCheckedChange = { worktree = it },
@@ -421,6 +447,10 @@ fun AddTaskSheet(
                 ),
             )
         }
+        Text(
+            "your main copy stays untouched until you merge the work back in",
+            style = ShepType.metaSmall,
+        )
         Text("branch task/<id>", style = ShepType.metaSmall)
         Spacer(Modifier.height(ShepSpace.small))
         Row(verticalAlignment = Alignment.CenterVertically) {

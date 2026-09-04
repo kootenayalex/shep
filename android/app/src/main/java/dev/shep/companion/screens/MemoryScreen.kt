@@ -26,6 +26,8 @@ import dev.shep.companion.MemoryView
 import dev.shep.companion.parseMemory
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.EmptyState
+import dev.shep.companion.ui.components.ExplainLine
+import dev.shep.companion.ui.components.ExplainRow
 import dev.shep.companion.ui.components.LoadingState
 import dev.shep.companion.ui.components.Meter
 import dev.shep.companion.ui.components.Notice
@@ -88,8 +90,8 @@ fun MemoryScreen(client: BridgeClient) {
                 )
                 Spacer(Modifier.height(ShepSpace.tight))
                 Text(
-                    "${v.percent}%" +
-                        if (overCap) " — consolidate soon" else "",
+                    "${v.used} of ${v.cap} characters used" +
+                        if (overCap) " — nearly full — merge or trim notes" else "",
                     style = ShepType.meta.copy(
                         color = if (overCap) ShepPalette.peach else ShepPalette.overlay0,
                     ),
@@ -97,11 +99,28 @@ fun MemoryScreen(client: BridgeClient) {
             }
         }
         notice?.let { Notice(it, onDismiss = { notice = null }) }
+        ExplainRow("notes vs chat memory") {
+            ExplainLine(
+                "notes",
+                "what is on this screen: the things you would otherwise repeat to " +
+                    "every agent. they stay until you remove them",
+            )
+            ExplainLine(
+                "chat memory",
+                "the bar beside each agent on the agents list: one agent's own " +
+                    "conversation, which fills up and empties itself",
+            )
+        }
         val v = view
         when {
             v == null && status.isEmpty() -> LoadingState("loading…")
             v == null -> LoadingState("reconnecting…", detail = status)
-            v.entries.isEmpty() -> EmptyState("no entries yet — add one with + add")
+            v.entries.isEmpty() -> EmptyState(
+                "nothing written down yet",
+                body = "notes are the things you'd otherwise repeat to every agent",
+                actionLabel = "write your first note",
+                onAction = { editing = "" },
+            )
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(ShepSpace.listGutter),
