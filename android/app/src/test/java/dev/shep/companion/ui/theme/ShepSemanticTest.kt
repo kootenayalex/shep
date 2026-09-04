@@ -64,6 +64,37 @@ class ShepSemanticTest {
         assertEquals(glyphs.size, glyphs.toSet().size)
     }
 
+    /**
+     * Mirrors `manual_state_appearance` in src/ui/status.rs: every tier the
+     * server can name resolves to a real appearance, and each one ends in the
+     * override marker so a hand-set state is never mistaken for a detected one.
+     */
+    @Test
+    fun `every manual tier resolves and wears the override marker`() {
+        assertEquals(7, ShepSemantic.MANUAL_TIERS.size)
+        ShepSemantic.MANUAL_TIERS.forEach { tier ->
+            val it = ShepSemantic.manual(tier, "hand")
+            assertEquals(tier, true, it.glyph.endsWith("·"))
+            assertEquals("hand", it.label)
+            assertNotEquals(ShepPalette.accent, it.color)
+        }
+        assertEquals("◉·", ShepSemantic.manual("stop", "x").glyph)
+        assertEquals(ShepPalette.red, ShepSemantic.manual("stop", "x").color)
+        assertEquals("◆·", ShepSemantic.manual("review", "x").glyph)
+        assertEquals(ShepPalette.mauve, ShepSemantic.manual("review", "x").color)
+        assertEquals("◐·", ShepSemantic.manual("working", "x", tick = 0).glyph)
+        // A tier this build has never heard of is absent, not a crash.
+        assertEquals("··", ShepSemantic.manual("future-tier", "x").glyph)
+    }
+
+    @Test
+    fun `a manual glyph is never a detected glyph`() {
+        val detected = listOf("blocked", "working", "done", "idle", "?").map { ShepSemantic.agent(it).glyph }
+        ShepSemantic.MANUAL_TIERS.forEach { tier ->
+            assertEquals(tier, false, ShepSemantic.manual(tier, "x").glyph in detected)
+        }
+    }
+
     @Test
     fun `the spinner rotates at the desktop's cadence`() {
         // spinnerFrame divides by eight, so eight steps is one frame and thirty-two

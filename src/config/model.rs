@@ -302,6 +302,7 @@ pub struct Config {
     pub remote: RemoteConfig,
     pub notifications: NotificationsConfig,
     pub tasks: TasksConfig,
+    pub states: StatesConfig,
 }
 
 #[derive(Debug)]
@@ -388,6 +389,8 @@ pub struct KeysConfig {
     pub close_tab: BindingConfig,
     /// Rename the focused pane. Default: "prefix+shift+p".
     pub rename_pane: BindingConfig,
+    /// Set or clear a manual state on the focused agent. Default: "prefix+shift+s".
+    pub set_agent_state: BindingConfig,
     /// Open the focused pane scrollback in $EDITOR. Default: "prefix+e".
     pub edit_scrollback: BindingConfig,
     /// Enter keyboard copy mode for the focused pane. Default: "prefix+[".
@@ -512,6 +515,8 @@ pub(crate) struct KeysConfigOverlay {
     #[serde(skip_serializing_if = "Option::is_none")]
     rename_pane: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    set_agent_state: Option<BindingConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     edit_scrollback: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     copy_mode: Option<BindingConfig>,
@@ -608,6 +613,7 @@ impl<'de> Deserialize<'de> for KeysConfig {
         apply_field!(switch_workspace);
         apply_field!(close_tab);
         apply_field!(rename_pane);
+        apply_field!(set_agent_state);
         apply_field!(edit_scrollback);
         apply_field!(copy_mode);
         apply_field!(focus_pane_left);
@@ -708,6 +714,7 @@ impl KeysConfig {
         copy_effective_indexed_field!(switch_workspace, keybinds.switch_workspace);
         copy_effective_action_field!(close_tab, keybinds.close_tab);
         copy_effective_action_field!(rename_pane, keybinds.rename_pane);
+        copy_effective_action_field!(set_agent_state, keybinds.set_agent_state);
         copy_effective_action_field!(edit_scrollback, keybinds.edit_scrollback);
         copy_effective_action_field!(copy_mode, keybinds.copy_mode);
         copy_effective_action_field!(focus_pane_left, keybinds.focus_pane_left);
@@ -1034,6 +1041,91 @@ impl TasksConfig {
     }
 }
 
+/// `[states]` — custom agent states a person can set by hand. Each custom
+/// state behaves as one of the four detected states and renders in one of the
+/// design language's colour tiers; ad-hoc names that are not configured here
+/// are rejected at set time so the tier table stays closed.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct StatesConfig {
+    pub custom: Vec<CustomStateConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CustomStateConfig {
+    /// Wire id: `[a-z0-9_-]{1,24}`, unique, and not a builtin state name.
+    pub name: String,
+    /// What surfaces print. Defaults to `name`.
+    #[serde(default)]
+    pub label: Option<String>,
+    /// Which detected state the terminal behaves as while this is set.
+    /// Default: blocked.
+    #[serde(default = "default_behaves_as")]
+    pub behaves_as: crate::api::schema::PaneAgentState,
+    /// Colour tier: stop, working, done, settled, waiting, absent, review.
+    /// Default: review.
+    #[serde(default = "default_state_tier")]
+    pub tier: crate::api::schema::ManualStateTier,
+}
+
+fn default_behaves_as() -> crate::api::schema::PaneAgentState {
+    crate::api::schema::PaneAgentState::Blocked
+}
+
+fn default_state_tier() -> crate::api::schema::ManualStateTier {
+    crate::api::schema::ManualStateTier::Review
+}
+
+pub const BUILTIN_STATE_NAMES: [&str; 4] = ["idle", "working", "blocked", "unknown"];
+
+pub fn valid_custom_state_name(name: &str) -> bool {
+    (1..=24).contains(&name.len())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+}
+
+impl CustomStateConfig {
+    pub fn label(&self) -> &str {
+        self.label.as_deref().unwrap_or(&self.name)
+    }
+}
+
+impl StatesConfig {
+    /// Drop invalid or duplicate entries, describing each in `diagnostics`.
+    pub fn validate(&mut self, diagnostics: &mut Vec<String>) {
+        let mut seen = std::collections::HashSet::new();
+        self.custom.retain(|custom| {
+            if !valid_custom_state_name(&custom.name) {
+                diagnostics.push(format!(
+                    "invalid states config: custom state name {:?} must match [a-z0-9_-]{{1,24}}; dropping it",
+                    custom.name
+                ));
+                return false;
+            }
+            if BUILTIN_STATE_NAMES.contains(&custom.name.as_str()) {
+                diagnostics.push(format!(
+                    "invalid states config: custom state name {:?} is a builtin state; dropping it",
+                    custom.name
+                ));
+                return false;
+            }
+            if !seen.insert(custom.name.clone()) {
+                diagnostics.push(format!(
+                    "invalid states config: custom state name {:?} is defined twice; dropping the duplicate",
+                    custom.name
+                ));
+                return false;
+            }
+            true
+        });
+    }
+
+    pub fn find(&self, name: &str) -> Option<&CustomStateConfig> {
+        self.custom.iter().find(|custom| custom.name == name)
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct ExperimentalConfig {
@@ -1114,6 +1206,7 @@ impl Default for KeysConfig {
             switch_workspace: BindingConfig::empty(),
             close_tab: BindingConfig::one("prefix+shift+x"),
             rename_pane: BindingConfig::one("prefix+shift+p"),
+            set_agent_state: BindingConfig::one("prefix+shift+s"),
             edit_scrollback: BindingConfig::one("prefix+e"),
             copy_mode: BindingConfig::one("prefix+["),
             focus_pane_left: BindingConfig::one("prefix+h"),

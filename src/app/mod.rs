@@ -583,6 +583,7 @@ impl App {
             selection: None,
             selection_autoscroll: None,
             context_menu: None,
+            state_picker: None,
             update_available,
             update_install_command,
             latest_release_notes_available,
@@ -591,6 +592,7 @@ impl App {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             tasks_config: config.tasks.clone(),
+            states_config: config.states.clone(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
             copy_feedback: None,
@@ -1446,6 +1448,10 @@ impl App {
             self.state.tasks_config = config.tasks.clone();
         }
 
+        if !invalid_section("states") {
+            self.state.states_config = config.states.clone();
+        }
+
         if !invalid_section("experimental") {
             let was_kitty_graphics_enabled = self.state.kitty_graphics_enabled;
             self.state.kitty_graphics_enabled = config.experimental.kitty_graphics;
@@ -1719,6 +1725,9 @@ impl App {
             Mode::ContextMenu => {
                 self.handle_context_menu_key_via_api(key_event);
             }
+            Mode::SetAgentState => {
+                self.handle_state_picker_key_via_api(key_event);
+            }
             Mode::KeybindHelp => {
                 input::handle_keybind_help_key(&mut self.state, key_event);
             }
@@ -1912,6 +1921,7 @@ mod tests {
             Mode::ConfirmClose,
             Mode::ConfirmRemoveWorktree,
             Mode::ContextMenu,
+            Mode::SetAgentState,
             Mode::GlobalMenu,
             Mode::KeybindHelp,
         ] {

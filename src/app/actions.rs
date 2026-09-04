@@ -1114,6 +1114,20 @@ impl AppState {
         }
     }
 
+    /// Mark one pane seen wherever it lives. Returns false when the pane does
+    /// not exist; true otherwise, whether or not anything changed.
+    pub(crate) fn mark_pane_seen(&mut self, ws_idx: usize, pane_id: PaneId) -> bool {
+        let Some(pane) = self.workspaces.get_mut(ws_idx).and_then(|ws| {
+            ws.tabs
+                .iter_mut()
+                .find_map(|tab| tab.panes.get_mut(&pane_id))
+        }) else {
+            return false;
+        };
+        pane.seen = true;
+        true
+    }
+
     pub(crate) fn mark_active_tab_seen(&mut self) -> bool {
         let Some(ws_idx) = self.active else {
             return false;
@@ -2780,7 +2794,11 @@ impl AppState {
         }
     }
 
-    fn update_terminal_state<F>(&mut self, pane_id: PaneId, update: F) -> Option<PaneStateUpdate>
+    pub(crate) fn update_terminal_state<F>(
+        &mut self,
+        pane_id: PaneId,
+        update: F,
+    ) -> Option<PaneStateUpdate>
     where
         F: FnOnce(&mut crate::terminal::TerminalState) -> Option<TerminalStateMutation>,
     {
@@ -2862,7 +2880,8 @@ impl AppState {
             .iter_mut()
             .find_map(|tab| tab.panes.get_mut(&pane_id))?;
 
-        if change.state != AgentState::Idle {
+        // A state a person just set is, by construction, already looked at.
+        if change.manual || change.state != AgentState::Idle {
             pane.seen = true;
         } else if is_completion_transition(change) {
             pane.seen = suppress_active_tab_notifications;
@@ -2883,6 +2902,9 @@ impl AppState {
         change: &EffectiveStateChange,
     ) -> Option<AgentNotificationDelivery> {
         self.pending_agent_notifications.remove(&pane_id);
+        if change.manual {
+            return None;
+        }
 
         let is_active_tab = self.pane_is_in_active_tab(ws_idx, pane_id);
         let suppress_active_tab_notifications =

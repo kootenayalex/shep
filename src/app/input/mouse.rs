@@ -168,7 +168,7 @@ impl AppState {
             return None;
         }
 
-        if self.mode == Mode::KeybindHelp {
+        if matches!(self.mode, Mode::KeybindHelp | Mode::SetAgentState) {
             return None;
         }
 
@@ -2740,7 +2740,7 @@ mod tests {
             },
             x: 2,
             y: 2,
-            list: MenuListState::new(1),
+            list: MenuListState::new(2),
         });
         app.state.mode = Mode::ContextMenu;
 

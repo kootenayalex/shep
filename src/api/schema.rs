@@ -123,6 +123,10 @@ pub enum Method {
     AgentSend(AgentSendParams),
     #[serde(rename = "agent.rename")]
     AgentRename(AgentRenameParams),
+    #[serde(rename = "agent.set_state")]
+    AgentSetState(AgentSetStateParams),
+    #[serde(rename = "agent.clear_state")]
+    AgentClearState(AgentTarget),
     #[serde(rename = "agent.focus")]
     AgentFocus(AgentTarget),
     #[serde(rename = "agent.start")]
@@ -161,6 +165,8 @@ pub enum Method {
     PaneGet(PaneTarget),
     #[serde(rename = "pane.focus")]
     PaneFocus(PaneTarget),
+    #[serde(rename = "pane.mark_seen")]
+    PaneMarkSeen(PaneTarget),
     #[serde(rename = "pane.rename")]
     PaneRename(PaneRenameParams),
     #[serde(rename = "pane.send_text")]

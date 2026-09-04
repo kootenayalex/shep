@@ -57,12 +57,63 @@ pub struct EffectiveStateChange {
     pub known_agent: Option<Agent>,
     pub state: AgentState,
     pub presentation: EffectivePresentation,
+    /// True when a person produced this change by setting or clearing a
+    /// manual state, as opposed to detection observing the agent. Manual
+    /// changes are already "seen" and never notify.
+    pub manual: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TerminalStateMutation {
     pub effective_state_change: Option<EffectiveStateChange>,
     pub session_ref_changed: bool,
+}
+
+/// A custom state named in `[[states.custom]]`, resolved at set time so the
+/// terminal never has to look the config up again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualCustomState {
+    pub name: String,
+    pub label: String,
+    pub tier: crate::api::schema::ManualStateTier,
+}
+
+/// A state a person set by hand. It pins the effective state at `state` for as
+/// long as detection keeps reporting `baseline`; the first detected transition
+/// away from `baseline` is new evidence and drops the override.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualStateOverride {
+    pub state: AgentState,
+    pub custom: Option<ManualCustomState>,
+    pub baseline: AgentState,
+}
+
+impl ManualStateOverride {
+    /// The override as surfaces see it: builtin overrides are named after the
+    /// state they pin and take that state's own tier.
+    pub fn as_pane_manual_state(&self) -> crate::api::schema::PaneManualState {
+        use crate::api::schema::{ManualStateTier, PaneManualState};
+        match &self.custom {
+            Some(custom) => PaneManualState {
+                name: custom.name.clone(),
+                label: custom.label.clone(),
+                tier: custom.tier,
+            },
+            None => {
+                let (name, tier) = match self.state {
+                    AgentState::Blocked => ("blocked", ManualStateTier::Stop),
+                    AgentState::Working => ("working", ManualStateTier::Working),
+                    AgentState::Idle => ("idle", ManualStateTier::Settled),
+                    AgentState::Unknown => ("unknown", ManualStateTier::Absent),
+                };
+                PaneManualState {
+                    name: name.to_string(),
+                    label: name.to_string(),
+                    tier,
+                }
+            }
+        }
+    }
 }
 
 /// Pure state for a server-owned terminal.
@@ -104,6 +155,10 @@ pub struct TerminalState {
     pub respawn_shell_on_exit: bool,
     recent_agent_process_exit_at: Option<Instant>,
     pub pending_agent_resume_plan: Option<crate::agent_resume::AgentResumePlan>,
+    /// A state a person set by hand; see [`ManualStateOverride`].
+    pub manual_state: Option<ManualStateOverride>,
+    manual_change_in_progress: bool,
+    manual_transition_pending: bool,
 }
 
 impl TerminalState {
@@ -134,6 +189,9 @@ impl TerminalState {
             respawn_shell_on_exit: false,
             recent_agent_process_exit_at: None,
             pending_agent_resume_plan: None,
+            manual_state: None,
+            manual_change_in_progress: false,
+            manual_transition_pending: false,
         }
     }
 
@@ -1288,6 +1346,86 @@ impl TerminalState {
         })
     }
 
+    /// Pin the effective state by hand. `state` is what the terminal behaves
+    /// as; `custom` carries the configured name/label/tier when the person
+    /// chose a custom state. The override baselines on the currently detected
+    /// state and drops itself on the next detected transition.
+    pub fn set_manual_state(
+        &mut self,
+        state: AgentState,
+        custom: Option<ManualCustomState>,
+        now: Instant,
+    ) -> TerminalStateMutation {
+        let baseline = self.detected_state();
+        self.manual_state = Some(ManualStateOverride {
+            state,
+            custom,
+            baseline,
+        });
+        self.apply_manual_change(now)
+    }
+
+    /// Drop a manual state, if any, so detection decides again.
+    pub fn clear_manual_state(&mut self, now: Instant) -> TerminalStateMutation {
+        if self.manual_state.is_none() {
+            return TerminalStateMutation::default();
+        }
+        self.manual_state = None;
+        self.apply_manual_change(now)
+    }
+
+    /// Restore a persisted override verbatim (no change event: the session is
+    /// being rebuilt, nobody is watching yet).
+    pub fn restore_manual_state(&mut self, manual_state: ManualStateOverride) {
+        // Seed detection with the baseline so the first observation after a
+        // restore compares against what the override was set against, not
+        // against the blank slate of a freshly built terminal.
+        self.fallback_state = manual_state.baseline;
+        self.state = manual_state.state;
+        self.manual_state = Some(manual_state);
+    }
+
+    /// True once, after a manual set/clear produced an effective-state change
+    /// that the server's request diff loop has yet to account for.
+    pub fn take_manual_transition_pending(&mut self) -> bool {
+        std::mem::take(&mut self.manual_transition_pending)
+    }
+
+    fn apply_manual_change(&mut self, now: Instant) -> TerminalStateMutation {
+        let previous_agent_label = self.effective_agent_label().map(str::to_string);
+        let previous_known_agent = self.effective_known_agent();
+        let previous_state = self.state;
+        let previous_presentation = self.effective_presentation_for_state_at(previous_state, now);
+        self.manual_change_in_progress = true;
+        let effective_state_change = self.recompute_effective_state(
+            previous_agent_label,
+            previous_known_agent,
+            previous_state,
+            previous_presentation,
+            now,
+        );
+        self.manual_change_in_progress = false;
+        if effective_state_change.is_some() {
+            self.manual_transition_pending = true;
+        }
+        TerminalStateMutation {
+            effective_state_change,
+            session_ref_changed: false,
+        }
+    }
+
+    /// What detection alone says the state is, before any manual override.
+    pub fn detected_state(&self) -> AgentState {
+        if self.visible_blocker_overrides_hook() {
+            AgentState::Blocked
+        } else {
+            self.hook_authority
+                .as_ref()
+                .map(|authority| authority.state)
+                .unwrap_or(self.fallback_state)
+        }
+    }
+
     pub fn set_manual_label(&mut self, label: String) {
         let label = label.trim().to_string();
         self.manual_label = (!label.is_empty()).then_some(label);
@@ -1353,13 +1491,21 @@ impl TerminalState {
         previous_presentation: EffectivePresentation,
         now: Instant,
     ) -> Option<EffectiveStateChange> {
-        let state = if self.visible_blocker_overrides_hook() {
-            AgentState::Blocked
-        } else {
-            self.hook_authority
-                .as_ref()
-                .map(|authority| authority.state)
-                .unwrap_or(self.fallback_state)
+        if !self.manual_change_in_progress {
+            // Detection ran; whatever a manual set left pending is now stale.
+            self.manual_transition_pending = false;
+        }
+        let detected = self.detected_state();
+        // Arbitration: a manual override holds only while detection keeps
+        // reporting the state it was set against. Any detected transition —
+        // including a visible blocker — is new evidence and drops it.
+        let state = match self.manual_state.as_ref() {
+            Some(manual) if manual.baseline == detected => manual.state,
+            Some(_) => {
+                self.manual_state = None;
+                detected
+            }
+            None => detected,
         };
         let agent_label = self.effective_agent_label().map(str::to_string);
         let known_agent = self.effective_known_agent();
@@ -1384,6 +1530,7 @@ impl TerminalState {
             known_agent,
             state,
             presentation,
+            manual: self.manual_change_in_progress,
         })
     }
 }
@@ -1420,6 +1567,132 @@ mod tests {
         };
 
         assert_eq!(stabilize_agent_detection(detection), AgentState::Idle);
+    }
+
+    fn custom_review() -> ManualCustomState {
+        ManualCustomState {
+            name: "review".into(),
+            label: "needs review".into(),
+            tier: crate::api::schema::ManualStateTier::Review,
+        }
+    }
+
+    #[test]
+    fn manual_state_holds_through_detection_noise() {
+        let mut terminal = test_terminal();
+        terminal.set_detected_state(Some(Agent::Pi), AgentState::Idle);
+        let now = Instant::now();
+
+        let mutation = terminal.set_manual_state(AgentState::Blocked, Some(custom_review()), now);
+        let change = mutation
+            .effective_state_change
+            .expect("manual set changes state");
+        assert!(change.manual);
+        assert_eq!(change.previous_state, AgentState::Idle);
+        assert_eq!(change.state, AgentState::Blocked);
+        assert_eq!(
+            change.presentation.custom_status.as_deref(),
+            Some("needs review")
+        );
+        assert_eq!(terminal.state, AgentState::Blocked);
+        assert!(terminal.take_manual_transition_pending());
+        assert!(!terminal.take_manual_transition_pending());
+
+        // Detection repeating the baseline is noise, not evidence.
+        let mutation = terminal.set_detected_state_with_screen_signals_at(
+            Some(Agent::Pi),
+            AgentState::Idle,
+            false,
+            true,
+            false,
+            false,
+            now,
+        );
+        assert!(mutation.effective_state_change.is_none());
+        assert_eq!(terminal.state, AgentState::Blocked);
+        assert!(terminal.manual_state.is_some());
+        assert_eq!(
+            terminal.effective_presentation().custom_status.as_deref(),
+            Some("needs review")
+        );
+    }
+
+    #[test]
+    fn manual_state_clears_on_next_detected_transition() {
+        let mut terminal = test_terminal();
+        terminal.set_detected_state(Some(Agent::Pi), AgentState::Idle);
+        let now = Instant::now();
+        terminal.set_manual_state(AgentState::Blocked, Some(custom_review()), now);
+
+        let mutation = terminal.set_detected_state_with_screen_signals_at(
+            Some(Agent::Pi),
+            AgentState::Working,
+            false,
+            false,
+            true,
+            false,
+            now,
+        );
+        let change = mutation
+            .effective_state_change
+            .expect("transition drops override");
+        assert!(!change.manual);
+        assert_eq!(change.previous_state, AgentState::Blocked);
+        assert_eq!(change.state, AgentState::Working);
+        assert!(change.presentation.custom_status.is_none());
+        assert!(terminal.manual_state.is_none());
+        // The set left a pending flag; the transition is detection's, so the
+        // flag must not survive to mislabel it as manual.
+        assert!(!terminal.take_manual_transition_pending());
+    }
+
+    #[test]
+    fn manual_clear_restores_detected_state() {
+        let mut terminal = test_terminal();
+        terminal.set_detected_state(Some(Agent::Pi), AgentState::Working);
+        let now = Instant::now();
+        terminal.set_manual_state(AgentState::Idle, None, now);
+        assert_eq!(terminal.state, AgentState::Idle);
+        assert_eq!(
+            terminal
+                .manual_state
+                .as_ref()
+                .map(|m| m.as_pane_manual_state().name.clone()),
+            Some("idle".to_string())
+        );
+
+        let change = terminal
+            .clear_manual_state(now)
+            .effective_state_change
+            .expect("clearing restores detection");
+        assert!(change.manual);
+        assert_eq!(change.state, AgentState::Working);
+        assert!(terminal.manual_state.is_none());
+        assert!(terminal
+            .clear_manual_state(now)
+            .effective_state_change
+            .is_none());
+    }
+
+    #[test]
+    fn visible_blocker_clears_manual_state() {
+        let mut terminal = test_terminal();
+        terminal.set_detected_state(Some(Agent::Pi), AgentState::Working);
+        let now = Instant::now();
+        terminal.set_manual_state(AgentState::Idle, None, now);
+
+        let mutation = terminal.set_detected_state_with_screen_signals_at(
+            Some(Agent::Pi),
+            AgentState::Blocked,
+            true,
+            false,
+            false,
+            false,
+            now,
+        );
+        assert!(mutation.effective_state_change.is_some());
+        assert_eq!(terminal.state, AgentState::Blocked);
+        assert!(terminal.manual_state.is_none());
     }
 
     #[test]

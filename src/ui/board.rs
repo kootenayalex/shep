@@ -20,7 +20,7 @@ use ratatui::{
 
 use super::glyphs;
 use super::sidebar::{agent_panel_entries, format_event_age};
-use super::status::{agent_icon, state_label};
+use super::status::{agent_icon_for, state_label};
 use super::text::{display_width, truncate_end, truncate_start};
 use super::widgets::render_panel_shell;
 use crate::app::state::{AppState, BoardView, Palette, TaskQueueRow};
@@ -103,6 +103,7 @@ pub(crate) struct BoardCard {
     pub status: Option<String>,
     pub state: AgentState,
     pub seen: bool,
+    pub manual_state: Option<crate::api::schema::PaneManualState>,
     pub context_percent: Option<u8>,
     /// Where the agent is working, contracted for display (`~/vault/dev/shep`).
     pub cwd: Option<String>,
@@ -312,6 +313,7 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             status: entry.custom_status,
             state: entry.state,
             seen: entry.seen,
+            manual_state: entry.manual_state,
             context_percent: entry.context_percent,
             cwd,
             model: agent_model,
@@ -1134,7 +1136,13 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
             }
         }
     }
-    let (dot, dot_style) = agent_icon(card.state, card.seen, app.spinner_tick, p);
+    let (dot, dot_style) = agent_icon_for(
+        card.state,
+        card.seen,
+        card.manual_state.as_ref(),
+        app.spinner_tick,
+        p,
+    );
     let marker = if selected { glyphs::MARKER } else { " " };
     let marker_style = if selected {
         Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
@@ -1356,7 +1364,13 @@ fn render_agent_detail(
     };
 
     // Heading: the same dot/name/model identity the card leads with, at rest.
-    let (dot, dot_style) = agent_icon(card.state, card.seen, app.spinner_tick, p);
+    let (dot, dot_style) = agent_icon_for(
+        card.state,
+        card.seen,
+        card.manual_state.as_ref(),
+        app.spinner_tick,
+        p,
+    );
     let mut heading = vec![
         Span::styled(dot, dot_style),
         Span::raw(" "),
@@ -2494,6 +2508,7 @@ mod tests {
             status: None,
             state: crate::detect::AgentState::Idle,
             seen: true,
+            manual_state: None,
             context_percent: None,
             cwd: None,
             model: None,

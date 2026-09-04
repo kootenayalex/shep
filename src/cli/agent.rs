@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use crate::api::schema::{
-    AgentReadParams, AgentRenameParams, AgentSendParams, AgentStartParams, AgentStatus,
-    AgentTarget, EmptyParams, Method, ReadFormat, ReadSource, Request, Subscription,
+    AgentReadParams, AgentRenameParams, AgentSendParams, AgentSetStateParams, AgentStartParams,
+    AgentStatus, AgentTarget, EmptyParams, Method, PaneAgentState, ReadFormat, ReadSource, Request,
+    Subscription,
 };
 
 pub(super) fn run_agent_command(args: &[String]) -> std::io::Result<i32> {
@@ -17,6 +18,8 @@ pub(super) fn run_agent_command(args: &[String]) -> std::io::Result<i32> {
         "read" => agent_read(&args[1..]),
         "send" => agent_send(&args[1..]),
         "rename" => agent_rename(&args[1..]),
+        "set-state" => agent_set_state(&args[1..]),
+        "clear-state" => agent_clear_state(&args[1..]),
         "focus" => agent_focus(&args[1..]),
         "wait" => agent_wait(&args[1..]),
         "attach" => agent_attach(&args[1..]),
@@ -566,6 +569,44 @@ fn agent_rename(args: &[String]) -> std::io::Result<i32> {
     })?)
 }
 
+fn agent_set_state(args: &[String]) -> std::io::Result<i32> {
+    let (Some(target), Some(state)) = (args.first(), args.get(1)) else {
+        eprintln!(
+            "usage: shep agent set-state <target> <idle|working|blocked|unknown|custom-name>"
+        );
+        return Ok(2);
+    };
+    let builtin = match state.as_str() {
+        "idle" => Some(PaneAgentState::Idle),
+        "working" => Some(PaneAgentState::Working),
+        "blocked" => Some(PaneAgentState::Blocked),
+        "unknown" => Some(PaneAgentState::Unknown),
+        _ => None,
+    };
+    let custom = builtin.is_none().then(|| state.clone());
+    super::print_response(&super::send_request(&Request {
+        id: "cli:agent:set_state".into(),
+        method: Method::AgentSetState(AgentSetStateParams {
+            target: target.clone(),
+            state: builtin,
+            custom,
+        }),
+    })?)
+}
+
+fn agent_clear_state(args: &[String]) -> std::io::Result<i32> {
+    let Some(target) = args.first() else {
+        eprintln!("usage: shep agent clear-state <target>");
+        return Ok(2);
+    };
+    super::print_response(&super::send_request(&Request {
+        id: "cli:agent:clear_state".into(),
+        method: Method::AgentClearState(AgentTarget {
+            target: target.clone(),
+        }),
+    })?)
+}
+
 fn agent_send(args: &[String]) -> std::io::Result<i32> {
     let (queue, args) = match args.first().map(String::as_str) {
         Some("--queue") => (true, &args[1..]),
@@ -681,6 +722,8 @@ fn print_agent_help() {
     eprintln!("  shep agent read <target> [--source visible|recent|recent-unwrapped] [--lines N] [--format text|ansi] [--ansi]");
     eprintln!("  shep agent send <target> <text>");
     eprintln!("  shep agent rename <target> <name>|--clear");
+    eprintln!("  shep agent set-state <target> <idle|working|blocked|unknown|custom-name>");
+    eprintln!("  shep agent clear-state <target>");
     eprintln!("  shep agent focus <target>");
     eprintln!("  shep agent wait <target> --status <idle|working|blocked|unknown> [--timeout MS]");
     eprintln!("  shep agent attach <target> [--takeover]");

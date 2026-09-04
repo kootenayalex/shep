@@ -1,9 +1,9 @@
 use crate::api::schema::{
-    EmptyParams, LayoutSetSplitRatioParams, Method, PaneFocusDirectionParams, PaneRenameParams,
-    PaneResizeParams, PaneSplitParams, PaneSwapParams, PaneTarget, PaneZoomParams, TabCreateParams,
-    TabMoveParams, TabRenameParams, TabTarget, WorkspaceCreateParams, WorkspaceMoveParams,
-    WorkspaceRenameParams, WorkspaceTarget, WorktreeCreateParams, WorktreeOpenParams,
-    WorktreeRemoveParams,
+    AgentSetStateParams, AgentTarget, EmptyParams, LayoutSetSplitRatioParams, Method,
+    PaneFocusDirectionParams, PaneRenameParams, PaneResizeParams, PaneSplitParams, PaneSwapParams,
+    PaneTarget, PaneZoomParams, TabCreateParams, TabMoveParams, TabRenameParams, TabTarget,
+    WorkspaceCreateParams, WorkspaceMoveParams, WorkspaceRenameParams, WorkspaceTarget,
+    WorktreeCreateParams, WorktreeOpenParams, WorktreeRemoveParams,
 };
 
 use super::App;
@@ -35,6 +35,22 @@ impl App {
         params: WorkspaceCreateParams,
     ) -> String {
         self.dispatch_runtime_mutation(id, Method::WorkspaceCreate(params))
+    }
+
+    pub(crate) fn runtime_agent_set_state(
+        &mut self,
+        id: &'static str,
+        params: AgentSetStateParams,
+    ) -> String {
+        self.dispatch_runtime_mutation(id, Method::AgentSetState(params))
+    }
+
+    pub(crate) fn runtime_agent_clear_state(
+        &mut self,
+        id: &'static str,
+        target: AgentTarget,
+    ) -> String {
+        self.dispatch_runtime_mutation(id, Method::AgentClearState(target))
     }
 
     pub(crate) fn runtime_workspace_rename(

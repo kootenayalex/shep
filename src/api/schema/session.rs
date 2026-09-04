@@ -55,6 +55,11 @@ pub struct SessionOverviewAgent {
     pub unseen: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_status: Option<String>,
+    /// A state set by hand (`agent.set_state`), when one is in force. Its
+    /// `tier` is what a client should draw; `agent_status` stays the builtin
+    /// the override behaves as.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manual_state: Option<super::common::PaneManualState>,
     /// Last line of real content on the pane's screen; a display hint only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity_line: Option<String>,
@@ -125,4 +130,8 @@ pub struct SessionOverview {
     /// Agents in attention order: blocked first, then finished-unseen, then
     /// working, then idle — the same order the session board uses.
     pub agents: Vec<SessionOverviewAgent>,
+    /// The custom states this server's `[[states.custom]]` config defines, so a
+    /// client can offer them in its own state picker without a config of its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom_states: Vec<super::common::PaneManualState>,
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "protocol": 16,
+  "protocol": 17,
   "schema_version": 1,
   "schemas": {
     "error_response": {
@@ -683,6 +683,19 @@
           ],
           "type": "string"
         },
+        "ManualStateTier": {
+          "description": "The colour tier a manually set state renders in. Tiers, not colours, cross\nthe wire: each surface maps a tier to its own palette (`src/ui/status.rs`\n`StateInk`, `ShepSemantic.kt`).",
+          "enum": [
+            "stop",
+            "working",
+            "done",
+            "settled",
+            "waiting",
+            "absent",
+            "review"
+          ],
+          "type": "string"
+        },
         "PaneInfo": {
           "properties": {
             "agent": {
@@ -736,6 +749,17 @@
                 "string",
                 "null"
               ]
+            },
+            "manual_state": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/event/$defs/PaneManualState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The manual override currently pinning `agent_status`, if any."
             },
             "pane_id": {
               "type": "string"
@@ -904,6 +928,26 @@
             "direction",
             "ratio",
             "rect"
+          ],
+          "type": "object"
+        },
+        "PaneManualState": {
+          "description": "A manual state override as surfaces see it. `name` is the wire id (a\nbuiltin state name or a configured custom state name), `label` is what to\nprint, `tier` is how to colour it.",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "tier": {
+              "$ref": "#/schemas/event/$defs/ManualStateTier"
+            }
+          },
+          "required": [
+            "name",
+            "label",
+            "tier"
           ],
           "type": "object"
         },
@@ -1216,6 +1260,34 @@
           "required": [
             "target",
             "text"
+          ],
+          "type": "object"
+        },
+        "AgentSetStateParams": {
+          "description": "`agent.set_state`: pin an agent's state by hand. Exactly one of `state`\n(a builtin) or `custom` (a `[[states.custom]]` name) names the new state;\nneither clears the override, same as `agent.clear_state`.",
+          "properties": {
+            "custom": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/PaneAgentState"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "target"
           ],
           "type": "object"
         },
@@ -4452,6 +4524,38 @@
         {
           "properties": {
             "method": {
+              "const": "agent.set_state",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AgentSetStateParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "agent.clear_state",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AgentTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
               "const": "agent.focus",
               "type": "string"
             },
@@ -4741,6 +4845,22 @@
           "properties": {
             "method": {
               "const": "pane.focus",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PaneTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "pane.mark_seen",
               "type": "string"
             },
             "params": {
@@ -5497,6 +5617,17 @@
                 "string",
                 "null"
               ]
+            },
+            "manual_state": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/PaneManualState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The manual override currently pinning `agent_status`, if any."
             },
             "name": {
               "type": [
@@ -6529,6 +6660,19 @@
             }
           ]
         },
+        "ManualStateTier": {
+          "description": "The colour tier a manually set state renders in. Tiers, not colours, cross\nthe wire: each surface maps a tier to its own palette (`src/ui/status.rs`\n`StateInk`, `ShepSemantic.kt`).",
+          "enum": [
+            "stop",
+            "working",
+            "done",
+            "settled",
+            "waiting",
+            "absent",
+            "review"
+          ],
+          "type": "string"
+        },
         "NotificationShowReason": {
           "enum": [
             "shown",
@@ -6673,6 +6817,17 @@
                 "string",
                 "null"
               ]
+            },
+            "manual_state": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/PaneManualState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The manual override currently pinning `agent_status`, if any."
             },
             "pane_id": {
               "type": "string"
@@ -6841,6 +6996,26 @@
             "direction",
             "ratio",
             "rect"
+          ],
+          "type": "object"
+        },
+        "PaneManualState": {
+          "description": "A manual state override as surfaces see it. `name` is the wire id (a\nbuiltin state name or a configured custom state name), `label` is what to\nprint, `tier` is how to colour it.",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "tier": {
+              "$ref": "#/schemas/success_response/$defs/ManualStateTier"
+            }
+          },
+          "required": [
+            "name",
+            "label",
+            "tier"
           ],
           "type": "object"
         },
@@ -8934,6 +9109,13 @@
               },
               "type": "array"
             },
+            "custom_states": {
+              "description": "The custom states this server's `[[states.custom]]` config defines, so a\nclient can offer them in its own state picker without a config of its own.",
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/PaneManualState"
+              },
+              "type": "array"
+            },
             "host": {
               "$ref": "#/schemas/success_response/$defs/SessionOverviewHost"
             },
@@ -9007,6 +9189,17 @@
             },
             "focused": {
               "type": "boolean"
+            },
+            "manual_state": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/PaneManualState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A state set by hand (`agent.set_state`), when one is in force. Its\n`tier` is what a client should draw; `agent_status` stays the builtin\nthe override behaves as."
             },
             "name": {
               "type": [

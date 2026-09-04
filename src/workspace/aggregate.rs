@@ -21,6 +21,7 @@ pub struct PaneDetail {
     pub custom_status: Option<String>,
     pub state_labels: HashMap<String, String>,
     pub context_percent: Option<u8>,
+    pub manual_state: Option<crate::api::schema::PaneManualState>,
 }
 
 impl Tab {
@@ -66,6 +67,10 @@ impl Tab {
                     custom_status: presentation.custom_status,
                     state_labels: presentation.state_labels,
                     context_percent: terminal.context_percent,
+                    manual_state: terminal
+                        .manual_state
+                        .as_ref()
+                        .map(crate::terminal::ManualStateOverride::as_pane_manual_state),
                 })
             })
             .collect()

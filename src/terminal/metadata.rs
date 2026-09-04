@@ -347,6 +347,13 @@ impl TerminalState {
         presentation.state_labels = self.effective_metadata_state_labels(now, enforce_ttl);
         presentation.custom_status =
             self.effective_custom_status_for_state_at_with_ttl(state, now, enforce_ttl);
+        if let Some(custom) = self
+            .manual_state
+            .as_ref()
+            .and_then(|manual| manual.custom.as_ref())
+        {
+            presentation.custom_status = Some(custom.label.clone());
+        }
         presentation
     }
 

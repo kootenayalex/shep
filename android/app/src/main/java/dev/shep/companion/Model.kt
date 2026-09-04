@@ -42,6 +42,11 @@ data class AgentRow(
     val cwd: String? = null,
     val stateAgeSeconds: Long? = null,
     val queuedInput: Int = 0,
+    /**
+     * A state someone set by hand, overriding what shep detected. Null when
+     * the agent is showing its detected state, which is nearly always.
+     */
+    val manualState: ManualState? = null,
 ) {
     /**
      * Where this agent lives, the way the desktop board writes it: the tab's
@@ -89,12 +94,45 @@ data class SessionHost(
     val memoryUsedBytes: Long? = null,
 )
 
+/**
+ * A manual state, as the server names it. [name] is the wire id (`blocked`,
+ * `idle`, or a configured custom name), [label] what to print, and [tier] the
+ * appearance family — one of the seven `ManualStateTier` names in
+ * src/api/schema/common.rs. The tier crosses the wire so a custom state can
+ * carry its configured ink; colours and glyphs themselves never do.
+ */
+data class ManualState(
+    val name: String,
+    val label: String,
+    val tier: String,
+)
+
 /** The whole board in one payload. */
 data class SessionOverview(
     val totals: SessionTotals,
     val host: SessionHost,
     val agents: List<AgentRow>,
+    /**
+     * Every state the picker may offer beyond the builtins, straight from the
+     * server's `[[states.custom]]` config. Empty against a server too old to
+     * send it, or one with nothing configured.
+     */
+    val customStates: List<ManualState> = emptyList(),
 )
+
+private fun JSONObject.optManualState(key: String): ManualState? {
+    val o = optJSONObject(key) ?: return null
+    return parseManualState(o)
+}
+
+private fun parseManualState(o: JSONObject): ManualState? {
+    val name = o.optStringOrNull("name") ?: return null
+    return ManualState(
+        name = name,
+        label = o.optStringOrNull("label") ?: name,
+        tier = o.optStringOrNull("tier") ?: "absent",
+    )
+}
 
 private fun JSONObject.optIntOrNull(key: String): Int? =
     if (has(key) && !isNull(key)) optInt(key) else null
@@ -149,8 +187,14 @@ fun parseOverview(result: JSONObject): SessionOverview? {
                 cwd = a.optStringOrNull("cwd"),
                 stateAgeSeconds = a.optLongOrNull("state_age_seconds"),
                 queuedInput = a.optInt("queued_input", 0),
+                manualState = a.optManualState("manual_state"),
             )
         )
+    }
+    val customStates = mutableListOf<ManualState>()
+    val customArray = overview.optJSONArray("custom_states") ?: JSONArray()
+    for (i in 0 until customArray.length()) {
+        customArray.optJSONObject(i)?.let(::parseManualState)?.let(customStates::add)
     }
     return SessionOverview(
         totals = SessionTotals(
@@ -175,6 +219,7 @@ fun parseOverview(result: JSONObject): SessionOverview? {
             memoryUsedBytes = h.optLongOrNull("memory_used_bytes"),
         ),
         agents = agents,
+        customStates = customStates,
     )
 }
 

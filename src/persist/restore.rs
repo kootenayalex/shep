@@ -488,6 +488,7 @@ fn restore_tab(
         let saved_label = saved_pane.and_then(|p| p.label.clone());
         let saved_agent_name = saved_pane.and_then(|p| p.agent_name.clone());
         let saved_launch_argv = saved_pane.and_then(|p| p.launch_argv.clone());
+        let saved_manual_state = saved_pane.and_then(|p| p.manual_state.clone());
         let saved_agent_session = saved_pane.and_then(|p| p.agent_session.as_ref());
         let saved_history =
             old_id.and_then(|old_id| history.and_then(|history| history.panes.get(old_id)));
@@ -549,6 +550,9 @@ fn restore_tab(
                 startup.duplicate_agent_session,
             ) {
                 terminal.set_persisted_agent_session(session);
+            }
+            if let Some(manual_state) = saved_manual_state {
+                terminal.restore_manual_state(manual_state.into_override());
             }
             panes.insert(*id, PaneState::new(terminal_id));
             terminals.push(terminal);
@@ -642,6 +646,9 @@ fn restore_tab(
                     startup.duplicate_agent_session,
                 ) {
                     terminal.set_persisted_agent_session(session);
+                }
+                if let Some(manual_state) = saved_manual_state {
+                    terminal.restore_manual_state(manual_state.into_override());
                 }
                 panes.insert(*id, PaneState::new(terminal_id.clone()));
                 terminal_runtimes.insert(terminal_id, runtime);
@@ -1180,6 +1187,7 @@ mod tests {
                                 value: "opencode-session".into(),
                             }),
                             launch_argv: None,
+                            manual_state: None,
                         },
                     )]),
                     zoomed: false,
@@ -1258,6 +1266,7 @@ mod tests {
                                 agent_name: None,
                                 agent_session: None,
                                 launch_argv: None,
+                                manual_state: None,
                             },
                         ),
                         (
@@ -1268,6 +1277,7 @@ mod tests {
                                 agent_name: None,
                                 agent_session: None,
                                 launch_argv: None,
+                                manual_state: None,
                             },
                         ),
                     ]),
@@ -1320,6 +1330,7 @@ mod tests {
                     agent_name: None,
                     agent_session: None,
                     launch_argv: None,
+                    manual_state: None,
                 },
             )
         };
@@ -1334,6 +1345,7 @@ mod tests {
                 value: "codex-session".into(),
             }),
             launch_argv: None,
+            manual_state: None,
         };
         let snapshot = SessionSnapshot {
             version: super::super::snapshot::SNAPSHOT_VERSION,
@@ -1485,6 +1497,7 @@ mod tests {
                                 value: "codex-session".into(),
                             }),
                             launch_argv: None,
+                            manual_state: None,
                         },
                     )]),
                     zoomed: false,
@@ -1646,6 +1659,7 @@ mod tests {
                 agent_name: None,
                 agent_session: None,
                 launch_argv: None,
+                manual_state: None,
             },
         );
         let history = SessionHistorySnapshot {

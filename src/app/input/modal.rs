@@ -375,6 +375,56 @@ pub(super) fn open_rename_pane(state: &mut AppState, pane_id: crate::layout::Pan
     state.mode = Mode::RenamePane;
 }
 
+pub(super) fn open_state_picker(state: &mut AppState, pane_id: crate::layout::PaneId) {
+    use crate::api::schema::PaneAgentState;
+    use crate::app::state::{MenuListState, StatePickerAction, StatePickerItem, StatePickerState};
+
+    let Some(ws_idx) = state.active else {
+        return;
+    };
+    let Some(ws) = state.workspaces.get(ws_idx) else {
+        return;
+    };
+    let Some(pane) = ws.pane_state(pane_id) else {
+        return;
+    };
+    let current = state
+        .terminals
+        .get(&pane.attached_terminal_id)
+        .and_then(|t| t.manual_state.as_ref())
+        .map(|m| m.as_pane_manual_state());
+    let mut items = Vec::new();
+    if let Some(current) = &current {
+        items.push(StatePickerItem {
+            label: format!("Clear override ({})", current.label),
+            action: StatePickerAction::Clear,
+        });
+    }
+    for (label, builtin) in [
+        ("blocked", PaneAgentState::Blocked),
+        ("working", PaneAgentState::Working),
+        ("idle", PaneAgentState::Idle),
+    ] {
+        items.push(StatePickerItem {
+            label: label.to_string(),
+            action: StatePickerAction::Builtin(builtin),
+        });
+    }
+    for custom in &state.states_config.custom {
+        items.push(StatePickerItem {
+            label: format!("{} ({})", custom.label(), custom.name),
+            action: StatePickerAction::Custom(custom.name.clone()),
+        });
+    }
+    state.state_picker = Some(StatePickerState {
+        ws_idx,
+        pane_id,
+        items,
+        list: MenuListState::new(0),
+    });
+    state.mode = Mode::SetAgentState;
+}
+
 fn next_new_tab_default_name(state: &AppState) -> String {
     state
         .active
@@ -801,6 +851,9 @@ pub(super) fn apply_context_menu_action(
         (ContextMenuKind::Pane { pane_id, .. }, Some("Rename pane")) => {
             open_rename_pane(state, pane_id);
         }
+        (ContextMenuKind::Pane { pane_id, .. }, Some("Set state...")) => {
+            open_state_picker(state, pane_id);
+        }
         (
             ContextMenuKind::Pane {
                 ws_idx, pane_id, ..
@@ -1155,6 +1208,71 @@ impl App {
         }
     }
 
+    pub(crate) fn handle_state_picker_key_via_api(&mut self, key: KeyEvent) {
+        use crate::api::schema::{AgentSetStateParams, AgentTarget};
+        use crate::app::state::StatePickerAction;
+
+        match key.code {
+            KeyCode::Esc => {
+                self.state.state_picker = None;
+                leave_modal(&mut self.state);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                if let Some(picker) = &mut self.state.state_picker {
+                    picker.list.move_prev();
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if let Some(picker) = &mut self.state.state_picker {
+                    picker.list.move_next(picker.items.len());
+                }
+            }
+            KeyCode::Enter => {
+                let Some(picker) = self.state.state_picker.take() else {
+                    leave_modal(&mut self.state);
+                    return;
+                };
+                let action = picker
+                    .items
+                    .get(picker.list.highlighted)
+                    .map(|item| item.action.clone());
+                let target = self.public_pane_id(picker.ws_idx, picker.pane_id);
+                if let (Some(action), Some(target)) = (action, target) {
+                    match action {
+                        StatePickerAction::Clear => {
+                            self.runtime_agent_clear_state(
+                                "tui:agent:clear_state",
+                                AgentTarget { target },
+                            );
+                        }
+                        StatePickerAction::Builtin(state) => {
+                            self.runtime_agent_set_state(
+                                "tui:agent:set_state",
+                                AgentSetStateParams {
+                                    target,
+                                    state: Some(state),
+                                    custom: None,
+                                },
+                            );
+                        }
+                        StatePickerAction::Custom(name) => {
+                            self.runtime_agent_set_state(
+                                "tui:agent:set_state",
+                                AgentSetStateParams {
+                                    target,
+                                    state: None,
+                                    custom: Some(name),
+                                },
+                            );
+                        }
+                    }
+                }
+                leave_modal(&mut self.state);
+            }
+            _ => {}
+        }
+    }
+
     pub(crate) fn apply_context_menu_action_via_api(&mut self, menu: ContextMenuState, idx: usize) {
         let item = menu.items().get(idx).copied();
         match (menu.kind, item) {
@@ -1246,6 +1364,9 @@ impl App {
             }
             (ContextMenuKind::Pane { pane_id, .. }, Some("Rename pane")) => {
                 open_rename_pane(&mut self.state, pane_id);
+            }
+            (ContextMenuKind::Pane { pane_id, .. }, Some("Set state...")) => {
+                open_state_picker(&mut self.state, pane_id);
             }
             (
                 ContextMenuKind::Pane {

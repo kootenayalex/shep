@@ -416,6 +416,10 @@ impl App {
             custom_status: presentation.custom_status,
             state_labels: presentation.state_labels,
             agent_session: terminal_agent_session_info(terminal),
+            manual_state: terminal
+                .manual_state
+                .as_ref()
+                .map(crate::terminal::ManualStateOverride::as_pane_manual_state),
             scroll,
             revision: terminal.revision,
         })

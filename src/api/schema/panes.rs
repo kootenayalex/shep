@@ -383,6 +383,9 @@ pub struct PaneInfo {
     pub state_labels: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_session: Option<AgentSessionInfo>,
+    /// The manual override currently pinning `agent_status`, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manual_state: Option<super::PaneManualState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll: Option<PaneScrollInfo>,
     pub revision: u64,

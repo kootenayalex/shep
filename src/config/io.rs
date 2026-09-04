@@ -12,6 +12,7 @@ const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
     "remote",
     "notifications",
     "session",
+    "states",
     "tasks",
     "terminal",
     "theme",
@@ -152,10 +153,11 @@ impl Config {
         if path.exists() {
             match std::fs::read_to_string(&path) {
                 Ok(content) => match toml::from_str::<Config>(&content) {
-                    Ok(config) => {
+                    Ok(mut config) => {
                         let mut diagnostics =
                             unknown_top_level_section_diagnostics_from_str(&content);
                         diagnostics.extend(config.collect_diagnostics());
+                        config.states.validate(&mut diagnostics);
                         return LoadedConfig {
                             config,
                             diagnostics,
@@ -361,6 +363,15 @@ fn load_live_config_from_str(content: &str) -> Result<LoadedConfig, Vec<String>>
         &mut invalid_sections,
         |section| config.tasks = section,
     );
+    load_live_section(
+        table,
+        "states",
+        "states config",
+        &mut diagnostics,
+        &mut invalid_sections,
+        |section: crate::config::StatesConfig| config.states = section,
+    );
+    config.states.validate(&mut diagnostics);
 
     Ok(LoadedConfig {
         config,

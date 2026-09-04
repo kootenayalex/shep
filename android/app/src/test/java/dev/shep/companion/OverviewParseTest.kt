@@ -37,6 +37,27 @@ class OverviewParseTest {
     """.trimIndent()
 
     @Test
+    fun `parses a manual state and the custom states on offer`() {
+        val inReview = JSONObject().put("name", "in_review").put("label", "in review").put("tier", "review")
+        val agent = JSONObject(fullAgent).put("manual_state", inReview)
+        val raw = payload(agent.toString())
+        raw.getJSONObject("overview").put("custom_states", org.json.JSONArray().put(inReview))
+        val overview = parseOverview(raw)!!
+        val manual = overview.agents.single().manualState!!
+        assertEquals("in_review", manual.name)
+        assertEquals("in review", manual.label)
+        assertEquals("review", manual.tier)
+        assertEquals(listOf(manual), overview.customStates)
+    }
+
+    @Test
+    fun `an agent without a manual state parses as detected only`() {
+        val overview = parseOverview(payload(fullAgent))!!
+        assertNull(overview.agents.single().manualState)
+        assertEquals(emptyList<ManualState>(), overview.customStates)
+    }
+
+    @Test
     fun `parses totals and host vitals`() {
         val overview = parseOverview(payload(fullAgent))!!
         assertEquals(2, overview.totals.agents)

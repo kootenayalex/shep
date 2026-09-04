@@ -105,6 +105,80 @@ pub struct PaneSnapshot {
     pub agent_session: Option<PaneAgentSessionSnapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub launch_argv: Option<Vec<String>>,
+    /// A state a person set by hand; absent from files written before it
+    /// existed, which is why it is optional and `SNAPSHOT_VERSION` did not move.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manual_state: Option<PaneManualStateSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PaneManualStateSnapshot {
+    pub state: crate::api::schema::PaneAgentState,
+    pub baseline: crate::api::schema::PaneAgentState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom: Option<PaneManualCustomStateSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PaneManualCustomStateSnapshot {
+    pub name: String,
+    pub label: String,
+    pub tier: crate::api::schema::ManualStateTier,
+}
+
+fn agent_state_to_snapshot(state: crate::detect::AgentState) -> crate::api::schema::PaneAgentState {
+    use crate::api::schema::PaneAgentState;
+    use crate::detect::AgentState;
+    match state {
+        AgentState::Idle => PaneAgentState::Idle,
+        AgentState::Working => PaneAgentState::Working,
+        AgentState::Blocked => PaneAgentState::Blocked,
+        AgentState::Unknown => PaneAgentState::Unknown,
+    }
+}
+
+fn agent_state_from_snapshot(
+    state: crate::api::schema::PaneAgentState,
+) -> crate::detect::AgentState {
+    use crate::api::schema::PaneAgentState;
+    use crate::detect::AgentState;
+    match state {
+        PaneAgentState::Idle => AgentState::Idle,
+        PaneAgentState::Working => AgentState::Working,
+        PaneAgentState::Blocked => AgentState::Blocked,
+        PaneAgentState::Unknown => AgentState::Unknown,
+    }
+}
+
+impl PaneManualStateSnapshot {
+    pub fn from_override(manual: &crate::terminal::ManualStateOverride) -> Self {
+        Self {
+            state: agent_state_to_snapshot(manual.state),
+            baseline: agent_state_to_snapshot(manual.baseline),
+            custom: manual
+                .custom
+                .as_ref()
+                .map(|custom| PaneManualCustomStateSnapshot {
+                    name: custom.name.clone(),
+                    label: custom.label.clone(),
+                    tier: custom.tier,
+                }),
+        }
+    }
+
+    pub fn into_override(self) -> crate::terminal::ManualStateOverride {
+        crate::terminal::ManualStateOverride {
+            state: agent_state_from_snapshot(self.state),
+            baseline: agent_state_from_snapshot(self.baseline),
+            custom: self
+                .custom
+                .map(|custom| crate::terminal::ManualCustomState {
+                    name: custom.name,
+                    label: custom.label,
+                    tier: custom.tier,
+                }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -358,6 +432,12 @@ fn capture_tab(
                         }
                     })
                 });
+        let manual_state = tab
+            .panes
+            .get(id)
+            .and_then(|pane| terminals.get(&pane.attached_terminal_id))
+            .and_then(|terminal| terminal.manual_state.as_ref())
+            .map(PaneManualStateSnapshot::from_override);
         panes.insert(
             id.raw(),
             PaneSnapshot {
@@ -366,6 +446,7 @@ fn capture_tab(
                 agent_name,
                 agent_session,
                 launch_argv,
+                manual_state,
             },
         );
     }
@@ -608,6 +689,7 @@ mod tests {
                 agent_name: None,
                 agent_session: None,
                 launch_argv: None,
+                manual_state: None,
             },
         );
         panes.insert(
@@ -618,6 +700,15 @@ mod tests {
                 agent_name: None,
                 agent_session: None,
                 launch_argv: None,
+                manual_state: Some(PaneManualStateSnapshot {
+                    state: crate::api::schema::PaneAgentState::Blocked,
+                    baseline: crate::api::schema::PaneAgentState::Idle,
+                    custom: Some(PaneManualCustomStateSnapshot {
+                        name: "review".into(),
+                        label: "needs review".into(),
+                        tier: crate::api::schema::ManualStateTier::Review,
+                    }),
+                }),
             },
         );
 
@@ -658,6 +749,22 @@ mod tests {
         let restored = parse_snapshot(&json).unwrap();
 
         assert_eq!(restored.workspaces.len(), 1);
+        let restored_panes = &restored.workspaces[0].tabs[0].panes;
+        assert!(restored_panes[&0].manual_state.is_none());
+        let manual = restored_panes[&1]
+            .manual_state
+            .clone()
+            .expect("manual state survives the round trip");
+        assert_eq!(manual.state, crate::api::schema::PaneAgentState::Blocked);
+        assert_eq!(manual.baseline, crate::api::schema::PaneAgentState::Idle);
+        assert_eq!(
+            manual.custom.as_ref().map(|custom| custom.name.as_str()),
+            Some("review")
+        );
+        assert_eq!(
+            manual.custom.as_ref().map(|custom| custom.tier),
+            Some(crate::api::schema::ManualStateTier::Review)
+        );
         assert_eq!(restored.workspaces[0].id.as_deref(), Some("wproj"));
         assert_eq!(
             restored.workspaces[0].custom_name.as_deref(),
@@ -1160,6 +1267,7 @@ mod tests {
                 agent_name: None,
                 agent_session: None,
                 launch_argv: None,
+                manual_state: None,
             },
         );
         panes.insert(
@@ -1172,6 +1280,7 @@ mod tests {
                 agent_name: None,
                 agent_session: None,
                 launch_argv: None,
+                manual_state: None,
             },
         );
 

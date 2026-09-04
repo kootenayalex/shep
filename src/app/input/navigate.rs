@@ -312,6 +312,16 @@ impl App {
                     super::modal::open_rename_pane(&mut self.state, pane_id);
                 }
             }
+            NavigateAction::SetAgentState => {
+                if let Some(pane_id) = self
+                    .state
+                    .active
+                    .and_then(|ws_idx| self.state.workspaces.get(ws_idx))
+                    .and_then(|ws| ws.focused_pane_id())
+                {
+                    super::modal::open_state_picker(&mut self.state, pane_id);
+                }
+            }
             NavigateAction::FocusPaneLeft => self.focus_pane_direction_via_api(NavDirection::Left),
             NavigateAction::FocusPaneDown => self.focus_pane_direction_via_api(NavDirection::Down),
             NavigateAction::FocusPaneUp => self.focus_pane_direction_via_api(NavDirection::Up),
@@ -1271,6 +1281,7 @@ pub(crate) enum NavigateAction {
     NextTab,
     CloseTab,
     RenamePane,
+    SetAgentState,
     FocusPaneLeft,
     FocusPaneDown,
     FocusPaneUp,
@@ -1401,6 +1412,7 @@ fn action_for_key(
         (&kb.next_tab, NavigateAction::NextTab),
         (&kb.close_tab, NavigateAction::CloseTab),
         (&kb.rename_pane, NavigateAction::RenamePane),
+        (&kb.set_agent_state, NavigateAction::SetAgentState),
         (&kb.edit_scrollback, NavigateAction::EditScrollback),
         (&kb.copy_mode, NavigateAction::CopyMode),
         (&kb.focus_pane_left, NavigateAction::FocusPaneLeft),
@@ -1589,6 +1601,15 @@ pub(super) fn execute_navigate_action_in_context(
                 .and_then(|ws| ws.focused_pane_id())
             {
                 super::modal::open_rename_pane(state, pane_id);
+            }
+        }
+        NavigateAction::SetAgentState => {
+            if let Some(pane_id) = state
+                .active
+                .and_then(|ws_idx| state.workspaces.get(ws_idx))
+                .and_then(|ws| ws.focused_pane_id())
+            {
+                super::modal::open_state_picker(state, pane_id);
             }
         }
         NavigateAction::FocusPaneLeft => state.navigate_pane(NavDirection::Left),

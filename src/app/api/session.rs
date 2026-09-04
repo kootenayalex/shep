@@ -117,6 +117,7 @@ impl App {
                 agent_status: crate::app::api_helpers::pane_agent_status(card.state, card.seen),
                 unseen: !card.seen,
                 custom_status: card.status.clone(),
+                manual_state: card.manual_state.clone(),
                 activity_line: card.activity.clone(),
                 activity_lines: card.activity_lines.clone(),
                 context_percent: card.context_percent,
@@ -129,6 +130,17 @@ impl App {
         }
 
         let vitals = self.state.dashboard_sample.vitals;
+        let custom_states = self
+            .state
+            .states_config
+            .custom
+            .iter()
+            .map(|custom| crate::api::schema::PaneManualState {
+                name: custom.name.clone(),
+                label: custom.label().to_string(),
+                tier: custom.tier,
+            })
+            .collect();
         SessionOverview {
             totals: SessionOverviewTotals {
                 agents: summary.agents() as u64,
@@ -152,6 +164,7 @@ impl App {
                 memory_used_bytes: vitals.memory_used_bytes,
             },
             agents,
+            custom_states,
         }
     }
 }

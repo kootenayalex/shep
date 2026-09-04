@@ -947,6 +947,12 @@ impl App {
             Method::AgentGet(target) => return self.handle_agent_get(request.id, target),
             Method::AgentFocus(target) => return self.handle_agent_focus(request.id, target),
             Method::AgentRename(params) => return self.handle_agent_rename(request.id, params),
+            Method::AgentSetState(params) => {
+                return self.handle_agent_set_state(request.id, params)
+            }
+            Method::AgentClearState(target) => {
+                return self.handle_agent_clear_state(request.id, target)
+            }
             Method::AgentStart(params) => return self.handle_agent_start(request.id, params),
             Method::AgentRead(params) => return self.handle_agent_read(request.id, params),
             Method::AgentExplain(target) => return self.handle_agent_explain(request.id, target),
@@ -974,6 +980,7 @@ impl App {
             Method::PaneCurrent(params) => return self.handle_pane_current(request.id, params),
             Method::PaneGet(target) => return self.handle_pane_get(request.id, target),
             Method::PaneFocus(target) => return self.handle_pane_focus(request.id, target),
+            Method::PaneMarkSeen(target) => return self.handle_pane_mark_seen(request.id, target),
             Method::PaneRename(params) => return self.handle_pane_rename(request.id, params),
             Method::PaneRead(params) => return self.handle_pane_read(request.id, params),
             Method::PaneReportAgent(params) => {

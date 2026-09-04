@@ -183,6 +183,22 @@ impl App {
         encode_success(id, ResponseResult::PaneInfo { pane })
     }
 
+    /// Mark one pane as looked at without focusing it: a companion surface
+    /// opened it, so its "done" claim is answered and its notification can go.
+    pub(super) fn handle_pane_mark_seen(&mut self, id: String, target: PaneTarget) -> String {
+        let Some((ws_idx, pane_id)) = self.parse_pane_id(&target.pane_id) else {
+            return pane_not_found(id, &target.pane_id);
+        };
+        if !self.state.mark_pane_seen(ws_idx, pane_id) {
+            return pane_not_found(id, &target.pane_id);
+        }
+
+        let Some(pane) = self.pane_info(ws_idx, pane_id) else {
+            return pane_not_found(id, &target.pane_id);
+        };
+        encode_success(id, ResponseResult::PaneInfo { pane })
+    }
+
     pub(super) fn handle_pane_layout(&mut self, id: String, params: PaneLayoutParams) -> String {
         let Some((ws_idx, pane_id)) = self.resolve_optional_pane(params.pane_id.as_deref()) else {
             return encode_error(id, "pane_not_found", "pane not found");

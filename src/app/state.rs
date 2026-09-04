@@ -791,6 +791,7 @@ pub enum Mode {
     Resize,
     ConfirmClose,
     ContextMenu,
+    SetAgentState,
     Settings,
     GlobalMenu,
     KeybindHelp,
@@ -819,6 +820,7 @@ impl Mode {
                 | Mode::ConfirmClose
                 | Mode::ConfirmRemoveWorktree
                 | Mode::ContextMenu
+                | Mode::SetAgentState
                 | Mode::GlobalMenu
                 | Mode::KeybindHelp
                 | Mode::Board
@@ -1378,6 +1380,7 @@ impl ContextMenuState {
                 ..
             } => &[
                 "Rename pane",
+                "Set state...",
                 "Clear pane name",
                 "Swap with focused pane",
                 "Split right",
@@ -1392,6 +1395,7 @@ impl ContextMenuState {
                 ..
             } => &[
                 "Rename pane",
+                "Set state...",
                 "Swap with focused pane",
                 "Split right",
                 "Split down",
@@ -1405,6 +1409,7 @@ impl ContextMenuState {
                 ..
             } => &[
                 "Rename pane",
+                "Set state...",
                 "Clear pane name",
                 "Split right",
                 "Split down",
@@ -1418,6 +1423,7 @@ impl ContextMenuState {
                 ..
             } => &[
                 "Rename pane",
+                "Set state...",
                 "Split right",
                 "Split down",
                 "Zoom",
@@ -1426,6 +1432,31 @@ impl ContextMenuState {
             ],
         }
     }
+}
+
+/// One choice in the manual-state picker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StatePickerAction {
+    Clear,
+    Builtin(crate::api::schema::PaneAgentState),
+    Custom(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatePickerItem {
+    pub label: String,
+    pub action: StatePickerAction,
+}
+
+/// The "set agent state" modal: a closed list built from the builtin states
+/// plus whatever `[[states.custom]]` configures. Pure TUI state; the pick is
+/// applied through `agent.set_state` / `agent.clear_state`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatePickerState {
+    pub ws_idx: usize,
+    pub pane_id: PaneId,
+    pub items: Vec<StatePickerItem>,
+    pub list: MenuListState,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1583,6 +1614,7 @@ pub struct AppState {
     pub selection: Option<Selection>,
     pub selection_autoscroll: Option<SelectionAutoscroll>,
     pub context_menu: Option<ContextMenuState>,
+    pub state_picker: Option<StatePickerState>,
     // Notifications
     pub update_available: Option<String>,
     pub update_install_command: String,
@@ -1662,6 +1694,8 @@ pub struct AppState {
     pub queue_prompt_target: Option<(usize, PaneId)>,
     /// Server-owned task-queue policy (`[tasks]`).
     pub tasks_config: crate::config::TasksConfig,
+    /// Custom agent states a person can set by hand (`[states]`).
+    pub states_config: crate::config::StatesConfig,
     /// Server-owned exec-bridge notification policy (`[notifications]`).
     /// Governs the exec-bridge only; toast/sound policy is unchanged.
     pub notifications: NotificationsConfig,
@@ -2027,6 +2061,7 @@ impl AppState {
             selection: None,
             selection_autoscroll: None,
             context_menu: None,
+            state_picker: None,
             update_available: None,
             update_install_command: "shep update".into(),
             latest_release_notes_available: false,
@@ -2035,6 +2070,7 @@ impl AppState {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             tasks_config: Default::default(),
+            states_config: Default::default(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
             copy_feedback: None,

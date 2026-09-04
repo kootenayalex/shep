@@ -230,6 +230,9 @@ pub(super) enum StateInk {
     /// the queue is a backlog, and the eye should land on what is moving.
     Waiting,
     Absent,
+    /// Waiting on a person, not a process. The review badge's mauve; a manual
+    /// "needs review" state borrows it so the two claims read alike.
+    Review,
 }
 
 impl StateInk {
@@ -241,7 +244,72 @@ impl StateInk {
             StateInk::Settled => p.green,
             StateInk::Waiting => p.overlay1,
             StateInk::Absent => p.overlay0,
+            StateInk::Review => p.mauve,
         }
+    }
+
+    /// The wire tier for a manually set state. Tiers cross the wire; inks do
+    /// not, so this is the one place the two vocabularies meet.
+    pub(super) fn from_manual_tier(tier: crate::api::schema::ManualStateTier) -> Self {
+        use crate::api::schema::ManualStateTier;
+        match tier {
+            ManualStateTier::Stop => StateInk::Stop,
+            ManualStateTier::Working => StateInk::Working,
+            ManualStateTier::Done => StateInk::DoneUnseen,
+            ManualStateTier::Settled => StateInk::Settled,
+            ManualStateTier::Waiting => StateInk::Waiting,
+            ManualStateTier::Absent => StateInk::Absent,
+            ManualStateTier::Review => StateInk::Review,
+        }
+    }
+}
+
+/// Spinner frames with the override marker attached, so a manually set
+/// "working" still moves.
+const MARKED_SPINNERS: &[&str] = &["⠋·", "⠙·", "⠹·", "⠸·", "⠼·", "⠴·", "⠦·", "⠧·", "⠇·", "⠏·"];
+
+/// The appearance of a manually set state. Same shapes as the detected table,
+/// each followed by a `·` so an override is never mistaken for detection. The
+/// label is the tier's generic word; the state's own label rides
+/// `custom_status` beside it.
+pub(super) fn manual_state_appearance(
+    manual: &crate::api::schema::PaneManualState,
+    tick: u32,
+) -> StateAppearance {
+    use crate::api::schema::ManualStateTier;
+    let (glyph, label) = match manual.tier {
+        ManualStateTier::Stop => ("◉·", "blocked"),
+        ManualStateTier::Working => (
+            MARKED_SPINNERS[(tick as usize / 8) % MARKED_SPINNERS.len()],
+            "working",
+        ),
+        ManualStateTier::Done => ("●·", "done"),
+        ManualStateTier::Settled => ("○·", "idle"),
+        ManualStateTier::Waiting => ("○·", "waiting"),
+        ManualStateTier::Absent => ("··", "idle"),
+        ManualStateTier::Review => ("◆·", "review"),
+    };
+    StateAppearance {
+        glyph,
+        label,
+        ink: StateInk::from_manual_tier(manual.tier),
+    }
+}
+
+/// `agent_icon` for a pane that may carry a manual override.
+pub(super) fn agent_icon_for(
+    state: AgentState,
+    seen: bool,
+    manual: Option<&crate::api::schema::PaneManualState>,
+    tick: u32,
+    p: &Palette,
+) -> (&'static str, Style) {
+    match manual {
+        Some(manual) => {
+            let it = manual_state_appearance(manual, tick);
+            (it.glyph, it.style(p))
+        }
+        None => agent_icon(state, seen, tick, p),
     }
 }
 
@@ -378,6 +446,60 @@ mod tests {
         .collect();
         let unique: std::collections::HashSet<&&str> = glyphs.iter().collect();
         assert_eq!(unique.len(), glyphs.len(), "{glyphs:?}");
+    }
+
+    /// Mirrors `every manual tier resolves and wears the override marker` in
+    /// android/.../ShepSemanticTest.kt: every tier the wire can carry renders,
+    /// and every rendering ends in the override marker so a hand-set state is
+    /// never mistaken for a detected one.
+    #[test]
+    fn every_manual_tier_resolves_and_wears_the_override_marker() {
+        use crate::api::schema::common::{ManualStateTier, PaneManualState};
+        let p = Palette::shep();
+        for tier in ManualStateTier::ALL {
+            let state = PaneManualState {
+                name: "hand".to_string(),
+                label: "hand".to_string(),
+                tier,
+            };
+            let look = manual_state_appearance(&state, 0);
+            assert!(
+                look.glyph.ends_with('·'),
+                "{tier:?} lacks the override marker: {}",
+                look.glyph
+            );
+            assert!(!look.label.is_empty(), "{tier:?} has no label");
+            assert_ne!(
+                look.color(&p),
+                p.accent,
+                "{tier:?} borrows the focus colour"
+            );
+        }
+        assert_eq!(ManualStateTier::ALL.len(), 7);
+        assert_eq!(
+            manual_state_appearance(
+                &PaneManualState {
+                    name: "s".into(),
+                    label: "s".into(),
+                    tier: ManualStateTier::Stop
+                },
+                0
+            )
+            .glyph,
+            "◉·"
+        );
+        assert_eq!(
+            manual_state_appearance(
+                &PaneManualState {
+                    name: "r".into(),
+                    label: "r".into(),
+                    tier: ManualStateTier::Review
+                },
+                0
+            )
+            .glyph,
+            "◆·"
+        );
     }
 
     #[test]

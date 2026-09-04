@@ -96,6 +96,33 @@ object ShepSemantic {
     fun agentColor(status: String): Color = agent(status).color
 
     /**
+     * Every tier a manual state can name, matching `ManualStateTier::ALL` in
+     * src/api/schema/common.rs and `manual_state_appearance` in src/ui/status.rs.
+     */
+    val MANUAL_TIERS = listOf("stop", "working", "done", "settled", "waiting", "absent", "review")
+
+    /**
+     * A state someone set by hand.
+     *
+     * The tier picks the same ink and shape a detected state of that family
+     * would get, and the trailing `·` says "somebody put this here" — the same
+     * mark the desktop sidebar draws, so a row that reads `◉·` on the phone
+     * reads `◉·` at the desk. The label is the configured one, not the tier
+     * name, because "in review" is what the person typed and "review" is not.
+     * An unknown tier renders as absent rather than crashing the row: a newer
+     * server may know a tier this build does not.
+     */
+    fun manual(tier: String, label: String, tick: Int = 0): StateAppearance = when (tier) {
+        "stop" -> StateAppearance("◉·", label, ShepPalette.red, "$label, set by hand")
+        "working" -> StateAppearance(spinnerFrame(tick) + "·", label, ShepPalette.yellow, "$label, set by hand")
+        "done" -> StateAppearance("●·", label, ShepPalette.blue, "$label, set by hand")
+        "settled" -> StateAppearance("○·", label, ShepPalette.green, "$label, set by hand")
+        "waiting" -> StateAppearance("○·", label, ShepPalette.overlay1, "$label, set by hand")
+        "review" -> StateAppearance("◆·", label, ShepPalette.mauve, "$label, set by hand")
+        else -> StateAppearance("··", label, ShepPalette.overlay0, "$label, set by hand")
+    }
+
+    /**
      * Task-queue states, matching `task_appearance` in `src/ui/status.rs`.
      *
      * The shapes tell the same story as an agent's, because they mean the same

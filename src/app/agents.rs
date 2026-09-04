@@ -107,6 +107,69 @@ impl App {
             })
     }
 
+    /// Set (or, with neither `state` nor `custom`, clear) a manual state on an
+    /// agent target. Manual changes route through the same effective-state
+    /// path as detection so sequence numbers, ages, and seen flags stay
+    /// coherent — but they are marked manual, so nothing notifies.
+    pub(super) fn set_agent_state_target(
+        &mut self,
+        target: &str,
+        state: Option<crate::api::schema::PaneAgentState>,
+        custom: Option<String>,
+    ) -> Result<crate::api::schema::AgentInfo, AgentSetStateError> {
+        let resolved = self
+            .resolve_terminal_target(target)
+            .map_err(AgentSetStateError::Target)?;
+        let manual = match (custom, state) {
+            (Some(name), _) => {
+                let config =
+                    self.state.states_config.find(&name).ok_or_else(|| {
+                        AgentSetStateError::UnknownCustomState { name: name.clone() }
+                    })?;
+                Some((
+                    super::api_helpers::detect_state_from_api(config.behaves_as),
+                    Some(crate::terminal::ManualCustomState {
+                        name,
+                        label: config.label().to_string(),
+                        tier: config.tier,
+                    }),
+                ))
+            }
+            (None, Some(state)) => Some((super::api_helpers::detect_state_from_api(state), None)),
+            (None, None) => None,
+        };
+        let now = std::time::Instant::now();
+        self.state
+            .update_terminal_state(resolved.pane_id, |terminal| {
+                Some(match manual {
+                    Some((state, custom)) => terminal.set_manual_state(state, custom, now),
+                    None => terminal.clear_manual_state(now),
+                })
+            });
+        self.state.mark_session_dirty();
+        self.agent_info_allowing_non_agent(resolved.ws_idx, resolved.pane_id, true)
+            .ok_or_else(|| {
+                AgentSetStateError::Target(TerminalTargetError::NotFound {
+                    target: target.to_string(),
+                })
+            })
+    }
+
+    pub(super) fn agent_set_state_error_body(
+        &self,
+        err: AgentSetStateError,
+    ) -> crate::api::schema::ErrorBody {
+        match err {
+            AgentSetStateError::Target(err) => self.agent_target_error_body(err),
+            AgentSetStateError::UnknownCustomState { name } => crate::api::schema::ErrorBody {
+                code: "unknown_state".into(),
+                message: format!(
+                    "custom state {name:?} is not configured; add it under [[states.custom]] or use idle|working|blocked|unknown"
+                ),
+            },
+        }
+    }
+
     pub(super) fn start_agent(
         &mut self,
         params: AgentStartParams,
@@ -460,6 +523,7 @@ impl App {
             state_labels: pane.state_labels,
             context_percent: terminal.context_percent,
             agent_session: pane.agent_session,
+            manual_state: pane.manual_state,
             workspace_id: pane.workspace_id,
             tab_id: pane.tab_id,
             pane_id: pane.pane_id,
@@ -504,4 +568,10 @@ pub(super) enum AgentRenameError {
         name: String,
         candidates: Vec<crate::api::schema::AgentInfo>,
     },
+}
+
+#[derive(Debug)]
+pub(super) enum AgentSetStateError {
+    Target(TerminalTargetError),
+    UnknownCustomState { name: String },
 }

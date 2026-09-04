@@ -3305,9 +3305,27 @@ impl HeadlessServer {
             };
 
             let new_state = terminal_after.state;
+            // A person set this state through the API; it is not the agent
+            // doing anything, so no toast, sound, exec bridge, or task
+            // transition. Taken before the equality check so a set that only
+            // changed the label cannot leave the flag behind for a later
+            // detected transition to trip over.
+            let terminal_id = pane_after.attached_terminal_id.clone();
+            if self
+                .app
+                .state
+                .terminals
+                .get_mut(&terminal_id)
+                .is_some_and(crate::terminal::TerminalState::take_manual_transition_pending)
+            {
+                continue;
+            }
             if new_state == *prev_state {
                 continue;
             }
+            let Some(terminal_after) = self.app.state.terminals.get(&terminal_id) else {
+                continue;
+            };
 
             let is_active_tab = self.app.state.pane_is_in_active_tab(*ws_idx, *pane_id);
             let suppress_active_tab_notifications =

@@ -56,6 +56,7 @@ import dev.shep.companion.terminal.stepFontSize
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.StateGlyph
+import dev.shep.companion.ui.theme.ShepSemantic
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepShape
 import dev.shep.companion.ui.theme.ShepSize
@@ -436,8 +437,19 @@ private fun PaneTitleBar(
             )
         }
         TextSizeControl(fontSizeSp, onFontSizeSp)
-        StateGlyph(status, style = ShepType.stateGlyphSmall)
-        Text(status, style = ShepType.metaSmall.copy(color = statusColor(status)))
+        StateGlyph(
+            status,
+            style = ShepType.stateGlyphSmall,
+            manualTier = row.manualState?.tier,
+            manualLabel = row.manualState?.label,
+        )
+        Text(
+            row.manualState?.label ?: status,
+            style = ShepType.metaSmall.copy(
+                color = row.manualState?.let { ShepSemantic.manual(it.tier, it.label).color }
+                    ?: statusColor(status),
+            ),
+        )
     }
 }
 

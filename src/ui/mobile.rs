@@ -12,7 +12,7 @@ use super::sidebar::{
     next_entry_is_indented_workspace, workspace_list_entries_expanded, AgentPanelEntry,
     WorkspaceListEntry,
 };
-use super::status::agent_icon;
+use super::status::{agent_icon, agent_icon_for};
 use super::text::{display_width_u16, truncate_end};
 use crate::app::state::{Palette, ToastKind, ToastNotification};
 use crate::app::AppState;
@@ -514,7 +514,13 @@ fn render_mobile_switcher_content(
                 entry.ws_idx == ws_idx && entry.tab_idx == tab_idx && entry.pane_id == pane_id
             });
             let bg = mobile_item_bg(false, active, p);
-            let (icon, icon_style) = agent_icon(entry.state, entry.seen, app.spinner_tick, p);
+            let (icon, icon_style) = agent_icon_for(
+                entry.state,
+                entry.seen,
+                entry.manual_state.as_ref(),
+                app.spinner_tick,
+                p,
+            );
             let title = Line::from(vec![
                 Span::styled("  ", Style::default().bg(bg)),
                 Span::styled(icon, icon_style.bg(bg)),
@@ -1160,6 +1166,7 @@ mod tests {
             custom_status: None,
             state_labels: std::collections::HashMap::new(),
             context_percent: None,
+            manual_state: None,
         }
     }
 

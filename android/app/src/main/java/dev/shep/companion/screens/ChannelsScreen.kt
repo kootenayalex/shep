@@ -51,6 +51,7 @@ import dev.shep.companion.parseOverview
 import dev.shep.companion.parseSnapshot
 import dev.shep.companion.parseTree
 import dev.shep.companion.repoName
+import dev.shep.companion.ManualState
 import dev.shep.companion.statusColor
 import dev.shep.companion.totalsFromRows
 import dev.shep.companion.ui.components.ActionText
@@ -259,6 +260,8 @@ fun ChannelsScreen(
     var spaceActions by remember { mutableStateOf<ChannelSection?>(null) }
     var renaming by remember { mutableStateOf<Renaming?>(null) }
     var confirming by remember { mutableStateOf<Confirm?>(null) }
+    var settingState by remember { mutableStateOf<Channel?>(null) }
+    var customStates by remember { mutableStateOf<List<ManualState>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
 
@@ -291,6 +294,7 @@ fun ChannelsScreen(
                     rows = overview.agents
                     totals = overview.totals
                     host = overview.host
+                    customStates = overview.customStates
                     status = "live · shep ${overview.host.version ?: ""}".trim()
                     return
                 }
@@ -543,6 +547,10 @@ fun ChannelsScreen(
                     act("desktop is on ${channel.name}", "tab.focus", JSONObject().put("tab_id", it))
                 }
             },
+            onSetState = {
+                channelActions = null
+                settingState = channel
+            },
             onSplit = {
                 channelActions = null
                 act(
@@ -635,6 +643,28 @@ fun ChannelsScreen(
                         JSONObject().put("workspace_id", section.workspaceId),
                     )
                 }
+            },
+        )
+    }
+
+    settingState?.let { channel ->
+        StatePickerSheet(
+            channel = channel,
+            customStates = customStates,
+            onDismiss = { settingState = null },
+            onClear = {
+                settingState = null
+                act(
+                    "${channel.name} back to detected",
+                    "agent.clear_state",
+                    JSONObject().put("target", channel.paneId),
+                )
+            },
+            onPick = { name, label ->
+                settingState = null
+                val params = JSONObject().put("target", channel.paneId)
+                if (name in BUILTIN_STATES) params.put("state", name) else params.put("custom", name)
+                act("${channel.name} marked $label", "agent.set_state", params)
             },
         )
     }
@@ -769,7 +799,12 @@ private fun ChannelRow(
             ),
         verticalAlignment = Alignment.Top,
     ) {
-        StateGlyph(channel.status, style = ShepType.stateGlyphSmall)
+        StateGlyph(
+            channel.status,
+            style = ShepType.stateGlyphSmall,
+            manualTier = row?.manualState?.tier,
+            manualLabel = row?.manualState?.label,
+        )
         Spacer(Modifier.width(ShepSpace.small))
         Column(Modifier.weight(1f)) {
             // The identity group is the one weighted child and the state word
@@ -810,9 +845,16 @@ private fun ChannelRow(
                     }
                 }
                 Spacer(Modifier.width(ShepSpace.small))
+                val manual = row?.manualState
                 Text(
                     row?.customStatus ?: channel.status,
-                    style = ShepType.metaSmall.copy(color = statusColor(channel.status)),
+                    style = ShepType.metaSmall.copy(
+                        color = if (manual != null) {
+                            ShepSemantic.manual(manual.tier, manual.label).color
+                        } else {
+                            statusColor(channel.status)
+                        },
+                    ),
                     maxLines = 1,
                 )
             }
@@ -871,6 +913,7 @@ private fun ChannelActionsSheet(
     onDismiss: () -> Unit,
     onRename: () -> Unit,
     onFocus: () -> Unit,
+    onSetState: () -> Unit,
     onSplit: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -879,8 +922,50 @@ private fun ChannelActionsSheet(
         if (channel.tabId != null) {
             SheetRow("go to", hint = "put the desktop on it", onClick = onFocus)
         }
+        SheetRow(
+            "set state",
+            hint = channel.row?.manualState?.let { "now: ${it.label}" } ?: "mark it by hand",
+            onClick = onSetState,
+        )
         SheetRow("split", hint = "a second pane beside it", onClick = onSplit)
         SheetRow("close pane", tone = ShepPalette.red, onClick = onClose)
+    }
+}
+
+/** The builtin states a hand can set; anything else on the wire is a custom name. */
+private val BUILTIN_STATES = setOf("blocked", "working", "idle")
+
+/**
+ * The same picker the desktop opens on `prefix+shift+s`: clear the override
+ * first when there is one, then the three builtins, then every configured
+ * custom state. Rows print the state's own glyph and ink so the choice looks
+ * like what it will do to the row.
+ */
+@Composable
+private fun StatePickerSheet(
+    channel: Channel,
+    customStates: List<ManualState>,
+    onDismiss: () -> Unit,
+    onClear: () -> Unit,
+    onPick: (name: String, label: String) -> Unit,
+) {
+    ShepSheet(title = "state of ${channel.name}", onDismiss = onDismiss) {
+        channel.row?.manualState?.let { current ->
+            SheetRow("clear override", hint = "back to detected, was ${current.label}", onClick = onClear)
+        }
+        listOf("blocked" to "stop", "working" to "working", "idle" to "settled").forEach { (name, tier) ->
+            val look = ShepSemantic.manual(tier, name)
+            SheetRow("${look.glyph} $name", tone = look.color, onClick = { onPick(name, name) })
+        }
+        customStates.forEach { state ->
+            val look = ShepSemantic.manual(state.tier, state.label)
+            SheetRow(
+                "${look.glyph} ${state.label}",
+                hint = state.name,
+                tone = look.color,
+                onClick = { onPick(state.name, state.label) },
+            )
+        }
     }
 }
 

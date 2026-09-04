@@ -51,10 +51,13 @@ const DEFAULT_BIND: &str = "127.0.0.1:7431";
 /// or handled locally on the bridge. Adding a verb the phone needs means
 /// adding it here in the same commit.
 const BRIDGE_ALLOWED_METHODS: &[&str] = &[
+    "agent.clear_state",
     "agent.rename",
     "agent.send",
+    "agent.set_state",
     "events.subscribe",
     "pane.close",
+    "pane.mark_seen",
     "pane.move",
     "pane.scroll",
     "pane.send_keys",

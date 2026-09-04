@@ -8,7 +8,9 @@ use ratatui::{
 
 use super::glyphs;
 use super::scrollbar::{render_scrollbar, should_show_scrollbar};
-use super::status::{agent_icon, state_label, state_label_color};
+use super::status::{
+    agent_icon, agent_icon_for, manual_state_appearance, state_label, state_label_color,
+};
 use super::text::{display_width, display_width_u16, truncate_end};
 use crate::app::state::{AgentPanelSort, Palette};
 use crate::app::{AppState, Mode};
@@ -31,6 +33,7 @@ pub(crate) struct AgentPanelEntry {
     pub custom_status: Option<String>,
     pub state_labels: std::collections::HashMap<String, String>,
     pub context_percent: Option<u8>,
+    pub manual_state: Option<crate::api::schema::PaneManualState>,
 }
 
 fn sidebar_section_heights(total_h: u16, split_ratio: f32) -> (u16, u16) {
@@ -140,6 +143,7 @@ fn agent_panel_entries_with_runtimes(
                     custom_status: detail.custom_status,
                     state_labels: detail.state_labels,
                     context_percent: detail.context_percent,
+                    manual_state: detail.manual_state,
                 })
         })
         .collect();
@@ -796,7 +800,13 @@ pub(super) fn render_sidebar_collapsed(app: &AppState, frame: &mut Frame, area: 
                 .and_then(|ws| ws.public_pane_number(detail.pane_id))
                 .unwrap_or(detail_idx + 1);
             let pane_style = Style::default().fg(p.overlay0);
-            let (icon, icon_style) = agent_icon(detail.state, detail.seen, app.spinner_tick, p);
+            let (icon, icon_style) = agent_icon_for(
+                detail.state,
+                detail.seen,
+                detail.manual_state.as_ref(),
+                app.spinner_tick,
+                p,
+            );
             frame.render_widget(
                 Paragraph::new(Line::from(vec![
                     Span::styled(format!("{pane_num}"), pane_style),
@@ -1195,8 +1205,18 @@ fn render_agent_detail(
         // Check if this agent entry corresponds to the active session
         let is_active = app.is_active_pane(detail.ws_idx, detail.tab_idx, detail.pane_id);
 
-        let (icon, icon_style) = agent_icon(detail.state, detail.seen, app.spinner_tick, p);
-        let label_color = state_label_color(detail.state, detail.seen, p);
+        let (icon, icon_style) = agent_icon_for(
+            detail.state,
+            detail.seen,
+            detail.manual_state.as_ref(),
+            app.spinner_tick,
+            p,
+        );
+        let label_color = detail
+            .manual_state
+            .as_ref()
+            .map(|manual| manual_state_appearance(manual, 0).color(p))
+            .unwrap_or_else(|| state_label_color(detail.state, detail.seen, p));
         let label = detail
             .state_labels
             .get(agent_panel_status_key(detail.state, detail.seen))
@@ -1682,6 +1702,7 @@ mod tests {
             custom_status: None,
             state_labels: std::collections::HashMap::new(),
             context_percent: None,
+            manual_state: None,
         };
 
         let label = format_agent_panel_primary_label(&entry, 18);

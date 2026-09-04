@@ -39,11 +39,26 @@ fun StateGlyph(
     status: String,
     modifier: Modifier = Modifier,
     style: TextStyle = ShepType.stateGlyph,
+    /**
+     * When set, the glyph shows this hand-set state (tier and label) instead
+     * of [status]. The detected state still decides the row's sort and the
+     * notification; only what the eye sees changes.
+     */
+    manualTier: String? = null,
+    manualLabel: String? = null,
 ) {
     Glyph(
         // Only a working agent needs a ticking clock, so only a working agent
         // gets one — an idle board does no work at all.
-        appearance = if (status == "working") {
+        appearance = if (manualTier != null) {
+            val label = manualLabel ?: manualTier
+            if (manualTier == "working") {
+                val tick by rememberSpinnerTick()
+                ShepSemantic.manual(manualTier, label, tick)
+            } else {
+                ShepSemantic.manual(manualTier, label)
+            }
+        } else if (status == "working") {
             val tick by rememberSpinnerTick()
             ShepSemantic.agent(status, tick)
         } else {

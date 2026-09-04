@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Added
+- Manual and custom agent states. `agent.set_state {target, state?|custom?}` and `agent.clear_state {target}` (CLI `shep agent set-state` / `clear-state`; TUI `prefix+shift+s` or the pane context menu's "Set state..."; the companion's channel sheet) pin a state by hand. The override holds until cleared or until the detected state changes on its own, never fires a notification, and survives snapshots and live handoff. Custom states come from config:
+  ```toml
+  [[states.custom]]
+  name = "in_review"     # wire id, [a-z0-9_-]{1,24}
+  label = "in review"    # what surfaces print
+  behaves_as = "blocked" # idle|working|blocked|unknown, for sorting and the board
+  tier = "review"        # stop|working|done|settled|waiting|absent|review, for the ink
+  ```
+  `pane.get`, `agent.get` and `session.overview` carry `manual_state {name, label, tier}`, the overview lists `custom_states`, and the new `pane.mark_seen {pane_id}` lets a companion mark an agent seen. Wire protocol is now 17.
 - The Android companion now lives in this repo under `android/` (its history imported from the former `shep-android` repo, which is archived). `just check` runs the companion's unit tests and debug build, and `just android-install` / `just android-maestro` cover the device loop.
 - Added a new `shep` built-in theme (warm graphite + copper) and made it the default when `[theme] name` is unset.
 - Added a full-width desktop titlebar showing the active workspace and tab plus an update/blocked attention slot (`ui.titlebar`, default on).

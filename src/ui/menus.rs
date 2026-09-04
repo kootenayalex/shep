@@ -7,7 +7,9 @@ use ratatui::{
 };
 
 use super::glyphs;
-use super::widgets::{panel_contrast_fg, render_panel_shell};
+use super::widgets::{
+    panel_contrast_fg, render_modal_header, render_modal_or_notice, render_panel_shell,
+};
 use crate::app::AppState;
 
 fn prefix_rhs_label(bindings: &crate::config::ActionKeybinds) -> String {
@@ -282,4 +284,46 @@ pub(super) fn render_context_menu(app: &AppState, frame: &mut Frame) {
         .highlight_symbol(" ");
     let mut state = ListState::default().with_selected(Some(menu.list.highlighted));
     frame.render_stateful_widget(list, inner, &mut state);
+}
+
+/// The manual-state picker: a centred list, "clear override" first when one is
+/// set, then the builtin states, then the configured custom ones.
+pub(super) fn render_state_picker(app: &AppState, frame: &mut Frame, area: Rect) {
+    let Some(picker) = &app.state_picker else {
+        return;
+    };
+    super::dim_background(frame, area);
+    let p = &app.palette;
+    let want_h = u16::try_from(picker.items.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(4);
+    let Some(inner) =
+        render_modal_or_notice(frame, area, (44, want_h), (20, 3), "the state picker", p)
+    else {
+        return;
+    };
+    let header = Rect::new(inner.x, inner.y, inner.width, 1);
+    render_modal_header(frame, header, "set agent state", p);
+    let list_area = Rect::new(
+        inner.x,
+        inner.y.saturating_add(2),
+        inner.width,
+        inner.height.saturating_sub(2),
+    );
+    let items: Vec<ListItem> = picker
+        .items
+        .iter()
+        .map(|item| ListItem::new(Line::from(item.label.clone())))
+        .collect();
+    let list = List::new(items)
+        .style(Style::default().fg(p.text))
+        .highlight_style(
+            Style::default()
+                .bg(p.accent)
+                .fg(panel_contrast_fg(p))
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(" ");
+    let mut state = ListState::default().with_selected(Some(picker.list.highlighted));
+    frame.render_stateful_widget(list, list_area, &mut state);
 }

@@ -33,6 +33,18 @@ pub struct AgentRenameParams {
     pub name: Option<String>,
 }
 
+/// `agent.set_state`: pin an agent's state by hand. Exactly one of `state`
+/// (a builtin) or `custom` (a `[[states.custom]]` name) names the new state;
+/// neither clears the override, same as `agent.clear_state`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AgentSetStateParams {
+    pub target: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<super::PaneAgentState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct AgentStartParams {
     pub name: String,
@@ -79,6 +91,9 @@ pub struct AgentInfo {
     pub context_percent: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_session: Option<AgentSessionInfo>,
+    /// The manual override currently pinning `agent_status`, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manual_state: Option<super::PaneManualState>,
     pub workspace_id: String,
     pub tab_id: String,
     pub pane_id: String,
