@@ -1022,6 +1022,8 @@ mod push {
             return serde_json::json!({"sent": 0, "results": [], "detail": "no registered devices"});
         }
         let payload = Payload {
+            tag: "test".to_string(),
+            op: "show".to_string(),
             kind: "test".to_string(),
             state: String::new(),
             agent: "shep".to_string(),
@@ -1084,12 +1086,18 @@ mod push {
             return Ok(0);
         }
         let kind = std::env::var("SHEP_NOTIFY_KIND").unwrap_or_default();
+        let pane_id = std::env::var("SHEP_NOTIFY_PANE_ID").unwrap_or_default();
         let payload = Payload {
+            // One notification per pane on the device: a newer event for the
+            // same pane replaces the older one instead of stacking beside it.
+            tag: pane_id.clone(),
+            // Absent from a server older than clears; treat as a show.
+            op: std::env::var("SHEP_NOTIFY_OP").unwrap_or_else(|_| "show".to_string()),
             kind: kind.clone(),
             state: std::env::var("SHEP_NOTIFY_STATE").unwrap_or_default(),
             agent: std::env::var("SHEP_NOTIFY_AGENT").unwrap_or_default(),
             workspace: std::env::var("SHEP_NOTIFY_WORKSPACE").unwrap_or_default(),
-            pane_id: std::env::var("SHEP_NOTIFY_PANE_ID").unwrap_or_default(),
+            pane_id,
             title: std::env::var("SHEP_NOTIFY_TITLE").unwrap_or_default(),
             task_id: std::env::var("SHEP_NOTIFY_TASK_ID").unwrap_or_default(),
             message: truncate(
@@ -1160,6 +1168,12 @@ mod push {
     /// block only carries strings, and the UnifiedPush body is the same shape so
     /// the app has one parser rather than two.
     pub(super) struct Payload {
+        /// What the device keys its notification on (the pane id): a later
+        /// event with the same tag bumps the earlier one, and a `clear`
+        /// with this tag withdraws it.
+        pub(super) tag: String,
+        /// `show` or `clear` (`SHEP_NOTIFY_OP`).
+        pub(super) op: String,
         pub(super) kind: String,
         pub(super) state: String,
         pub(super) agent: String,
@@ -1173,6 +1187,8 @@ mod push {
     impl Payload {
         pub(super) fn fields(&self) -> serde_json::Value {
             serde_json::json!({
+                "tag": self.tag,
+                "op": self.op,
                 "kind": self.kind,
                 "state": self.state,
                 "agent": self.agent,

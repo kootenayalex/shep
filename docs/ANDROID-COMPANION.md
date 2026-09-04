@@ -3,9 +3,9 @@
 Status: A0–A5 BUILT (A5 2026-07-17), A6 BUILT 2026-07-17 (app-side; physical-
 device gates owed). A0–A2 shipped + tails closed (bottom-nav
 shell, event-driven home, filter chips, ANSI pane render, QR pairing, version
-gating). A3 notifications implemented and server-verified end-to-end; the final
-locked-screen gate needs the ntfy distributor app on the S22 (Alex's manual
-step). A4 tasks + memory tabs built and live-verified over the bridge. A5 review &
+gating). A3 notifications rebuilt on FCM 2026-09-03: one notification per
+agent that a newer event bumps, withdrawn when the agent is looked at on any
+surface; the lock-screen gate is AVD-verified, real-phone check owed. A4 tasks + memory tabs built and live-verified over the bridge. A5 review &
 ship built (workspace.diff/ship JSON API methods + review screen). A6 polish
 built (widget, launcher shortcut, voice add-task, tablet two-pane, Maestro
 E2E). Feature parity with the desktop ADE, re-shaped for a
@@ -80,7 +80,7 @@ shep server (macmini)
 | Ship worktree | Ship button with loss-aversion-honest confirm ("merge task/41 → master · 12 commits · then remove worktree") → `✓ shipped` success moment. |
 | Task queue CLI | Tasks tab: list with states, add-task sheet (repo picker, runtime, `--worktree` toggle), cancel, dispatch-now. |
 | `shep memory` CLI | Memory tab: USER/repo files, `§`-entry list, add/edit/remove, search (FTS5), cap meter with the >80% nudge. |
-| Toasts | Snackbars in-app; ntfy notifications out-of-app. |
+| Toasts | Snackbars in-app; FCM notifications out-of-app. |
 | Modals | Bottom sheets (thumb reach), destructive ones red-headed with an explicit noun ("Close workspace *api*?"). |
 
 ## Navigation
@@ -140,21 +140,21 @@ shep server (macmini)
   read-only ANSI renderer of the observe stream), quick-keys row
   (y/n/enter/esc/arrows via `terminal session control`), prompt composer with
   queue-on-busy. Gate: answer a real claude permission prompt from the phone.
-- **A3 — notifications. BUILT 2026-07-14.** ntfy self-hosted (Docker + tailscale
-  sidecar at `https://ntfy.tail58187b.ts.net`, deploy in
-  `shep-android/deploy/ntfy/`) as the UnifiedPush distributor. Server: the phone
-  registers its endpoint over the bridge (`push.register`, handled bridge-locally
-  → `<config>/push-endpoints.json`, no protocol bump); `[notifications] exec =
-  "shep bridge notify-push"` POSTs the transition context to each endpoint
-  (`SHEP_NTFY_PUBLISH_BASE` keeps the publish on loopback since shep + ntfy are
-  co-located). App: UnifiedPush `MessagingReceiver` renders an actionable
-  notification whose Approve/Deny fire `pane.send_keys` (y/n) over a short-lived
-  bridge connection, and whose tap deep-links `shep://pane?pane=…`. Verified
-  live: register→persist→exec→notify-push→ntfy publish; app installs/launches,
-  fires the POST_NOTIFICATIONS prompt, and the distributor-detection path runs on
-  the AVD. Gate (lock-screen approve, app never opened) pending the ntfy app on a
-  real device — Alex installs ntfy (F-Droid), points it at the ntfy server, then
-  installs the APK + pairs.
+- **A3 — notifications. BUILT 2026-07-14, REBUILT 2026-09-03.** Server: the
+  phone registers its FCM token over the bridge (`push.register`, handled
+  bridge-locally → `<config>/push-endpoints.json`, no protocol bump);
+  `[notifications] exec = "shep bridge notify-push"` sends the transition
+  context, data-only, to each registered device. Every message carries a
+  `tag` (the pane id) and an `op`: `show` raises or replaces the one
+  notification that agent gets, `clear` withdraws it. The server fires the
+  clear when the pane is looked at — on the active tab of a focused desktop
+  client, through `pane.mark_seen` from a companion, or because the pane is
+  gone — so a question answered at the desk stops paging the phone. App:
+  `ShepMessagingService` builds the notification (Approve/Deny fire
+  `pane.send_keys` y/n over a short-lived bridge connection; tap deep-links
+  `shep://pane?pane=…`); opening an agent anywhere in the app cancels its
+  notification locally and calls `pane.mark_seen`. The original self-hosted
+  ntfy/UnifiedPush transport was removed in the rebuild.
 - **A4 — tasks + memory. BUILT 2026-07-17.** Bridge-local `task.list/add/cancel`
   and `memory.show/add/replace/remove` (direct ops on `<state>/tasks.db` and the
   memory files — same as the CLIs, no new API method / protocol bump, mirroring
@@ -220,8 +220,8 @@ macmini server, never a mock (mock-pg lesson generalized).
 - **VT rendering on Android** — RESOLVED (2026-07-12): shipped the read-only
   ANSI-to-AnnotatedString renderer (`AnsiRender.kt`), not Termux terminal-view.
   Observe-only v1, so control keys need no local echo; contained to one module.
-- **Battery vs immediacy** — no persistent background socket; ntfy wake-ups
-  only. If ntfy latency disappoints, revisit with a foreground-service toggle
+- **Battery vs immediacy** — no persistent background socket; push wake-ups
+  only. If push latency disappoints, revisit with a foreground-service toggle
   ("on shift" mode), never a silent always-on drain.
 - **Bincode temptation** — never implement the TUI client protocol in Kotlin;
   the JSON API is the contract. If a needed capability exists only in the

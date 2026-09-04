@@ -970,6 +970,30 @@ impl NotifyKind {
     }
 }
 
+/// What an exec-bridge invocation is asking the receiver to do.
+///
+/// A notification is not only raised; it is also withdrawn once someone has
+/// looked at the pane it was about, so a phone does not keep paging about a
+/// question that was answered at the desk. `SHEP_NOTIFY_OP` carries this; an
+/// exec that predates it sees the variable as absent and behaves as before.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotifyOp {
+    /// Raise (or replace) the notification for this pane.
+    Show,
+    /// Withdraw the notification for this pane: it has been looked at.
+    Clear,
+}
+
+impl NotifyOp {
+    /// Env spelling for `SHEP_NOTIFY_OP`.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Show => "show",
+            Self::Clear => "clear",
+        }
+    }
+}
+
 /// `[notifications]` config: the omnara-style "notify only when blocked" filter
 /// plus a user-configurable exec-bridge hook (voicebox / KDE Connect / ntfy).
 ///

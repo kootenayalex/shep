@@ -11,26 +11,28 @@ import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import org.json.JSONObject
-import org.unifiedpush.android.connector.MessagingReceiver
-import org.unifiedpush.android.connector.UnifiedPush
 
 /**
- * Push notifications, over either transport.
+ * Push notifications.
  *
  * shep's `[notifications] exec = "shep bridge notify-push"` sends a flat set of
- * string fields to every registered device. FCM delivers them to
- * [ShepMessagingService]; UnifiedPush delivers the same fields as a JSON body
- * to [PushReceiver]. Both hand off to [showShepNotification], so there is one
- * notification design and one place it can go wrong.
+ * string fields to every registered device over FCM, which delivers them to
+ * [ShepMessagingService]. From there [showShepNotification] either posts one
+ * notification per agent (a newer event for the same agent replaces the older
+ * one — the `tag` field is the pane id) or, for `op = clear`, withdraws it:
+ * the pane was looked at, on the desk or on another device.
  *
- * From there: Approve/Deny fire [ActionReceiver], which sends `y`/`n` through a
- * short-lived [BridgeClient] via `pane.send_keys`; tapping the body deep-links
- * into the pane. No persistent foreground socket — the app lives entirely off
- * push wake-ups (the ANDROID-COMPANION.md battery guardrail).
+ * Approve/Deny fire [ActionReceiver], which sends `y`/`n` through a short-lived
+ * [BridgeClient] via `pane.send_keys`; tapping the body deep-links into the
+ * pane, which in turn tells shep the pane was seen. No persistent foreground
+ * socket — the app lives entirely off push wake-ups (the ANDROID-COMPANION.md
+ * battery guardrail).
  */
 
 /**
- * The kinds of thing shep notifies about, mirroring `crate::config::NotifyKind`.
+ * The kinds of thing shep notifies about, mirroring `crate::config::NotifyKind`
+ * one for one: what the server can put in `SHEP_NOTIFY_KIND`, the phone can
+ * name, so a subscription chosen here always means something there.
  *
  * Each gets its own Android channel so the system's own per-channel controls
  * work — silencing "done" while keeping "blocked" audible is a thing people
@@ -53,13 +55,25 @@ enum class NotifyKind(
         "done", "done", "shep_done", "Run finished",
         "An agent finished what it was doing", NotificationManager.IMPORTANCE_DEFAULT,
     ),
+    Review(
+        "review", "review", "shep_review", "Ready for review",
+        "A group is ready to review", NotificationManager.IMPORTANCE_DEFAULT,
+    ),
     Task(
         "task", "task", "shep_task", "Task queue",
         "A queued task changed state", NotificationManager.IMPORTANCE_LOW,
     ),
-    Review(
-        "review", "review", "shep_review", "Ready for review",
-        "A space is ready to review", NotificationManager.IMPORTANCE_DEFAULT,
+    Working(
+        "working", "working", "shep_working", "Agent working",
+        "An agent started working", NotificationManager.IMPORTANCE_LOW,
+    ),
+    Idle(
+        "idle", "idle", "shep_idle", "Agent idle",
+        "An agent went quiet without finishing a run", NotificationManager.IMPORTANCE_LOW,
+    ),
+    Unknown(
+        "unknown", "unknown", "shep_unknown", "Agent state unknown",
+        "shep lost track of what an agent is doing", NotificationManager.IMPORTANCE_LOW,
     );
 
     companion object {
@@ -74,71 +88,6 @@ enum class NotifyKind(
 const val PUSH_CHANNEL_ID = "shep_agent"
 private const val PUSH_ACTION = "dev.shep.companion.PANE_ACTION"
 private const val PREFS = "shep"
-
-/** UnifiedPush registration + the endpoint→shep handshake. */
-object PushManager {
-    /**
-     * Ensure a distributor is chosen and (re)register, so the endpoint arrives at
-     * [PushReceiver.onNewEndpoint]. No-op with a logged reason when no distributor
-     * (e.g. the ntfy app) is installed. Returns a human status for the Shep tab.
-     */
-    fun register(context: Context): String {
-        val saved = UnifiedPush.getSavedDistributor(context)
-        if (saved.isNullOrEmpty()) {
-            val available = UnifiedPush.getDistributors(context)
-            when {
-                available.isEmpty() ->
-                    return "no push distributor — install the ntfy app and point it at your ntfy server"
-                available.size == 1 -> UnifiedPush.saveDistributor(context, available.first())
-                else -> UnifiedPush.saveDistributor(context, available.first())
-            }
-        }
-        UnifiedPush.registerApp(context)
-        return "registering for push…"
-    }
-
-    fun unregister(context: Context) {
-        UnifiedPush.unregisterApp(context)
-    }
-}
-
-/** UnifiedPush delivery target. Manifest-registered so it wakes a closed app. */
-class PushReceiver : MessagingReceiver() {
-
-    override fun onNewEndpoint(context: Context, endpoint: String, instance: String) {
-        // Persist locally (for display) and hand the endpoint to shep so its
-        // notify-push hook knows where to POST. Done off the main thread.
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString("push_endpoint", endpoint).apply()
-        registerEndpointWithShep(context, endpoint)
-    }
-
-    override fun onRegistrationFailed(context: Context, instance: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString("push_status", "registration failed").apply()
-    }
-
-    override fun onUnregistered(context: Context, instance: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().remove("push_endpoint").apply()
-    }
-
-    override fun onMessage(context: Context, message: ByteArray, instance: String) {
-        val json = runCatching { JSONObject(String(message, Charsets.UTF_8)) }.getOrNull() ?: return
-        showShepNotification(
-            context,
-            ShepNotification(
-                kind = json.optString("kind"),
-                state = json.optString("state"),
-                agent = json.optString("agent"),
-                workspace = json.optString("workspace"),
-                paneId = json.optString("pane_id"),
-                title = json.optString("title"),
-                body = json.optString("message"),
-            ),
-        )
-    }
-}
 
 /** Approve/Deny tapped from the notification — send the keystroke over the bridge. */
 class ActionReceiver : BroadcastReceiver() {
@@ -187,32 +136,109 @@ data class ShepNotification(
     val paneId: String,
     val title: String,
     val body: String,
-)
+    /** What the device keys the notification on; the pane id from shep. */
+    val tag: String = "",
+    /** `show` (default, and what a server without ops sends) or `clear`. */
+    val op: String = OP_SHOW,
+) {
+    val isClear: Boolean get() = op == OP_CLEAR
+
+    companion object {
+        const val OP_SHOW = "show"
+        const val OP_CLEAR = "clear"
+
+        /** Decode the flat string fields of a push message; absent keys are empty. */
+        fun fromFields(field: (String) -> String?): ShepNotification = ShepNotification(
+            kind = field("kind").orEmpty(),
+            state = field("state").orEmpty(),
+            agent = field("agent").orEmpty(),
+            workspace = field("workspace").orEmpty(),
+            paneId = field("pane_id").orEmpty(),
+            title = field("title").orEmpty(),
+            body = field("message").orEmpty(),
+            tag = field("tag").orEmpty(),
+            op = field("op")?.takeIf { it.isNotEmpty() } ?: OP_SHOW,
+        )
+    }
+}
 
 /**
- * Build and post the notification. Approve/Deny appear only when an agent is
+ * The Android notification id for one agent. One id per agent — not per
+ * (agent, kind) — so a "done" that follows a "blocked" replaces it rather than
+ * stacking beside it, and a clear knows exactly what to take down.
+ */
+fun notificationIdFor(tag: String, paneId: String = "", agent: String = ""): Int =
+    tag.ifEmpty { paneId.ifEmpty { agent.ifEmpty { "agent" } } }.hashCode()
+
+/** What [showShepNotification] will do, decided without touching Android. */
+sealed class NotificationPlan {
+    abstract val id: Int
+
+    data class Cancel(override val id: Int) : NotificationPlan()
+
+    data class Post(
+        override val id: Int,
+        val kind: NotifyKind,
+        val title: String,
+        val body: String,
+        /** Approve/Deny are offered only when an agent is waiting on an answer. */
+        val offerAnswer: Boolean,
+    ) : NotificationPlan()
+}
+
+/**
+ * Turn a message into a plan. Approve/Deny appear only when an agent is
  * actually waiting on an answer — offering them on a "task done" would send a
  * keystroke nobody asked for.
  */
-fun showShepNotification(context: Context, notification: ShepNotification) {
+fun planNotification(notification: ShepNotification): NotificationPlan {
+    val agent = notification.agent.ifEmpty { "agent" }
+    val id = notificationIdFor(notification.tag, notification.paneId, agent)
+    if (notification.isClear) return NotificationPlan.Cancel(id)
     val kind = NotifyKind.fromWire(notification.kind)
         // A server too old to send a kind only ever sent blocked transitions.
         ?: NotifyKind.Blocked
-    val agent = notification.agent.ifEmpty { "agent" }
-    val paneId = notification.paneId
     val body = notification.body.ifEmpty {
         when (kind) {
             NotifyKind.Blocked -> "needs your attention"
             NotifyKind.Done -> "finished"
-            NotifyKind.Task -> "task queue changed"
             NotifyKind.Review -> "ready for review"
+            NotifyKind.Task -> "task queue changed"
+            NotifyKind.Working -> "working"
+            NotifyKind.Idle -> "went quiet"
+            NotifyKind.Unknown -> "state unknown"
         }
     }
+    // Task and review events name themselves ("task #4 done"); agent events are
+    // identified by who and where instead.
+    val title = notification.title.ifEmpty {
+        if (notification.workspace.isNotEmpty()) "$agent · ${notification.workspace}" else agent
+    }
+    return NotificationPlan.Post(
+        id = id,
+        kind = kind,
+        title = title,
+        body = body,
+        offerAnswer = kind == NotifyKind.Blocked && notification.paneId.isNotEmpty(),
+    )
+}
+
+/** Build and post (or withdraw) the notification for one message. */
+fun showShepNotification(context: Context, notification: ShepNotification) {
+    when (val plan = planNotification(notification)) {
+        is NotificationPlan.Cancel -> {
+            runCatching { NotificationManagerCompat.from(context).cancel(plan.id) }
+        }
+        is NotificationPlan.Post -> postNotification(context, notification.paneId, plan)
+    }
+    // The blocked set may have just changed either way — repaint the widget.
+    ShepWidgetProvider.refreshAll(context)
+}
+
+private fun postNotification(context: Context, paneId: String, plan: NotificationPlan.Post) {
+    val kind = plan.kind
+    val notifId = plan.id
     ensureChannel(context, kind)
-    // Keyed per pane per kind, so a "done" does not overwrite the "blocked"
-    // still waiting for an answer on the same pane.
-    val identity = if (paneId.isNotEmpty()) paneId else agent
-    val notifId = (identity + "/" + kind.wire).hashCode()
 
     val openPending = PendingIntent.getActivity(
         context,
@@ -225,16 +251,11 @@ fun showShepNotification(context: Context, notification: ShepNotification) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    // Task and review events name themselves ("task #4 done"); agent events are
-    // identified by who and where instead.
-    val title = notification.title.ifEmpty {
-        if (notification.workspace.isNotEmpty()) "$agent · ${notification.workspace}" else agent
-    }
     val builder = NotificationCompat.Builder(context, kind.channelId)
         .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle(title)
-        .setContentText(body)
-        .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        .setContentTitle(plan.title)
+        .setContentText(plan.body)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(plan.body))
         .setPriority(
             if (kind == NotifyKind.Blocked) {
                 NotificationCompat.PRIORITY_HIGH
@@ -252,7 +273,7 @@ fun showShepNotification(context: Context, notification: ShepNotification) {
         .setAutoCancel(true)
         .setContentIntent(openPending)
 
-    if (kind == NotifyKind.Blocked && paneId.isNotEmpty()) {
+    if (plan.offerAnswer) {
         builder.addAction(
             0, "Approve", actionPending(context, "approve", paneId, notifId),
         )
@@ -262,8 +283,6 @@ fun showShepNotification(context: Context, notification: ShepNotification) {
     }
 
     runCatching { NotificationManagerCompat.from(context).notify(notifId, builder.build()) }
-    // The blocked set may have just changed — repaint the widget.
-    ShepWidgetProvider.refreshAll(context)
 }
 
 private fun actionPending(
@@ -301,26 +320,4 @@ private fun ensureChannel(context: Context, kind: NotifyKind) {
         }
         mgr.createNotificationChannel(channel)
     }
-}
-
-/** Register the UnifiedPush endpoint with shep over a short-lived bridge call. */
-private fun registerEndpointWithShep(context: Context, endpoint: String) {
-    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    val url = prefs.getString("url", null) ?: return
-    val token = prefs.getString("token", null) ?: return
-    Thread {
-        val client = BridgeClient(url, token)
-        if (client.connect(timeoutSeconds = 8) == null) {
-            runCatching {
-                client.call(
-                    "push.register",
-                    JSONObject()
-                        .put("endpoint", endpoint)
-                        .put("label", android.os.Build.MODEL ?: "android"),
-                )
-            }
-            prefs.edit().putString("push_status", "push registered").apply()
-        }
-        client.close()
-    }.start()
 }

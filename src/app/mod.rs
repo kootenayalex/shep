@@ -597,6 +597,7 @@ impl App {
             queue_prompt_target: None,
             copy_feedback: None,
             outer_terminal_focus: None,
+            notify_seen_requests: Vec::new(),
             prefix_code,
             prefix_mods,
             default_sidebar_width: config.ui.sidebar_width,

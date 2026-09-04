@@ -65,19 +65,6 @@
             </intent-filter>
         </service>
 
-        <!-- UnifiedPush delivery: kept until FCM is confirmed on real hardware,
-             so there is never a window with no working transport. -->
-        <receiver
-            android:name=".PushReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="org.unifiedpush.android.connector.MESSAGE" />
-                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
-                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
-                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
-            </intent-filter>
-        </receiver>
-
         <!-- Approve/Deny notification actions → pane.send_keys over the bridge. -->
         <receiver
             android:name=".ActionReceiver"

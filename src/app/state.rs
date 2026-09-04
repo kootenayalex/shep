@@ -1627,6 +1627,10 @@ pub struct AppState {
     /// Last reported focus state for the outer terminal hosting shep.
     /// None means unsupported or not yet reported, which preserves active-pane suppression.
     pub outer_terminal_focus: Option<bool>,
+    /// Panes a companion surface reported as looked at (`pane.mark_seen`) since
+    /// the headless loop last drained them. The loop turns each into an
+    /// exec-bridge clear so the notification comes down everywhere.
+    pub notify_seen_requests: Vec<PaneId>,
     // Config
     pub prefix_code: KeyCode,
     pub prefix_mods: KeyModifiers,
@@ -2075,6 +2079,7 @@ impl AppState {
             queue_prompt_target: None,
             copy_feedback: None,
             outer_terminal_focus: None,
+            notify_seen_requests: Vec::new(),
             prefix_code: KeyCode::Char('b'),
             prefix_mods: KeyModifiers::CONTROL,
             default_sidebar_width: 26,

@@ -192,6 +192,7 @@ impl App {
         if !self.state.mark_pane_seen(ws_idx, pane_id) {
             return pane_not_found(id, &target.pane_id);
         }
+        self.state.notify_seen_requests.push(pane_id);
 
         let Some(pane) = self.pane_info(ws_idx, pane_id) else {
             return pane_not_found(id, &target.pane_id);

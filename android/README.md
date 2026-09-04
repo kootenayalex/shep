@@ -11,8 +11,9 @@ URL + token into the app.
 
 v0 scope (A0–A2 core): pairing, live agents home (blocked-first, state
 colors, review badges), pane view (live text, quick keys y/n/enter/esc/↑/↓,
-prompt composer with send / queue-on-busy). A3 push (UnifiedPush, lock-screen
-approve/deny), A4 tasks + memory tabs, A5 review & ship, A6 polish (home-screen
+prompt composer with send / queue-on-busy). A3 push (FCM, lock-screen
+approve/deny, one notification per agent that clears when the agent is looked
+at), A4 tasks + memory tabs, A5 review & ship, A6 polish (home-screen
 widget, "New task" launcher shortcut, voice add-task, tablet two-pane) — see
 `maestro/README.md` for the E2E flows.
 
@@ -34,9 +35,13 @@ notification and keeps the lock-screen Approve/Deny.
 
 This is the only Google dependency in a repo that is otherwise `org.json` +
 OkHttp on purpose. It needs Play Services on the device and a
-`app/google-services.json` from the Firebase project. The UnifiedPush path is
-still present and still works; it will be removed once FCM is confirmed on real
-hardware.
+`app/google-services.json` from the Firebase project.
+
+Each agent gets one notification: a newer event replaces it (the message's
+`tag` is the pane id) rather than stacking beside it, and an `op = clear`
+message — sent when the pane is looked at on the desktop, in this app, or on
+another phone — takes it down. Opening an agent in the app calls
+`pane.mark_seen`, which is what makes the other surfaces clear too.
 
 Server side needs a Firebase service-account key at
 `<shep config>/fcm-service-account.json`. `shep bridge notify-push` signs a JWT

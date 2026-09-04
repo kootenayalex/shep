@@ -104,6 +104,27 @@ pub(crate) fn notify_exec_decision(
     NotifyExecDecision::Fire
 }
 
+/// Whether a fired exec-bridge notification for a pane should now be withdrawn.
+///
+/// `standing` is how long the notification has been up and `settle` the minimum
+/// it must stand before an on-screen sighting counts — a pane that blocks while
+/// it is already in view is still announced once, and the show and the clear
+/// never race each other to the push service. A pane that is gone, or that a
+/// companion explicitly reported looked at, clears regardless of age: the
+/// companion already has the notification in hand, so there is nothing to race.
+pub(crate) fn notify_exec_clear_due(
+    standing: std::time::Duration,
+    settle: std::time::Duration,
+    pane_exists: bool,
+    seen_requested: bool,
+    on_screen: bool,
+) -> bool {
+    if !pane_exists || seen_requested {
+        return true;
+    }
+    on_screen && standing >= settle
+}
+
 fn toast_event_text(kind: app::state::ToastKind) -> &'static str {
     match kind {
         app::state::ToastKind::NeedsAttention => "needs attention",
@@ -277,6 +298,55 @@ mod tests {
                 clear_debounce: true
             }
         );
+    }
+
+    use super::notify_exec_clear_due;
+    use std::time::Duration;
+
+    const SETTLE: Duration = Duration::from_millis(1500);
+
+    /// A companion that opened the pane, or a pane that is gone, clears at
+    /// once; only the desk's own sighting waits out the settle window.
+    #[test]
+    fn notify_exec_clear_fires_for_a_seen_request_or_a_dead_pane_immediately() {
+        assert!(notify_exec_clear_due(
+            Duration::ZERO,
+            SETTLE,
+            true,
+            true,
+            false
+        ));
+        assert!(notify_exec_clear_due(
+            Duration::ZERO,
+            SETTLE,
+            false,
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn notify_exec_clear_waits_for_the_settle_window_when_merely_on_screen() {
+        assert!(!notify_exec_clear_due(
+            Duration::from_millis(200),
+            SETTLE,
+            true,
+            false,
+            true
+        ));
+        assert!(notify_exec_clear_due(SETTLE, SETTLE, true, false, true));
+    }
+
+    /// A notification nobody has looked at stands, however old it is.
+    #[test]
+    fn notify_exec_clear_never_fires_unseen() {
+        assert!(!notify_exec_clear_due(
+            Duration::from_secs(3600),
+            SETTLE,
+            true,
+            false,
+            false
+        ));
     }
 
     #[cfg(unix)]

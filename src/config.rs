@@ -34,6 +34,7 @@ pub(crate) use self::keybinds::parse_key_combo;
 // exec-bridge tests in other modules, so allow it to be otherwise unused.
 #[allow(unused_imports)]
 pub use self::model::NotifyKind;
+pub use self::model::NotifyOp;
 
 pub const CONFIG_PATH_ENV_VAR: &str = "SHEP_CONFIG_PATH";
 pub const DEFAULT_SCROLLBACK_LIMIT_BYTES: usize = 10_000_000;

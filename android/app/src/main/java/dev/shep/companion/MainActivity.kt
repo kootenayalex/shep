@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
@@ -58,6 +59,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import dev.shep.companion.ui.theme.ShepMotion
@@ -202,9 +204,6 @@ fun ShepApp(
             // kinds are passed: an unqualified re-register on every app start
             // must not overwrite a choice made in settings.
             FcmManager.register(context)
-            // UnifiedPush stays registered alongside until FCM is confirmed on
-            // real hardware, so a failure of one is not a failure of both.
-            withContext(Dispatchers.IO) { PushManager.register(context) }
         }
     }
 
@@ -377,6 +376,24 @@ fun NavShell(
     // the whole scaffold on a phone, so a space collapsed in the list itself is
     // re-expanded the moment you look at an agent and come back.
     var collapsedSpaces by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val context = LocalContext.current
+
+    // Opening an agent answers its notification. The local one comes down at
+    // once, and shep is told the pane was seen so it withdraws the notification
+    // on every other device too — and the desk's own unseen mark clears. This is
+    // the single place that happens, whether the pane came from the list, the
+    // tablet dock, or a notification tap.
+    LaunchedEffect(paneDetail?.paneId) {
+        val opened = paneDetail ?: return@LaunchedEffect
+        runCatching {
+            NotificationManagerCompat.from(context).cancel(notificationIdFor(opened.paneId))
+        }
+        withContext(Dispatchers.IO) {
+            runCatching {
+                client.call("pane.mark_seen", JSONObject().put("pane_id", opened.paneId))
+            }
+        }
+    }
 
     // A notification tap (shep://pane?pane=…) resolves the pane id to its row via
     // a one-shot snapshot and pushes the pane detail; falls back to the Chats

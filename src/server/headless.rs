@@ -59,8 +59,8 @@ use crate::server::clients::{
 };
 use crate::server::keybindings::{app_keybindings, apply_keybindings};
 use crate::server::notifications::{
-    notify_exec_decision, should_forward_toast_to_clients, toast_message_from_state_change,
-    toast_notify_kind, NotifyExecDecision,
+    notify_exec_clear_due, notify_exec_decision, should_forward_toast_to_clients,
+    toast_message_from_state_change, toast_notify_kind, NotifyExecDecision,
 };
 use crate::server::socket_paths::{
     client_socket_path, prepare_socket_path, restrict_socket_permissions,
@@ -240,7 +240,10 @@ pub struct HeadlessServer {
     server_event_tx: mpsc::Sender<ServerEvent>,
     /// Last exec-bridge state fired per pane, for the "one exec per pane per
     /// state-transition" debounce.
-    notify_exec_fired: HashMap<PaneId, AgentState>,
+    /// One remembered fire per pane: the state and kind the exec-bridge was
+    /// last told about, and when. Cleared again once the pane is looked at
+    /// (see [`Self::fire_notify_exec_clears`]) or leaves the notify set.
+    notify_exec_fired: HashMap<PaneId, NotifyExecFired>,
     /// Keeps the M4 filesystem watchers alive for the server's lifetime.
     _fs_watchers: Option<notify::RecommendedWatcher>,
 }
@@ -249,6 +252,10 @@ pub struct HeadlessServer {
 struct NotifyExecContext {
     agent: Option<String>,
     workspace: Option<String>,
+    /// The pane's public id (`w2:p1`), the form every `pane.*` API method
+    /// resolves, so a receiver can open or answer the pane it names. Unset
+    /// only when the pane is already gone.
+    pane_id: Option<String>,
     message: Option<String>,
     /// One line naming what happened, for a notification that has a headline
     /// and a body. Agent-state events leave it unset and let the receiver
@@ -258,6 +265,24 @@ struct NotifyExecContext {
     /// Set only for `task` events.
     task_id: Option<i64>,
 }
+
+/// What the exec-bridge was last told about one pane, so the same notification
+/// is neither repeated while the state holds nor left standing once someone
+/// has looked at the pane.
+#[derive(Debug, Clone, Copy)]
+struct NotifyExecFired {
+    /// The agent state that fired, or `None` for a task/review event, which
+    /// is not about the agent's state and must not debounce a later one.
+    state: Option<AgentState>,
+    kind: crate::config::NotifyKind,
+    at: Instant,
+}
+
+/// How long a fired notification must stand before an "it is on screen" clear
+/// may withdraw it. A pane that blocks while it is already on a focused screen
+/// would otherwise be cleared in the same loop turn, and two exec processes
+/// racing to the push service arrive in whichever order the network likes.
+const NOTIFY_CLEAR_SETTLE: Duration = Duration::from_millis(1500);
 
 /// Spawn the exec-bridge command detached, passing event context through
 /// `SHEP_NOTIFY_*` env vars. Never blocks the caller: a short-lived reaper
@@ -271,11 +296,13 @@ struct NotifyExecContext {
 fn spawn_notify_exec(
     command: &str,
     pane_id: PaneId,
+    op: crate::config::NotifyOp,
     kind: crate::config::NotifyKind,
     state: Option<AgentState>,
     context: NotifyExecContext,
 ) {
     let mut cmd = notify_exec_command(command);
+    cmd.env("SHEP_NOTIFY_OP", op.label());
     cmd.env("SHEP_NOTIFY_KIND", kind.label());
     cmd.env(
         "SHEP_NOTIFY_STATE",
@@ -288,7 +315,10 @@ fn spawn_notify_exec(
         "SHEP_NOTIFY_WORKSPACE",
         context.workspace.unwrap_or_default(),
     );
-    cmd.env("SHEP_NOTIFY_PANE_ID", pane_id.raw().to_string());
+    cmd.env(
+        "SHEP_NOTIFY_PANE_ID",
+        context.pane_id.unwrap_or_else(|| pane_id.raw().to_string()),
+    );
     cmd.env("SHEP_NOTIFY_MESSAGE", context.message.unwrap_or_default());
     cmd.env("SHEP_NOTIFY_TITLE", context.title.unwrap_or_default());
     cmd.env(
@@ -621,6 +651,7 @@ impl HeadlessServer {
                 crate::render_prof::event("full_render_cause.default_workspace");
             }
 
+            self.fire_notify_exec_clears();
             self.drain_client_config_reload_request();
             self.stream_host_mouse_capture_mode();
 
@@ -659,7 +690,11 @@ impl HeadlessServer {
                     self.has_app_client(),
                 )
                 .map(|deadline| deadline.min(now + CLIENT_ACCEPT_POLL_INTERVAL))
-                .or(Some(now + CLIENT_ACCEPT_POLL_INTERVAL));
+                .or(Some(now + CLIENT_ACCEPT_POLL_INTERVAL))
+                .map(|deadline| match self.next_notify_clear_deadline(now) {
+                    Some(clear_at) => deadline.min(clear_at),
+                    None => deadline,
+                });
             let event = {
                 tokio::select! {
                     maybe_api = self.app.api_rx.recv() => match maybe_api {
@@ -1458,7 +1493,9 @@ impl HeadlessServer {
         let finished = prev_state == AgentState::Working && new_state == AgentState::Idle;
         let decision = notify_exec_decision(
             &self.app.state.notifications,
-            self.notify_exec_fired.get(&pane_id).copied(),
+            self.notify_exec_fired
+                .get(&pane_id)
+                .and_then(|fired| fired.state),
             prev_state,
             new_state,
             finished,
@@ -1470,15 +1507,97 @@ impl HeadlessServer {
                 }
             }
             NotifyExecDecision::Fire => {
-                self.notify_exec_fired.insert(pane_id, new_state);
+                let kind = crate::config::NotifyKind::from_agent_state(new_state, finished);
+                self.notify_exec_fired.insert(
+                    pane_id,
+                    NotifyExecFired {
+                        state: Some(new_state),
+                        kind,
+                        at: Instant::now(),
+                    },
+                );
                 let Some(exec) = self.app.state.notifications.exec.clone() else {
                     return;
                 };
                 let context = self.notify_exec_context(pane_id);
-                let kind = crate::config::NotifyKind::from_agent_state(new_state, finished);
-                spawn_notify_exec(&exec, pane_id, kind, Some(new_state), context);
+                spawn_notify_exec(
+                    &exec,
+                    pane_id,
+                    crate::config::NotifyOp::Show,
+                    kind,
+                    Some(new_state),
+                    context,
+                );
             }
         }
+    }
+
+    /// Withdraw notifications whose panes have since been looked at.
+    ///
+    /// "Looked at" is any of: the pane is on the active tab of the active
+    /// workspace while a foreground client reports outer-terminal focus (a
+    /// person is at the desk with it on screen); a companion surface said so
+    /// through `pane.mark_seen`; or the pane no longer exists. Each remembered
+    /// fire is cleared once and forgotten, so the next transition into a notify
+    /// state pages again. Runs every loop turn; cheap when nothing has fired.
+    fn fire_notify_exec_clears(&mut self) {
+        let requested = std::mem::take(&mut self.app.state.notify_seen_requests);
+        if self.notify_exec_fired.is_empty() {
+            return;
+        }
+        let in_view = self.foreground_client_id.is_some()
+            && self.app.state.outer_terminal_focus == Some(true);
+        let now = Instant::now();
+        let due: Vec<(PaneId, NotifyExecFired)> = self
+            .notify_exec_fired
+            .iter()
+            .filter(|(pane_id, fired)| {
+                let pane_id = **pane_id;
+                let exists = self
+                    .app
+                    .state
+                    .workspaces
+                    .iter()
+                    .any(|ws| ws.find_tab_index_for_pane(pane_id).is_some());
+                let on_screen = in_view
+                    && self.app.state.active.is_some_and(|ws_idx| {
+                        self.app.state.pane_is_in_active_tab(ws_idx, pane_id)
+                    });
+                notify_exec_clear_due(
+                    now.saturating_duration_since(fired.at),
+                    NOTIFY_CLEAR_SETTLE,
+                    exists,
+                    requested.contains(&pane_id),
+                    on_screen,
+                )
+            })
+            .map(|(pane_id, fired)| (*pane_id, *fired))
+            .collect();
+        for (pane_id, fired) in due {
+            self.notify_exec_fired.remove(&pane_id);
+            let Some(exec) = self.app.state.notifications.exec.clone() else {
+                continue;
+            };
+            let context = self.notify_exec_context(pane_id);
+            spawn_notify_exec(
+                &exec,
+                pane_id,
+                crate::config::NotifyOp::Clear,
+                fired.kind,
+                fired.state,
+                context,
+            );
+        }
+    }
+
+    /// When the loop must wake so a settling notification can be cleared on
+    /// time, if nothing else wakes it first.
+    fn next_notify_clear_deadline(&self, now: Instant) -> Option<Instant> {
+        self.notify_exec_fired
+            .values()
+            .map(|fired| fired.at + NOTIFY_CLEAR_SETTLE)
+            .filter(|deadline| *deadline > now)
+            .min()
     }
 
     /// Fire the exec-bridge for an event that is not an agent-state change.
@@ -1486,9 +1605,10 @@ impl HeadlessServer {
     /// Task and review events arrive already de-duplicated — the callers only
     /// reach here on a real change — so this deliberately skips the per-pane
     /// state debounce, which exists for a different problem (an agent being
-    /// re-reported in the state it is already in).
+    /// re-reported in the state it is already in). It is still remembered as
+    /// fired, so looking at the pane withdraws it like any other.
     fn fire_notify_exec_event(
-        &self,
+        &mut self,
         pane_id: PaneId,
         kind: crate::config::NotifyKind,
         title: String,
@@ -1497,16 +1617,31 @@ impl HeadlessServer {
         if !self.app.state.notifications.should_notify(kind) {
             return;
         }
+        self.notify_exec_fired.insert(
+            pane_id,
+            NotifyExecFired {
+                state: None,
+                kind,
+                at: Instant::now(),
+            },
+        );
         let Some(exec) = self.app.state.notifications.exec.clone() else {
             return;
         };
         let mut context = self.notify_exec_context(pane_id);
         context.title = Some(title);
         context.task_id = task_id;
-        spawn_notify_exec(&exec, pane_id, kind, None, context);
+        spawn_notify_exec(
+            &exec,
+            pane_id,
+            crate::config::NotifyOp::Show,
+            kind,
+            None,
+            context,
+        );
     }
 
-    /// Gather the (agent, workspace, message) context passed to the exec-bridge
+    /// Gather the (agent, workspace, pane id, message) context passed to the exec-bridge
     /// command as `SHEP_NOTIFY_*` env vars.
     fn notify_exec_context(&self, pane_id: PaneId) -> NotifyExecContext {
         for ws in &self.app.state.workspaces {
@@ -1523,9 +1658,13 @@ impl HeadlessServer {
                 );
                 let message =
                     terminal.and_then(|terminal| terminal.effective_presentation().custom_status);
+                let public_pane_id = ws.public_pane_number(pane_id).map(|pane_number| {
+                    crate::workspace::public_pane_id_for_number(&ws.id, pane_number)
+                });
                 return NotifyExecContext {
                     agent,
                     workspace,
+                    pane_id: public_pane_id,
                     message,
                     ..NotifyExecContext::default()
                 };
@@ -9091,6 +9230,102 @@ next_tab = ""
         let pane = server.app.state.view.pane_infos[0].rect;
         assert!(pane.right() > MIN_COLS, "{pane:?}");
         assert!(pane.bottom() > MIN_ROWS, "{pane:?}");
+    }
+
+    fn fired_ago(state: crate::detect::AgentState, age: Duration) -> NotifyExecFired {
+        NotifyExecFired {
+            state: Some(state),
+            kind: crate::config::NotifyKind::from_agent_state(state, false),
+            at: Instant::now().checked_sub(age).unwrap_or_else(Instant::now),
+        }
+    }
+
+    fn server_with_one_pane() -> (HeadlessServer, PaneId) {
+        let mut server = test_headless_server();
+        server.app.state.workspaces = vec![crate::workspace::Workspace::test_new("seen")];
+        server.app.state.active = Some(0);
+        server.app.state.selected = 0;
+        let root = server.app.state.workspaces[0].tabs[0].root_pane;
+        (server, root)
+    }
+
+    /// A companion that opened the pane clears its notification at once,
+    /// whatever the desk is showing.
+    #[test]
+    fn notify_exec_clear_fires_for_a_companion_seen_request_at_once() {
+        let (mut server, root) = server_with_one_pane();
+        server.app.state.outer_terminal_focus = None;
+        server.notify_exec_fired.insert(
+            root,
+            fired_ago(crate::detect::AgentState::Blocked, Duration::ZERO),
+        );
+        server.app.state.notify_seen_requests.push(root);
+
+        server.fire_notify_exec_clears();
+
+        assert!(server.notify_exec_fired.is_empty());
+        assert!(server.app.state.notify_seen_requests.is_empty());
+    }
+
+    /// The desk's own sighting counts only after the settle window, and only
+    /// while a focused foreground client has the pane on screen.
+    #[test]
+    fn notify_exec_clear_waits_out_settle_while_on_screen() {
+        let (mut server, root) = server_with_one_pane();
+        server.foreground_client_id = Some(1);
+        server.app.state.outer_terminal_focus = Some(true);
+        server.notify_exec_fired.insert(
+            root,
+            fired_ago(crate::detect::AgentState::Blocked, Duration::ZERO),
+        );
+
+        server.fire_notify_exec_clears();
+        assert!(
+            server.notify_exec_fired.contains_key(&root),
+            "a notification that just fired must stand through the settle window"
+        );
+        let now = Instant::now();
+        let wake = server.next_notify_clear_deadline(now);
+        assert!(wake.is_some_and(|at| at > now && at <= now + NOTIFY_CLEAR_SETTLE));
+
+        server.notify_exec_fired.insert(
+            root,
+            fired_ago(crate::detect::AgentState::Blocked, NOTIFY_CLEAR_SETTLE),
+        );
+        server.fire_notify_exec_clears();
+        assert!(server.notify_exec_fired.is_empty());
+        assert_eq!(server.next_notify_clear_deadline(Instant::now()), None);
+    }
+
+    #[test]
+    fn notify_exec_clear_leaves_an_unseen_notification_standing() {
+        let (mut server, root) = server_with_one_pane();
+        server.foreground_client_id = Some(1);
+        // Terminal reports it is not the focused window: nobody is looking.
+        server.app.state.outer_terminal_focus = Some(false);
+        server.notify_exec_fired.insert(
+            root,
+            fired_ago(crate::detect::AgentState::Blocked, Duration::from_secs(60)),
+        );
+
+        server.fire_notify_exec_clears();
+
+        assert!(server.notify_exec_fired.contains_key(&root));
+    }
+
+    /// A pane that has since been closed has nothing left to answer for.
+    #[test]
+    fn notify_exec_clear_forgets_a_pane_that_is_gone() {
+        let (mut server, _root) = server_with_one_pane();
+        let gone = PaneId::from_raw(u32::MAX);
+        server.notify_exec_fired.insert(
+            gone,
+            fired_ago(crate::detect::AgentState::Idle, Duration::ZERO),
+        );
+
+        server.fire_notify_exec_clears();
+
+        assert!(server.notify_exec_fired.is_empty());
     }
 
     #[test]

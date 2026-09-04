@@ -38,18 +38,9 @@ class ShepMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
         if (data.isEmpty()) return
-        showShepNotification(
-            applicationContext,
-            ShepNotification(
-                kind = data["kind"].orEmpty(),
-                state = data["state"].orEmpty(),
-                agent = data["agent"].orEmpty(),
-                workspace = data["workspace"].orEmpty(),
-                paneId = data["pane_id"].orEmpty(),
-                title = data["title"].orEmpty(),
-                body = data["message"].orEmpty(),
-            ),
-        )
+        // A `clear` arrives here too: the pane was looked at somewhere else,
+        // and the notification comes down without the app ever opening.
+        showShepNotification(applicationContext, ShepNotification.fromFields { data[it] })
     }
 }
 
