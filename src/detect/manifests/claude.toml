@@ -1,7 +1,7 @@
 id = "claude"
-version = "2026.08.14.1"
+version = "2026.09.04.1"
 min_engine_version = 2
-updated_at = "2026-08-14T00:00:00Z"
+updated_at = "2026-09-04T00:00:00Z"
 aliases = ["claude-code"]
 
 [[rules]]

@@ -28,6 +28,37 @@ path = "{path}"
 
 
 class AgentDetectionManifestCheckTests(unittest.TestCase):
+    def test_accepts_extractors_with_a_capture_group(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundled = Path(tmp)
+            (bundled / "codex.toml").write_text(
+                manifest("codex", "2026.06.10.1")
+                + """
+[[extractors]]
+id = "context_remaining"
+region = "whole_recent"
+regex = '(?i)context[^\\n%]*?(\\d{1,3})\\s*%'
+capture = 1
+"""
+            )
+            manifests = check.load_manifest_dir(bundled, engine_version=1)
+            self.assertEqual(len(manifests["codex"][1]["extractors"]), 1)
+
+    def test_rejects_extractor_capture_outside_its_groups(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundled = Path(tmp)
+            (bundled / "codex.toml").write_text(
+                manifest("codex", "2026.06.10.1")
+                + """
+[[extractors]]
+id = "context_remaining"
+regex = '(\\d+)%'
+capture = 2
+"""
+            )
+            with self.assertRaises(check.CheckError):
+                check.load_manifest_dir(bundled, engine_version=1)
+
     def test_validates_bundled_and_matching_website_catalog(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

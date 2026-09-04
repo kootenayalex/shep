@@ -15,7 +15,8 @@ DEFAULT_BUNDLED_DIR = PROJECT_ROOT / "src" / "detect" / "manifests"
 DEFAULT_WEBSITE_DIR = PROJECT_ROOT / "website" / "agent-detection"
 ENGINE_SOURCE = PROJECT_ROOT / "src" / "detect" / "manifest_update.rs"
 
-MANIFEST_KEYS = {"id", "version", "min_engine_version", "updated_at", "aliases", "rules"}
+MANIFEST_KEYS = {"id", "version", "min_engine_version", "updated_at", "aliases", "rules", "extractors"}
+EXTRACTOR_KEYS = {"id", "region", "regex", "capture"}
 RULE_KEYS = {
     "id",
     "state",
@@ -137,7 +138,50 @@ def validate_manifest(path: Path, engine_version: int) -> dict:
     for index, rule in enumerate(rules):
         validate_rule(path, index, rule, complexity)
 
+    validate_extractors(path, manifest.get("extractors", []))
+
     return manifest
+
+
+def validate_extractors(path: Path, extractors: object) -> None:
+    """`[[extractors]]` pull a number (context-remaining %) out of a region.
+
+    Mirrors `ManifestExtractor` in src/detect/manifest.rs: an id, an optional
+    region (default whole_recent), a regex with at least one capture group,
+    and a 1-based `capture` index that names one of those groups (default 1).
+    """
+    if not isinstance(extractors, list):
+        raise CheckError(f"{path}: extractors must be an array of tables")
+    seen: set[str] = set()
+    for index, extractor in enumerate(extractors):
+        if not isinstance(extractor, dict):
+            raise CheckError(f"{path}: extractor {index} must be a table")
+        unknown = sorted(set(extractor) - EXTRACTOR_KEYS)
+        if unknown:
+            raise CheckError(f"{path}: extractor {index} has unknown field(s): {', '.join(unknown)}")
+        extractor_id = extractor.get("id")
+        if not isinstance(extractor_id, str) or not extractor_id:
+            raise CheckError(f"{path}: extractor {index} needs a non-empty id")
+        if extractor_id in seen:
+            raise CheckError(f"{path}: duplicate extractor id {extractor_id!r}")
+        seen.add(extractor_id)
+        region = extractor.get("region", "whole_recent")
+        if not isinstance(region, str) or not REGION_RE.fullmatch(region):
+            raise CheckError(f"{path}: extractor {extractor_id} has invalid region {region!r}")
+        regex = extractor.get("regex")
+        if not isinstance(regex, str) or not regex:
+            raise CheckError(f"{path}: extractor {extractor_id} needs a regex")
+        try:
+            groups = re.compile(regex).groups
+        except re.error as exc:
+            raise CheckError(f"{path}: extractor {extractor_id} regex does not compile: {exc}") from exc
+        if groups < 1:
+            raise CheckError(f"{path}: extractor {extractor_id} regex needs a capture group")
+        capture = extractor.get("capture", 1)
+        if isinstance(capture, bool) or not isinstance(capture, int) or not 1 <= capture <= groups:
+            raise CheckError(
+                f"{path}: extractor {extractor_id} capture must be between 1 and {groups}"
+            )
 
 
 def validate_rule(path: Path, index: int, rule: object, complexity: dict[str, int]) -> None:

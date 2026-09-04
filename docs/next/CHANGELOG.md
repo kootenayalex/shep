@@ -15,6 +15,7 @@
   tier = "review"        # stop|working|done|settled|waiting|absent|review, for the ink
   ```
   `pane.get`, `agent.get` and `session.overview` carry `manual_state {name, label, tier}`, the overview lists `custom_states`, and the new `pane.mark_seen {pane_id}` lets a companion mark an agent seen. Wire protocol is now 17.
+- The agent-detection release checker (`scripts/agent_detection_manifest_check.py`) now knows the `[[extractors]]` manifest field and validates each extractor (id, region, a regex with a capture group, and a `capture` index inside it); the bundled `claude`, `kilo`, `opencode` and `pi` manifests are versioned `2026.09.04.1` and the website catalog matches them again.
 - Companion end-to-end coverage for the input path: Maestro flows `08`–`13` under `android/maestro/` (live typing, queued prompts, the key bar's modifiers and `^C`, notification clear-on-view, move to group, manual state) plus `android/maestro/input-checks.py`, which runs them against a throwaway server and verifies each by artifact — the pty read back over the socket, the agent's state and group, and the notification shade.
 - The Android companion now lives in this repo under `android/` (its history imported from the former `shep-android` repo, which is archived). `just check` runs the companion's unit tests and debug build, and `just android-install` / `just android-maestro` cover the device loop.
 - Added a new `shep` built-in theme (warm graphite + copper) and made it the default when `[theme] name` is unset.
