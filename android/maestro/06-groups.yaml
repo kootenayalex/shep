@@ -1,8 +1,8 @@
-# Spaces tree: the session's shape, and the controls that change it.
-# Needs a paired app (run 01 first) against a bridge with at least one space.
+# Groups tree: the session's shape, and the controls that change it.
+# Needs a paired app (run 01 first) against a bridge with at least one group.
 # Text anchors only (no ids) per device-testing conventions.
 #
-# Deliberately does NOT close anything: a flow that destroys spaces cannot be
+# Deliberately does NOT close anything: a flow that destroys groups cannot be
 # run against a real session, and this one is meant to be.
 appId: dev.shep.companion
 ---
@@ -12,12 +12,12 @@ appId: dev.shep.companion
 - assertVisible: "agents"
 - tapOn: "all.*"
 - assertVisible: "\\+ new"
-# Space actions live behind the workspace overflow menu so the list stays
+# Group actions live behind the group overflow menu so the list stays
 # readable on a phone.
-- tapOn: "space actions"
+- tapOn: "group actions"
 - assertVisible: "go to"
 - assertVisible: "new tab"
-- assertVisible: "rename space"
+- assertVisible: "rename group"
 # Pane-level actions remain available through the row's long-press menu; this
 # flow avoids destructive or timing-sensitive gestures on the live session.
 - pressKey: back

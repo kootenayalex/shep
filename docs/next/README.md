@@ -63,7 +63,7 @@ Press `ctrl+b q` to detach the client. The server and pane processes keep runnin
 
 **Server and client.** By default, `herdr` attaches to a background server. Detaching closes only the client. `herdr server stop` stops the default server and kills its panes. Named sessions are separate server namespaces: use `herdr session attach work`, `herdr session stop work`, and `herdr session list` when you want fully separate runtime state.
 
-**Workspaces, tabs, panes.** A workspace is the project-level container. Tabs group panes inside a workspace. Panes are real terminal processes, not rewritten agent views.
+**Groups and agents.** A group (the API says `workspace`) is the project-level container. An agent is a tab inside a group, normally holding one pane; agents move between groups with `prefix+shift+m`, `shep agent move`, or the companion. Panes are real terminal processes, not rewritten agent views; a tab can still be split when two processes belong side by side.
 
 **Copy.** Herdr copies pane text, not the sidebar. Drag-select inside a pane, double-click a word or token, or press `prefix+[` for keyboard copy mode. In copy mode, move with `h/j/k/l`, `w/b/e`, and `{`/`}`, start selection with `v` or Space, copy with `y` or Enter, and leave with `q` or Esc. In PuTTY and some SSH terminals, hold `Shift` while dragging to use the terminal's own selection, and `Shift` + right click to paste.
 
@@ -161,7 +161,7 @@ not a gui window, not a web dashboard, not electron. herdr runs inside whatever 
 
 ## what you get
 
-- **workspaces** — organized around git repos or folder names, each with its own tabs and panes
+- **groups** — organized around git repos or folder names, each holding the agents (tabs) that work there; agents move between groups
 - **tabs** — first-class in the socket api and cli
 - **copy-friendly** — drag-select pane text, double-click tokens, or use keyboard copy mode with `prefix+[`, `h/j/k/l`, `{`/`}`, `v`, and `y`
 - **notifications** — sounds and toasts for background events; tab-aware suppression
@@ -237,12 +237,14 @@ Press `ctrl+b` to enter prefix mode. Default actions are prefix-first and tmux-l
 | `prefix+c` | new tab |
 | `prefix+n` / `prefix+p` | next / previous tab |
 | `prefix+1..9` | switch tab |
-| `prefix+w` | workspace navigation |
+| `prefix+w` | group navigation |
 | `prefix+g` | session navigator |
-| `prefix+shift+n` | new workspace |
+| `prefix+shift+n` | new group |
 | `prefix+shift+g` | new worktree |
-| `prefix+shift+w` | rename workspace |
-| `prefix+shift+d` | close workspace |
+| `prefix+shift+w` | rename group |
+| `prefix+shift+d` | close group |
+| `prefix+shift+m` | move agent to another group |
+| `prefix+shift+s` | set or clear a manual agent state |
 | `prefix+h/j/k/l` | focus pane |
 | `prefix+shift+h/j/k/l` | swap pane |
 | `prefix+v` / `prefix+minus` | split pane |

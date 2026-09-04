@@ -792,6 +792,7 @@ pub enum Mode {
     ConfirmClose,
     ContextMenu,
     SetAgentState,
+    MoveAgentToGroup,
     Settings,
     GlobalMenu,
     KeybindHelp,
@@ -821,6 +822,7 @@ impl Mode {
                 | Mode::ConfirmRemoveWorktree
                 | Mode::ContextMenu
                 | Mode::SetAgentState
+                | Mode::MoveAgentToGroup
                 | Mode::GlobalMenu
                 | Mode::KeybindHelp
                 | Mode::Board
@@ -1356,7 +1358,7 @@ impl ContextMenuState {
                 ..
             } => &[
                 "Rename",
-                "Close group",
+                "Close with worktrees",
                 "New worktree",
                 "Open worktree...",
                 "Expand",
@@ -1368,12 +1370,12 @@ impl ContextMenuState {
                 ..
             } => &[
                 "Rename",
-                "Close group",
+                "Close with worktrees",
                 "New worktree",
                 "Open worktree...",
                 "Collapse",
             ],
-            ContextMenuKind::Tab { .. } => &["New tab", "Rename", "Close"],
+            ContextMenuKind::Tab { .. } => &["New tab", "Rename", "Move to group...", "Close"],
             ContextMenuKind::Pane {
                 has_manual_label: true,
                 source_pane_id: Some(_),
@@ -1387,6 +1389,7 @@ impl ContextMenuState {
                 "Split down",
                 "Zoom",
                 "Queue prompt...",
+                "Move to group...",
                 "Close pane",
             ],
             ContextMenuKind::Pane {
@@ -1401,6 +1404,7 @@ impl ContextMenuState {
                 "Split down",
                 "Zoom",
                 "Queue prompt...",
+                "Move to group...",
                 "Close pane",
             ],
             ContextMenuKind::Pane {
@@ -1415,6 +1419,7 @@ impl ContextMenuState {
                 "Split down",
                 "Zoom",
                 "Queue prompt...",
+                "Move to group...",
                 "Close pane",
             ],
             ContextMenuKind::Pane {
@@ -1428,10 +1433,36 @@ impl ContextMenuState {
                 "Split down",
                 "Zoom",
                 "Queue prompt...",
+                "Move to group...",
                 "Close pane",
             ],
         }
     }
+}
+
+/// One choice in the move-to-group picker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroupPickerAction {
+    /// An existing group, by public workspace id.
+    Existing(String),
+    /// A fresh group of the agent's own.
+    NewGroup,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupPickerItem {
+    pub label: String,
+    pub action: GroupPickerAction,
+}
+
+/// The "move to group" modal: every other group, then "new group". Pure TUI
+/// state; the pick is applied through `tab.move`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupPickerState {
+    pub ws_idx: usize,
+    pub tab_idx: usize,
+    pub items: Vec<GroupPickerItem>,
+    pub list: MenuListState,
 }
 
 /// One choice in the manual-state picker.
@@ -1615,6 +1646,7 @@ pub struct AppState {
     pub selection_autoscroll: Option<SelectionAutoscroll>,
     pub context_menu: Option<ContextMenuState>,
     pub state_picker: Option<StatePickerState>,
+    pub group_picker: Option<GroupPickerState>,
     // Notifications
     pub update_available: Option<String>,
     pub update_install_command: String,
@@ -2066,6 +2098,7 @@ impl AppState {
             selection_autoscroll: None,
             context_menu: None,
             state_picker: None,
+            group_picker: None,
             update_available: None,
             update_install_command: "shep update".into(),
             latest_release_notes_available: false,
@@ -2684,7 +2717,7 @@ mod tests {
             menu.items(),
             &[
                 "Rename",
-                "Close group",
+                "Close with worktrees",
                 "New worktree",
                 "Open worktree...",
                 "Collapse"

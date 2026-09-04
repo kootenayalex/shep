@@ -117,7 +117,7 @@ pub(crate) fn mobile_switcher_workspace_doc_range(
         .iter()
         .position(|WorkspaceListEntry::Workspace { ws_idx, .. }| *ws_idx == idx)
         .unwrap_or(idx);
-    // spaces sit after the agents block, then a title + "new workspace" row.
+    // groups sit after the agents block, then a title + "new group" row.
     let start = mobile_agents_block_height(app) + 2 + pos * 2;
     start..start + 2
 }
@@ -316,7 +316,7 @@ fn render_header_status(
     }
     let p = &app.palette;
     let Some(ws) = app.active.and_then(|idx| app.workspaces.get(idx)) else {
-        frame.render_widget(Paragraph::new(" no workspace"), area);
+        frame.render_widget(Paragraph::new(" no group"), area);
         return;
     };
 
@@ -558,7 +558,7 @@ fn render_mobile_switcher_content(
         content,
         doc_y,
         app.mobile_switcher_scroll,
-        "spaces",
+        "groups",
         p,
     );
     doc_y += 1;
@@ -568,7 +568,7 @@ fn render_mobile_switcher_content(
         content,
         doc_y,
         app.mobile_switcher_scroll,
-        "+ new workspace",
+        "+ new group",
         p,
     );
     doc_y += 1;

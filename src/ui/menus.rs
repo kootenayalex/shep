@@ -53,7 +53,7 @@ pub(super) fn render_prefix_overlay(app: &AppState, frame: &mut Frame, area: Rec
         Span::styled(prefix, key),
         Span::styled(" send prefix  ", dim),
         Span::styled(workspace_picker, key),
-        Span::styled(" workspace nav  ", dim),
+        Span::styled(" group nav  ", dim),
         Span::styled(help, key),
         Span::styled(" keybinds", dim),
     ]);
@@ -304,6 +304,47 @@ pub(super) fn render_state_picker(app: &AppState, frame: &mut Frame, area: Rect)
     };
     let header = Rect::new(inner.x, inner.y, inner.width, 1);
     render_modal_header(frame, header, "set agent state", p);
+    let list_area = Rect::new(
+        inner.x,
+        inner.y.saturating_add(2),
+        inner.width,
+        inner.height.saturating_sub(2),
+    );
+    let items: Vec<ListItem> = picker
+        .items
+        .iter()
+        .map(|item| ListItem::new(Line::from(item.label.clone())))
+        .collect();
+    let list = List::new(items)
+        .style(Style::default().fg(p.text))
+        .highlight_style(
+            Style::default()
+                .bg(p.accent)
+                .fg(panel_contrast_fg(p))
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(" ");
+    let mut state = ListState::default().with_selected(Some(picker.list.highlighted));
+    frame.render_stateful_widget(list, list_area, &mut state);
+}
+
+/// The move-to-group picker: every other group, then "New group".
+pub(super) fn render_group_picker(app: &AppState, frame: &mut Frame, area: Rect) {
+    let Some(picker) = &app.group_picker else {
+        return;
+    };
+    super::dim_background(frame, area);
+    let p = &app.palette;
+    let want_h = u16::try_from(picker.items.len())
+        .unwrap_or(u16::MAX)
+        .saturating_add(4);
+    let Some(inner) =
+        render_modal_or_notice(frame, area, (44, want_h), (20, 3), "the group picker", p)
+    else {
+        return;
+    };
+    let header = Rect::new(inner.x, inner.y, inner.width, 1);
+    render_modal_header(frame, header, "move agent to group", p);
     let list_area = Rect::new(
         inner.x,
         inner.y.saturating_add(2),

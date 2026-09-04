@@ -17,7 +17,7 @@ import org.junit.Test
  */
 class ChannelsTest {
 
-    /** Trimmed from a live `session.snapshot`: two spaces, three panes, one a shell. */
+    /** Trimmed from a live `session.snapshot`: two groups, three panes, one a shell. */
     private val snapshot = """
     {"snapshot":{
       "focused_workspace_id":"w3","focused_tab_id":"w3:t1","focused_pane_id":"w3:p1",
@@ -154,7 +154,7 @@ class ChannelsTest {
         assertFalse(looksUnsupported(null))
     }
 
-    /** What the space heading counts, now that nothing is filtered out of view. */
+    /** What the group heading counts, now that nothing is filtered out of view. */
     @Test
     fun `attention is blocked plus finished-and-unseen`() {
         assertTrue(needsAttention("blocked"))
@@ -196,5 +196,22 @@ class ChannelsTest {
         assertEquals(1, channels.count { matchesAgentFilter(it, AgentFilter.Review) })
         assertEquals(1, channels.count { matchesAgentFilter(it, AgentFilter.Queued) })
         assertEquals(5, channels.count { matchesAgentFilter(it, AgentFilter.All) })
+    }
+
+    /**
+     * An agent can go to any group but its own. The overview row names the
+     * group when there is one; the tree's tab id names it otherwise.
+     */
+    @Test
+    fun moveTargetsLeaveOutTheAgentsOwnGroup() {
+        val sections = buildChannels(tree(), emptyList())
+        assertEquals(listOf("w1", "w3"), sections.map { it.workspaceId })
+        val inW1 = sections[0].channels[0]
+        assertEquals(listOf("w3"), moveTargets(sections, inW1).map { it.workspaceId })
+        val inW3 = sections[1].channels[0]
+        assertEquals(listOf("w1"), moveTargets(sections, inW3).map { it.workspaceId })
+        // Without a row or a tab id nothing is known, so every group is offered.
+        val orphan = inW1.copy(row = null, tabId = null)
+        assertEquals(2, moveTargets(sections, orphan).size)
     }
 }

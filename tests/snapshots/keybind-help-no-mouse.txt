@@ -3,7 +3,7 @@
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- s╭──────────────────────────────────────────────────────────────────────────╮
+ g╭──────────────────────────────────────────────────────────────────────────╮
   │keybinds                                                        esc close │─╮
  ◉│ available commands and configured shortcuts                              │ │
   │                                                                          │ │
@@ -17,15 +17,15 @@
 ──│                                                                         ▕│ │
  a│ navigation                                                              ▕│ │
   │ esc                          back                                       ▕│ │
- ◉│ up / down                    workspace list                             ▕│ │
+ ◉│ up / down                    group list                                 ▕│ │
   │ h / j / k / l / left / right move focus                                 ▕│ │
   │ tab / shift+tab              cycle pane                                 ▕│ │
- ⠹│ enter                        open workspace                             ▕│ │
-  │ 1..9                         switch workspace                           ▕│ │
+ ⠹│ enter                        open group                                 ▕│ │
+  │ 1..9                         switch group                               ▕│ │
   │                                                                          │ │
  ●│ scroll jk/↑↓  ·  jump pgup / pgdn  ·  close esc / enter                  │ │
   ╰──────────────────────────────────────────────────────────────────────────╯─╯
- ctrl+b prefix  w spaces  c tab  ? keys  q detach
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
 nccccnnnnnnnnnnnnnnnnnnnnnnnnnnnnnuuuuuuuugggqnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkn
@@ -43,11 +43,11 @@ ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssssssssssssssmmmmmmmmmmmmmmmmmmmfaov
 rrammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
 hhabbbbbbbbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
 ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-plaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
+plaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
 ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
 ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ovaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
+ovaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
 ooammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaov
 odaffffffffsssssfffffffffssssssssssssffffffffffsssssssssssssmmmmmmmmmmmmmmmmmaov
 ooaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavv

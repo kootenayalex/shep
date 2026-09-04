@@ -322,6 +322,16 @@ impl App {
                     super::modal::open_state_picker(&mut self.state, pane_id);
                 }
             }
+            NavigateAction::MoveAgentToGroup => {
+                if let Some((ws_idx, tab_idx)) = self
+                    .state
+                    .active
+                    .and_then(|ws_idx| self.state.workspaces.get(ws_idx).map(|ws| (ws_idx, ws)))
+                    .map(|(ws_idx, ws)| (ws_idx, ws.active_tab))
+                {
+                    super::modal::open_group_picker(&mut self.state, ws_idx, tab_idx);
+                }
+            }
             NavigateAction::FocusPaneLeft => self.focus_pane_direction_via_api(NavDirection::Left),
             NavigateAction::FocusPaneDown => self.focus_pane_direction_via_api(NavDirection::Down),
             NavigateAction::FocusPaneUp => self.focus_pane_direction_via_api(NavDirection::Up),
@@ -473,7 +483,9 @@ impl App {
             "tui.tab.move",
             crate::api::schema::TabMoveParams {
                 tab_id,
-                insert_index: insert_idx,
+                workspace_id: None,
+                new_workspace: false,
+                insert_index: Some(insert_idx),
             },
         );
     }
@@ -1282,6 +1294,7 @@ pub(crate) enum NavigateAction {
     CloseTab,
     RenamePane,
     SetAgentState,
+    MoveAgentToGroup,
     FocusPaneLeft,
     FocusPaneDown,
     FocusPaneUp,
@@ -1413,6 +1426,7 @@ fn action_for_key(
         (&kb.close_tab, NavigateAction::CloseTab),
         (&kb.rename_pane, NavigateAction::RenamePane),
         (&kb.set_agent_state, NavigateAction::SetAgentState),
+        (&kb.move_agent, NavigateAction::MoveAgentToGroup),
         (&kb.edit_scrollback, NavigateAction::EditScrollback),
         (&kb.copy_mode, NavigateAction::CopyMode),
         (&kb.focus_pane_left, NavigateAction::FocusPaneLeft),
@@ -1610,6 +1624,16 @@ pub(super) fn execute_navigate_action_in_context(
                 .and_then(|ws| ws.focused_pane_id())
             {
                 super::modal::open_state_picker(state, pane_id);
+            }
+        }
+        NavigateAction::MoveAgentToGroup => {
+            if let Some((ws_idx, tab_idx)) = state.active.and_then(|ws_idx| {
+                state
+                    .workspaces
+                    .get(ws_idx)
+                    .map(|ws| (ws_idx, ws.active_tab))
+            }) {
+                super::modal::open_group_picker(state, ws_idx, tab_idx);
             }
         }
         NavigateAction::FocusPaneLeft => state.navigate_pane(NavDirection::Left),

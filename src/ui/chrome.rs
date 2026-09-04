@@ -138,7 +138,7 @@ pub(super) fn render_hint_bar(app: &AppState, frame: &mut Frame, area: Rect) {
         hints.push(("shift+esc".to_string(), "interrupt"));
     }
     for (bindings, label) in [
-        (&app.keybinds.workspace_picker, "spaces"),
+        (&app.keybinds.workspace_picker, "groups"),
         (&app.keybinds.new_tab, "tab"),
         (&app.keybinds.help, "keys"),
         (&app.keybinds.detach, "detach"),

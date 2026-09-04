@@ -64,14 +64,14 @@ fn render_onboarding_welcome(app: &AppState, frame: &mut Frame, area: Rect) {
         header_rows[0],
     );
     frame.render_widget(
-        Paragraph::new("  terminal workspace manager for coding agents")
+        Paragraph::new("  terminal group manager for coding agents")
             .style(Style::default().fg(app.palette.overlay0)),
         header_rows[1],
     );
 
     frame.render_widget(
         Paragraph::new(
-            "  this is a mouse-first terminal.\n  click the sidebar to switch workspaces, drag pane\n  borders to resize, right-click for context menus.",
+            "  this is a mouse-first terminal.\n  click the sidebar to switch groups, drag pane\n  borders to resize, right-click for context menus.",
         )
         .style(Style::default().fg(app.palette.overlay1)),
         content_rows[0],

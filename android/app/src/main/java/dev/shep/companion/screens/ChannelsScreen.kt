@@ -44,7 +44,7 @@ import dev.shep.companion.EXPECTED_PROTOCOL
 import dev.shep.companion.PaneNode
 import dev.shep.companion.SessionHost
 import dev.shep.companion.SessionTotals
-import dev.shep.companion.SpaceNode
+import dev.shep.companion.GroupNode
 import dev.shep.companion.asAgentRow
 import dev.shep.companion.formatAge
 import dev.shep.companion.parseOverview
@@ -81,7 +81,7 @@ import org.json.JSONObject
 /**
  * Everything that changes what this list says.
  *
- * The board watched agent state and the spaces tree watched structure, and each
+ * The board watched agent state and the groups tree watched structure, and each
  * re-read on its own half. One list needs both sets, plus a per-pane status
  * subscription for the agents currently in it.
  */
@@ -135,11 +135,11 @@ data class Channel(
     val tabId: String?,
 )
 
-/** One space, and the panes inside it. */
+/** One group (a workspace on the wire), and the panes inside it. */
 data class ChannelSection(
     val workspaceId: String,
     val label: String,
-    val space: SpaceNode?,
+    val group: GroupNode?,
     val channels: List<Channel>,
 )
 
@@ -149,18 +149,18 @@ data class ChannelSection(
  * The tree decides what exists and in what order — including shells, which the
  * overview does not carry — and the overview decides what each agent *is*. A
  * server (or a moment) that answers only one of the two still produces a list:
- * without the tree this degrades to the old board grouped by space, and without
+ * without the tree this degrades to the old board grouped by workspace id, and without
  * the overview to bare names and states.
  */
-fun buildChannels(spaces: List<SpaceNode>, rows: List<AgentRow>): List<ChannelSection> {
+fun buildChannels(groups: List<GroupNode>, rows: List<AgentRow>): List<ChannelSection> {
     val byPane = rows.associateBy { it.paneId }
-    if (spaces.isNotEmpty()) {
-        return spaces.map { space ->
+    if (groups.isNotEmpty()) {
+        return groups.map { group ->
             ChannelSection(
-                workspaceId = space.workspaceId,
-                label = space.label.ifBlank { space.workspaceId },
-                space = space,
-                channels = space.tabs.flatMap { tab ->
+                workspaceId = group.workspaceId,
+                label = group.label.ifBlank { group.workspaceId },
+                group = group,
+                channels = group.tabs.flatMap { tab ->
                     tab.panes.map { pane ->
                         val row = byPane[pane.paneId]
                         Channel(
@@ -182,7 +182,7 @@ fun buildChannels(spaces: List<SpaceNode>, rows: List<AgentRow>): List<ChannelSe
             ChannelSection(
                 workspaceId = id,
                 label = group.first().workspaceLabel.ifBlank { id },
-                space = null,
+                group = null,
                 channels = group.map { row ->
                     Channel(
                         paneId = row.paneId,
@@ -218,7 +218,7 @@ private data class Confirm(
     val run: () -> Unit,
 )
 
-/** Which thing is being renamed. Spaces, tabs and panes each have their own method. */
+/** Which thing is being renamed. Groups, tabs and panes each have their own method. */
 private data class Renaming(
     val title: String,
     val current: String,
@@ -226,7 +226,7 @@ private data class Renaming(
 )
 
 /**
- * The session as one list: spaces as headings, the panes inside them as rows.
+ * The session as one list: groups as headings, the panes inside them as rows.
  *
  * This replaced two screens — a board that answered "who needs me" and a tree
  * that answered "what is open" — which between them listed every agent twice
@@ -249,7 +249,7 @@ fun ChannelsScreen(
     collapsed: Set<String> = emptySet(),
     onCollapsedChange: (Set<String>) -> Unit = {},
 ) {
-    var spaces by remember { mutableStateOf<List<SpaceNode>>(emptyList()) }
+    var groups by remember { mutableStateOf<List<GroupNode>>(emptyList()) }
     var rows by remember { mutableStateOf<List<AgentRow>>(emptyList()) }
     var totals by remember { mutableStateOf(SessionTotals()) }
     var host by remember { mutableStateOf(SessionHost()) }
@@ -257,7 +257,8 @@ fun ChannelsScreen(
     var showNew by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var channelActions by remember { mutableStateOf<Channel?>(null) }
-    var spaceActions by remember { mutableStateOf<ChannelSection?>(null) }
+    var groupActions by remember { mutableStateOf<ChannelSection?>(null) }
+    var movingChannel by remember { mutableStateOf<Channel?>(null) }
     var renaming by remember { mutableStateOf<Renaming?>(null) }
     var confirming by remember { mutableStateOf<Confirm?>(null) }
     var settingState by remember { mutableStateOf<Channel?>(null) }
@@ -282,7 +283,7 @@ fun ChannelsScreen(
                 runCatching { client.call("session.snapshot") }
             }
             snapshot
-                .onSuccess { spaces = parseTree(it) }
+                .onSuccess { groups = parseTree(it) }
                 .onFailure { status = "reconnect: ${it.message}" }
 
             if (overviewSupported) {
@@ -412,14 +413,14 @@ fun ChannelsScreen(
     }
 
     var filter by remember { mutableStateOf(AgentFilter.Attention) }
-    val sections = buildChannels(spaces, rows)
+    val sections = buildChannels(groups, rows)
     val filteredSections = sections.mapNotNull { section ->
         val channels = section.channels.filter { matchesAgentFilter(it, filter) }
         section.takeIf { channels.isNotEmpty() }?.copy(channels = channels)
     }
     // Directories already in play seed the new-session picker, so starting a
     // second session where you are working is two taps and no typing.
-    val recentRepos = (rows.mapNotNull { it.cwd } + spaces.flatMap { it.tabs }
+    val recentRepos = (rows.mapNotNull { it.cwd } + groups.flatMap { it.tabs }
         .flatMap { it.panes }.mapNotNull { it.cwd }).distinct()
 
     Column(Modifier.fillMaxSize()) {
@@ -469,7 +470,7 @@ fun ChannelsScreen(
             ) {
                 filteredSections.forEach { section ->
                     val channels = section.channels
-                    item(key = "space:${section.workspaceId}") {
+                    item(key = "group:${section.workspaceId}") {
                         SectionHeader(
                             section = section,
                             shown = channels.size,
@@ -484,7 +485,7 @@ fun ChannelsScreen(
                                     }
                                 )
                             },
-                            onActions = { spaceActions = section },
+                            onActions = { groupActions = section },
                         )
                     }
                     if (section.workspaceId !in collapsed) {
@@ -551,6 +552,10 @@ fun ChannelsScreen(
                 channelActions = null
                 settingState = channel
             },
+            onMove = {
+                channelActions = null
+                movingChannel = channel
+            },
             onSplit = {
                 channelActions = null
                 act(
@@ -579,12 +584,27 @@ fun ChannelsScreen(
         )
     }
 
-    spaceActions?.let { section ->
-        SpaceActionsSheet(
+    movingChannel?.let { channel ->
+        GroupPickerSheet(
+            channel = channel,
+            targets = moveTargets(sections, channel),
+            onDismiss = { movingChannel = null },
+            onPick = { workspaceId, label ->
+                movingChannel = null
+                val tabId = channel.tabId ?: return@GroupPickerSheet
+                val params = JSONObject().put("tab_id", tabId)
+                if (workspaceId == null) params.put("new_workspace", true) else params.put("workspace_id", workspaceId)
+                act("${channel.name} moved to $label", "tab.move", params)
+            },
+        )
+    }
+
+    groupActions?.let { section ->
+        GroupActionsSheet(
             section = section,
-            onDismiss = { spaceActions = null },
+            onDismiss = { groupActions = null },
             onFocus = {
-                spaceActions = null
+                groupActions = null
                 act(
                     "desktop is on ${section.label}",
                     "workspace.focus",
@@ -592,7 +612,7 @@ fun ChannelsScreen(
                 )
             },
             onNewTab = {
-                spaceActions = null
+                groupActions = null
                 act(
                     "new tab in ${section.label}",
                     "tab.create",
@@ -600,8 +620,8 @@ fun ChannelsScreen(
                 )
             },
             onRename = {
-                spaceActions = null
-                renaming = Renaming("rename space", section.label) { name ->
+                groupActions = null
+                renaming = Renaming("rename group", section.label) { name ->
                     act(
                         "renamed to $name",
                         "workspace.rename",
@@ -610,7 +630,7 @@ fun ChannelsScreen(
                 }
             },
             onRenameTab = { tabId, label ->
-                spaceActions = null
+                groupActions = null
                 renaming = Renaming("rename tab", label) { name ->
                     act(
                         "renamed to $name",
@@ -620,7 +640,7 @@ fun ChannelsScreen(
                 }
             },
             onCloseTab = { tabId, label, panes ->
-                spaceActions = null
+                groupActions = null
                 confirming = Confirm(
                     title = "Close tab?",
                     body = "$label — $panes pane(s). Anything running in them stops.",
@@ -630,12 +650,12 @@ fun ChannelsScreen(
                 }
             },
             onClose = {
-                spaceActions = null
+                groupActions = null
                 confirming = Confirm(
-                    title = "Close space?",
+                    title = "Close group?",
                     body = "${section.label} — ${section.channels.size} pane(s). " +
                         "Anything running in them stops.",
-                    action = "close space",
+                    action = "close group",
                 ) {
                     act(
                         "closed ${section.label}",
@@ -687,7 +707,7 @@ fun ChannelsScreen(
                     target.action,
                     style = ShepType.action.copy(color = ShepPalette.red),
                 ) {
-                    // Closing a space stops everything running in it. A tick
+                    // Closing a group stops everything running in it. A tick
                     // is the difference between "I pressed it" and "it went".
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     confirming = null
@@ -700,11 +720,11 @@ fun ChannelsScreen(
 }
 
 /**
- * A space, as a heading over its panes.
+ * A group, as a heading over its panes.
  *
  * Sticky-feeling rather than a card: the sections are one list, not a stack of
  * boxes, which is the whole difference between reading this and reading the
- * tree it replaced. The attention count is on the heading so a collapsed space
+ * tree it replaced. The attention count is on the heading so a collapsed group
  * can still tell you something is waiting inside it.
  */
 @Composable
@@ -737,16 +757,16 @@ private fun SectionHeader(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        section.space?.let { space ->
-            ShepSemantic.reviewBadge(space.reviewState)?.let { (glyph, ink) ->
+        section.group?.let { group ->
+            ShepSemantic.reviewBadge(group.reviewState)?.let { (glyph, ink) ->
                 Spacer(Modifier.width(ShepSpace.snug))
                 Text(glyph, style = ShepType.badge.copy(color = ink))
             }
-            if (space.isWorktree) {
+            if (group.isWorktree) {
                 Spacer(Modifier.width(ShepSpace.snug))
                 Text("worktree", style = ShepType.badge.copy(color = ShepPalette.overlay0))
             }
-            if (space.focused) {
+            if (group.focused) {
                 Spacer(Modifier.width(ShepSpace.snug))
                 Text("here", style = ShepType.badge.copy(color = ShepPalette.teal))
             }
@@ -762,7 +782,7 @@ private fun SectionHeader(
         ActionText(
             "⋯",
             style = ShepType.state.copy(color = ShepPalette.overlay1),
-            description = "space actions",
+            description = "group actions",
             onClick = onActions,
         )
     }
@@ -914,6 +934,7 @@ private fun ChannelActionsSheet(
     onRename: () -> Unit,
     onFocus: () -> Unit,
     onSetState: () -> Unit,
+    onMove: () -> Unit,
     onSplit: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -927,6 +948,9 @@ private fun ChannelActionsSheet(
             hint = channel.row?.manualState?.let { "now: ${it.label}" } ?: "mark it by hand",
             onClick = onSetState,
         )
+        if (channel.tabId != null) {
+            SheetRow("move to group", hint = "another group, or a new one", onClick = onMove)
+        }
         SheetRow("split", hint = "a second pane beside it", onClick = onSplit)
         SheetRow("close pane", tone = ShepPalette.red, onClick = onClose)
     }
@@ -969,9 +993,43 @@ private fun StatePickerSheet(
     }
 }
 
-/** The actions a space has, plus its tabs' — the only place tabs still appear. */
+/**
+ * Where an agent can move: every group but its own. A channel's group is the
+ * overview row's workspace when there is one, else the prefix of its tab id
+ * (`w3:t1` lives in `w3`), which is how the tree names it.
+ */
+fun moveTargets(sections: List<ChannelSection>, channel: Channel): List<ChannelSection> {
+    val current = channel.row?.workspaceId ?: channel.tabId?.substringBefore(':')
+    return sections.filter { it.workspaceId != current }
+}
+
+/**
+ * The same picker the desktop opens on `prefix+shift+m`: every other group,
+ * then a fresh one. [onPick] gets the target workspace id, or null for a new
+ * group, and the label the toast should use.
+ */
 @Composable
-private fun SpaceActionsSheet(
+private fun GroupPickerSheet(
+    channel: Channel,
+    targets: List<ChannelSection>,
+    onDismiss: () -> Unit,
+    onPick: (workspaceId: String?, label: String) -> Unit,
+) {
+    ShepSheet(title = "move ${channel.name} to", onDismiss = onDismiss) {
+        targets.forEach { section ->
+            SheetRow(
+                section.label,
+                hint = "${section.channels.size} there now",
+                onClick = { onPick(section.workspaceId, section.label) },
+            )
+        }
+        SheetRow("new group", hint = "a group of its own", onClick = { onPick(null, "a new group") })
+    }
+}
+
+/** The actions a group has, plus its tabs' — the only place tabs still appear. */
+@Composable
+private fun GroupActionsSheet(
     section: ChannelSection,
     onDismiss: () -> Unit,
     onFocus: () -> Unit,
@@ -984,8 +1042,8 @@ private fun SpaceActionsSheet(
     ShepSheet(title = section.label, onDismiss = onDismiss) {
         SheetRow("go to", hint = "put the desktop on it", onClick = onFocus)
         SheetRow("new tab", onClick = onNewTab)
-        SheetRow("rename space", onClick = onRename)
-        val tabs = section.space?.tabs.orEmpty()
+        SheetRow("rename group", onClick = onRename)
+        val tabs = section.group?.tabs.orEmpty()
         // Tabs stopped being a level of the list — they are placement, not
         // identity, and nesting three deep is what made the tree hard to read.
         // They keep their actions here so nothing became unreachable.
@@ -1012,7 +1070,7 @@ private fun SpaceActionsSheet(
             }
         }
         Spacer(Modifier.height(ShepSpace.small))
-        SheetRow("close space", tone = ShepPalette.red, onClick = onClose)
+        SheetRow("close group", tone = ShepPalette.red, onClick = onClose)
     }
 }
 
@@ -1037,7 +1095,7 @@ private fun SheetRow(
     }
 }
 
-/** One text field and a save button — renaming a space, a tab or a pane. */
+/** One text field and a save button — renaming a group, a tab or a pane. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RenameSheet(

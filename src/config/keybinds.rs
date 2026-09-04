@@ -319,6 +319,7 @@ pub struct Keybinds {
     pub close_tab: ActionKeybinds,
     pub rename_pane: ActionKeybinds,
     pub set_agent_state: ActionKeybinds,
+    pub move_agent: ActionKeybinds,
     pub edit_scrollback: ActionKeybinds,
     pub copy_mode: ActionKeybinds,
     pub focus_pane_left: ActionKeybinds,
@@ -484,6 +485,7 @@ impl Config {
             close_tab: empty_action!(),
             rename_pane: empty_action!(),
             set_agent_state: empty_action!(),
+            move_agent: empty_action!(),
             edit_scrollback: empty_action!(),
             copy_mode: empty_action!(),
             focus_pane_left: empty_action!(),
@@ -628,6 +630,7 @@ impl Config {
             apply_action!(keybinds.close_tab, close_tab, source);
             apply_action!(keybinds.rename_pane, rename_pane, source);
             apply_action!(keybinds.set_agent_state, set_agent_state, source);
+            apply_action!(keybinds.move_agent, move_agent, source);
             apply_action!(keybinds.edit_scrollback, edit_scrollback, source);
             apply_action!(keybinds.copy_mode, copy_mode, source);
             apply_action!(keybinds.focus_pane_left, focus_pane_left, source);

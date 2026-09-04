@@ -130,7 +130,6 @@ impl Workspace {
     }
 
     pub fn pane_details(&self, terminals: &HashMap<TerminalId, TerminalState>) -> Vec<PaneDetail> {
-        let multi_tab = self.tabs.len() > 1;
         self.tabs
             .iter()
             .enumerate()
@@ -138,13 +137,18 @@ impl Workspace {
                 let tab_label = self
                     .tab_display_name(tab_idx)
                     .unwrap_or_else(|| (tab_idx + 1).to_string());
-                tab.pane_details(terminals, tab_idx, &tab_label).into_iter()
-            })
-            .map(|mut detail| {
-                if multi_tab {
-                    detail.label = format!("{}·{}", detail.tab_label, detail.agent_label);
-                }
-                detail
+                // A tab normally holds one agent, and then its label is the
+                // agent's own. Only a tab that really holds several panes
+                // needs the tab named in front of each of them.
+                let multi_pane = tab.panes.len() > 1;
+                tab.pane_details(terminals, tab_idx, &tab_label)
+                    .into_iter()
+                    .map(move |mut detail| {
+                        if multi_pane {
+                            detail.label = format!("{}·{}", detail.tab_label, detail.agent_label);
+                        }
+                        detail
+                    })
             })
             .collect()
     }
@@ -272,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn pane_details_includes_tab_context_for_multi_tab_workspace() {
+    fn pane_details_prefixes_the_tab_only_when_it_holds_several_panes() {
         let mut ws = Workspace::test_new("test");
         ws.tabs[0].custom_name = Some("main".into());
         let root_pane = ws.tabs[0].root_pane;
@@ -298,18 +302,32 @@ mod tests {
         );
         terminals.insert(review_terminal.id.clone(), review_terminal);
 
-        let labels: Vec<_> = ws
-            .pane_details(&terminals)
-            .into_iter()
-            .map(|detail| (detail.label, detail.agent_label, detail.agent))
-            .collect();
+        let labels = |ws: &Workspace, terminals: &HashMap<_, _>| -> Vec<String> {
+            ws.pane_details(terminals)
+                .into_iter()
+                .map(|detail| detail.label)
+                .collect()
+        };
 
+        // Two tabs, one agent each: the agent's own name is the whole label.
+        assert_eq!(labels(&ws, &terminals), vec!["pi", "claude"]);
+
+        // Split the review tab and the tab name comes back in front of both
+        // panes, because now the tab is the thing they share.
+        ws.active_tab = second_tab;
+        let extra_pane = ws.test_split(ratatui::layout::Direction::Horizontal);
+        let mut extra_terminal = terminal_for_pane(&ws, extra_pane);
+        extra_terminal.set_hook_authority(
+            "test".into(),
+            "codex".into(),
+            AgentState::Working,
+            None,
+            None,
+        );
+        terminals.insert(extra_terminal.id.clone(), extra_terminal);
         assert_eq!(
-            labels,
-            vec![
-                ("main·pi".into(), "pi".into(), Some(Agent::Pi)),
-                ("review·claude".into(), "claude".into(), Some(Agent::Claude)),
-            ]
+            labels(&ws, &terminals),
+            vec!["pi", "review·claude", "review·codex"]
         );
     }
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::api::schema::{
     AgentReadParams, AgentRenameParams, AgentSendParams, AgentSetStateParams, AgentStartParams,
     AgentStatus, AgentTarget, EmptyParams, Method, PaneAgentState, ReadFormat, ReadSource, Request,
-    Subscription,
+    Subscription, TabMoveParams,
 };
 
 pub(super) fn run_agent_command(args: &[String]) -> std::io::Result<i32> {
@@ -18,6 +18,7 @@ pub(super) fn run_agent_command(args: &[String]) -> std::io::Result<i32> {
         "read" => agent_read(&args[1..]),
         "send" => agent_send(&args[1..]),
         "rename" => agent_rename(&args[1..]),
+        "move" => agent_move(&args[1..]),
         "set-state" => agent_set_state(&args[1..]),
         "clear-state" => agent_clear_state(&args[1..]),
         "focus" => agent_focus(&args[1..]),
@@ -569,6 +570,81 @@ fn agent_rename(args: &[String]) -> std::io::Result<i32> {
     })?)
 }
 
+/// `shep agent move <target> --group <id> | --new-group [--index N]`.
+///
+/// An agent lives in a tab, so this is `tab.move` with the target resolved
+/// through `agent.get` first; the id printed by `shep agent list` is the
+/// terminal, not the tab.
+fn agent_move(args: &[String]) -> std::io::Result<i32> {
+    const USAGE: &str =
+        "usage: shep agent move <target> (--group <workspace_id> | --new-group) [--index N]";
+    let Some(target) = args.first() else {
+        eprintln!("{USAGE}");
+        return Ok(2);
+    };
+    let mut group = None;
+    let mut new_group = false;
+    let mut index = None;
+    let mut rest = args[1..].iter();
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--group" => {
+                let Some(value) = rest.next() else {
+                    eprintln!("missing value for --group");
+                    return Ok(2);
+                };
+                group = Some(super::normalize_workspace_id(value));
+            }
+            "--new-group" => new_group = true,
+            "--index" => {
+                let Some(value) = rest.next() else {
+                    eprintln!("missing value for --index");
+                    return Ok(2);
+                };
+                index = match value.parse::<usize>() {
+                    Ok(index) => Some(index),
+                    Err(_) => {
+                        eprintln!("--index must be a non-negative integer");
+                        return Ok(2);
+                    }
+                };
+            }
+            other => {
+                eprintln!("unknown option: {other}");
+                eprintln!("{USAGE}");
+                return Ok(2);
+            }
+        }
+    }
+    // Exactly one destination: a named group or a new one.
+    if group.is_some() == new_group {
+        eprintln!("{USAGE}");
+        return Ok(2);
+    }
+    let info = super::send_request(&Request {
+        id: "cli:agent:move:get".into(),
+        method: Method::AgentGet(AgentTarget {
+            target: target.clone(),
+        }),
+    })?;
+    let Some(tab_id) = info["result"]["agent"]["tab_id"]
+        .as_str()
+        .map(str::to_string)
+    else {
+        super::print_response(&info)?;
+        return Ok(1);
+    };
+    super::print_response(&super::send_request(&Request {
+        id: "cli:agent:move".into(),
+        method: Method::TabMove(TabMoveParams {
+            tab_id,
+            workspace_id: group,
+            new_workspace: new_group,
+            insert_index: index,
+        }),
+    })?)
+}
+
 fn agent_set_state(args: &[String]) -> std::io::Result<i32> {
     let (Some(target), Some(state)) = (args.first(), args.get(1)) else {
         eprintln!(
@@ -722,6 +798,7 @@ fn print_agent_help() {
     eprintln!("  shep agent read <target> [--source visible|recent|recent-unwrapped] [--lines N] [--format text|ansi] [--ansi]");
     eprintln!("  shep agent send <target> <text>");
     eprintln!("  shep agent rename <target> <name>|--clear");
+    eprintln!("  shep agent move <target> (--group <workspace_id> | --new-group) [--index N]");
     eprintln!("  shep agent set-state <target> <idle|working|blocked|unknown|custom-name>");
     eprintln!("  shep agent clear-state <target>");
     eprintln!("  shep agent focus <target>");

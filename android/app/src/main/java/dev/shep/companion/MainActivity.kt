@@ -373,7 +373,7 @@ fun NavShell(
     // Hoisted from TasksScreen so the new-task deep-link can pre-open the sheet.
     var tasksShowAdd by remember { mutableStateOf(false) }
     // Hoisted out of the list for a different reason: opening a pane replaces
-    // the whole scaffold on a phone, so a space collapsed in the list itself is
+    // the whole scaffold on a phone, so a group collapsed in the list itself is
     // re-expanded the moment you look at an agent and come back.
     var collapsedSpaces by remember { mutableStateOf<Set<String>>(emptySet()) }
     val context = LocalContext.current

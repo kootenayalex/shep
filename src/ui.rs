@@ -34,7 +34,8 @@ use self::dialogs::{
 use self::keybind_help::render_keybind_help_overlay;
 use self::menus::{
     render_context_menu, render_copy_mode_overlay, render_global_launcher_menu,
-    render_navigate_overlay, render_prefix_overlay, render_resize_overlay, render_state_picker,
+    render_group_picker, render_navigate_overlay, render_prefix_overlay, render_resize_overlay,
+    render_state_picker,
 };
 use self::mobile::{
     compute_mobile_header_hit_areas, is_mobile_width, mobile_switcher_max_scroll_for_height,
@@ -482,6 +483,7 @@ pub fn render_with_runtime_registry(
             render_context_menu(app, frame);
         }
         Mode::SetAgentState => render_state_picker(app, frame, frame.area()),
+        Mode::MoveAgentToGroup => render_group_picker(app, frame, frame.area()),
         Mode::Settings => render_settings_overlay(app, frame, frame.area()),
         Mode::RenameWorkspace
         | Mode::RenameTab
@@ -873,7 +875,7 @@ mod tests {
         let prefix = crate::config::format_key_combo((app.prefix_code, app.prefix_mods));
         assert!(row.contains(&prefix), "missing prefix chord in {row:?}");
         assert!(row.contains("prefix"), "missing prefix label in {row:?}");
-        assert!(row.contains("spaces"), "missing spaces hint in {row:?}");
+        assert!(row.contains("groups"), "missing groups hint in {row:?}");
         assert!(row.contains("detach"), "missing detach hint in {row:?}");
     }
 
@@ -1507,7 +1509,7 @@ mod tests {
 
         let workspace_tab = groups
             .iter()
-            .find(|(name, _)| *name == "workspaces / tabs")
+            .find(|(name, _)| *name == "groups / tabs")
             .expect("workspace tab group")
             .1
             .clone();
@@ -1520,10 +1522,10 @@ mod tests {
 
         assert!(workspace_tab
             .iter()
-            .any(|(key, label)| key == "unset" && label.as_ref() == "previous workspace"));
+            .any(|(key, label)| key == "unset" && label.as_ref() == "previous group"));
         assert!(workspace_tab
             .iter()
-            .any(|(key, label)| key == "unset" && label.as_ref() == "next workspace"));
+            .any(|(key, label)| key == "unset" && label.as_ref() == "next group"));
         assert!(workspace_tab
             .iter()
             .any(|(key, label)| key == "unset" && label.as_ref() == "previous agent"));
@@ -1535,7 +1537,7 @@ mod tests {
             .any(|(key, label)| key == "unset" && label.as_ref() == "focus agent 1-9"));
         assert!(workspace_tab
             .iter()
-            .any(|(key, label)| key == "unset" && label.as_ref() == "switch workspace 1-9"));
+            .any(|(key, label)| key == "unset" && label.as_ref() == "switch group 1-9"));
         assert!(panes
             .iter()
             .any(|(key, label)| key == "prefix+h" && label.as_ref() == "focus pane left"));
@@ -1610,7 +1612,7 @@ switch_workspace = "ctrl+1..9"
 
         let workspace_tab = keybind_help_groups(&app)
             .into_iter()
-            .find(|(name, _)| *name == "workspaces / tabs")
+            .find(|(name, _)| *name == "groups / tabs")
             .expect("workspace tab group")
             .1;
 
@@ -1621,7 +1623,7 @@ switch_workspace = "ctrl+1..9"
             .expect("switch tab help entry");
         let switch_workspace_key = workspace_tab
             .iter()
-            .find(|(_, label)| label.as_ref() == "switch workspace 1-9")
+            .find(|(_, label)| label.as_ref() == "switch group 1-9")
             .map(|(key, _)| key.as_str())
             .expect("switch workspace help entry");
 

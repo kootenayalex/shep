@@ -44,7 +44,7 @@ pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rec
     super::dim_background(frame, area);
 
     let title = match app.mode {
-        Mode::RenameWorkspace => "rename workspace",
+        Mode::RenameWorkspace => "rename group",
         Mode::RequestChanges => "request changes",
         Mode::QueuePrompt => "queue prompt (delivered when agent is idle)",
         Mode::RenameTab if app.creating_new_tab => "new tab",
@@ -372,7 +372,7 @@ pub(super) fn render_remove_worktree_overlay(app: &AppState, frame: &mut Frame, 
         rows[2],
     );
     frame.render_widget(
-        Paragraph::new(" The branch is not deleted. The Shep workspace will close.")
+        Paragraph::new(" The branch is not deleted. The Shep group will close.")
             .style(Style::default().fg(app.palette.overlay0)),
         rows[3],
     );
@@ -650,18 +650,18 @@ fn confirm_close_overlay_text(app: &AppState) -> (String, String) {
     let workspace_text = if closes_group {
         let count = group_member_indices.len();
         if count == 1 {
-            "1 workspace, ".to_string()
+            "1 group, ".to_string()
         } else {
-            format!("{count} workspaces, ")
+            format!("{count} groups, ")
         }
     } else {
         String::new()
     };
 
     let title = if closes_group {
-        "Close worktree group?"
+        "Close group and its worktrees?"
     } else {
-        "Close workspace?"
+        "Close group?"
     };
     let detail = format!("{ws_name} — {workspace_text}{pane_text}");
     (title.to_string(), detail)
@@ -803,8 +803,8 @@ mod tests {
 
         let (title, detail) = confirm_close_overlay_text(&app);
 
-        assert_eq!(title, "Close worktree group?");
-        assert_eq!(detail, "main — 2 workspaces, 2 panes");
+        assert_eq!(title, "Close group and its worktrees?");
+        assert_eq!(detail, "main — 2 groups, 2 panes");
     }
 
     #[test]

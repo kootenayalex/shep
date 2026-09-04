@@ -103,6 +103,9 @@ impl App {
                 Mode::SetAgentState => {
                     self.handle_state_picker_key_via_api(key_event);
                 }
+                Mode::MoveAgentToGroup => {
+                    self.handle_group_picker_key_via_api(key_event);
+                }
                 Mode::Settings => self.handle_settings_key(key_event),
                 Mode::GlobalMenu => handle_global_menu_key(&mut self.state, key_event),
                 Mode::KeybindHelp => handle_keybind_help_key(&mut self.state, key_event),

@@ -391,6 +391,8 @@ pub struct KeysConfig {
     pub rename_pane: BindingConfig,
     /// Set or clear a manual state on the focused agent. Default: "prefix+shift+s".
     pub set_agent_state: BindingConfig,
+    /// Move the focused agent (its tab) to another group. Default: "prefix+shift+m".
+    pub move_agent: BindingConfig,
     /// Open the focused pane scrollback in $EDITOR. Default: "prefix+e".
     pub edit_scrollback: BindingConfig,
     /// Enter keyboard copy mode for the focused pane. Default: "prefix+[".
@@ -517,6 +519,8 @@ pub(crate) struct KeysConfigOverlay {
     #[serde(skip_serializing_if = "Option::is_none")]
     set_agent_state: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    move_agent: Option<BindingConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     edit_scrollback: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     copy_mode: Option<BindingConfig>,
@@ -614,6 +618,7 @@ impl<'de> Deserialize<'de> for KeysConfig {
         apply_field!(close_tab);
         apply_field!(rename_pane);
         apply_field!(set_agent_state);
+        apply_field!(move_agent);
         apply_field!(edit_scrollback);
         apply_field!(copy_mode);
         apply_field!(focus_pane_left);
@@ -715,6 +720,7 @@ impl KeysConfig {
         copy_effective_action_field!(close_tab, keybinds.close_tab);
         copy_effective_action_field!(rename_pane, keybinds.rename_pane);
         copy_effective_action_field!(set_agent_state, keybinds.set_agent_state);
+        copy_effective_action_field!(move_agent, keybinds.move_agent);
         copy_effective_action_field!(edit_scrollback, keybinds.edit_scrollback);
         copy_effective_action_field!(copy_mode, keybinds.copy_mode);
         copy_effective_action_field!(focus_pane_left, keybinds.focus_pane_left);
@@ -1231,6 +1237,7 @@ impl Default for KeysConfig {
             close_tab: BindingConfig::one("prefix+shift+x"),
             rename_pane: BindingConfig::one("prefix+shift+p"),
             set_agent_state: BindingConfig::one("prefix+shift+s"),
+            move_agent: BindingConfig::one("prefix+shift+m"),
             edit_scrollback: BindingConfig::one("prefix+e"),
             copy_mode: BindingConfig::one("prefix+["),
             focus_pane_left: BindingConfig::one("prefix+h"),

@@ -584,6 +584,7 @@ impl App {
             selection_autoscroll: None,
             context_menu: None,
             state_picker: None,
+            group_picker: None,
             update_available,
             update_install_command,
             latest_release_notes_available,
@@ -1729,6 +1730,9 @@ impl App {
             Mode::SetAgentState => {
                 self.handle_state_picker_key_via_api(key_event);
             }
+            Mode::MoveAgentToGroup => {
+                self.handle_group_picker_key_via_api(key_event);
+            }
             Mode::KeybindHelp => {
                 input::handle_keybind_help_key(&mut self.state, key_event);
             }
@@ -1923,6 +1927,7 @@ mod tests {
             Mode::ConfirmRemoveWorktree,
             Mode::ContextMenu,
             Mode::SetAgentState,
+            Mode::MoveAgentToGroup,
             Mode::GlobalMenu,
             Mode::KeybindHelp,
         ] {

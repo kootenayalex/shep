@@ -168,7 +168,10 @@ impl AppState {
             return None;
         }
 
-        if matches!(self.mode, Mode::KeybindHelp | Mode::SetAgentState) {
+        if matches!(
+            self.mode,
+            Mode::KeybindHelp | Mode::SetAgentState | Mode::MoveAgentToGroup
+        ) {
             return None;
         }
 
@@ -3238,7 +3241,7 @@ mod tests {
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 3,
+            menu.y + 4,
         ));
 
         assert_eq!(app.state.workspaces[0].tabs.len(), 1);

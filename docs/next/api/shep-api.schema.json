@@ -3604,17 +3604,31 @@
         "TabMoveParams": {
           "properties": {
             "insert_index": {
+              "description": "Where the tab lands in its (new) workspace's tab strip. Required for a\nsame-workspace reorder; for a cross-workspace move it defaults to the\nend.",
               "format": "uint",
               "minimum": 0,
-              "type": "integer"
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "new_workspace": {
+              "description": "Move the tab into a fresh workspace of its own. Conflicts with\n`workspace_id`.",
+              "type": "boolean"
             },
             "tab_id": {
               "type": "string"
+            },
+            "workspace_id": {
+              "description": "Move the tab into this workspace instead of reordering it where it is.\nEvery pane in the tab comes along; the layout is rebuilt as a row of\nright splits because pane identity is what a move preserves, not\nsplit ratios. Panes get new public ids in the target workspace, as\nwith `pane.move`.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
-            "tab_id",
-            "insert_index"
+            "tab_id"
           ],
           "type": "object"
         },

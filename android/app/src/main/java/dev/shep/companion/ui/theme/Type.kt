@@ -23,7 +23,7 @@ import dev.shep.companion.R
  * **Every size in the app comes from this file.** A JVM test fails the build on
  * an `.sp` literal anywhere else — see `ThemeTokensTest`. Before this pass the
  * app used twelve font sizes across 126 inline literals, and the bundled font
- * was reaching only the pane views: the board, spaces, tasks, memory, settings
+ * was reaching only the pane views: the board, groups, tasks, memory, settings
  * and pairing screens all rendered in Roboto, which is the single loudest way
  * the companion failed to look like shep.
  */
@@ -39,7 +39,7 @@ object ShepType {
 
     // ── Headings ────────────────────────────────────────────────────────────
 
-    /** The one word at the top of a tab: "board", "spaces", "tasks", "memory". */
+    /** The one word at the top of a tab: "board", "agents", "tasks", "memory". */
     val screenTitle = mono.copy(
         fontSize = 22.sp,
         fontWeight = FontWeight.Bold,
@@ -83,7 +83,7 @@ object ShepType {
 
     // ── Naming things ───────────────────────────────────────────────────────
 
-    /** The primary name on a surface: a board card's agent, a space's label. */
+    /** The primary name on a surface: a board card's agent, a group's label. */
     val agentName = mono.copy(
         fontSize = 15.sp,
         fontWeight = FontWeight.SemiBold,
@@ -97,7 +97,7 @@ object ShepType {
         color = ShepPalette.text,
     )
 
-    /** A name two levels in: a tab or pane inside the spaces tree. */
+    /** A name two levels in: a tab or pane inside the groups tree. */
     val itemLabel = mono.copy(fontSize = 13.sp, color = ShepPalette.subtext0)
 
     /** An identifier shep generated rather than a person chose. */
@@ -118,7 +118,7 @@ object ShepType {
      */
     val stateGlyph = mono.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold)
 
-    /** A state glyph one level in: the spaces tree, a title bar, a task row. */
+    /** A state glyph one level in: the groups tree, a title bar, a task row. */
     val stateGlyphSmall = mono.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold)
 
     /** Ids, ages, paths, counts — the quiet second line of nearly every row. */

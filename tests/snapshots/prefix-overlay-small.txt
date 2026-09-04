@@ -3,7 +3,7 @@
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- spaces                  │ 1       +
+ groups                  │ 1       +
                          │╭──────────────────────────┬─────────────────────────╮
  ◉ workmayt ◆ ⇥2        ▕││                          │                         │
     ↑2 ↓1 20s mem 87%   ▕││                          │                         │
@@ -25,7 +25,7 @@
                         ▕││                          │                         │
  ● emberline            ▕││                          │                         │
    done · claude · 88%  «│╰──────────────────────────┴─────────────────────────╯
- PREFIX  esc cancel  ctrl+b send prefix  w workspace nav  ? keybinds
+ PREFIX  esc cancel  ctrl+b send prefix  w group nav  ? keybinds
 
 --- styles ---
 raaaarrrrrrrrrrrrrrrrrrrrrrrrrrrrryyyyyyyygggtrrrrrrrrrrrrrrrrrrrrrrpppppppppppr
@@ -51,7 +51,7 @@ sssqqqqqqqkkkkkkkkkkkkkkhwb..........................b.........................A
 ........................wwb..........................b.........................A
 .c.vvvvvvvvv............wwb..........................b.........................A
 ...ddddjjjjjjjjjjjjjjj..hwbbbbbbbbbbbbbbbbbbbbbbbbbbbbAAAAAAAAAAAAAAAAAAAAAAAAAA
-nnnnnnnnraaagggggggggaaaaaaggggggggggggggaggggggggggggggggagggggggggrrrrrrrrrrrr
+nnnnnnnnraaagggggggggaaaaaaggggggggggggggaggggggggggggagggggggggrrrrrrrrrrrrrrrr
 
 --- legend ---
 . = (unstyled)

@@ -41,7 +41,7 @@
 │                                                                                                                      │
 │ enter attach  t tasks  esc/q back to board                                                                           │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ctrl+b prefix  w spaces  c tab  ? keys  q detach
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
 gbbbbgggggggggggggggggggggggggggggggggggggggggggggggggkkkkkkkkccciggggggggggggggggggggggggggggggggggggggggggfffffffffffg

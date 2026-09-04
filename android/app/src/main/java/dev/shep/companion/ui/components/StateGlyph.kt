@@ -30,7 +30,7 @@ import androidx.compose.animation.core.tween
  * The glyph also announces itself, which the coloured dot never did.
  *
  * [style] is a token, not a size: [ShepType.stateGlyph] on a card, and
- * [ShepType.stateGlyphSmall] one level in — a tab or pane in the spaces tree,
+ * [ShepType.stateGlyphSmall] one level in — a tab or pane in the groups tree,
  * or a pane's own title bar. Two steps are enough to carry the hierarchy; the
  * tree used to ask for four different diameters.
  */

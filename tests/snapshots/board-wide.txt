@@ -56,7 +56,7 @@
 │                                                                                                                                                                                                      │
 │ enter focus  i inspect  hjkl/↑↓←→ move  t tasks  esc/q close                                                                                                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ctrl+b prefix  w spaces  c tab  ? keys  q detach
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
 mbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmssssssssgggommmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmkkkkkkkkkkkm

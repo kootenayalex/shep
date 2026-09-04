@@ -50,7 +50,7 @@ object ShepSpace {
     /** Between the edge of the screen and the cards in a list. */
     val listGutter = 12.dp
 
-    /** Each level of the spaces tree steps in by this much. */
+    /** Each level of the groups tree steps in by this much. */
     val indent = 20.dp
 }
 

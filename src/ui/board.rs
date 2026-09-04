@@ -255,11 +255,10 @@ fn location_label(
         .tabs
         .get(tab_idx)
         .and_then(|tab| tab.custom_name.as_deref());
-    let tab_part = match named {
-        Some(name) => Some(name.to_string()),
-        None if multi_tab => ws.public_tab_number(tab_idx).map(|n| format!("t{n}")),
-        None => None,
-    };
+    // A tab is one agent, so its number says nothing the agent name does
+    // not; only a deliberately named tab earns the width.
+    let _ = multi_tab;
+    let tab_part = named.map(str::to_string);
     let multi_pane = ws
         .tabs
         .get(tab_idx)

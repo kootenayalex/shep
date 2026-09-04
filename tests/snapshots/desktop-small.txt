@@ -3,7 +3,7 @@
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- spaces                  │ 1       +
+ groups                  │ 1       +
                          │╭──────────────────────────┬─────────────────────────╮
  ◉ workmayt ◆ ⇥2        ▕││                          │                         │
     ↑2 ↓1 20s mem 87%   ▕││                          │                         │
@@ -25,7 +25,7 @@
                         ▕││                          │                         │
  ● emberline            ▕││                          │                         │
    done · claude · 88%  «│╰──────────────────────────┴─────────────────────────╯
- ctrl+b prefix  w spaces  c tab  ? keys  q detach
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
 qaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqxxxxxxxxgggsqqqqqqqqqqqqqqqqqqqqqqoooooooooooq

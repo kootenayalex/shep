@@ -425,6 +425,40 @@ pub(super) fn open_state_picker(state: &mut AppState, pane_id: crate::layout::Pa
     state.mode = Mode::SetAgentState;
 }
 
+pub(super) fn open_group_picker(state: &mut AppState, ws_idx: usize, tab_idx: usize) {
+    use crate::app::state::{GroupPickerAction, GroupPickerItem, GroupPickerState, MenuListState};
+
+    if state
+        .workspaces
+        .get(ws_idx)
+        .and_then(|ws| ws.tabs.get(tab_idx))
+        .is_none()
+    {
+        return;
+    }
+    let mut items: Vec<GroupPickerItem> = state
+        .workspaces
+        .iter()
+        .enumerate()
+        .filter(|(idx, _)| *idx != ws_idx)
+        .map(|(_, ws)| GroupPickerItem {
+            label: ws.display_name(),
+            action: GroupPickerAction::Existing(ws.id.clone()),
+        })
+        .collect();
+    items.push(GroupPickerItem {
+        label: "New group".to_string(),
+        action: GroupPickerAction::NewGroup,
+    });
+    state.group_picker = Some(GroupPickerState {
+        ws_idx,
+        tab_idx,
+        items,
+        list: MenuListState::new(0),
+    });
+    state.mode = Mode::MoveAgentToGroup;
+}
+
 fn next_new_tab_default_name(state: &AppState) -> String {
     state
         .active
@@ -814,7 +848,7 @@ pub(super) fn apply_context_menu_action(
         }
         (
             ContextMenuKind::Workspace { ws_idx } | ContextMenuKind::GitWorkspace { ws_idx, .. },
-            Some("Close" | "Close group"),
+            Some("Close" | "Close with worktrees"),
         ) => {
             state.selected = ws_idx;
             if state.confirm_close {
@@ -853,6 +887,15 @@ pub(super) fn apply_context_menu_action(
         }
         (ContextMenuKind::Pane { pane_id, .. }, Some("Set state...")) => {
             open_state_picker(state, pane_id);
+        }
+        (
+            ContextMenuKind::Pane {
+                ws_idx, tab_idx, ..
+            },
+            Some("Move to group..."),
+        )
+        | (ContextMenuKind::Tab { ws_idx, tab_idx }, Some("Move to group...")) => {
+            open_group_picker(state, ws_idx, tab_idx);
         }
         (
             ContextMenuKind::Pane {
@@ -1273,6 +1316,58 @@ impl App {
         }
     }
 
+    pub(crate) fn handle_group_picker_key_via_api(&mut self, key: KeyEvent) {
+        use crate::api::schema::TabMoveParams;
+        use crate::app::state::GroupPickerAction;
+
+        match key.code {
+            KeyCode::Esc => {
+                self.state.group_picker = None;
+                leave_modal(&mut self.state);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                if let Some(picker) = &mut self.state.group_picker {
+                    picker.list.move_prev();
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if let Some(picker) = &mut self.state.group_picker {
+                    picker.list.move_next(picker.items.len());
+                }
+            }
+            KeyCode::Enter => {
+                let Some(picker) = self.state.group_picker.take() else {
+                    leave_modal(&mut self.state);
+                    return;
+                };
+                let action = picker
+                    .items
+                    .get(picker.list.highlighted)
+                    .map(|item| item.action.clone());
+                let tab_id = self.public_tab_id(picker.ws_idx, picker.tab_idx);
+                if let (Some(action), Some(tab_id)) = (action, tab_id) {
+                    let params = match action {
+                        GroupPickerAction::Existing(workspace_id) => TabMoveParams {
+                            tab_id,
+                            workspace_id: Some(workspace_id),
+                            new_workspace: false,
+                            insert_index: None,
+                        },
+                        GroupPickerAction::NewGroup => TabMoveParams {
+                            tab_id,
+                            workspace_id: None,
+                            new_workspace: true,
+                            insert_index: None,
+                        },
+                    };
+                    self.runtime_tab_move("tui:agent:move", params);
+                }
+                leave_modal(&mut self.state);
+            }
+            _ => {}
+        }
+    }
+
     pub(crate) fn apply_context_menu_action_via_api(&mut self, menu: ContextMenuState, idx: usize) {
         let item = menu.items().get(idx).copied();
         match (menu.kind, item) {
@@ -1335,7 +1430,7 @@ impl App {
             (
                 ContextMenuKind::Workspace { ws_idx }
                 | ContextMenuKind::GitWorkspace { ws_idx, .. },
-                Some("Close" | "Close group"),
+                Some("Close" | "Close with worktrees"),
             ) => {
                 self.state.selected = ws_idx;
                 if self.state.confirm_close {
@@ -1367,6 +1462,15 @@ impl App {
             }
             (ContextMenuKind::Pane { pane_id, .. }, Some("Set state...")) => {
                 open_state_picker(&mut self.state, pane_id);
+            }
+            (
+                ContextMenuKind::Pane {
+                    ws_idx, tab_idx, ..
+                },
+                Some("Move to group..."),
+            )
+            | (ContextMenuKind::Tab { ws_idx, tab_idx }, Some("Move to group...")) => {
+                open_group_picker(&mut self.state, ws_idx, tab_idx);
             }
             (
                 ContextMenuKind::Pane {

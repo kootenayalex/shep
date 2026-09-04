@@ -19,8 +19,8 @@ widget, "New task" launcher shortcut, voice add-task, tablet two-pane) — see
 
 ## Screens
 
-- **agents** — the session board grouped by spaces, with the same state and
-  agent naming vocabulary as the desktop. Spaces still expose open, close,
+- **agents** — the session board grouped by groups (a group is what the API calls a workspace), with the same state and
+  agent naming vocabulary as the desktop. Groups still expose open, close,
   rename, focus and split actions from their overflow menus.
 - **tasks**, **memory**, **shep** (bridge, server, notification settings and
   push diagnostics).

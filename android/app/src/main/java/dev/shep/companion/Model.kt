@@ -387,14 +387,14 @@ fun parseMemory(result: JSONObject): MemoryView {
 }
 
 /**
- * The session's shape: spaces, their tabs, and the panes inside them.
+ * The session's shape: groups, their tabs, and the panes inside them.
  *
  * The board answers "who needs me", ordered by attention and flat on purpose.
  * This answers the other question — "what is open, and where" — which is the
  * one you need to close something or start something beside it. Both come from
  * the same server, so a rename in either place is the same rename.
  *
- * "Space" is the word shep's own picker uses; the API says `workspace`.
+ * "Group" is the word every shep surface uses; the API says `workspace`.
  */
 data class PaneNode(
     val paneId: String,
@@ -439,7 +439,7 @@ data class TabNode(
     val panes: List<PaneNode>,
 )
 
-data class SpaceNode(
+data class GroupNode(
     val workspaceId: String,
     val label: String,
     val number: Int,
@@ -452,7 +452,7 @@ data class SpaceNode(
     val tabs: List<TabNode>,
 ) {
     /**
-     * Closing the last tab in a space is refused by the server — the space is
+     * Closing the last tab in a group is refused by the server — the group is
      * what you close instead. Asking here keeps the UI from offering a button
      * that can only return an error.
      */
@@ -460,14 +460,14 @@ data class SpaceNode(
 }
 
 /**
- * Build the space → tab → pane tree from one `session.snapshot`.
+ * Build the group → tab → pane tree from one `session.snapshot`.
  *
  * The snapshot is three flat lists plus ids, so this is the join. Order is the
- * server's own: spaces and tabs come back in session order, which is the order
+ * server's own: groups and tabs come back in session order, which is the order
  * the desktop shows them in, and re-sorting would be the phone inventing a
  * second arrangement of the same session.
  */
-fun parseTree(result: JSONObject): List<SpaceNode> {
+fun parseTree(result: JSONObject): List<GroupNode> {
     val snapshot = result.optJSONObject("snapshot") ?: return emptyList()
 
     val panesByTab = mutableMapOf<String, MutableList<PaneNode>>()
@@ -508,14 +508,14 @@ fun parseTree(result: JSONObject): List<SpaceNode> {
         )
     }
 
-    val spaces = mutableListOf<SpaceNode>()
+    val groups = mutableListOf<GroupNode>()
     val workspaces = snapshot.optJSONArray("workspaces") ?: JSONArray()
     for (i in 0 until workspaces.length()) {
         val w = workspaces.optJSONObject(i) ?: continue
         val id = w.optString("workspace_id")
         val worktree = w.optJSONObject("worktree")
-        spaces.add(
-            SpaceNode(
+        groups.add(
+            GroupNode(
                 workspaceId = id,
                 label = w.optString("label").ifEmpty { id },
                 number = w.optInt("number"),
@@ -529,7 +529,7 @@ fun parseTree(result: JSONObject): List<SpaceNode> {
             )
         )
     }
-    return spaces
+    return groups
 }
 
 // --------------------------------------------------------------------------

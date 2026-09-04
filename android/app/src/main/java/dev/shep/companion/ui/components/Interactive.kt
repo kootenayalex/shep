@@ -48,7 +48,7 @@ import dev.shep.companion.ui.theme.ShepType
  * 48dp to the parent and intercepts out-of-bounds pointer events, but places
  * its child at the child's own size. So the target is 48dp and the *pill* stays
  * the size of its word. Forcing the visual to 48dp instead turned every chip
- * into a near-circle and made the spaces tree twice as tall as it needs to be —
+ * into a near-circle and made the groups tree twice as tall as it needs to be —
  * paying for reach with density is not the trade to make when the framework
  * offers both.
  */
@@ -59,7 +59,7 @@ import dev.shep.companion.ui.theme.ShepType
  * The smallest affordance in the app, and the one that was least tappable.
  * [ShepSize.touchTarget] is enforced as a minimum *height* only — a minimum
  * width would put 48dp of dead space between two adjacent actions in the
- * spaces tree, where five of them share a row.
+ * groups tree, where five of them share a row.
  */
 @Composable
 fun ActionText(

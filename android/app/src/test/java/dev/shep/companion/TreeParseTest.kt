@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * `session.snapshot` is three flat lists plus ids; the spaces screen needs the
+ * `session.snapshot` is three flat lists plus ids; the groups screen needs the
  * tree they describe. These pin the join, using the shape a real server sends.
  */
 class TreeParseTest {
@@ -49,13 +49,13 @@ class TreeParseTest {
     private fun tree() = parseTree(JSONObject(snapshot))
 
     @Test
-    fun `builds the space tab pane tree`() {
-        val spaces = tree()
-        assertEquals(2, spaces.size)
-        assertEquals(listOf("w1", "w3"), spaces.map { it.workspaceId })
-        assertEquals(listOf(2, 1), spaces.map { it.tabs.size })
-        assertEquals(listOf("w1:p1"), spaces[0].tabs[0].panes.map { it.paneId })
-        assertEquals(listOf("w1:p2"), spaces[0].tabs[1].panes.map { it.paneId })
+    fun `builds the group tab pane tree`() {
+        val groups = tree()
+        assertEquals(2, groups.size)
+        assertEquals(listOf("w1", "w3"), groups.map { it.workspaceId })
+        assertEquals(listOf(2, 1), groups.map { it.tabs.size })
+        assertEquals(listOf("w1:p1"), groups[0].tabs[0].panes.map { it.paneId })
+        assertEquals(listOf("w1:p2"), groups[0].tabs[1].panes.map { it.paneId })
     }
 
     /** Server order is session order — the phone must not re-sort the session. */
@@ -68,13 +68,13 @@ class TreeParseTest {
 
     @Test
     fun `carries review state and worktree facts`() {
-        val spaces = tree()
-        assertEquals("needs_review", spaces[0].reviewState)
-        assertFalse(spaces[0].isWorktree)
-        assertNull(spaces[0].worktreeRepo)
-        assertEquals("shep", spaces[1].worktreeRepo)
-        assertTrue(spaces[1].isWorktree)
-        assertTrue(spaces[1].focused)
+        val groups = tree()
+        assertEquals("needs_review", groups[0].reviewState)
+        assertFalse(groups[0].isWorktree)
+        assertNull(groups[0].worktreeRepo)
+        assertEquals("shep", groups[1].worktreeRepo)
+        assertTrue(groups[1].isWorktree)
+        assertTrue(groups[1].focused)
     }
 
     /**
@@ -83,26 +83,26 @@ class TreeParseTest {
      */
     @Test
     fun `pane name prefers the label it was given`() {
-        val spaces = tree()
-        assertEquals("claude", spaces[0].tabs[0].panes[0].agent)
-        assertNull(spaces[0].tabs[1].panes[0].agent)
-        assertEquals("reviewer", spaces[1].tabs[0].panes[0].agent)
+        val groups = tree()
+        assertEquals("claude", groups[0].tabs[0].panes[0].agent)
+        assertNull(groups[0].tabs[1].panes[0].agent)
+        assertEquals("reviewer", groups[1].tabs[0].panes[0].agent)
     }
 
     /**
-     * The server refuses to close a space's last tab, so the screen has to know
-     * which spaces those are rather than offering a button that only errors.
+     * The server refuses to close a group's last tab, so the screen has to know
+     * which groups those are rather than offering a button that only errors.
      */
     @Test
-    fun `knows when a space has no closable tab`() {
-        val spaces = tree()
-        assertFalse(spaces[0].hasOnlyOneTab)
-        assertTrue(spaces[1].hasOnlyOneTab)
+    fun `knows when a group has no closable tab`() {
+        val groups = tree()
+        assertFalse(groups[0].hasOnlyOneTab)
+        assertTrue(groups[1].hasOnlyOneTab)
     }
 
     @Test
-    fun `an empty or malformed snapshot yields no spaces`() {
-        assertEquals(emptyList<SpaceNode>(), parseTree(JSONObject("{}")))
-        assertEquals(emptyList<SpaceNode>(), parseTree(JSONObject("""{"snapshot":{}}""")))
+    fun `an empty or malformed snapshot yields no groups`() {
+        assertEquals(emptyList<GroupNode>(), parseTree(JSONObject("{}")))
+        assertEquals(emptyList<GroupNode>(), parseTree(JSONObject("""{"snapshot":{}}""")))
     }
 }

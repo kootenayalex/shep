@@ -150,7 +150,7 @@ fn workspace_close(args: &[String]) -> std::io::Result<i32> {
 }
 
 fn print_workspace_help() {
-    eprintln!("shep workspace commands:");
+    eprintln!("shep workspace commands (a workspace is what the UI calls a group; `shep group` is an alias):");
     eprintln!("  shep workspace list");
     eprintln!("  shep workspace create [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus] [--no-focus]");
     eprintln!("  shep workspace get <workspace_id>");

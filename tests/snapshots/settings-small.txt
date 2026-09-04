@@ -3,7 +3,7 @@
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- s╭──────────────────────────────────────────────────────────────────────────╮
+ g╭──────────────────────────────────────────────────────────────────────────╮
   │ settings                                                                 │─╮
  ◉│ theme   sound   toasts   pane labels   integrations   experiments        │ │
   │──────────────────────────────────────────────────────────────────────────│ │
@@ -25,7 +25,7 @@
   │ ↑↓ select  tab section                                                   │ │
  ●│                           ↵ apply    esc close                           │ │
   ╰──────────────────────────────────────────────────────────────────────────╯─╯
- ctrl+b prefix  w spaces  c tab  ? keys  q detach
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
 nbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnvvvvvvvvfffrnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkn

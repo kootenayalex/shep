@@ -92,7 +92,7 @@ pub(super) fn keybind_help_groups(app: &AppState) -> Vec<HelpGroup> {
                     keybind_label(&kb.navigate.workspace_up),
                     keybind_label(&kb.navigate.workspace_down)
                 ),
-                "workspace list",
+                "group list",
             ),
             help_entry(
                 format!(
@@ -105,26 +105,26 @@ pub(super) fn keybind_help_groups(app: &AppState) -> Vec<HelpGroup> {
                 "move focus",
             ),
             help_entry("tab / shift+tab", "cycle pane"),
-            help_entry("enter", "open workspace"),
-            help_entry("1..9", "switch workspace"),
+            help_entry("enter", "open group"),
+            help_entry("1..9", "switch group"),
         ],
     ));
 
     let workspace_tab = vec![
-        help_entry(keybind_label(&kb.workspace_picker), "workspace navigation"),
+        help_entry(keybind_label(&kb.workspace_picker), "group navigation"),
         help_entry(keybind_label(&kb.goto), "session navigator"),
-        help_entry(keybind_label(&kb.new_workspace), "new workspace"),
+        help_entry(keybind_label(&kb.new_workspace), "new group"),
         help_entry(keybind_label(&kb.new_worktree), "new worktree"),
         help_entry(keybind_label(&kb.open_worktree), "open worktree"),
         help_entry(
             keybind_label(&kb.remove_worktree),
             "delete worktree checkout",
         ),
-        help_entry(keybind_label(&kb.rename_workspace), "rename workspace"),
-        help_entry(keybind_label(&kb.close_workspace), "close workspace"),
-        help_entry(keybind_label(&kb.previous_workspace), "previous workspace"),
-        help_entry(keybind_label(&kb.next_workspace), "next workspace"),
-        help_entry(indexed_label(&kb.switch_workspace), "switch workspace 1-9"),
+        help_entry(keybind_label(&kb.rename_workspace), "rename group"),
+        help_entry(keybind_label(&kb.close_workspace), "close group"),
+        help_entry(keybind_label(&kb.previous_workspace), "previous group"),
+        help_entry(keybind_label(&kb.next_workspace), "next group"),
+        help_entry(indexed_label(&kb.switch_workspace), "switch group 1-9"),
         help_entry(keybind_label(&kb.previous_agent), "previous agent"),
         help_entry(keybind_label(&kb.next_agent), "next agent"),
         help_entry(keybind_label(&kb.next_blocked), "next blocked pane"),
@@ -137,7 +137,7 @@ pub(super) fn keybind_help_groups(app: &AppState) -> Vec<HelpGroup> {
         help_entry(indexed_label(&kb.switch_tab), "switch tab 1-9"),
         help_entry(keybind_label(&kb.close_tab), "close tab"),
     ];
-    groups.push(("workspaces / tabs", workspace_tab));
+    groups.push(("groups / tabs", workspace_tab));
 
     let panes = vec![
         help_entry(keybind_label(&kb.split_vertical), "split vertical"),
@@ -145,6 +145,7 @@ pub(super) fn keybind_help_groups(app: &AppState) -> Vec<HelpGroup> {
         help_entry(keybind_label(&kb.close_pane), "close pane"),
         help_entry(keybind_label(&kb.rename_pane), "rename pane"),
         help_entry(keybind_label(&kb.set_agent_state), "set agent state"),
+        help_entry(keybind_label(&kb.move_agent), "move agent to group"),
         help_entry(keybind_label(&kb.edit_scrollback), "edit scrollback"),
         help_entry(keybind_label(&kb.copy_mode), "copy mode"),
         help_entry(keybind_label(&kb.zoom), "zoom pane"),

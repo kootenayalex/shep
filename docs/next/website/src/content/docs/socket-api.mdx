@@ -269,6 +269,21 @@ remain `pane.swap`; moving to the source tab returns `changed: false` with
 `reason: "same_tab"`. Moves involving a zoomed source or target tab return
 `changed: false` with `reason: "zoomed_tab"`.
 
+`tab.move` reorders a tab (`insert_index`) or moves it, panes and all, into
+another workspace (`workspace_id`) or a fresh one (`new_workspace: true`).
+Every pane keeps its terminal and gets a new public id in the destination, as
+with `pane.move`; the tab keeps its name. A cross-workspace move rebuilds the
+tab as a row of right splits (pane identity is what a move preserves, not
+ratios), refuses a zoomed tab, and closes the source workspace when the tab
+was its last. `insert_index` is optional for a cross-workspace move and
+defaults to the end. The response is the destination's `tab_list`.
+
+```json
+{"id":"req_tab_reorder","method":"tab.move","params":{"tab_id":"w1:t2","insert_index":0}}
+{"id":"req_tab_regroup","method":"tab.move","params":{"tab_id":"w1:t2","workspace_id":"w3"}}
+{"id":"req_tab_own_group","method":"tab.move","params":{"tab_id":"w1:t2","new_workspace":true}}
+```
+
 The response is `type: "pane_move"` with `changed`, optional `reason`,
 `previous_pane_id`, `previous_workspace_id`, `previous_tab_id`, the moved
 `pane`, optional `source_layout`, `target_layout`, optional created workspace or
@@ -647,8 +662,9 @@ The first response acknowledges the subscription. Later lines are pushed events.
 Workspace event subscriptions include `workspace.created`, `workspace.updated`, `workspace.renamed`, `workspace.moved`, `workspace.closed`, and `workspace.focused`. Workspace events describe Herdr UI/runtime lifecycle. `workspace.created` includes optional `workspace.worktree` provenance when the workspace belongs to a worktree group. `workspace.moved` includes the moved `workspace_id`, requested `insert_index`, and updated ordered `workspaces` list. `workspace.closed` includes a final `workspace` snapshot when Herdr can still identify it before removal.
 Tab event subscriptions include `tab.created`, `tab.closed`, `tab.focused`,
 `tab.renamed`, and `tab.moved`. `tab.moved` includes the moved `tab_id`,
-`workspace_id`, requested `insert_index`, and updated ordered `tabs` list for
-that workspace.
+`workspace_id`, the `insert_index` the tab landed at, and updated ordered
+`tabs` list for that workspace. A tab moved into another workspace gets a new
+`tab_id` there, so the event's `tab_id` is the one to keep.
 Pane event subscriptions include `pane.created`, `pane.closed`, `pane.focused`,
 `pane.moved`, `pane.exited`, `pane.agent_detected`,
 `pane.output_matched`, `pane.agent_status_changed`, and `pane.scroll_changed`.
