@@ -47,6 +47,7 @@ import dev.shep.companion.SessionTotals
 import dev.shep.companion.GroupNode
 import dev.shep.companion.asAgentRow
 import dev.shep.companion.formatAge
+import dev.shep.companion.nowLine
 import dev.shep.companion.parseOverview
 import dev.shep.companion.parseSnapshot
 import dev.shep.companion.parseTree
@@ -878,6 +879,24 @@ private fun ChannelRow(
                     maxLines = 1,
                 )
             }
+            // What it is doing, in words, before the raw lines that prove it.
+            // The lines below are the agent's own screen and stay verbatim;
+            // this is the sentence you can read at arm's length.
+            Text(
+                nowLine(
+                    channel.status,
+                    row?.manualState?.label,
+                    row?.stateAgeSeconds,
+                    row?.activityLine,
+                ),
+                style = ShepType.state.copy(
+                    color = row?.manualState?.let {
+                        ShepSemantic.manual(it.tier, it.label).color
+                    } ?: statusColor(channel.status),
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             // What the pane is actually saying. Three lines, because one line
             // of an agent's screen is usually its spinner and tells you the
             // agent is alive but not what it is doing. For a shell — which

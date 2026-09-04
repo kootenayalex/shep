@@ -255,6 +255,65 @@ fun formatAge(seconds: Long): String = when {
     else -> "${seconds / 86400}d"
 }
 
+/**
+ * What this agent is doing, in words, right now.
+ *
+ * The board says `blocked` and quotes the agent's own screen, which is exactly
+ * right for someone who has read a hundred of these rows and wrong for the
+ * first ten. This is the same three facts — state, what it is chewing on, how
+ * long — said as a sentence, above the raw lines rather than instead of them.
+ *
+ * Two things it must never render, because Maestro anchors on both elsewhere in
+ * the hierarchy: a bare `live` (flow 07 taps the first of those by index) and
+ * anything full-matching `\S+ blocked` (flow 13).
+ */
+fun nowLine(
+    status: String,
+    manualLabel: String?,
+    ageSeconds: Long?,
+    activityLine: String?,
+): String {
+    val trimmed = activityLine?.let { trimActivity(it) }?.takeIf { it.isNotEmpty() }
+    val head = when {
+        // A label set by hand wins over anything shep detected: the point of
+        // setting one is that shep had it wrong.
+        manualLabel != null -> manualLabel
+        status == "blocked" ->
+            if (trimmed != null) "waiting for you — $trimmed" else "waiting for you"
+        status == "working" -> if (trimmed != null) "working · $trimmed" else "working"
+        status == "done" -> "finished — ready for you to look at"
+        status == "idle" -> "idle"
+        else -> status
+    }
+    val line = if (ageSeconds == null) head else "$head · ${formatAge(ageSeconds)}"
+    // Maestro matches the *whole* text of an element, and flow 07 taps the
+    // first one that reads exactly `live` — the out toggle. This line renders
+    // above it, so a state literally called `live` with no age beside it would
+    // sit in front of the toggle and take the tap.
+    return if (line == "live") "running" else line
+}
+
+/**
+ * One line of an agent's screen, reduced to something that fits in a sentence:
+ * no spinner frames, no prompt marker, no runs of whitespace, no essay.
+ */
+internal fun trimActivity(line: String): String {
+    val stripped = line
+        .trim()
+        .trimStart('⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦',
+            '⠧', '⠇', '⠏', '•', '●', '│', '┃', '╭',
+            '╰', '─', '✱', '✹', '*', '>', ' ')
+        .trim()
+    val collapsed = stripped.replace(Regex("""\s+"""), " ")
+    return if (collapsed.length <= ACTIVITY_MAX) {
+        collapsed
+    } else {
+        collapsed.take(ACTIVITY_MAX).trimEnd() + "…"
+    }
+}
+
+private const val ACTIVITY_MAX = 60
+
 /** Sort weight: blocked demands attention first, then done (unseen), working, idle. */
 fun statusPriority(status: String): Int = when (status) {
     "blocked" -> 0

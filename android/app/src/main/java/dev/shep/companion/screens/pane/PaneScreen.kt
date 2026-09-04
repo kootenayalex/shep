@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.text.style.TextOverflow
 import dev.shep.companion.AgentRow
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.Transcript
@@ -47,6 +48,7 @@ import dev.shep.companion.net.InputRouter
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
 import dev.shep.companion.screens.ReviewScreen
+import dev.shep.companion.nowLine
 import dev.shep.companion.statusColor
 import dev.shep.companion.terminal.GridState
 import dev.shep.companion.terminal.KeyBar
@@ -55,6 +57,7 @@ import dev.shep.companion.terminal.TerminalGrid
 import dev.shep.companion.terminal.TerminalKey
 import dev.shep.companion.terminal.stepFontSize
 import dev.shep.companion.ui.components.ActionText
+import dev.shep.companion.ui.components.BackHeader
 import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepSemantic
@@ -449,26 +452,35 @@ private fun PaneTitleBar(
     fontSizeSp: Float,
     onFontSizeSp: (Float) -> Unit,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(ShepPalette.surfaceDim)
-            .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.medium),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
-    ) {
-        ActionText(
-            "‹",
-            style = ShepType.wordmark.copy(color = ShepPalette.accent),
-            description = "back to the board",
-            onClick = onBack,
-        )
+    BackHeader("agents", onBack) {
         Column(Modifier.weight(1f)) {
-            Text(row.paneId, style = ShepType.agentName.copy(color = ShepPalette.accent))
+            // The name a person chose, not the id shep generated: the id is
+            // still here, one line down, with the rest of the machine facts.
             Text(
-                listOfNotNull(row.workspaceLabel, row.branch).joinToString(" · "),
+                row.displayName ?: row.agent,
+                style = ShepType.agentName.copy(color = ShepPalette.accent),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                listOfNotNull(row.workspaceLabel, row.branch, row.paneId).joinToString(" · "),
                 style = ShepType.paneId,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                nowLine(
+                    status,
+                    row.manualState?.label,
+                    row.stateAgeSeconds,
+                    row.activityLine,
+                ),
+                style = ShepType.metaSmall.copy(
+                    color = row.manualState?.let { ShepSemantic.manual(it.tier, it.label).color }
+                        ?: statusColor(status),
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         TextSizeControl(fontSizeSp, onFontSizeSp)
@@ -477,13 +489,6 @@ private fun PaneTitleBar(
             style = ShepType.stateGlyphSmall,
             manualTier = row.manualState?.tier,
             manualLabel = row.manualState?.label,
-        )
-        Text(
-            row.manualState?.label ?: status,
-            style = ShepType.metaSmall.copy(
-                color = row.manualState?.let { ShepSemantic.manual(it.tier, it.label).color }
-                    ?: statusColor(status),
-            ),
         )
     }
 }
