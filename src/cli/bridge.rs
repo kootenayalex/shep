@@ -13,28 +13,80 @@
 //!                    {"ch":1,"line":{...api response line...}}
 //!                    {"ch":1,"eof":true} | {"ch":1,"error":"..."}
 //!
-//! Auth: `Authorization: Bearer <token>` header or `?token=<token>` query
-//! parameter on the upgrade request; the token lives at
-//! `<config dir>/bridge-token` (created on first run, 0600). Bind defaults to
-//! loopback — pass the tailscale IP explicitly to reach it from the phone;
-//! never bind a public interface.
+//! Auth: `Authorization: Bearer <token>` header on the upgrade request (a
+//! `?token=` query parameter is refused: it lands in logs and proxies); the
+//! token lives at `<config dir>/bridge-token` (created on first run, 0600).
+//! Upgrades carrying an `Origin` header are refused outright — native clients
+//! send none, so any that arrives is a browser page trying to reach the
+//! bridge. Bind defaults to loopback — pass the tailscale IP explicitly to
+//! reach it from the phone; never bind a public interface.
+//!
+//! Only the methods in [`BRIDGE_ALLOWED_METHODS`] are relayed to the API; the
+//! bridge-local `pane.stream` / `pane.transcript` / `push.*` / `task.*` /
+//! `memory.*` handlers run ahead of that check. Everything else is answered
+//! with a JSON error so a paired phone can never reach `server.stop`, the
+//! config, or the pty of an agent it has no UI for.
 
 mod stream;
 mod transcript;
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{IpAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use tungstenite::handshake::server::{ErrorResponse, Request as WsRequest, Response as WsResponse};
 use tungstenite::http::{header, HeaderValue, StatusCode};
 use tungstenite::{Message, WebSocket};
 
 const DEFAULT_BIND: &str = "127.0.0.1:7431";
+
+/// API methods a paired companion may relay through the bridge.
+///
+/// Sorted, one per line: `scripts/test_bridge_allowlist.py` parses this block
+/// and checks every dotted method the Android app sends is either listed here
+/// or handled locally on the bridge. Adding a verb the phone needs means
+/// adding it here in the same commit.
+const BRIDGE_ALLOWED_METHODS: &[&str] = &[
+    "agent.rename",
+    "agent.send",
+    "events.subscribe",
+    "pane.close",
+    "pane.move",
+    "pane.scroll",
+    "pane.send_keys",
+    "pane.send_text",
+    "pane.split",
+    "session.overview",
+    "session.snapshot",
+    "tab.close",
+    "tab.create",
+    "tab.focus",
+    "tab.move",
+    "tab.rename",
+    "task.dispatch",
+    "workspace.close",
+    "workspace.create",
+    "workspace.diff",
+    "workspace.focus",
+    "workspace.rename",
+    "workspace.set_review_state",
+    "workspace.ship",
+    "worktree.remove",
+];
+
+/// Upper bound on simultaneous WebSocket clients. One phone holds one
+/// connection; the cap exists so a scanner cannot pin a thread per socket.
+const MAX_CONCURRENT: usize = 16;
+/// Each failed authentication from an address adds this much delay before the
+/// next handshake from it is even read, up to [`AUTH_BACKOFF_MAX`].
+const AUTH_BACKOFF_STEP: Duration = Duration::from_millis(500);
+const AUTH_BACKOFF_MAX: Duration = Duration::from_secs(8);
+/// Failures older than this are forgotten.
+const AUTH_BACKOFF_FORGET: Duration = Duration::from_secs(600);
 const USAGE: &str = "usage: shep bridge [--bind <ip:port>] [--socket <api-socket-path>] | shep bridge pair [--host <ip[:port]>] | shep bridge token | shep bridge notify-push";
 
 pub(super) fn run_bridge_command(args: &[String]) -> std::io::Result<i32> {
@@ -155,17 +207,93 @@ fn serve(args: &[String]) -> std::io::Result<i32> {
     let token = load_or_create_token()?;
     let listener = TcpListener::bind(&bind)?;
     eprintln!("shep bridge listening on ws://{bind}/ (api socket: {api_socket:?})");
+    let active = Arc::new(AtomicUsize::new(0));
+    let throttle = Arc::new(AuthThrottle::default());
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
+        let Some(slot) = ConnectionSlot::acquire(&active) else {
+            tracing::debug!("bridge at {MAX_CONCURRENT} clients; dropping a new connection");
+            continue;
+        };
         let token = token.clone();
         let api_socket = api_socket.clone();
+        let throttle = throttle.clone();
         std::thread::spawn(move || {
-            if let Err(err) = handle_ws_client(stream, &token, &api_socket) {
+            let _slot = slot;
+            if let Err(err) = handle_ws_client(stream, &token, &api_socket, &throttle) {
                 tracing::debug!(err = %err, "bridge client ended");
             }
         });
     }
     Ok(0)
+}
+
+/// One of the [`MAX_CONCURRENT`] connection slots; released on drop, so a
+/// thread that panics or returns early still frees its place.
+struct ConnectionSlot(Arc<AtomicUsize>);
+
+impl ConnectionSlot {
+    fn acquire(active: &Arc<AtomicUsize>) -> Option<Self> {
+        let mut current = active.load(Ordering::Acquire);
+        loop {
+            if current >= MAX_CONCURRENT {
+                return None;
+            }
+            match active.compare_exchange_weak(
+                current,
+                current + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => return Some(Self(active.clone())),
+                Err(observed) => current = observed,
+            }
+        }
+    }
+}
+
+impl Drop for ConnectionSlot {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// Per-address failed-authentication backoff.
+///
+/// A wrong token costs the *next* handshake from that address a growing sleep
+/// before the bridge even reads it, which turns token guessing from thousands
+/// of tries a second into a handful a minute without touching the happy path
+/// (an address with no failures pays nothing).
+#[derive(Default)]
+struct AuthThrottle {
+    failures: Mutex<HashMap<IpAddr, (u32, Instant)>>,
+}
+
+impl AuthThrottle {
+    fn delay_for(&self, ip: IpAddr, now: Instant) -> Duration {
+        let failures = self.failures.lock().unwrap_or_else(|err| err.into_inner());
+        match failures.get(&ip) {
+            Some((count, last)) if now.duration_since(*last) < AUTH_BACKOFF_FORGET => {
+                AUTH_BACKOFF_STEP
+                    .saturating_mul(*count)
+                    .min(AUTH_BACKOFF_MAX)
+            }
+            _ => Duration::ZERO,
+        }
+    }
+
+    fn record_failure(&self, ip: IpAddr, now: Instant) {
+        let mut failures = self.failures.lock().unwrap_or_else(|err| err.into_inner());
+        failures.retain(|_, (_, last)| now.duration_since(*last) < AUTH_BACKOFF_FORGET);
+        let entry = failures.entry(ip).or_insert((0, now));
+        entry.0 = entry.0.saturating_add(1);
+        entry.1 = now;
+    }
+
+    fn record_success(&self, ip: IpAddr) {
+        let mut failures = self.failures.lock().unwrap_or_else(|err| err.into_inner());
+        failures.remove(&ip);
+    }
 }
 
 /// Accept one WebSocket client, then relay frames <-> API channels until it
@@ -174,21 +302,48 @@ fn handle_ws_client(
     stream: TcpStream,
     token: &str,
     api_socket: &Arc<PathBuf>,
+    throttle: &AuthThrottle,
 ) -> Result<(), Box<dyn std::error::Error>> {
     stream.set_nodelay(true).ok();
+    let peer = stream.peer_addr()?.ip();
+    let delay = throttle.delay_for(peer, Instant::now());
+    if !delay.is_zero() {
+        std::thread::sleep(delay);
+    }
     let expected = token.to_string();
+    let auth_failed = Arc::new(AtomicBool::new(false));
+    let auth_failed_in_check = auth_failed.clone();
     // The Err type is tungstenite's ErrorResponse (a full http::Response);
     // accept_hdr fixes the callback signature, so the size is not ours to
     // shrink.
     #[allow(clippy::result_large_err)]
     let auth_check = move |request: &WsRequest, response: WsResponse| {
+        if request.headers().contains_key(header::ORIGIN) {
+            auth_failed_in_check.store(true, Ordering::Relaxed);
+            return Err(rejection_response(
+                StatusCode::FORBIDDEN,
+                "browser origins are not accepted\n",
+            ));
+        }
         if request_authorized(request, &expected) {
             Ok(response)
         } else {
+            auth_failed_in_check.store(true, Ordering::Relaxed);
             Err(unauthorized_response())
         }
     };
-    let mut socket = tungstenite::accept_hdr(stream, auth_check)?;
+    let mut socket = match tungstenite::accept_hdr(stream, auth_check) {
+        Ok(socket) => {
+            throttle.record_success(peer);
+            socket
+        }
+        Err(err) => {
+            if auth_failed.load(Ordering::Relaxed) {
+                throttle.record_failure(peer, Instant::now());
+            }
+            return Err(err.into());
+        }
+    };
     // Poll reads so queued outbound frames from channel readers keep flowing
     // through this single IO thread (tungstenite sockets don't split).
     socket
@@ -305,7 +460,8 @@ fn handle_client_frame(
     // (not as new API methods) keeps them out of the herdr API contract /
     // protocol version. `task.dispatch` is NOT local: it must spawn a pane, so
     // it proxies through to the server like everything else.
-    if let Some(method) = request.get("method").and_then(|m| m.as_str()) {
+    let method = request.get("method").and_then(|m| m.as_str());
+    if let Some(method) = method {
         let params = request.get("params");
         // `pane.stream` is long-lived and duplex, so it is handled ahead of the
         // one-shot locals below rather than alongside them.
@@ -337,6 +493,24 @@ fn handle_client_frame(
             let _ = out_tx.send(serde_json::json!({"ch": ch, "eof": true}).to_string());
             return;
         }
+    }
+    // Everything past here goes to the API socket, so it is gated by the
+    // allowlist: the API answers an unknown method itself, but a *known* one
+    // the phone has no business calling (`server.stop`, `config.*`) must never
+    // leave the bridge.
+    let rejection = match method {
+        None => Some("request missing method".to_string()),
+        Some(method) if !bridge_allows_method(method) => {
+            Some(format!("method not allowed over the bridge: {method}"))
+        }
+        Some(_) => None,
+    };
+    if let Some(message) = rejection {
+        let _ = out_tx.send(
+            serde_json::json!({"ch": ch, "line": {"error": {"message": message}}}).to_string(),
+        );
+        let _ = out_tx.send(serde_json::json!({"ch": ch, "eof": true}).to_string());
+        return;
     }
     let cancel = Arc::new(AtomicBool::new(false));
     channels.insert(ch, ChannelHandle::Relay(cancel.clone()));
@@ -416,45 +590,60 @@ fn channel_error(ch: u64, message: &str) -> String {
 /// appended after it), so Content-Length has to be set by hand or the response
 /// is only framed by the connection close.
 fn unauthorized_response() -> ErrorResponse {
-    const BODY: &str = "unauthorized\n";
-    let mut response = ErrorResponse::new(Some(BODY.to_string()));
-    *response.status_mut() = StatusCode::UNAUTHORIZED;
-    let headers = response.headers_mut();
-    headers.insert(
+    let mut response = rejection_response(StatusCode::UNAUTHORIZED, "unauthorized\n");
+    response.headers_mut().insert(
         header::WWW_AUTHENTICATE,
         HeaderValue::from_static("Bearer realm=\"shep bridge\""),
     );
+    response
+}
+
+/// A non-2xx handshake rejection with a framed plain-text body (see
+/// [`unauthorized_response`] for why the status must not be a success).
+fn rejection_response(status: StatusCode, body: &str) -> ErrorResponse {
+    let mut response = ErrorResponse::new(Some(body.to_string()));
+    *response.status_mut() = status;
+    let headers = response.headers_mut();
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("text/plain; charset=utf-8"),
     );
-    headers.insert(header::CONTENT_LENGTH, HeaderValue::from(BODY.len()));
+    headers.insert(header::CONTENT_LENGTH, HeaderValue::from(body.len()));
     response
 }
 
-/// Constant-time-ish token comparison is unnecessary here (tailnet-only,
-/// random 256-bit token), but never log or echo the expected value.
+/// Whether an API method may be relayed for a companion client.
+fn bridge_allows_method(method: &str) -> bool {
+    BRIDGE_ALLOWED_METHODS.binary_search(&method).is_ok()
+}
+
+/// Header-only bearer check. The token is compared in constant time so the
+/// reject path's timing does not leak how many leading bytes matched; the
+/// expected value is never logged or echoed.
 fn request_authorized(request: &WsRequest, expected: &str) -> bool {
     if expected.is_empty() {
         return false;
     }
-    let header = request
-        .headers()
-        .get("authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "));
-    if header == Some(expected) {
-        return true;
-    }
     request
-        .uri()
-        .query()
-        .map(|query| {
-            query
-                .split('&')
-                .any(|pair| pair.strip_prefix("token=") == Some(expected))
-        })
-        .unwrap_or(false)
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .is_some_and(|presented| constant_time_eq(presented.as_bytes(), expected.as_bytes()))
+}
+
+/// Length-then-xor-fold comparison: every byte is visited whenever the
+/// lengths agree, so the time taken does not depend on where they differ.
+/// (The length itself is not secret — every bridge token is 64 hex chars.)
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b) {
+        diff |= x ^ y;
+    }
+    std::hint::black_box(diff) == 0
 }
 
 fn token_path() -> PathBuf {
@@ -1962,12 +2151,40 @@ mod memory_local {
             .filter(|value| !value.is_empty());
         match repo {
             Some(path) => {
-                let root = memory::resolve_repo_root(Some(Path::new(path)))
-                    .map_err(|err| err.to_string())?;
+                let root = confined_repo_root(Path::new(path))?;
                 Ok((memory::repo_memory_path(&root), MemoryKind::Repo))
             }
             None => Ok((memory::user_memory_path(), MemoryKind::User)),
         }
+    }
+
+    /// Resolve a client-supplied repo path to its git root, refusing anything
+    /// that does not canonicalise to a directory under the bridge user's home.
+    /// The phone is paired, not trusted with the whole filesystem: without
+    /// this a `repo` of `/` or a symlink out of `$HOME` would let it read and
+    /// rewrite a `.shep/memory` file anywhere the bridge can.
+    pub(super) fn confined_repo_root(requested: &Path) -> Result<PathBuf, String> {
+        if !requested.is_absolute() {
+            return Err("memory repo path must be absolute".to_string());
+        }
+        let home = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from)
+            .ok_or_else(|| "home directory is not set".to_string())?;
+        let home = std::fs::canonicalize(&home)
+            .map_err(|err| format!("home directory {}: {err}", home.display()))?;
+        let canonical = std::fs::canonicalize(requested)
+            .map_err(|err| format!("memory repo path {}: {err}", requested.display()))?;
+        if !canonical.starts_with(&home) {
+            return Err("memory repo path must be under the home directory".to_string());
+        }
+        let root = memory::resolve_repo_root(Some(&canonical)).map_err(|err| err.to_string())?;
+        let root = std::fs::canonicalize(&root)
+            .map_err(|err| format!("memory repo root {}: {err}", root.display()))?;
+        if !root.starts_with(&home) {
+            return Err("memory repo root must be under the home directory".to_string());
+        }
+        Ok(root)
     }
 
     fn load(params: Option<&Value>) -> Result<(PathBuf, MemoryKind, MemoryDoc), String> {
@@ -2065,12 +2282,154 @@ mod tests {
         assert!(!request_authorized(&request, "other"));
     }
 
+    /// The query-string fallback was removed: a token in the URL lands in
+    /// proxy and access logs, and the companion has only ever sent the header.
     #[test]
-    fn query_token_authorizes() {
+    fn query_token_is_refused() {
         let request = ws_request(None, "ws://x/?a=1&token=sekrit");
-        assert!(request_authorized(&request, "sekrit"));
-        let request = ws_request(None, "ws://x/?token=wrong");
         assert!(!request_authorized(&request, "sekrit"));
+        let request = ws_request(None, "ws://x/?token=sekrit");
+        assert!(!request_authorized(&request, "sekrit"));
+    }
+
+    #[test]
+    fn constant_time_eq_matches_only_equal_bytes() {
+        assert!(constant_time_eq(b"abc", b"abc"));
+        assert!(!constant_time_eq(b"abc", b"abd"));
+        assert!(!constant_time_eq(b"abc", b"ab"));
+        assert!(!constant_time_eq(b"", b"a"));
+        assert!(constant_time_eq(b"", b""));
+    }
+
+    #[test]
+    fn allowlist_is_sorted_and_gates_relay() {
+        let mut sorted = BRIDGE_ALLOWED_METHODS.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(
+            sorted, BRIDGE_ALLOWED_METHODS,
+            "keep the allowlist sorted and unique"
+        );
+        assert!(bridge_allows_method("session.snapshot"));
+        assert!(bridge_allows_method("pane.send_keys"));
+        assert!(!bridge_allows_method("server.stop"));
+        assert!(!bridge_allows_method("config.reload"));
+        assert!(!bridge_allows_method("pane.read"));
+        assert!(!bridge_allows_method(""));
+    }
+
+    fn drain(rx: &mpsc::Receiver<String>) -> Vec<serde_json::Value> {
+        let mut out = Vec::new();
+        while let Ok(frame) = rx.try_recv() {
+            out.push(serde_json::from_str(&frame).expect("bridge frames are json"));
+        }
+        out
+    }
+
+    #[test]
+    fn handle_client_frame_rejects_disallowed_methods_before_relaying() {
+        let (tx, rx) = mpsc::channel();
+        let mut channels = HashMap::new();
+        let socket = Arc::new(PathBuf::from("/nonexistent/shep-bridge-test.sock"));
+        handle_client_frame(
+            r#"{"ch":7,"req":{"method":"server.stop","params":{}}}"#,
+            &tx,
+            &mut channels,
+            &socket,
+        );
+        let frames = drain(&rx);
+        assert_eq!(frames.len(), 2, "error line then eof: {frames:?}");
+        assert_eq!(frames[0]["ch"], 7);
+        assert_eq!(
+            frames[0]["line"]["error"]["message"],
+            "method not allowed over the bridge: server.stop"
+        );
+        assert_eq!(frames[1], serde_json::json!({"ch": 7, "eof": true}));
+        assert!(
+            channels.is_empty(),
+            "a rejected request must not leave a relay channel open"
+        );
+    }
+
+    #[test]
+    fn handle_client_frame_rejects_requests_without_a_method() {
+        let (tx, rx) = mpsc::channel();
+        let mut channels = HashMap::new();
+        let socket = Arc::new(PathBuf::from("/nonexistent/shep-bridge-test.sock"));
+        handle_client_frame(
+            r#"{"ch":3,"req":{"params":{}}}"#,
+            &tx,
+            &mut channels,
+            &socket,
+        );
+        let frames = drain(&rx);
+        assert_eq!(
+            frames[0]["line"]["error"]["message"],
+            "request missing method"
+        );
+        assert_eq!(frames[1], serde_json::json!({"ch": 3, "eof": true}));
+        assert!(channels.is_empty());
+    }
+
+    #[test]
+    fn auth_throttle_grows_caps_and_forgets() {
+        let throttle = AuthThrottle::default();
+        let ip: IpAddr = "10.0.0.9".parse().unwrap();
+        let other: IpAddr = "10.0.0.10".parse().unwrap();
+        let t0 = Instant::now();
+        assert_eq!(throttle.delay_for(ip, t0), Duration::ZERO);
+        throttle.record_failure(ip, t0);
+        assert_eq!(throttle.delay_for(ip, t0), AUTH_BACKOFF_STEP);
+        throttle.record_failure(ip, t0);
+        assert_eq!(throttle.delay_for(ip, t0), AUTH_BACKOFF_STEP * 2);
+        assert_eq!(
+            throttle.delay_for(other, t0),
+            Duration::ZERO,
+            "backoff is per address"
+        );
+        for _ in 0..100 {
+            throttle.record_failure(ip, t0);
+        }
+        assert_eq!(throttle.delay_for(ip, t0), AUTH_BACKOFF_MAX);
+        let later = t0 + AUTH_BACKOFF_FORGET + Duration::from_secs(1);
+        assert_eq!(
+            throttle.delay_for(ip, later),
+            Duration::ZERO,
+            "old failures expire"
+        );
+        throttle.record_failure(ip, t0);
+        throttle.record_success(ip);
+        assert_eq!(
+            throttle.delay_for(ip, t0),
+            Duration::ZERO,
+            "success clears the slate"
+        );
+    }
+
+    #[test]
+    fn connection_slots_are_capped_and_released_on_drop() {
+        let active = Arc::new(AtomicUsize::new(0));
+        let slots: Vec<_> = (0..MAX_CONCURRENT)
+            .map(|_| ConnectionSlot::acquire(&active).expect("slot under the cap"))
+            .collect();
+        assert!(ConnectionSlot::acquire(&active).is_none(), "cap reached");
+        drop(slots);
+        assert_eq!(active.load(Ordering::Acquire), 0);
+        assert!(ConnectionSlot::acquire(&active).is_some());
+    }
+
+    #[test]
+    fn confined_repo_root_refuses_paths_outside_home() {
+        let err =
+            memory_local::confined_repo_root(std::path::Path::new("relative/path")).unwrap_err();
+        assert!(err.contains("absolute"), "{err}");
+        let err = memory_local::confined_repo_root(std::path::Path::new("/")).unwrap_err();
+        assert!(err.contains("under the home directory"), "{err}");
+        let err = memory_local::confined_repo_root(std::path::Path::new(
+            "/nonexistent/shep-bridge-test-repo",
+        ))
+        .unwrap_err();
+        assert!(err.contains("memory repo path"), "{err}");
     }
 
     #[test]
