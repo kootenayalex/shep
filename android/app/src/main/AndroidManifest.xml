@@ -8,12 +8,20 @@
     <!-- A3 push notifications (runtime-prompted on Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Bridge is ws:// over the tailnet (WireGuard-encrypted); no public TLS. -->
+    <!-- Bridge is ws:// over the tailnet (WireGuard-encrypted) or the LAN; no
+         public TLS. Cleartext stays allowed at the platform level because the
+         network security config cannot express "private addresses only" —
+         BridgeClient enforces that rule (net/HostPolicy.kt) before a token is
+         sent. Backups and device transfers are off: the pairing is a bearer
+         token for a shell. -->
     <application
         android:label="Shep"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.Shep.Main"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"

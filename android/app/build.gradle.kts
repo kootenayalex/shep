@@ -1,4 +1,5 @@
 import java.io.ByteArrayOutputStream
+import java.util.Properties
 
 /**
  * `git describe`, so a build on a phone can be traced back to a commit.
@@ -22,6 +23,22 @@ fun gitVersionName(fallback: String): String = try {
     fallback
 }
 
+/**
+ * Release signing comes from the environment or `local.properties`, never from
+ * the debug key. `SHEP_ANDROID_KEYSTORE`, `SHEP_ANDROID_KEYSTORE_PASSWORD`,
+ * `SHEP_ANDROID_KEY_ALIAS`, `SHEP_ANDROID_KEY_PASSWORD` — or the same four as
+ * `shep.keystore`, `shep.keystore_password`, `shep.key_alias`,
+ * `shep.key_password` in local.properties. A release build without them fails
+ * at packaging rather than quietly shipping a debug-signed APK.
+ */
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun releaseSetting(name: String): String? =
+    System.getenv("SHEP_ANDROID_${name.uppercase()}") ?: localProps.getProperty("shep.$name")
+val releaseKeystore: String? = releaseSetting("keystore")
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -44,11 +61,20 @@ android {
         versionName = gitVersionName("0.1.0")
     }
 
+    signingConfigs {
+        create("release") {
+            if (releaseKeystore != null) {
+                storeFile = file(releaseKeystore)
+                storePassword = releaseSetting("keystore_password")
+                keyAlias = releaseSetting("key_alias")
+                keyPassword = releaseSetting("key_password")
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Personal sideload build; signed with the debug key on purpose.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -74,6 +100,8 @@ dependencies {
     // activity — so a shep-coloured cold start costs no time to first frame.
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // The bridge token at rest, keyed by the Android keystore (Pairing.kt).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     // QR pairing scanner — no Google Play Services, license-clean (Apache-2.0).
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     // Push. FCM is the one transport that actually wakes the app from Doze.
@@ -87,4 +115,19 @@ dependencies {
     // repackaged under Apache-2.0 (the upstream org.json artifact carries the
     // "Good, not Evil" clause), so wire parsing can be tested on the JVM.
     testImplementation("com.vaadin.external.google:android-json:0.0.20131108.vaadin1")
+}
+
+// A release build with no real keystore stops here, loudly.
+tasks.configureEach {
+    if (name == "validateSigningRelease" || name == "packageRelease") {
+        doFirst {
+            if (releaseKeystore == null) {
+                throw GradleException(
+                    "release builds need a real keystore: set SHEP_ANDROID_KEYSTORE, " +
+                        "SHEP_ANDROID_KEYSTORE_PASSWORD, SHEP_ANDROID_KEY_ALIAS and " +
+                        "SHEP_ANDROID_KEY_PASSWORD (or shep.keystore etc. in local.properties)",
+                )
+            }
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package dev.shep.companion
 
+import dev.shep.companion.net.plaintextAllowed
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -50,6 +51,11 @@ class BridgeClient(private val url: String, private val token: String) {
         // keyboard autocapitalization) — normalize, then report instead of
         // throwing.
         val normalized = normalizeUrl(url)
+        // The token is a bearer credential for a shell. It never goes out in
+        // the clear to an address that is not ours to begin with.
+        if (!plaintextAllowed(normalized)) {
+            return "refusing plaintext ws:// to a public address — use wss://, or a tailnet or LAN address"
+        }
         val request = try {
             Request.Builder()
                 .url(normalized)

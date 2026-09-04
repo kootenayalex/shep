@@ -87,7 +87,6 @@ enum class NotifyKind(
 /** Kept for the pre-kinds notification channel, which is now Blocked's. */
 const val PUSH_CHANNEL_ID = "shep_agent"
 private const val PUSH_ACTION = "dev.shep.companion.PANE_ACTION"
-private const val PREFS = "shep"
 
 /** Approve/Deny tapped from the notification — send the keystroke over the bridge. */
 class ActionReceiver : BroadcastReceiver() {
@@ -102,11 +101,9 @@ class ActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         Thread {
             try {
-                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                val url = prefs.getString("url", null)
-                val token = prefs.getString("token", null)
-                if (url != null && token != null) {
-                    val client = BridgeClient(url, token)
+                val saved = PairingStore.load(context)
+                if (saved != null) {
+                    val client = BridgeClient(saved.url, saved.token)
                     if (client.connect(timeoutSeconds = 8) == null) {
                         runCatching {
                             client.call(

@@ -30,7 +30,6 @@ class ShepWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_REFRESH = "dev.shep.companion.WIDGET_REFRESH"
-        private const val PREFS = "shep"
 
         /** Re-fetch the snapshot off the main thread and repaint every widget. */
         fun refreshAll(context: Context) {
@@ -38,9 +37,9 @@ class ShepWidgetProvider : AppWidgetProvider() {
             val ids = mgr.getAppWidgetIds(ComponentName(context, ShepWidgetProvider::class.java))
             if (ids.isEmpty()) return
 
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val url = prefs.getString("url", null)
-            val token = prefs.getString("token", null)
+            val saved = PairingStore.load(context)
+            val url = saved?.url
+            val token = saved?.token
 
             Thread {
                 // "unpaired" | "offline" | "ok"

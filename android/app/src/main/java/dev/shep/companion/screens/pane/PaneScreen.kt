@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import dev.shep.companion.AgentRow
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.Transcript
+import dev.shep.companion.net.InputRouter
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
 import dev.shep.companion.screens.ReviewScreen
@@ -63,6 +64,7 @@ import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -141,11 +143,34 @@ fun PaneScreen(
     var transcriptLoading by remember(row.paneId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Held so the key bar and the IME can both reach the open channel.
-    var send by remember { mutableStateOf<((TerminalKey) -> Unit)>({}) }
-
+    // Keys typed while no stream channel is open go as requests, in order.
+    val requests = remember(row.paneId) { Channel<Pair<String, JSONObject>>(Channel.UNLIMITED) }
+    LaunchedEffect(requests, client) {
+        for ((method, params) in requests) {
+            withContext(Dispatchers.IO) {
+                runCatching { client.call(method, params) }
+                    .onFailure { notice = it.message ?: "input failed" }
+            }
+        }
+    }
     // Every key, from the bar or from the soft keyboard, goes through here.
-    val press: (TerminalKey) -> Unit = { key -> send(key) }
+    val router = remember(row.paneId, client) {
+        InputRouter(
+            paneId = row.paneId,
+            request = { method, params -> requests.trySend(method to params) },
+            onDropped = { notice = it },
+        )
+    }
+    val press: (TerminalKey) -> Unit = { key -> router.press(key) }
+
+    // The invisible view that owns the IME connection. Hoisted here so the
+    // keyboard can be put away from anywhere: when input leaves stream mode,
+    // and when the screen goes (back, or the pane closing under it) — it used
+    // to stay up over the list you had just returned to.
+    val inputView = remember(context) { ShepInputView(context) }
+    inputView.onKey = press
+    LaunchedEffect(mode) { if (mode != InputMode.Stream) inputView.hideKeyboard() }
+    DisposableEffect(inputView) { onDispose { inputView.hideKeyboard() } }
 
     // Collected scroll goes out on a beat. `pane.scroll` routes it the way the
     // desktop routes a wheel over the same pane: a shell moves its own
@@ -248,12 +273,7 @@ fun PaneScreen(
         if (!active) return@LaunchedEffect
         ended = null
         client.paneStream(row.paneId).collect { (channel, event) ->
-            send = { key ->
-                when (key) {
-                    is TerminalKey.Text -> channel.sendText(key.text)
-                    is TerminalKey.Named -> channel.sendKeys(key.name)
-                }
-            }
+            router.channel = channel
             when (event) {
                 is StreamEvent.Size -> streaming = true
                 is StreamEvent.Frame -> {
@@ -264,8 +284,12 @@ fun PaneScreen(
                     grid.apply(event.json)
                 }
                 is StreamEvent.Ping -> {}
-                is StreamEvent.Ended -> ended = event.reason ?: "pane ended"
+                is StreamEvent.Ended -> {
+                    router.channel = null
+                    ended = event.reason ?: "pane ended"
+                }
                 is StreamEvent.Failed -> {
+                    router.channel = null
                     streaming = false
                     notice = event.message
                 }
@@ -316,13 +340,6 @@ fun PaneScreen(
             }
             PaneFrame(agent = row.agent, state = status, blocked = status == "blocked") {
                 Box(Modifier.fillMaxSize()) {
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    val inputView = remember(context) {
-                        ShepInputView(context).apply { onKey = press }
-                    }
-                    // Keep the sink pointed at the current channel.
-                    inputView.onKey = press
-
                     TerminalGrid(
                         grid = grid,
                         modifier = Modifier.fillMaxSize().testTag("terminal-grid"),
@@ -370,10 +387,11 @@ fun PaneScreen(
             output = output,
             onOutput = {
                 output = it
-                // The two halves pair by default: a chat wants a composer, a
-                // live terminal wants keystrokes. The input chips are right
-                // there, so this is a default rather than a decision.
-                mode = if (it == OutputMode.Recorded) InputMode.Queue else InputMode.Stream
+                // The recorded view has no grid to type into, so stream input
+                // gives way to the composer. Going back to live leaves the
+                // input mode alone: someone who chose the queue keeps it, and
+                // the keyboard does not pop up uninvited.
+                if (it == OutputMode.Recorded && mode == InputMode.Stream) mode = InputMode.Queue
             },
             onReview = { showReview = true },
         )

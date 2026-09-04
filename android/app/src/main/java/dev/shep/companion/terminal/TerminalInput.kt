@@ -19,6 +19,8 @@ import android.view.inputmethod.InputMethodManager
 sealed interface TerminalKey {
     data class Text(val text: String) : TerminalKey
     data class Named(val name: String) : TerminalKey
+    /** Several named keys in one write, e.g. a burst of backspaces. */
+    data class Keys(val names: List<String>) : TerminalKey
 }
 
 /**
@@ -86,30 +88,23 @@ class ShepInputView(context: Context) : View(context) {
     private class TerminalInputConnection(private val view: ShepInputView) :
         BaseInputConnection(view, false) {
 
+        // The translation itself is [ImeKeys], which has no Android in it and
+        // is pinned by TerminalInputTest; this class only owns the connection.
         override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
-            text?.toString()?.takeIf { it.isNotEmpty() }?.let {
-                view.onKey(TerminalKey.Text(it))
-            }
+            ImeKeys.commit(text)?.let(view.onKey)
             return true
         }
 
-        /**
-         * Composition is deliberately not buffered.
-         *
-         * A terminal has no undo and agents react per keystroke, so holding text
-         * back until the IME commits would mean the remote side sees nothing
-         * while the user types. Each delta is sent as it arrives; the cost is
-         * that gesture-typed words land as one chunk.
-         */
-        override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean =
-            commitText(text, newCursorPosition)
+        override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
+            ImeKeys.compose(text)?.let(view.onKey)
+            return true
+        }
 
         override fun finishComposingText(): Boolean = true
 
         /** How Gboard's backspace arrives under TYPE_NULL. */
         override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-            repeat(beforeLength) { view.onKey(TerminalKey.Named("backspace")) }
-            repeat(afterLength) { view.onKey(TerminalKey.Named("delete")) }
+            ImeKeys.deleteSurrounding(beforeLength, afterLength)?.let(view.onKey)
             return true
         }
 
@@ -119,13 +114,13 @@ class ShepInputView(context: Context) : View(context) {
         }
 
         override fun performEditorAction(actionCode: Int): Boolean {
-            view.onKey(TerminalKey.Named("enter"))
+            view.onKey(ImeKeys.editorAction())
             return true
         }
 
         // Never expose a buffer to the IME — there isn't one.
-        override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence = ""
-        override fun getTextAfterCursor(length: Int, flags: Int): CharSequence = ""
+        override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence = ImeKeys.NO_BUFFER
+        override fun getTextAfterCursor(length: Int, flags: Int): CharSequence = ImeKeys.NO_BUFFER
         override fun getSelectedText(flags: Int): CharSequence? = null
     }
 }

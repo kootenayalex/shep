@@ -153,15 +153,13 @@ object FcmManager {
         onResult: (String) -> Unit,
         body: (BridgeClient) -> String,
     ) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val url = prefs.getString("url", null)
-        val token = prefs.getString("token", null)
-        if (url == null || token == null) {
+        val saved = PairingStore.load(context)
+        if (saved == null) {
             onResult("not paired with shep yet")
             return
         }
         Thread {
-            val client = BridgeClient(url, token)
+            val client = BridgeClient(saved.url, saved.token)
             val error = client.connect(timeoutSeconds = 8)
             val message = if (error != null) {
                 "cannot reach shep: $error"

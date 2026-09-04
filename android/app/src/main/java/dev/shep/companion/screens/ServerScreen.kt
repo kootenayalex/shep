@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import dev.shep.companion.FcmManager
+import dev.shep.companion.PairingStore
 import dev.shep.companion.NotifyKind
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.ui.components.ButtonTone
@@ -63,12 +64,13 @@ fun ServerScreen(
         Column(Modifier.fillMaxWidth().padding(ShepSpace.screen)) {
             ShepCard {
                 Text("bridge", style = ShepType.sectionLabel)
-                ServerInfoRow("url", prefs.getString("url", "not paired") ?: "not paired")
+                val pairing = remember { PairingStore.load(context) }
+                ServerInfoRow("url", pairing?.url ?: "not paired")
                 ServerInfoRow("protocol", client?.serverProtocol?.toString() ?: "unknown")
                 ServerInfoRow(
                     "token",
-                    if (prefs.getString("token", null) != null) "prod ✓" else "not paired",
-                    if (prefs.getString("token", null) != null) ShepPalette.green else ShepPalette.peach,
+                    if (pairing != null) "prod ✓ (encrypted at rest)" else "not paired",
+                    if (pairing != null) ShepPalette.green else ShepPalette.peach,
                 )
             }
             Spacer(Modifier.height(ShepSpace.small))

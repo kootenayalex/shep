@@ -1,6 +1,7 @@
 package dev.shep.companion.net
 
 import dev.shep.companion.BridgeClient
+import dev.shep.companion.terminal.TerminalKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -30,14 +31,21 @@ class StreamChannel(
     private val client: BridgeClient,
     private val ch: Long,
 ) {
-    fun sendText(text: String) {
-        if (text.isEmpty()) return
-        client.sendData(ch, JSONObject().put("text", text))
+    /** False when the socket refused the write — the caller says so; silence was how keys got lost. */
+    fun sendText(text: String): Boolean {
+        if (text.isEmpty()) return true
+        return client.sendData(ch, JSONObject().put("text", text))
     }
 
-    fun sendKeys(vararg keys: String) {
-        if (keys.isEmpty()) return
-        client.sendData(ch, JSONObject().put("keys", JSONArray(keys.toList())))
+    fun sendKeys(vararg keys: String): Boolean {
+        if (keys.isEmpty()) return true
+        return client.sendData(ch, JSONObject().put("keys", JSONArray(keys.toList())))
+    }
+
+    fun send(key: TerminalKey): Boolean = when (key) {
+        is TerminalKey.Text -> sendText(key.text)
+        is TerminalKey.Named -> sendKeys(key.name)
+        is TerminalKey.Keys -> sendKeys(*key.names.toTypedArray())
     }
 
     fun close() = client.closeChannel(ch)

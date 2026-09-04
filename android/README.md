@@ -56,3 +56,39 @@ setting survives a reinstall.
 
 Build: `./gradlew assembleRelease` (JDK 17, compileSdk 35). Release is
 debug-signed on purpose — personal sideload only.
+
+## Security
+
+- **Pairing at rest.** The bridge URL and token live in an
+  `EncryptedSharedPreferences` file keyed by the Android keystore
+  (`Pairing.kt`). A pairing saved by an older build is moved out of the plain
+  preferences file the first time anything reads it. Backups and
+  device-to-device transfers are off (`allowBackup="false"`,
+  `data_extraction_rules.xml`).
+- **Plaintext only to our own addresses.** The bridge speaks `ws://` on the
+  tailnet or LAN, so cleartext stays allowed at the platform level, but
+  `BridgeClient` refuses to send the token over `ws://` to anything that is not
+  loopback, the emulator host, RFC 1918, the tailnet's `100.64.0.0/10`,
+  link-local, IPv6 ULA/link-local, or a local-only name (`.local`, `.ts.net`,
+  `.internal`, `.lan`, `.home.arpa`, bare hostnames). `wss://` is always fine.
+  The rule is `net/HostPolicy.kt`, pinned by `HostPolicyTest`.
+- **Release signing.** `assembleRelease` needs a real keystore from
+  `SHEP_ANDROID_KEYSTORE` / `SHEP_ANDROID_KEYSTORE_PASSWORD` /
+  `SHEP_ANDROID_KEY_ALIAS` / `SHEP_ANDROID_KEY_PASSWORD` (or `shep.keystore`,
+  `shep.keystore_password`, `shep.key_alias`, `shep.key_password` in
+  `local.properties`) and fails at packaging without one. Debug builds are
+  unaffected.
+- **Bridge allowlist.** The phone can only call the methods `shep bridge`
+  relays (see `BRIDGE_ALLOWED_METHODS` in `src/cli/bridge.rs`); everything else
+  is refused server-side.
+
+## Live input
+
+Keys from the key bar and the soft keyboard go through one `InputRouter`
+(`net/InputRouter.kt`): down the open `pane.stream` channel when there is one,
+otherwise as `pane.send_text` / `pane.send_keys` requests in order — so what
+you type while "connecting to pane…" is still on screen lands. A refused
+socket write is reported in the notice line rather than dropped. Gboard's
+delete bursts are coalesced into one write carrying N backspaces
+(`terminal/TerminalIme.kt`, pinned by `TerminalInputTest`), and the keyboard is
+put away when input leaves stream mode or the pane screen goes.

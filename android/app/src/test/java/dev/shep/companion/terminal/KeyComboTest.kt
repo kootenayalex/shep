@@ -64,4 +64,19 @@ class KeyComboTest {
         assertEquals(ModifierState.Locked, ModifierState.Off.advance(doubleTap = true))
         assertEquals(ModifierState.Off, ModifierState.Locked.advance(doubleTap = true))
     }
+
+    /** The control chords the key bar's sticky ctrl produces: interrupt, EOF, clear, reverse search. */
+    @Test
+    fun `control chords are spelled ctrl plus the letter`() {
+        assertEquals("ctrl+c", keyCombo("c", ctrl = ModifierState.Armed))
+        assertEquals("ctrl+d", keyCombo("d", ctrl = ModifierState.Locked))
+        assertEquals("ctrl+l", keyCombo("l", ctrl = ModifierState.Armed))
+        assertEquals("ctrl+r", keyCombo("r", ctrl = ModifierState.Armed))
+    }
+
+    /** The bar's own ⇧⇥ key forces shift on regardless of the sticky state. */
+    @Test
+    fun `shift tab from the bar is shift plus tab even with shift off`() {
+        assertEquals("shift+tab", keyCombo("tab", ModifierState.Off, ModifierState.Off, shift = true))
+    }
 }

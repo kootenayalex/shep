@@ -164,7 +164,8 @@ fun ShepApp(
     var connectError by remember { mutableStateOf<String?>(null) }
     // True while the first auto-connect with a saved pairing is in flight —
     // shows a connecting spinner instead of flashing the manual pairing form.
-    var firstConnect by remember { mutableStateOf(prefs.getString("token", null) != null) }
+    val context = LocalContext.current
+    var firstConnect by remember { mutableStateOf(PairingStore.isPaired(context)) }
     // Whether the socket we are holding is believed good. A drop no longer
     // unmounts the shell, so this drives a banner rather than a whole screen.
     var online by remember { mutableStateOf(false) }
@@ -173,7 +174,6 @@ fun ShepApp(
     // A live socket is only worth holding while somebody is looking at it.
     var foreground by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -211,9 +211,8 @@ fun ShepApp(
     // auto-connect and for every reconnect; wires onDisconnect so a dropped
     // tailnet socket self-heals instead of stranding the screen.
     suspend fun establish(): String? {
-        val url = prefs.getString("url", null) ?: return "no saved pairing"
-        val token = prefs.getString("token", null) ?: return "no saved pairing"
-        val fresh = BridgeClient(url, token)
+        val saved = PairingStore.load(context) ?: return "no saved pairing"
+        val fresh = BridgeClient(saved.url, saved.token)
         val error = withContext(Dispatchers.IO) {
             runCatching { fresh.connect() }.getOrElse { it.message ?: "connection failed" }
         }
@@ -237,7 +236,7 @@ fun ShepApp(
 
     fun pairAndConnect(url: String, token: String, onDone: (String?) -> Unit) {
         scope.launch {
-            prefs.edit().putString("url", url).putString("token", token).apply()
+            PairingStore.save(context, url, token)
             val error = establish()
             if (error == null) {
                 paired = true
@@ -249,7 +248,7 @@ fun ShepApp(
 
     // Auto-connect on launch when a saved pairing exists.
     LaunchedEffect(Unit) {
-        if (prefs.getString("token", null) != null) {
+        if (PairingStore.isPaired(context)) {
             val error = establish()
             if (error == null) paired = true else connectError = error
             firstConnect = false
@@ -311,9 +310,10 @@ fun ShepApp(
             if (firstConnect && connectError == null) {
                 LoadingState("connecting…")
             } else {
+                val saved = PairingStore.load(context)
                 PairingScreen(
-                    initialUrl = prefs.getString("url", "") ?: "",
-                    initialToken = prefs.getString("token", "") ?: "",
+                    initialUrl = saved?.url ?: "",
+                    initialToken = saved?.token ?: "",
                     lastError = connectError,
                     onConnect = { url, token, onDone -> pairAndConnect(url, token, onDone) },
                 )
@@ -340,7 +340,7 @@ fun ShepApp(
                         onUnpair = {
                             paired = false
                             online = false
-                            prefs.edit().remove("url").remove("token").apply()
+                            PairingStore.clear(context)
                             active.onDisconnect = null
                             active.close()
                             client = null
