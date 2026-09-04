@@ -96,7 +96,7 @@ fun ServerScreen(
             Spacer(Modifier.height(ShepSpace.small))
             ShepCard {
                 Text("connection", style = ShepType.sectionLabel)
-                ServerInfoRow("connection", if (client?.isOpen == true) "connected" else "offline")
+                ServerInfoRow("status", if (client?.isOpen == true) "connected" else "offline")
                 ServerInfoRow("version", client?.serverVersion ?: "unknown")
             }
             Spacer(Modifier.height(ShepSpace.section))
