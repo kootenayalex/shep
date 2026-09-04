@@ -4,6 +4,13 @@
 
 ### Added
 
+- The companion's fourth tab is now titled "shep" like the tab that opens it,
+  and opens with a row explaining what the shep server is: a program on your
+  computer, with the phone as its remote control, talking to it over your own
+  network. Its cards read "your computer" / "address" / "connection", the
+  token reads "saved, encrypted on this phone", FCM is "push notifications",
+  and "re-pair (scan QR)" is "link a computer".
+
 - Review now reads as a summary of the change — who wrote it, how many files
   and lines, one collapsible row per file — instead of a `git diff --stat`
   block. "ship" is "merge it in", "request changes" is "ask for changes", and

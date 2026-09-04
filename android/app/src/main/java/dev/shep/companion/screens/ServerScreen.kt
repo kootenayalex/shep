@@ -29,6 +29,8 @@ import dev.shep.companion.PairingStore
 import dev.shep.companion.NotifyKind
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.ui.components.ButtonTone
+import dev.shep.companion.ui.components.ExplainLine
+import dev.shep.companion.ui.components.ExplainRow
 import dev.shep.companion.ui.components.ScreenHeader
 import dev.shep.companion.ui.components.ShepButton
 import dev.shep.companion.ui.components.ShepCard
@@ -60,22 +62,40 @@ fun ServerScreen(
     var testing by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        ScreenHeader("server")
+        ScreenHeader("shep")
+        ExplainRow("what is the shep server?") {
+            ExplainLine(
+                "shep",
+                "a program running on your computer. it holds the agents; this phone is " +
+                    "the remote control for them.",
+            )
+            ExplainLine(
+                "your computer",
+                "the phone talks to it directly over your own network. nothing here goes " +
+                    "over the internet.",
+            )
+            ExplainLine(
+                "push notifications",
+                "the one exception — a notification travels through google's servers to " +
+                    "reach a sleeping phone. it carries the agent's name and state, " +
+                    "nothing it wrote.",
+            )
+        }
         Column(Modifier.fillMaxWidth().padding(ShepSpace.screen)) {
             ShepCard {
-                Text("bridge", style = ShepType.sectionLabel)
+                Text("your computer", style = ShepType.sectionLabel)
                 val pairing = remember { PairingStore.load(context) }
-                ServerInfoRow("url", pairing?.url ?: "not paired")
+                ServerInfoRow("address", pairing?.url ?: "not linked")
                 ServerInfoRow("protocol", client?.serverProtocol?.toString() ?: "unknown")
                 ServerInfoRow(
                     "token",
-                    if (pairing != null) "prod ✓ (encrypted at rest)" else "not paired",
+                    if (pairing != null) "saved, encrypted on this phone" else "not linked",
                     if (pairing != null) ShepPalette.green else ShepPalette.peach,
                 )
             }
             Spacer(Modifier.height(ShepSpace.small))
             ShepCard {
-                Text("server", style = ShepType.sectionLabel)
+                Text("connection", style = ShepType.sectionLabel)
                 ServerInfoRow("connection", if (client?.isOpen == true) "connected" else "offline")
                 ServerInfoRow("version", client?.serverVersion ?: "unknown")
             }
@@ -130,7 +150,7 @@ fun ServerScreen(
             Spacer(Modifier.height(ShepSpace.snug))
             Text(status, style = ShepType.state.copy(color = ShepPalette.overlay0))
             Text(
-                if (token != null) "registered with FCM" else "no FCM token yet",
+                if (token != null) "push notifications on" else "push notifications not set up yet",
                 style = ShepType.meta.copy(
                     color = if (token != null) ShepPalette.green else ShepPalette.peach,
                 ),
@@ -150,7 +170,7 @@ fun ServerScreen(
                     enabled = !testing,
                 )
                 ShepButton(
-                    text = "re-register",
+                    text = "re-register for push",
                     tone = ButtonTone.Quiet,
                     onClick = {
                         FcmManager.register(context, kinds)
@@ -170,7 +190,7 @@ fun ServerScreen(
             }
             Spacer(Modifier.height(ShepSpace.medium))
             ShepButton(
-                text = "re-pair (scan QR)",
+                text = "link a computer",
                 tone = ButtonTone.Quiet,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onRePair,
