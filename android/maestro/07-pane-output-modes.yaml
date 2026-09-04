@@ -1,0 +1,40 @@
+# A pane has two outputs and two inputs, and they pair up.
+# Needs a paired app (run 01 first) against a bridge with at least one agent.
+# Text anchors only (no ids) per device-testing conventions.
+#
+# Deliberately types nothing: this runs against Alex's real agents, and a flow
+# that sends keystrokes into a live claude pane is not one you can run twice.
+appId: dev.shep.companion
+---
+- launchApp
+- tapOn: "agents"
+- tapOn: "all.*"
+# Any agent row will do; the accessible label is stable across runtime names.
+- tapOn:
+    text: "agent.*"
+    index: 0
+
+# Both toggles are present and labelled, so two chips called "live" are not
+# ambiguous.
+- assertVisible: "out"
+- assertVisible: "recorded"
+- assertVisible: "in"
+# The chip is "⇥ queue"; a plain string is a full-text regex, not a substring.
+- assertVisible: ".*queue"
+
+# Live output pairs with the key bar.
+- assertVisible: "esc"
+
+# Switching the output to recorded switches the input to a composer: a chat
+# wants a message box, not raw keystrokes.
+- tapOn: "recorded"
+# The composer's buttons, not its placeholder: a BasicTextField owns the
+# semantics of the box it sits in, so the hint text is invisible to the
+# accessibility tree even though it is on screen.
+- assertVisible: "send"
+
+# And back again, with the key bar returning.
+- tapOn:
+    text: "live"
+    index: 0
+- assertVisible: "esc"

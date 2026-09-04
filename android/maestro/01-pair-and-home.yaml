@@ -1,0 +1,38 @@
+# A6 E2E — pairing (typed path, incl. the crash-regression territory) → home.
+# Needs SHEP_TOKEN and SHEP_BRIDGE_URL as the DEVICE sees the bridge:
+#   AVD:    -e SHEP_BRIDGE_URL=ws://10.0.2.2:7432/
+#   phone:  -e SHEP_BRIDGE_URL=ws://100.83.179.75:7431/   (tailnet)
+# Text anchors only (no ids) per device-testing conventions.
+# IDEMPOTENT: no clearState (OxygenOS/ColorOS block `pm clear` for shell);
+# the pairing block only runs when the pairing screen is showing, so the same
+# flow works on a fresh install and on an already-paired device.
+appId: dev.shep.companion
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "the cockpit in your pocket"
+    commands:
+      # The URL field is pre-filled (default or a saved value) — the regex
+      # matches either; retarget it at the host bridge.
+      - tapOn: "ws://.*"
+      - eraseText
+      - inputText: "${SHEP_BRIDGE_URL}"
+      # Landscape/tablet: the IME covers the Token field — back dismisses it
+      # (pressKey works everywhere; hideKeyboard is UNAVAILABLE on OxygenOS).
+      - pressKey: back
+      - tapOn: "Token"
+      - inputText: "${SHEP_TOKEN}"
+      - pressKey: back
+      - tapOn: "Connect"
+      # Android 13+ notification permission prompt fires after pairing.
+      - runFlow:
+          when:
+            visible: "Allow"
+          commands:
+            - tapOn: "Allow"
+# Board: header, live status, and the default attention filter chip.
+# (Maestro plain strings are full-text regexes — "attention 0" needs a wildcard.)
+- assertVisible: "agents"
+- assertVisible: "live.*"
+- assertVisible: "attention.*"

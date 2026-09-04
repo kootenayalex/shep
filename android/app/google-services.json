@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "380312194717",
+    "project_id": "shep-82aa3",
+    "storage_bucket": "shep-82aa3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:380312194717:android:e754e9fa55fd61e62bce74",
+        "android_client_info": {
+          "package_name": "dev.shep.companion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBop1fwZGH0tef0k80zxEJlAzxgzK7Katg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

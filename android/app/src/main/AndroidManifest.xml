@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- QR pairing scanner. Optional: manual URL+token paste works without it. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- A3 push notifications (runtime-prompted on Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Bridge is ws:// over the tailnet (WireGuard-encrypted); no public TLS. -->
+    <application
+        android:label="Shep"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.Shep.Main"
+        android:usesCleartextTraffic="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Shep"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- A3 deep-link: a notification tap lands on the right pane. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="shep" android:host="pane" />
+            </intent-filter>
+            <!-- A6: launcher shortcut + widget deep-link into Tasks/add. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="shep" android:host="tasks" />
+            </intent-filter>
+            <!-- A6: static launcher shortcuts (res/xml/shortcuts.xml). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!-- A6 home-screen widget: blocked count + top blocked agent. -->
+        <receiver
+            android:name=".ShepWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="dev.shep.companion.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_blocked_info" />
+        </receiver>
+
+        <!-- FCM delivery: the transport that wakes the app out of Doze. -->
+        <service
+            android:name=".ShepMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- UnifiedPush delivery: kept until FCM is confirmed on real hardware,
+             so there is never a window with no working transport. -->
+        <receiver
+            android:name=".PushReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.MESSAGE" />
+                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
+                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
+                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Approve/Deny notification actions → pane.send_keys over the bridge. -->
+        <receiver
+            android:name=".ActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.shep.companion.PANE_ACTION" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

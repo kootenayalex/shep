@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A6 static launcher shortcuts. Long-press app icon → "New task" lands on
+     the Tasks tab with the add sheet already open (shep://tasks/new). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_task"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_task"
+        android:shortcutShortLabel="@string/shortcut_new_task"
+        android:shortcutLongLabel="@string/shortcut_new_task_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="shep://tasks/new"
+            android:targetPackage="dev.shep.companion"
+            android:targetClass="dev.shep.companion.MainActivity" />
+    </shortcut>
+</shortcuts>

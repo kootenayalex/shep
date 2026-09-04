@@ -1,0 +1,14 @@
+# A6 E2E — Tasks tab + add-task sheet (and the voice chip's presence).
+# Assumes the app is already paired (run 01 first, or have a saved pairing).
+appId: dev.shep.companion
+---
+- launchApp
+- tapOn: "tasks"
+- assertVisible: "\\+ new"
+- tapOn: "\\+ new"
+- assertVisible: "new task"
+- assertVisible: "queue task"
+- assertVisible: "voice"
+- assertVisible: "repo path"
+- back
+- assertVisible: "agents"
