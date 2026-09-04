@@ -4,6 +4,16 @@
 
 ### Added
 
+- `shep bridge pair` prints an 8-character claim code beside the QR, for
+  pairing a phone whose camera is not to hand: enter the computer's address
+  and the code, and the phone fetches the token itself over the same
+  WebSocket (`Authorization: Pair <code>`, answered with the token and an
+  immediate close). The code lives at `<config dir>/bridge-pair-code` (0600),
+  works once, expires after five minutes, and is taken back by Ctrl-C; `pair`
+  now waits until it is claimed and prints `paired`, or `--no-wait` to print
+  and return. A wrong code takes the same 401 and the same growing per-address
+  backoff as a wrong token, and does not cancel the pairing window.
+
 - The companion's fourth tab is now titled "shep" like the tab that opens it,
   and opens with a row explaining what the shep server is: a program on your
   computer, with the phone as its remote control, talking to it over your own

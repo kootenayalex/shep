@@ -27,6 +27,7 @@
 //! with a JSON error so a paired phone can never reach `server.stop`, the
 //! config, or the pty of an agent it has no UI for.
 
+mod pair;
 mod stream;
 mod transcript;
 
@@ -90,11 +91,11 @@ const AUTH_BACKOFF_STEP: Duration = Duration::from_millis(500);
 const AUTH_BACKOFF_MAX: Duration = Duration::from_secs(8);
 /// Failures older than this are forgotten.
 const AUTH_BACKOFF_FORGET: Duration = Duration::from_secs(600);
-const USAGE: &str = "usage: shep bridge [--bind <ip:port>] [--socket <api-socket-path>] | shep bridge pair [--host <ip[:port]>] | shep bridge token | shep bridge notify-push";
+const USAGE: &str = "usage: shep bridge [--bind <ip:port>] [--socket <api-socket-path>] | shep bridge pair [--host <ip[:port]>] [--no-wait] | shep bridge token | shep bridge notify-push";
 
 pub(super) fn run_bridge_command(args: &[String]) -> std::io::Result<i32> {
     match args.first().map(|arg| arg.as_str()) {
-        Some("pair") => pair(&args[1..]),
+        Some("pair") => pair::pair(&args[1..]),
         Some("notify-push") => push::notify_push(&args[1..]),
         Some("token") => {
             println!("{}", load_or_create_token()?);
@@ -110,73 +111,6 @@ pub(super) fn run_bridge_command(args: &[String]) -> std::io::Result<i32> {
             Ok(2)
         }
     }
-}
-
-/// Print the pairing info the companion app asks for (URL + token).
-fn pair(args: &[String]) -> std::io::Result<i32> {
-    let mut host = None;
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--host" => host = iter.next().cloned(),
-            _ => {
-                eprintln!("{USAGE}");
-                return Ok(2);
-            }
-        }
-    }
-    let host = host.unwrap_or_else(|| DEFAULT_BIND.to_string());
-    let host = if host.contains(':') {
-        host
-    } else {
-        format!("{host}:7431")
-    };
-    let token = load_or_create_token()?;
-    let url = format!("ws://{host}/");
-    let payload = format!(
-        "shep://pair?url={}&token={}",
-        percent_encode(&url),
-        percent_encode(&token),
-    );
-    match render_qr(&payload) {
-        Ok(image) => {
-            println!("{image}");
-        }
-        Err(err) => eprintln!("(could not render QR: {err}; use the text values below)"),
-    }
-    println!("url: {url}");
-    println!("token: {token}");
-    println!("scan the QR in the companion app, or paste both into the pairing screen.");
-    Ok(0)
-}
-
-/// Render `payload` as a terminal QR (light modules on the dark background, an
-/// inverted QR that scanners read fine). Kept dependency-light: the `qrcode`
-/// crate's unicode renderer, no image backend.
-fn render_qr(payload: &str) -> Result<String, qrcode::types::QrError> {
-    use qrcode::render::unicode;
-    let code = qrcode::QrCode::new(payload.as_bytes())?;
-    Ok(code
-        .render::<unicode::Dense1x2>()
-        .dark_color(unicode::Dense1x2::Light)
-        .light_color(unicode::Dense1x2::Dark)
-        .quiet_zone(true)
-        .build())
-}
-
-/// Percent-encode a query-parameter value (RFC 3986 unreserved set passes
-/// through). The companion app decodes via `Uri.getQueryParameter`.
-fn percent_encode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char);
-            }
-            _ => out.push_str(&format!("%{byte:02X}")),
-        }
-    }
-    out
 }
 
 fn serve(args: &[String]) -> std::io::Result<i32> {
@@ -316,6 +250,11 @@ fn handle_ws_client(
     let expected = token.to_string();
     let auth_failed = Arc::new(AtomicBool::new(false));
     let auth_failed_in_check = auth_failed.clone();
+    // The handshake callback can only answer Ok/Err, so a successful *claim*
+    // (as opposed to a normal Bearer connection) leaves the closure the same
+    // way an auth failure does.
+    let claim_mode = Arc::new(AtomicBool::new(false));
+    let claim_mode_in_check = claim_mode.clone();
     // The Err type is tungstenite's ErrorResponse (a full http::Response);
     // accept_hdr fixes the callback signature, so the size is not ours to
     // shrink.
@@ -327,6 +266,17 @@ fn handle_ws_client(
                 StatusCode::FORBIDDEN,
                 "browser origins are not accepted\n",
             ));
+        }
+        if let Some(code) = presented_pair_code(request) {
+            // A claim is not an authenticated connection: it is one printed
+            // code, spent, in exchange for the token. Wrong ones take the same
+            // 401 and the same growing backoff as a wrong token.
+            if pair::claim(&code) {
+                claim_mode_in_check.store(true, Ordering::Relaxed);
+                return Ok(response);
+            }
+            auth_failed_in_check.store(true, Ordering::Relaxed);
+            return Err(unauthorized_response());
         }
         if request_authorized(request, &expected) {
             Ok(response)
@@ -352,6 +302,15 @@ fn handle_ws_client(
     socket
         .get_ref()
         .set_read_timeout(Some(Duration::from_millis(50)))?;
+
+    if claim_mode.load(Ordering::Relaxed) {
+        // The whole connection: one frame with the token, then closed. No
+        // channel is ever served on it, so `handle_client_frame` never runs.
+        socket.send(Message::Text(claim_hello(token)))?;
+        socket.close(None).ok();
+        socket.flush().ok();
+        return Ok(());
+    }
 
     socket.send(Message::Text(
         serde_json::json!({
@@ -633,6 +592,39 @@ fn request_authorized(request: &WsRequest, expected: &str) -> bool {
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .is_some_and(|presented| constant_time_eq(presented.as_bytes(), expected.as_bytes()))
+}
+
+/// The claim code on an `Authorization: Pair <code>` upgrade, normalized.
+///
+/// A separate scheme rather than a query parameter or a new endpoint: it
+/// travels the same path as the token, so it inherits the Origin rejection,
+/// the connection cap and the per-address backoff for free.
+fn presented_pair_code(request: &WsRequest) -> Option<String> {
+    let code = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Pair "))
+        .map(pair::normalize_code)?;
+    if code.is_empty() {
+        None
+    } else {
+        Some(code)
+    }
+}
+
+/// The one frame a claimed connection gets: the same hello a paired client
+/// sees, plus the token it came for. `pair` is a sibling of `hello`, never
+/// nested inside it, so a client that ignores it parses the hello as usual.
+fn claim_hello(token: &str) -> String {
+    serde_json::json!({
+        "hello": {
+            "server_version": env!("CARGO_PKG_VERSION"),
+            "protocol": crate::protocol::PROTOCOL_VERSION,
+        },
+        "pair": { "token": token },
+    })
+    .to_string()
 }
 
 /// Length-then-xor-fold comparison: every byte is visited whenever the
@@ -2300,6 +2292,29 @@ mod tests {
         let request = ws_request(Some("Bearer sekrit"), "ws://x/");
         assert!(request_authorized(&request, "sekrit"));
         assert!(!request_authorized(&request, "other"));
+    }
+
+    #[test]
+    fn a_pair_header_is_read_as_a_claim_not_a_token() {
+        let request = ws_request(Some("Pair 7k4m-9qp2"), "ws://x/");
+        assert_eq!(presented_pair_code(&request).as_deref(), Some("7K4M9QP2"));
+        // A claim is never an authenticated connection, whatever the token is.
+        assert!(!request_authorized(&request, "7K4M9QP2"));
+        assert!(presented_pair_code(&ws_request(Some("Bearer x"), "ws://x/")).is_none());
+        assert!(presented_pair_code(&ws_request(Some("Pair  "), "ws://x/")).is_none());
+        assert!(presented_pair_code(&ws_request(None, "ws://x/")).is_none());
+    }
+
+    #[test]
+    fn a_claim_hello_carries_the_token_beside_the_hello() {
+        let value: serde_json::Value = serde_json::from_str(&claim_hello("sekrit")).unwrap();
+        assert_eq!(value["pair"]["token"], "sekrit");
+        assert_eq!(
+            value["hello"]["protocol"],
+            crate::protocol::PROTOCOL_VERSION
+        );
+        // Not a channel frame: nothing on this connection is ever relayed.
+        assert!(value.get("ch").is_none());
     }
 
     /// The query-string fallback was removed: a token in the URL lands in

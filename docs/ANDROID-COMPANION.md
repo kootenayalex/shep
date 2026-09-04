@@ -210,6 +210,17 @@ shep server (macmini)
 
 ## Security (2026-09-04)
 
+- **Claim code.** `shep bridge pair` also writes an 8-character code to
+  `<config dir>/bridge-pair-code` (0600, two lines: code, unix expiry) and
+  waits. A phone presents it as `Authorization: Pair <code>` on the upgrade;
+  the bridge claims it (single use — the file is deleted), answers with one
+  frame carrying the real token beside the usual hello, and closes without
+  serving a channel. The code is 40 bits, so it is safe only because of what
+  surrounds it: five-minute TTL, one use, the same 401 and the same growing
+  per-address backoff as a wrong token, and the same Origin rejection and
+  connection cap. A **wrong** code never deletes the file, so a guesser cannot
+  cancel a live pairing window. Ctrl-C in `pair` removes it; a file left by a
+  killed `pair` is inert once expired.
 - **Pairing at rest.** The bridge URL and token live in an
   `EncryptedSharedPreferences` file keyed by the Android keystore
   (`Pairing.kt`). A pairing saved by an older build is moved out of the plain

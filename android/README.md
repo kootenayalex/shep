@@ -6,8 +6,12 @@ tailnet. Lives in the shep repo under `android/`; see `docs/ANDROID-COMPANION.md
 for the plan. From the repo root: `just android-check` (tests + debug build),
 `just android-install`, `just android-maestro`.
 
-Pairing: run `shep bridge pair --host <tailnet-ip>` on the server, paste the
-URL + token into the app.
+Pairing: run `shep bridge pair --host <tailnet-ip>` on the server. Scan the QR
+in the app, or enter the computer's address and the 8-character claim code it
+prints beneath. `pair` waits until the code is claimed and prints `paired`; the
+code expires after five minutes, works once, and Ctrl-C takes it back.
+`--no-wait` prints and returns. The URL + token fields are still there under
+"address and token" for scripts.
 
 v0 scope (A0–A2 core): pairing, live agents home (blocked-first, state
 colors, review badges), pane view (live text, quick keys y/n/enter/esc/↑/↓,
