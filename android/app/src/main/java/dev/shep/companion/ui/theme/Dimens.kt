@@ -73,6 +73,9 @@ object ShepSize {
     /** The memory-cap bar, which spans its screen. */
     val meterHeight = 6.dp
 
+    /** A swatch in a legend, and the per-file bar it explains. Height is [gaugeHeight]. */
+    val legendBarWidth = 24.dp
+
     /** A full-width primary button. */
     val buttonHeight = 52.dp
 

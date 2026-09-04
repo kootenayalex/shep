@@ -19,12 +19,17 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepShape
@@ -84,6 +89,12 @@ enum class NoticeTone {
 
     /** Something is wrong enough to interrupt: a protocol mismatch, a failure. */
     Alert,
+
+    /** It worked: approved, merged, sent. A receipt, in the settled colour. */
+    Good,
+
+    /** It did not work. Red is stop, so it is ink on nothing, never a fill. */
+    Bad,
 }
 
 /**
@@ -105,14 +116,21 @@ fun Notice(
     // [ShepMotion.NOTICE_MS] so the screen stops asserting something that
     // stopped being true minutes ago. An Alert does not: a protocol mismatch
     // is a standing condition, not an event.
-    if (onDismiss != null && tone == NoticeTone.Info) {
+    // A Good notice is a receipt too, so it clears itself alongside Info; a
+    // Bad one is a standing condition and stays with the Alert.
+    if (onDismiss != null && (tone == NoticeTone.Info || tone == NoticeTone.Good)) {
         LaunchedEffect(text) {
             delay(ShepMotion.NOTICE_MS)
             onDismiss()
         }
     }
     val background = if (tone == NoticeTone.Alert) ShepPalette.peach else Color.Transparent
-    val ink = if (tone == NoticeTone.Alert) ShepPalette.panelBg else ShepPalette.peach
+    val ink = when (tone) {
+        NoticeTone.Alert -> ShepPalette.panelBg
+        NoticeTone.Good -> ShepPalette.green
+        NoticeTone.Bad -> ShepPalette.red
+        NoticeTone.Info -> ShepPalette.peach
+    }
     Text(
         text,
         style = ShepType.meta.copy(color = ink),
@@ -132,12 +150,144 @@ fun Notice(
  * non-shep typography in the app, on the screens with the least to say.
  */
 @Composable
-fun EmptyState(text: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    text: String,
+    modifier: Modifier = Modifier,
+    body: String? = null,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     Box(
         modifier.fillMaxSize().padding(ShepSpace.section),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = ShepType.emptyState, textAlign = TextAlign.Center)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(ShepSpace.small),
+        ) {
+            Text(
+                text,
+                style = if (body == null) ShepType.emptyState else ShepType.emptyTitle,
+                textAlign = TextAlign.Center,
+            )
+            body?.let { Text(it, style = ShepType.emptyState, textAlign = TextAlign.Center) }
+            if (actionLabel != null && onAction != null) {
+                ShepButton(actionLabel, tone = ButtonTone.Quiet, onClick = onAction)
+            }
+        }
+    }
+}
+
+/**
+ * A question the screen can answer about itself, collapsed until asked.
+ *
+ * The prototype pass found that every screen has two or three words a first-time
+ * reader has to guess at — a ring, a glyph, "its own copy" — and that a per-term
+ * `i` button is a hidden affordance costing 48dp on every row. One row per
+ * screen, phrased as the question rather than as a noun, costs one line and
+ * says out loud that there is something to read.
+ *
+ * The private `Expandable` in `TranscriptView` does the same trick for tool
+ * output; this is the public one, and it takes a body rather than a string.
+ */
+@Composable
+fun ExplainRow(
+    question: String,
+    modifier: Modifier = Modifier,
+    tag: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .then(if (tag == null) Modifier else Modifier.testTag(tag)),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .minimumInteractiveComponentSize()
+                .clickable { open = !open }
+                .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.snug),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (open) "▾" else "▸",
+                style = ShepType.explainLabel,
+            )
+            Spacer(Modifier.width(ShepSpace.small))
+            Text(question, style = ShepType.explainLabel)
+        }
+        if (open) {
+            Column(
+                Modifier.padding(
+                    start = ShepSpace.screen,
+                    end = ShepSpace.screen,
+                    bottom = ShepSpace.small,
+                ),
+                verticalArrangement = Arrangement.spacedBy(ShepSpace.tight),
+                content = content,
+            )
+        }
+    }
+}
+
+/** One `term = what it means` line inside an [ExplainRow]. */
+@Composable
+fun ExplainLine(term: String, meaning: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
+        Text(term, style = ShepType.explainTerm)
+        Text(meaning, style = ShepType.bodySmall)
+    }
+}
+
+/** One numbered step in a walkthrough. */
+@Composable
+fun StepRow(
+    number: Int,
+    text: String,
+    modifier: Modifier = Modifier,
+    detail: String? = null,
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Text("$number.", style = ShepType.stepNumber)
+        Spacer(Modifier.width(ShepSpace.small))
+        Column {
+            Text(text, style = ShepType.bodySmall)
+            detail?.let { Text(it, style = ShepType.metaSmall) }
+        }
+    }
+}
+
+/**
+ * A detail screen's top row, with the word it goes back to on screen.
+ *
+ * Both hand-rolled versions drew a bare chevron and put the origin only in a
+ * `contentDescription`, so the one reader who could not see it was the one
+ * looking at it.
+ */
+@Composable
+fun BackHeader(
+    origin: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(ShepPalette.surfaceDim)
+            .padding(horizontal = ShepSpace.small, vertical = ShepSpace.tight),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ActionText(
+            "‹ $origin",
+            style = ShepType.action.copy(color = ShepPalette.accent),
+            description = "back to $origin",
+            onClick = onBack,
+        )
+        Spacer(Modifier.width(ShepSpace.small))
+        content()
     }
 }
 
@@ -212,6 +362,7 @@ fun ShepSheet(
     title: String,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    showCancel: Boolean = true,
     titleAction: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -235,6 +386,16 @@ fun ShepSheet(
                 Text(title, style = ShepType.sheetTitle)
                 Spacer(Modifier.weight(1f))
                 titleAction()
+                // In the title row rather than beside the primary action: the
+                // sheet opens fully expanded precisely so the primary is above
+                // the fold, and a footer button would push it back down.
+                if (showCancel) {
+                    ActionText(
+                        "cancel",
+                        description = "cancel and close",
+                        onClick = onDismiss,
+                    )
+                }
             }
             Spacer(Modifier.height(ShepSpace.medium))
             content()

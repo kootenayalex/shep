@@ -133,8 +133,44 @@ object ShepType {
     /** Text inside a pill. */
     val chip = mono.copy(fontSize = 12.sp)
 
-    /** What a screen says when it has nothing to show. */
+    /** The first line of what a screen says when it has nothing to show. */
+    val emptyTitle = mono.copy(
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = ShepPalette.subtext0,
+    )
+
+    /** The rest of it, and the same voice anywhere else a screen explains itself. */
     val emptyState = mono.copy(fontSize = 13.sp, color = ShepPalette.overlay0)
+
+    /** The question on a collapsed explain row: "how to read this list". */
+    val explainLabel = mono.copy(
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = ShepPalette.overlay1,
+    )
+
+    /** The `glyph =` half of a line inside an open explain row. */
+    val explainTerm = mono.copy(
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = ShepPalette.subtext0,
+    )
+
+    /**
+     * The number on a numbered step.
+     *
+     * Deliberately not copper: accent is focus, never a state and never chrome,
+     * and a step number is chrome.
+     */
+    val stepNumber = mono.copy(
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = ShepPalette.overlay1,
+    )
+
+    /** One line saying what a whole change is: review's "written by ... - N files". */
+    val summary = mono.copy(fontSize = 13.sp, color = ShepPalette.subtext0)
 
     // ── Doing things ────────────────────────────────────────────────────────
 
