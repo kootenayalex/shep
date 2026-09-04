@@ -45,6 +45,11 @@ install-hooks:
 build:
     cargo build --release --locked
 
+# Build, code-sign, and install shep on macOS.
+# The signature must be stable or macOS discards every file-access grant on rebuild.
+install-macos:
+    scripts/install-macos.sh
+
 # Build the website and documentation
 website-build:
     cd website && bun install --frozen-lockfile && bun run build
