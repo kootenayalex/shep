@@ -107,7 +107,9 @@ impl App {
                     .unwrap_or_default(),
                 workspace_id: self.public_workspace_id(card.ws_idx),
                 tab_id: self.public_tab_id(card.ws_idx, tab_idx).unwrap_or_default(),
-                tab_name: ws.tab_display_name(tab_idx).unwrap_or_default(),
+                tab_name: ws
+                    .tab_display_name(tab_idx, &self.state.terminals)
+                    .unwrap_or_default(),
                 pane_number: ws.public_pane_number(card.pane_id).map(|n| n as u64),
                 workspace_label: card.workspace_label.clone(),
                 branch: card.branch.clone(),

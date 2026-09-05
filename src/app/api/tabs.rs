@@ -145,15 +145,31 @@ impl App {
         let tab_id = self.public_tab_id(ws_idx, tab_idx).unwrap_or_else(|| {
             crate::workspace::public_tab_id_for_number(&workspace_id, tab_idx + 1)
         });
-        let Some(tab) = self
-            .state
-            .workspaces
-            .get_mut(ws_idx)
-            .and_then(|ws| ws.tabs.get_mut(tab_idx))
-        else {
-            return tab_not_found(id, &params.tab_id);
-        };
-        tab.set_custom_name(params.label.clone());
+        // A tab holding one agent has no separate name to carry: renaming it is
+        // renaming the agent, so the name lands where every surface reads it
+        // rather than in a second field that then disagrees.
+        let lone_pane = self.state.workspaces[ws_idx].lone_tab_pane(tab_idx);
+        let lone_terminal = lone_pane
+            .and_then(|pane_id| self.state.workspaces[ws_idx].pane_state(pane_id))
+            .map(|pane| pane.attached_terminal_id.clone());
+        if let Some(terminal) = lone_terminal.and_then(|id| self.state.terminals.get_mut(&id)) {
+            let label = params.label.trim();
+            if label.is_empty() {
+                terminal.clear_agent_display_name();
+            } else {
+                terminal.set_agent_display_name(label.to_string());
+            }
+        } else {
+            let Some(tab) = self
+                .state
+                .workspaces
+                .get_mut(ws_idx)
+                .and_then(|ws| ws.tabs.get_mut(tab_idx))
+            else {
+                return tab_not_found(id, &params.tab_id);
+            };
+            tab.set_custom_name(params.label.clone());
+        }
         crate::logging::tab_renamed(&workspace_id, &tab_id);
         self.schedule_session_save();
         self.emit_event(EventEnvelope {
@@ -454,6 +470,84 @@ mod tests {
         config::{Config, ShellModeConfig},
         workspace::Workspace,
     };
+
+    /// `tab.rename` on a tab holding one agent names the agent. Two stored
+    /// names for one thing is what this replaced: the projection every surface
+    /// reads must not depend on which verb the caller reached for.
+    #[test]
+    fn api_tab_rename_names_the_agent_of_a_one_agent_tab() {
+        let event_hub = crate::api::EventHub::default();
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(&Config::default(), true, None, api_rx, event_hub.clone());
+        app.state.workspaces = vec![Workspace::test_new("tabs")];
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.ensure_test_terminals();
+        let root_pane = app.state.workspaces[0].tabs[0].root_pane;
+        let terminal_id = app.state.workspaces[0].tabs[0]
+            .terminal_id(root_pane)
+            .unwrap()
+            .clone();
+        let tab_id = app.public_tab_id(0, 0).unwrap();
+
+        let response = app.handle_tab_rename(
+            "req".into(),
+            TabRenameParams {
+                tab_id: tab_id.clone(),
+                label: "kai".into(),
+            },
+        );
+
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        let ResponseResult::TabInfo { tab } = success.result else {
+            panic!("expected tab info");
+        };
+        assert_eq!(tab.label, "kai");
+        assert!(app.state.workspaces[0].tabs[0].custom_name.is_none());
+        let terminal = &app.state.terminals[&terminal_id];
+        assert_eq!(terminal.agent_name.as_deref(), Some("kai"));
+        assert_eq!(terminal.manual_label.as_deref(), Some("kai"));
+        assert_eq!(
+            app.state.workspaces[0]
+                .tab_display_name(0, &app.state.terminals)
+                .as_deref(),
+            Some("kai")
+        );
+    }
+
+    /// A tab that really holds several panes is a container again, and keeps a
+    /// name of its own.
+    #[test]
+    fn api_tab_rename_keeps_a_tab_name_when_the_tab_holds_several_panes() {
+        let event_hub = crate::api::EventHub::default();
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(&Config::default(), true, None, api_rx, event_hub.clone());
+        let mut workspace = Workspace::test_new("tabs");
+        workspace.test_split(ratatui::layout::Direction::Vertical);
+        app.state.workspaces = vec![workspace];
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.ensure_test_terminals();
+        let tab_id = app.public_tab_id(0, 0).unwrap();
+
+        app.handle_tab_rename(
+            "req".into(),
+            TabRenameParams {
+                tab_id,
+                label: "pair".into(),
+            },
+        );
+
+        assert_eq!(
+            app.state.workspaces[0].tabs[0].custom_name.as_deref(),
+            Some("pair")
+        );
+        assert!(app
+            .state
+            .terminals
+            .values()
+            .all(|terminal| terminal.agent_name.is_none()));
+    }
 
     #[test]
     fn api_tab_move_reorders_tabs_in_target_workspace() {

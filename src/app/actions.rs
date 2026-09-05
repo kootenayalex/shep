@@ -217,11 +217,15 @@ pub fn notification_context(
     workspace_label: &str,
     ws_idx: usize,
     pane_id: PaneId,
+    terminals: &std::collections::HashMap<
+        crate::terminal::TerminalId,
+        crate::terminal::TerminalState,
+    >,
 ) -> String {
     let mut context = format!("{} · {}", workspace_label, ws_idx + 1);
     if ws.tabs.len() > 1 {
         if let Some(tab_idx) = ws.find_tab_index_for_pane(pane_id) {
-            if let Some(label) = ws.tab_display_name(tab_idx) {
+            if let Some(label) = ws.tab_display_name(tab_idx, terminals) {
                 context.push_str(&format!(" · {label}"));
             }
         }
@@ -469,7 +473,7 @@ impl AppState {
         let ws = &self.workspaces[ws_idx];
         let tab = &ws.tabs[tab_idx];
         let label = ws
-            .tab_display_name(tab_idx)
+            .tab_display_name(tab_idx, &self.terminals)
             .unwrap_or_else(|| (tab_idx + 1).to_string());
         let (status, seen) = tab_aggregate_state(tab, &self.terminals);
         let activity = tab_activity_summary(tab, &self.terminals);
@@ -1590,6 +1594,7 @@ impl AppState {
             self.tab_scroll,
             self.tab_scroll_follow_active,
             self.mouse_capture,
+            &self.terminals,
         );
         self.tab_scroll = layout.scroll;
         self.view.tab_hit_areas = layout.tab_hit_areas;
@@ -2993,8 +2998,13 @@ impl AppState {
             .filter(|_| self.sound.allows(known_agent));
         let build_toast = || {
             let workspace_label = self.workspaces[ws_idx].display_name();
-            let context =
-                notification_context(&self.workspaces[ws_idx], &workspace_label, ws_idx, pane_id);
+            let context = notification_context(
+                &self.workspaces[ws_idx],
+                &workspace_label,
+                ws_idx,
+                pane_id,
+                &self.terminals,
+            );
             ToastNotification {
                 kind,
                 title: format!(
@@ -3203,7 +3213,13 @@ mod tests {
         let root = state.workspaces[0].tabs[0].root_pane;
 
         assert_eq!(
-            notification_context(&state.workspaces[0], "__shep_projects__", 0, root),
+            notification_context(
+                &state.workspaces[0],
+                "__shep_projects__",
+                0,
+                root,
+                &state.terminals,
+            ),
             "__shep_projects__ · 1"
         );
     }

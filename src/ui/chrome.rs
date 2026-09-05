@@ -95,7 +95,7 @@ pub(super) fn render_titlebar(
     let ws_name = ws.display_name_from(&app.terminals, terminal_runtimes);
     let tab_idx = ws.active_tab_index();
     let tab_name = ws
-        .tab_display_name(tab_idx)
+        .tab_display_name(tab_idx, &app.terminals)
         .unwrap_or_else(|| (tab_idx + 1).to_string());
     let center = Line::from(vec![
         Span::styled(

@@ -1435,6 +1435,20 @@ impl TerminalState {
         self.manual_label = None;
     }
 
+    /// Name the agent this terminal is running. Both halves move together:
+    /// `agent_name` is the name every surface shows, `manual_label` is the
+    /// pane border's, and a rename that set only one left the pane answering
+    /// to a name the caller had just replaced.
+    pub fn set_agent_display_name(&mut self, name: String) {
+        self.set_agent_name(name.clone());
+        self.set_manual_label(name);
+    }
+
+    pub fn clear_agent_display_name(&mut self) {
+        self.clear_agent_name();
+        self.clear_manual_label();
+    }
+
     pub fn set_agent_name(&mut self, name: String) {
         let name = name.trim().to_string();
         self.agent_name = (!name.is_empty()).then_some(name);

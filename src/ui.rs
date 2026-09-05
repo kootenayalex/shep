@@ -285,6 +285,7 @@ fn compute_view_internal(
                 app.tab_scroll,
                 app.tab_scroll_follow_active,
                 app.mouse_capture,
+                &app.terminals,
             )
         })
         .unwrap_or_default();

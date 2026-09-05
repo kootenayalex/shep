@@ -135,7 +135,7 @@ impl Workspace {
             .enumerate()
             .flat_map(|(tab_idx, tab)| {
                 let tab_label = self
-                    .tab_display_name(tab_idx)
+                    .tab_display_name(tab_idx, terminals)
                     .unwrap_or_else(|| (tab_idx + 1).to_string());
                 // A tab normally holds one agent, and then its label is the
                 // agent's own. Only a tab that really holds several panes

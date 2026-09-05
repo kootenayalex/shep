@@ -1370,7 +1370,11 @@ mod tests {
             .tabs
             .iter()
             .enumerate()
-            .map(|(tab_idx, _)| app.state.workspaces[0].tab_display_name(tab_idx).unwrap())
+            .map(|(tab_idx, _)| {
+                app.state.workspaces[0]
+                    .tab_display_name(tab_idx, &app.state.terminals)
+                    .unwrap()
+            })
             .collect();
         assert_eq!(labels, vec!["foo", "2", "3"]);
         assert_eq!(

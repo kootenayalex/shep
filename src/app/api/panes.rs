@@ -1178,9 +1178,11 @@ impl App {
         let Some(terminal) = self.state.terminals.get_mut(&terminal_id) else {
             return pane_not_found(id, &params.pane_id);
         };
+        // Renaming a pane is renaming the agent in it: one name, so the
+        // border, the agent panel, the board and the phone cannot disagree.
         match params.label.map(|label| label.trim().to_string()) {
-            Some(label) if !label.is_empty() => terminal.set_manual_label(label),
-            _ => terminal.clear_manual_label(),
+            Some(label) if !label.is_empty() => terminal.set_agent_display_name(label),
+            _ => terminal.clear_agent_display_name(),
         }
         self.state.mark_session_dirty();
         let pane = self.pane_info(ws_idx, pane_id).unwrap();

@@ -437,17 +437,70 @@ impl Workspace {
         self.tabs.get_mut(self.active_tab)
     }
 
-    pub fn active_tab_display_name(&self) -> Option<String> {
-        self.tab_display_name(self.active_tab)
+    pub fn active_tab_display_name(
+        &self,
+        terminals: &HashMap<TerminalId, TerminalState>,
+    ) -> Option<String> {
+        self.tab_display_name(self.active_tab, terminals)
     }
 
-    pub fn tab_display_name(&self, tab_idx: usize) -> Option<String> {
+    /// The name a tab answers to on every surface.
+    ///
+    /// A tab is one agent, and shep already lets that agent be named
+    /// directly. Two stored names for one thing is one too many, so the
+    /// agent's own name wins and the tab's own name is what a tab falls back
+    /// to: when it has no named agent to borrow from, or when it really holds
+    /// several panes and is a container again.
+    pub fn tab_display_name(
+        &self,
+        tab_idx: usize,
+        terminals: &HashMap<TerminalId, TerminalState>,
+    ) -> Option<String> {
         let tab = self.tabs.get(tab_idx)?;
         Some(
-            tab.custom_name
-                .clone()
+            Self::lone_agent_name(tab, terminals)
+                .or_else(|| tab.custom_name.clone())
                 .unwrap_or_else(|| (tab_idx + 1).to_string()),
         )
+    }
+
+    /// The pane of a tab that holds exactly one — the agent the tab *is*,
+    /// rather than a tab that is a container for several.
+    pub fn lone_tab_pane(&self, tab_idx: usize) -> Option<PaneId> {
+        let tab = self.tabs.get(tab_idx)?;
+        let mut ids = tab.panes.keys();
+        let id = *ids.next()?;
+        ids.next().is_none().then_some(id)
+    }
+
+    /// Whether a tab is still answering to its position rather than a name
+    /// anybody chose — for its own name or its lone agent's.
+    pub fn tab_is_auto_named(
+        &self,
+        tab_idx: usize,
+        terminals: &HashMap<TerminalId, TerminalState>,
+    ) -> bool {
+        self.tabs.get(tab_idx).is_some_and(|tab| {
+            tab.custom_name.is_none() && Self::lone_agent_name(tab, terminals).is_none()
+        })
+    }
+
+    /// The name the human gave the tab's single agent, if it has exactly one
+    /// and they named it. A detected label ("claude") is not a name anybody
+    /// chose, so it never displaces a tab name here.
+    fn lone_agent_name(
+        tab: &Tab,
+        terminals: &HashMap<TerminalId, TerminalState>,
+    ) -> Option<String> {
+        let mut panes = tab.panes.values();
+        let pane = panes.next()?;
+        if panes.next().is_some() {
+            return None;
+        }
+        terminals
+            .get(&pane.attached_terminal_id)?
+            .agent_name
+            .clone()
     }
 
     pub fn switch_tab(&mut self, idx: usize) {
@@ -1608,6 +1661,56 @@ mod tests {
         );
     }
 
+    /// A tab is one agent, so the agent's name is the tab's name — the tab's
+    /// own stored name only answers for a tab with no named agent to borrow
+    /// from, and for a tab that really is holding several panes.
+    #[test]
+    fn a_named_agent_is_the_name_its_tab_answers_to() {
+        let mut ws = Workspace::test_new("test");
+        ws.tabs[0].set_custom_name("tab-name".into());
+        let root_pane = ws.tabs[0].root_pane;
+        let terminal_id = ws.tabs[0].terminal_id(root_pane).unwrap().clone();
+        let mut terminals = HashMap::new();
+        terminals.insert(
+            terminal_id.clone(),
+            TerminalState::new(terminal_id.clone(), PathBuf::from("/tmp")),
+        );
+
+        // No agent name yet: the tab's own name still answers.
+        assert_eq!(
+            ws.tab_display_name(0, &terminals).as_deref(),
+            Some("tab-name")
+        );
+        assert!(!ws.tab_is_auto_named(0, &terminals));
+
+        terminals
+            .get_mut(&terminal_id)
+            .unwrap()
+            .set_agent_display_name("kai".into());
+        assert_eq!(ws.tab_display_name(0, &terminals).as_deref(), Some("kai"));
+        assert_eq!(ws.lone_tab_pane(0), Some(root_pane));
+
+        // Split the tab and it is a container again, answering to its own name.
+        ws.test_split(Direction::Vertical);
+        assert_eq!(ws.lone_tab_pane(0), None);
+        assert_eq!(
+            ws.tab_display_name(0, &terminals).as_deref(),
+            Some("tab-name")
+        );
+    }
+
+    /// A tab nobody has named answers to its position, whether the name would
+    /// have come from the tab or from its agent.
+    #[test]
+    fn an_unnamed_tab_still_answers_to_its_number() {
+        let ws = Workspace::test_new("test");
+        assert!(ws.tab_is_auto_named(0, &HashMap::new()));
+        assert_eq!(
+            ws.tab_display_name(0, &HashMap::new()).as_deref(),
+            Some("1")
+        );
+    }
+
     #[test]
     fn moving_tab_keeps_active_identity_and_stable_tab_numbers() {
         let mut ws = Workspace::test_new("test");
@@ -1620,7 +1723,7 @@ mod tests {
         assert!(ws.move_tab(0, ws.tabs.len()));
 
         let labels: Vec<_> = (0..ws.tabs.len())
-            .map(|tab_idx| ws.tab_display_name(tab_idx).unwrap())
+            .map(|tab_idx| ws.tab_display_name(tab_idx, &HashMap::new()).unwrap())
             .collect();
         assert_eq!(labels, vec!["foo", "2", "3"]);
         assert_eq!(ws.tabs[0].custom_name.as_deref(), Some("foo"));

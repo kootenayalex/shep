@@ -166,7 +166,8 @@ fn agent_panel_entries_with_runtimes(
                     tab_idx: detail.tab_idx,
                     pane_id: detail.pane_id,
                     primary_label: workspace_label.clone(),
-                    primary_tab_label: multi_tab.then_some(detail.tab_label),
+                    primary_tab_label: multi_tab
+                        .then(|| strip_workspace_prefix(&detail.tab_label, &workspace_label)),
                     agent_label: Some(strip_workspace_prefix(
                         &detail.agent_label,
                         &workspace_label,

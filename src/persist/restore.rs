@@ -1466,6 +1466,73 @@ mod tests {
         assert_eq!(next_public_pane_number, 3);
     }
 
+    /// The name a tab shows now lives on its agent, so restore has to bring it
+    /// back through the pane — a session that reopened answering to "1" would
+    /// have lost the only name the human ever typed.
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn restore_brings_back_the_name_a_tab_borrows_from_its_agent() {
+        let cwd = std::env::current_dir().unwrap();
+        let snapshot = SessionSnapshot {
+            version: super::super::snapshot::SNAPSHOT_VERSION,
+            workspaces: vec![WorkspaceSnapshot {
+                id: Some("workspace".into()),
+                custom_name: None,
+                identity_cwd: cwd.clone(),
+                worktree_space: None,
+                public_pane_numbers: HashMap::new(),
+                next_public_pane_number: 0,
+                public_tab_numbers: Vec::new(),
+                next_public_tab_number: 0,
+                tabs: vec![TabSnapshot {
+                    custom_name: None,
+                    layout: LayoutSnapshot::Pane(0),
+                    panes: HashMap::from([(
+                        0,
+                        super::super::snapshot::PaneSnapshot {
+                            cwd,
+                            label: Some("kai".into()),
+                            agent_name: Some("kai".into()),
+                            agent_session: None,
+                            launch_argv: None,
+                            manual_state: None,
+                        },
+                    )]),
+                    zoomed: false,
+                    focused: Some(0),
+                    root_pane: Some(0),
+                }],
+                active_tab: 0,
+            }],
+            active: Some(0),
+            selected: 0,
+            sidebar_width: None,
+            sidebar_section_split: None,
+            collapsed_space_keys: Default::default(),
+        };
+        let (events, _event_rx) = mpsc::channel(4);
+
+        let (workspaces, terminals, _runtimes) = restore(
+            &snapshot,
+            None,
+            24,
+            80,
+            0,
+            test_restore_shell(),
+            crate::config::ShellModeConfig::NonLogin,
+            true,
+            events,
+            Arc::new(Notify::new()),
+            Arc::new(AtomicBool::new(false)),
+        );
+
+        assert_eq!(
+            workspaces[0].tab_display_name(0, &terminals).as_deref(),
+            Some("kai")
+        );
+        assert!(workspaces[0].tabs[0].custom_name.is_none());
+    }
+
     #[tokio::test]
     #[cfg(unix)]
     async fn native_agent_restore_defers_runtime_launch() {

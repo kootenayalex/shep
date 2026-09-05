@@ -322,7 +322,7 @@ fn render_header_status(
 
     let (state, seen) = ws.aggregate_state(&app.terminals);
     let (dot, dot_style) = agent_icon(state, seen, app.spinner_tick, p);
-    let tab_label = mobile_tab_status(ws);
+    let tab_label = mobile_tab_status(ws, &app.terminals);
     let row1 = Rect::new(area.x, area.y, area.width, 1);
     let tab_w = display_width_u16(&tab_label)
         .saturating_add(1)
@@ -362,9 +362,15 @@ fn render_header_status(
     }
 }
 
-fn mobile_tab_status(ws: &crate::workspace::Workspace) -> String {
+fn mobile_tab_status(
+    ws: &crate::workspace::Workspace,
+    terminals: &std::collections::HashMap<
+        crate::terminal::TerminalId,
+        crate::terminal::TerminalState,
+    >,
+) -> String {
     let tab_label = ws
-        .tab_display_name(ws.active_tab)
+        .tab_display_name(ws.active_tab, terminals)
         .unwrap_or_else(|| (ws.active_tab + 1).to_string());
     if ws.tabs.len() <= 1 {
         format!("tab {tab_label}")
@@ -629,7 +635,7 @@ fn render_mobile_switcher_content(
             "{detail_prefix}{} {} {}",
             ws.branch().unwrap_or_else(|| "shell".into()),
             glyphs::SEP,
-            mobile_tab_status(ws)
+            mobile_tab_status(ws, &app.terminals)
         );
         render_two_line_item(
             frame,
@@ -666,13 +672,13 @@ fn render_mobile_switcher_content(
             p,
         );
         doc_y += 1;
-        for (idx, tab) in ws.tabs.iter().enumerate() {
+        for (idx, _tab) in ws.tabs.iter().enumerate() {
             let active = idx == ws.active_tab;
             let bg = mobile_item_bg(false, active, p);
             let display_name = ws
-                .tab_display_name(idx)
+                .tab_display_name(idx, &app.terminals)
                 .unwrap_or_else(|| (idx + 1).to_string());
-            let label = if tab.is_auto_named() {
+            let label = if ws.tab_is_auto_named(idx, &app.terminals) {
                 format!("tab {display_name}")
             } else {
                 format!("{} {} {display_name}", idx + 1, glyphs::SEP)
@@ -1360,7 +1366,10 @@ mod tests {
         assert!(workspace.close_tab(removed_tab));
         workspace.active_tab = 1;
 
-        assert_eq!(mobile_tab_status(&workspace), "tab 2 · 2/2");
+        assert_eq!(
+            mobile_tab_status(&workspace, &std::collections::HashMap::new()),
+            "tab 2 · 2/2"
+        );
     }
 
     #[test]

@@ -79,19 +79,10 @@ impl App {
                 target: target.to_string(),
             }));
         };
-        // Clearing has to undo both halves of the set above, or "reset the
-        // name" leaves the manual pane label behind and the pane keeps
-        // answering to a name the caller just removed.
         let cleared = normalized_name.is_none();
         match normalized_name {
-            Some(name) => {
-                terminal.set_agent_name(name.clone());
-                terminal.set_manual_label(name);
-            }
-            None => {
-                terminal.clear_agent_name();
-                terminal.clear_manual_label();
-            }
+            Some(name) => terminal.set_agent_display_name(name),
+            None => terminal.clear_agent_display_name(),
         }
         self.state.mark_session_dirty();
         // A pane whose only claim to agenthood was the manual name stops being

@@ -345,11 +345,23 @@ pub(super) fn open_queue_prompt(
 }
 
 pub(super) fn open_rename_active_tab(state: &mut AppState, replace_on_type: bool) {
+    // A tab that holds one agent has no name of its own worth typing: naming
+    // it *is* naming the agent. Route the prompt there so the name the human
+    // types is the one every surface already shows, and so there is one place
+    // it can be stored rather than two that disagree.
+    if let Some(pane_id) = state
+        .active
+        .and_then(|i| state.workspaces.get(i))
+        .and_then(|ws| ws.lone_tab_pane(ws.active_tab))
+    {
+        open_rename_pane(state, pane_id);
+        return;
+    }
     state.creating_new_tab = false;
     state.requested_new_tab_name = None;
     state.rename_pane_target = None;
     if let Some(ws) = state.active.and_then(|i| state.workspaces.get(i)) {
-        if let Some(name) = ws.active_tab_display_name() {
+        if let Some(name) = ws.active_tab_display_name(&state.terminals) {
             state.name_input = name;
             state.name_input_replace_on_type = replace_on_type;
             state.mode = Mode::RenameTab;
@@ -368,10 +380,9 @@ pub(super) fn open_rename_pane(state: &mut AppState, pane_id: crate::layout::Pan
     state.creating_new_tab = false;
     state.requested_new_tab_name = None;
     state.rename_pane_target = Some(pane_id);
-    state.name_input = terminal
-        .and_then(|t| t.manual_label.clone())
-        .unwrap_or_default();
-    state.name_input_replace_on_type = terminal.and_then(|t| t.manual_label.as_ref()).is_none();
+    let current = terminal.and_then(|t| t.agent_name.clone().or_else(|| t.manual_label.clone()));
+    state.name_input = current.clone().unwrap_or_default();
+    state.name_input_replace_on_type = current.is_none();
     state.mode = Mode::RenamePane;
 }
 
@@ -559,16 +570,15 @@ pub(super) fn apply_rename_action(state: &mut AppState, action: ModalAction) {
                 }
                 Mode::RenameTab => {
                     if let Some(ws_idx) = state.active {
+                        let keep_auto_name = state.workspaces[ws_idx].tab_is_auto_named(
+                            state.workspaces[ws_idx].active_tab,
+                            &state.terminals,
+                        ) && state.workspaces[ws_idx]
+                            .tab_display_name(state.workspaces[ws_idx].active_tab, &state.terminals)
+                            .is_some_and(|name| new_name == name);
                         if let Some(ws) = state.workspaces.get_mut(ws_idx) {
                             let workspace_id = ws.id.clone();
                             let active_tab = ws.active_tab;
-                            let keep_auto_name = ws
-                                .tabs
-                                .get(active_tab)
-                                .is_some_and(|tab| tab.is_auto_named())
-                                && ws
-                                    .tab_display_name(active_tab)
-                                    .is_some_and(|name| new_name == name);
                             if let Some(tab) = ws.active_tab_mut() {
                                 if !new_name.is_empty() && !keep_auto_name {
                                     tab.set_custom_name(new_name);
@@ -595,7 +605,11 @@ pub(super) fn apply_rename_action(state: &mut AppState, action: ModalAction) {
                             if let Some(pane) = ws.pane_state(pane_id) {
                                 let terminal_id = pane.attached_terminal_id.clone();
                                 if let Some(terminal) = state.terminals.get_mut(&terminal_id) {
-                                    terminal.set_manual_label(new_name);
+                                    if new_name.trim().is_empty() {
+                                        terminal.clear_agent_display_name();
+                                    } else {
+                                        terminal.set_agent_display_name(new_name);
+                                    }
                                     state.mark_session_dirty();
                                 }
                             }
@@ -1118,11 +1132,9 @@ impl App {
                 };
                 let tab_idx = self.state.workspaces[ws_idx].active_tab;
                 let keep_auto_name = self.state.workspaces[ws_idx]
-                    .tabs
-                    .get(tab_idx)
-                    .is_some_and(|tab| tab.is_auto_named())
+                    .tab_is_auto_named(tab_idx, &self.state.terminals)
                     && self.state.workspaces[ws_idx]
-                        .tab_display_name(tab_idx)
+                        .tab_display_name(tab_idx, &self.state.terminals)
                         .is_some_and(|name| new_name == name);
                 if !keep_auto_name {
                     if let Some(tab_id) = self.public_tab_id(ws_idx, tab_idx) {
@@ -2051,15 +2063,19 @@ mod tests {
     }
 
     #[test]
-    fn open_rename_active_tab_can_prefill_default_new_tab_name() {
+    fn renaming_a_one_agent_tab_renames_the_agent() {
         let mut state = state_with_workspaces(&["test"]);
         state.workspaces[0].test_add_tab(None);
         state.workspaces[0].switch_tab(1);
+        let pane_id = state.workspaces[0].lone_tab_pane(1).unwrap();
 
         open_rename_active_tab(&mut state, true);
 
-        assert_eq!(state.mode, Mode::RenameTab);
-        assert_eq!(state.name_input, "2");
+        // The tab holds one agent, so the prompt is the agent's, not a second
+        // name of its own: an unnamed agent starts empty rather than at "2".
+        assert_eq!(state.mode, Mode::RenamePane);
+        assert_eq!(state.rename_pane_target, Some(pane_id));
+        assert_eq!(state.name_input, "");
         assert!(state.name_input_replace_on_type);
     }
 
@@ -2131,7 +2147,9 @@ mod tests {
         state.workspaces[0].switch_tab(0);
 
         assert_eq!(
-            state.workspaces[0].tab_display_name(0).as_deref(),
+            state.workspaces[0]
+                .tab_display_name(0, &state.terminals)
+                .as_deref(),
             Some("1")
         );
         assert!(state.workspaces[0].tabs[0].custom_name.is_none());
@@ -2155,7 +2173,9 @@ mod tests {
         assert_eq!(state.mode, Mode::Terminal);
         assert!(state.workspaces[0].tabs[1].custom_name.is_none());
         assert_eq!(
-            state.workspaces[0].tab_display_name(1).as_deref(),
+            state.workspaces[0]
+                .tab_display_name(1, &state.terminals)
+                .as_deref(),
             Some("2")
         );
     }

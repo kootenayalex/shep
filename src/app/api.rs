@@ -370,6 +370,7 @@ impl App {
             &workspace_label,
             update.ws_idx,
             update.pane_id,
+            &self.state.terminals,
         );
         if let Some(toast) = self.state.toast.as_mut() {
             toast.context = context;
@@ -653,6 +654,7 @@ impl App {
                     &workspace_label,
                     update.ws_idx,
                     update.pane_id,
+                    &self.state.terminals,
                 )),
             );
         }
@@ -722,6 +724,7 @@ impl App {
                 &workspace_label,
                 ws_idx,
                 delivery.pane_id,
+                &self.state.terminals,
             );
             if let Some(toast) = delivery.toast.as_mut() {
                 toast.context = context.clone();
