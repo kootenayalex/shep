@@ -1388,7 +1388,9 @@ fn render_agent_detail(
         sub.push_str(glyphs::SEP_SPACED);
         sub.push_str(branch);
     }
-    if !card.location.is_empty() {
+    // The heading is already the agent's name; a location that only repeats it
+    // (a tab named after its one agent) says nothing twice.
+    if !card.location.is_empty() && !card.location.eq_ignore_ascii_case(&card.display_name) {
         sub.push_str(glyphs::SEP_SPACED);
         sub.push_str(&card.location);
     }

@@ -97,6 +97,37 @@ pub(crate) fn agent_panel_toggle_rect(area: Rect, sort: AgentPanelSort) -> Rect 
     )
 }
 
+/// Drop the workspace's own name from the front of an agent's name.
+///
+/// A pane the human named `ShiftMayt Legal` inside the `ShiftMayt` workspace
+/// says the group twice on every surface that already prints the group beside
+/// it. The stored name keeps whatever they typed; only the redundant prefix is
+/// dropped at render time, and only when something is left to show.
+fn strip_workspace_prefix(agent_label: &str, workspace_label: &str) -> String {
+    let workspace = workspace_label.trim();
+    if workspace.is_empty() {
+        return agent_label.to_string();
+    }
+    let Some(head) = agent_label.get(..workspace.len()) else {
+        return agent_label.to_string();
+    };
+    if !head.eq_ignore_ascii_case(workspace) {
+        return agent_label.to_string();
+    }
+    let tail = &agent_label[workspace.len()..];
+    let rest = tail.trim_start_matches(|c: char| " -_:/".contains(c) || glyphs::SEP.contains(c));
+    // Only a real word boundary counts: `ShiftMaytics` is its own name, not the
+    // group plus a suffix.
+    if !rest.is_empty() && rest.len() == tail.len() {
+        return agent_label.to_string();
+    }
+    if rest.is_empty() {
+        agent_label.to_string()
+    } else {
+        rest.to_string()
+    }
+}
+
 pub(crate) fn agent_panel_entries(app: &AppState) -> Vec<AgentPanelEntry> {
     agent_panel_entries_with_runtimes(app, None)
 }
@@ -136,7 +167,10 @@ fn agent_panel_entries_with_runtimes(
                     pane_id: detail.pane_id,
                     primary_label: workspace_label.clone(),
                     primary_tab_label: multi_tab.then_some(detail.tab_label),
-                    agent_label: Some(detail.agent_label),
+                    agent_label: Some(strip_workspace_prefix(
+                        &detail.agent_label,
+                        &workspace_label,
+                    )),
                     state: detail.state,
                     seen: detail.seen,
                     last_agent_state_change_seq: detail.last_agent_state_change_seq,
@@ -1259,7 +1293,16 @@ fn render_agent_detail(
             Span::styled("   ", Style::default()),
             Span::styled(label, status_style),
         ];
-        if let Some(agent_label) = &detail.agent_label {
+        // The name line above already carries the workspace and the tab; an
+        // agent name that only repeats one of them is width without meaning.
+        let agent_label = detail.agent_label.as_deref().filter(|agent_label| {
+            !agent_label.eq_ignore_ascii_case(detail.primary_label.trim())
+                && detail
+                    .primary_tab_label
+                    .as_deref()
+                    .is_none_or(|tab| !agent_label.eq_ignore_ascii_case(tab.trim()))
+        });
+        if let Some(agent_label) = agent_label {
             status_spans.push(Span::styled(glyphs::SEP_SPACED, agent_style));
             status_spans.push(Span::styled(agent_label, agent_style));
         }
@@ -1353,6 +1396,38 @@ mod tests {
     use super::*;
     use crate::{detect::Agent, workspace::Workspace};
     use ratatui::{backend::TestBackend, Terminal};
+
+    #[test]
+    fn strip_workspace_prefix_drops_the_group_name_it_repeats() {
+        assert_eq!(
+            strip_workspace_prefix("ShiftMayt Legal", "ShiftMayt"),
+            "Legal"
+        );
+        assert_eq!(strip_workspace_prefix("shiftmayt-dev", "ShiftMayt"), "dev");
+        assert_eq!(
+            strip_workspace_prefix(
+                &format!("ShiftMayt{}Legal", glyphs::SEP_SPACED),
+                "ShiftMayt"
+            ),
+            "Legal"
+        );
+    }
+
+    #[test]
+    fn strip_workspace_prefix_keeps_names_that_only_look_like_the_group() {
+        // A longer word that merely starts with the group name is its own name.
+        assert_eq!(
+            strip_workspace_prefix("ShiftMaytics", "ShiftMayt"),
+            "ShiftMaytics"
+        );
+        // Nothing would be left, so nothing is dropped.
+        assert_eq!(
+            strip_workspace_prefix("ShiftMayt", "ShiftMayt"),
+            "ShiftMayt"
+        );
+        assert_eq!(strip_workspace_prefix("claude", "ShiftMayt"), "claude");
+        assert_eq!(strip_workspace_prefix("claude", "   "), "claude");
+    }
 
     #[test]
     fn render_sidebar_toggle_draws_expanded_collapse_icon() {
