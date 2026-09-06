@@ -7,4 +7,4 @@ tags:
 - launchApp
 - assertVisible: "agents"
 - assertVisible: "select an agent"
-- assertVisible: "attention.*"
+- assertVisible: "live.*"

@@ -143,7 +143,7 @@ object ShepType {
     /** The rest of it, and the same voice anywhere else a screen explains itself. */
     val emptyState = mono.copy(fontSize = 13.sp, color = ShepPalette.overlay0)
 
-    /** The question on a collapsed explain row: "how to read this list". */
+    /** The question on a collapsed explain row: "what is the shep server?". */
     val explainLabel = mono.copy(
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,

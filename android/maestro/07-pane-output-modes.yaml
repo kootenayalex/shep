@@ -8,7 +8,8 @@ appId: dev.shep.companion
 ---
 - launchApp
 - tapOn: "agents"
-- tapOn: "all.*"
+# The list is unfiltered, so every agent is already on it — this used to have
+# to tap the "all" chip first to escape the "attention" default.
 # Any agent row will do; the accessible label ("agent <name>") is stable
 # across runtime names. The space keeps the "agents" header out of it.
 - tapOn:

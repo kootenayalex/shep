@@ -7,4 +7,4 @@ appId: dev.shep.companion
 - assertVisible: "queue task"
 - back
 - tapOn: "agents"
-- assertVisible: "attention.*"
+- assertVisible: "live.*"

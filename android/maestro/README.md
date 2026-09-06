@@ -91,7 +91,10 @@ maestro --device <phone-serial> test \
   idempotent instead: the pairing block runs only when the pairing screen is
   visible, so one flow covers fresh installs and paired devices.
 - Maestro plain-string selectors are **full-text regexes**, not substrings:
-  chip "attention 0" needs `"attention.*"`; "+ new" needs `"\\+ new"`.
+  the header's "live · shep 0.7.3" needs `"live.*"`; "+ new" needs `"\\+ new"`.
+  That header is also why the agents list must never render a bare `live`:
+  flow 07 taps the first element whose *whole* text is `live` (the pane's out
+  toggle), and the tablet layout has both on screen at once.
 - **Landscape IME covers the form** — `hideKeyboard` between fields and before
   tapping buttons on tablets.
 - The first run on a fresh AVD can hit a transient dadb `tcp:7001: closed`;

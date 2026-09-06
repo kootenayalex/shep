@@ -260,17 +260,22 @@ fun formatAge(seconds: Long): String = when {
  *
  * The board says `blocked` and quotes the agent's own screen, which is exactly
  * right for someone who has read a hundred of these rows and wrong for the
- * first ten. This is the same three facts — state, what it is chewing on, how
- * long — said as a sentence, above the raw lines rather than instead of them.
+ * first ten. This is the same facts — state, and what it is chewing on — said
+ * as a sentence, above the raw lines rather than instead of them.
+ *
+ * How long it has been that way is deliberately NOT in here. It rides beside
+ * this line instead, so it can sit in a column under the state word rather than
+ * trailing off the end of a sentence that ellipsises before you reach it.
  *
  * Two things it must never render, because Maestro anchors on both elsewhere in
  * the hierarchy: a bare `live` (flow 07 taps the first of those by index) and
- * anything full-matching `\S+ blocked` (flow 13).
+ * anything full-matching `\S+ blocked` (flow 13). Without an age to suffix, the
+ * `live` guard below is the only thing standing between a state named `live`
+ * and that anchor.
  */
 fun nowLine(
     status: String,
     manualLabel: String?,
-    ageSeconds: Long?,
     activityLine: String?,
 ): String {
     val trimmed = activityLine?.let { trimActivity(it) }?.takeIf { it.isNotEmpty() }
@@ -285,12 +290,11 @@ fun nowLine(
         status == "idle" -> "idle"
         else -> status
     }
-    val line = if (ageSeconds == null) head else "$head · ${formatAge(ageSeconds)}"
     // Maestro matches the *whole* text of an element, and flow 07 taps the
     // first one that reads exactly `live` — the out toggle. This line renders
-    // above it, so a state literally called `live` with no age beside it would
-    // sit in front of the toggle and take the tap.
-    return if (line == "live") "running" else line
+    // above it, so a state literally called `live` would sit in front of the
+    // toggle and take the tap.
+    return if (head == "live") "running" else head
 }
 
 /**

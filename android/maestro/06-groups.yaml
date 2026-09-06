@@ -10,7 +10,6 @@ appId: dev.shep.companion
 - tapOn: "agents"
 # Header and the affordance for opening a session from here.
 - assertVisible: "agents"
-- tapOn: "all.*"
 - assertVisible: "\\+ new"
 # Group actions live behind the group overflow menu so the list stays
 # readable on a phone.

@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,7 +34,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import dev.shep.companion.AgentRow
 import dev.shep.companion.BridgeClient
@@ -57,14 +59,11 @@ import dev.shep.companion.statusColor
 import dev.shep.companion.totalsFromRows
 import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.EmptyState
-import dev.shep.companion.ui.components.ExplainLine
-import dev.shep.companion.ui.components.ExplainRow
 import dev.shep.companion.ui.components.Meter
 import dev.shep.companion.ui.components.Notice
 import dev.shep.companion.ui.components.NoticeTone
 import dev.shep.companion.ui.components.ScreenHeader
 import dev.shep.companion.ui.components.ShepButton
-import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.ShepSheet
 import dev.shep.companion.ui.components.StateGlyph
 import dev.shep.companion.ui.theme.ShepPalette
@@ -99,26 +98,46 @@ private val CHANNEL_SUBSCRIPTIONS = listOf(
 /** Blocked, or finished and not yet looked at: the agents waiting on a human. */
 fun needsAttention(status: String): Boolean = status == "blocked" || status == "done"
 
-/** The compact board filters from the mobile prototype. */
-enum class AgentFilter(val label: String) {
-    Attention("attention"),
-    All("all"),
-    Working("working"),
-    Review("review ◆"),
-    Queued("queued ⇥"),
+/**
+ * The header's word for a connection that is not answering.
+ *
+ * Only the word: the transport error that comes with it goes nowhere near this
+ * strip. `offlineNotice` already made that call for the banner — an error reads
+ * as a fault to someone whose only move is to wait — and the header has even
+ * less room to be wrong in, sitting inches from "+ new" and "unpair". A message
+ * like `reconnect: timed out connecting to ws://100.83.179.75:7431/` overran
+ * the title and wrapped "unpair" onto two lines.
+ */
+const val RECONNECTING = "reconnect"
+
+/**
+ * The ink for the header's connection word.
+ *
+ * All three states are inked, not just the good one: a status that lights up
+ * only when things are fine cannot tell you when they are not, and a dropped
+ * stream is the half of this signal worth reading across the room.
+ */
+fun connectionInk(status: String): Color = when {
+    status.startsWith("live") -> ShepPalette.green
+    status.startsWith("reconnect") -> ShepPalette.red
+    else -> ShepPalette.overlay0
 }
 
-/** Keep filter semantics independent from the Compose list rendering. */
-fun matchesAgentFilter(channel: Channel, filter: AgentFilter): Boolean = when (filter) {
-    AgentFilter.Attention ->
-        needsAttention(channel.status) ||
-            channel.status == "working" ||
-            channel.row?.reviewState?.let { it != "none" } == true ||
-            channel.row?.queuedInput?.let { it > 0 } == true
-    AgentFilter.All -> true
-    AgentFilter.Working -> channel.status == "working"
-    AgentFilter.Review -> channel.row?.reviewState?.let { it != "none" } == true
-    AgentFilter.Queued -> channel.row?.queuedInput?.let { it > 0 } == true
+/**
+ * The header's connection line, with its first word inked and the rest left as
+ * ordinary metadata: the state is the part you read, the version is the part
+ * you look up.
+ *
+ * It stays ONE element on purpose. Maestro's flow 07 taps the first element
+ * whose whole text is `live` — the pane's out toggle — and on the tablet
+ * two-pane layout this header is on screen beside it. `live · shep 0.7.3`
+ * cannot full-match that anchor; a bare `live` in a Text of its own would, and
+ * would take the tap.
+ */
+fun connectionLine(status: String): AnnotatedString = buildAnnotatedString {
+    val word = status.substringBefore(' ')
+    withStyle(SpanStyle(color = connectionInk(status))) { append(word) }
+    append(status.removePrefix(word))
 }
 
 /**
@@ -287,7 +306,7 @@ fun ChannelsScreen(
             }
             snapshot
                 .onSuccess { groups = parseTree(it) }
-                .onFailure { status = "reconnect: ${it.message}" }
+                .onFailure { status = RECONNECTING }
 
             if (overviewSupported) {
                 val result = withContext(Dispatchers.IO) {
@@ -303,7 +322,7 @@ fun ChannelsScreen(
                     return
                 }
                 if (!looksUnsupported(result.exceptionOrNull()?.message)) {
-                    status = "reconnect: ${result.exceptionOrNull()?.message}"
+                    status = RECONNECTING
                     return
                 }
                 overviewSupported = false
@@ -415,12 +434,7 @@ fun ChannelsScreen(
         }
     }
 
-    var filter by remember { mutableStateOf(AgentFilter.Attention) }
     val sections = buildChannels(groups, rows)
-    val filteredSections = sections.mapNotNull { section ->
-        val channels = section.channels.filter { matchesAgentFilter(it, filter) }
-        section.takeIf { channels.isNotEmpty() }?.copy(channels = channels)
-    }
     // Directories already in play seed the new-session picker, so starting a
     // second session where you are working is two taps and no typing.
     val recentRepos = (rows.mapNotNull { it.cwd } + groups.flatMap { it.tabs }
@@ -428,7 +442,7 @@ fun ChannelsScreen(
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("agents") {
-            Text(status, style = ShepType.meta)
+            Text(connectionLine(status), style = ShepType.meta)
             Spacer(Modifier.width(ShepSpace.small))
             ActionText("+ new", style = ShepType.actionStrong) { showNew = true }
             ActionText("unpair", style = ShepType.meta, onClick = onUnpair)
@@ -442,51 +456,20 @@ fun ChannelsScreen(
             )
         }
         notice?.let { Notice(it, onDismiss = { notice = null }) }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = ShepSpace.screen),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ShepSpace.small),
-        ) {
-            AgentFilter.entries.forEach { entry ->
-                val count = sections.sumOf { section ->
-                    section.channels.count { matchesAgentFilter(it, entry) }
-                }
-                ShepChip(
-                    text = if (count == 0) entry.label else "${entry.label} $count",
-                    selected = filter == entry,
-                    onClick = { filter = entry },
-                )
-            }
-        }
-        ExplainRow("how to read this list") {
-            ExplainLine(
-                "the mark",
-                "what the agent is doing — a ring means it has stopped and is waiting for you",
-            )
-            ExplainLine("the name", "which assistant it is, and the group it is working in")
-            ExplainLine("the bar", "how much of its chat memory is used up")
-            ExplainLine("◆", "it has changes waiting for you to look at")
-        }
         DashboardStrip(totals, host) { statusColor(it) }
-        if (filteredSections.isEmpty()) {
-            if (sections.isEmpty()) {
-                EmptyState(
-                    "nothing running",
-                    body = "start an agent and it appears here, grouped by project",
-                    actionLabel = "start an agent",
-                    onAction = { showNew = true },
-                )
-            } else {
-                EmptyState("nothing matches ${filter.label}")
-            }
+        if (sections.isEmpty()) {
+            EmptyState(
+                "nothing running",
+                body = "start an agent and it appears here, grouped by project",
+                actionLabel = "start an agent",
+                onAction = { showNew = true },
+            )
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = ShepSpace.section),
             ) {
-                filteredSections.forEach { section ->
+                sections.forEach { section ->
                     val channels = section.channels
                     item(key = "group:${section.workspaceId}") {
                         SectionHeader(
@@ -899,21 +882,32 @@ private fun ChannelRow(
             // What it is doing, in words, before the raw lines that prove it.
             // The lines below are the agent's own screen and stay verbatim;
             // this is the sentence you can read at arm's length.
-            Text(
-                nowLine(
-                    channel.status,
-                    row?.manualState?.label,
-                    row?.stateAgeSeconds,
-                    row?.activityLine,
-                ),
-                style = ShepType.state.copy(
-                    color = row?.manualState?.let {
-                        ShepSemantic.manual(it.tier, it.label).color
-                    } ?: statusColor(channel.status),
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            //
+            // How long it has been that way is a sibling of the sentence rather
+            // than its tail: weighted-sentence-plus-unweighted-age is the same
+            // shape as the name row above, so the age lands in the state word's
+            // column instead of being the first thing an ellipsis eats.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    nowLine(
+                        channel.status,
+                        row?.manualState?.label,
+                        row?.activityLine,
+                    ),
+                    style = ShepType.state.copy(
+                        color = row?.manualState?.let {
+                            ShepSemantic.manual(it.tier, it.label).color
+                        } ?: statusColor(channel.status),
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                row?.stateAgeSeconds?.let {
+                    Spacer(Modifier.width(ShepSpace.small))
+                    Text(formatAge(it), style = ShepType.metaSmall)
+                }
+            }
             // What the pane is actually saying. Three lines, because one line
             // of an agent's screen is usually its spinner and tells you the
             // agent is alive but not what it is doing. For a shell — which
@@ -924,8 +918,8 @@ private fun ChannelRow(
                 listOfNotNull(row?.branch, channel.node?.cwd?.let { repoName(it) }).take(1)
             }
             // One blank line rather than none when there is nothing to quote:
-            // age and context ride the last line, and a row with neither line
-            // nor age reads as an agent nothing is known about.
+            // the context gauge rides the last line, and a row with neither a
+            // line nor a gauge reads as an agent nothing is known about.
             val lines = preview.ifEmpty { listOf("") }
             lines.forEachIndexed { index, line ->
                 val isLast = index == lines.lastIndex
@@ -944,13 +938,9 @@ private fun ChannelRow(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    // Age and context sit on the last line so they stay pinned
-                    // to the bottom-right of the row whatever its height.
+                    // Context sits on the last line so it stays pinned to the
+                    // bottom-right of the row whatever its height.
                     if (isLast) {
-                        row?.stateAgeSeconds?.let {
-                            Spacer(Modifier.width(ShepSpace.small))
-                            Text(formatAge(it), style = ShepType.metaSmall)
-                        }
                         row?.contextPercent?.let {
                             Spacer(Modifier.width(ShepSpace.small))
                             ContextGauge(it)

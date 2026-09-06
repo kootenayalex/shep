@@ -48,6 +48,7 @@ import dev.shep.companion.net.InputRouter
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
 import dev.shep.companion.screens.ReviewScreen
+import dev.shep.companion.formatAge
 import dev.shep.companion.nowLine
 import dev.shep.companion.statusColor
 import dev.shep.companion.terminal.GridState
@@ -469,12 +470,10 @@ private fun PaneTitleBar(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                nowLine(
-                    status,
-                    row.manualState?.label,
-                    row.stateAgeSeconds,
-                    row.activityLine,
-                ),
+                listOfNotNull(
+                    nowLine(status, row.manualState?.label, row.activityLine),
+                    row.stateAgeSeconds?.let { formatAge(it) },
+                ).joinToString(" · "),
                 style = ShepType.metaSmall.copy(
                     color = row.manualState?.let { ShepSemantic.manual(it.tier, it.label).color }
                         ?: statusColor(status),

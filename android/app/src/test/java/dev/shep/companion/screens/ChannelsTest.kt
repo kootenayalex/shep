@@ -2,6 +2,7 @@ package dev.shep.companion.screens
 
 import dev.shep.companion.AgentRow
 import dev.shep.companion.parseTree
+import dev.shep.companion.ui.theme.ShepPalette
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -182,20 +183,44 @@ class ChannelsTest {
         assertEquals(0, sections.sumOf { s -> s.channels.count { needsAttention(it.status) } })
     }
 
+    /**
+     * The header's connection word carries ink of its own. A status that goes
+     * green when the stream is up but stays grey when it drops is only half a
+     * signal, and the dropped half is the one worth noticing.
+     */
     @Test
-    fun `prototype filters keep blocked working review and queued attention visible`() {
-        val channels = listOf(
-            Channel("w:p1", "blocked", "blocked", row("w:p1", status = "blocked"), null, null),
-            Channel("w:p2", "working", "working", row("w:p2", status = "working"), null, null),
-            Channel("w:p3", "review", "idle", row("w:p3", reviewState = "needs_review"), null, null),
-            Channel("w:p4", "queued", "idle", row("w:p4", queuedInput = 2), null, null),
-            Channel("w:p5", "idle", "idle", row("w:p5"), null, null),
-        )
+    fun `the connection word is inked by state`() {
+        assertEquals(ShepPalette.green, connectionInk("live · shep 0.7.3"))
+        assertEquals(ShepPalette.red, connectionInk(RECONNECTING))
+        assertEquals(ShepPalette.overlay0, connectionInk("connecting"))
+    }
 
-        assertEquals(4, channels.count { matchesAgentFilter(it, AgentFilter.Attention) })
-        assertEquals(1, channels.count { matchesAgentFilter(it, AgentFilter.Review) })
-        assertEquals(1, channels.count { matchesAgentFilter(it, AgentFilter.Queued) })
-        assertEquals(5, channels.count { matchesAgentFilter(it, AgentFilter.All) })
+    /**
+     * Only the first word is inked, and the line stays one element.
+     *
+     * Maestro's flow 07 taps the first element reading exactly `live` — the
+     * pane's out toggle — and the tablet layout puts this header on screen
+     * beside it, so this text must never full-match that anchor.
+     */
+    @Test
+    fun `the connection line inks the word and keeps the version plain`() {
+        val line = connectionLine("live · shep 0.7.3")
+        assertEquals("live · shep 0.7.3", line.text)
+        assertEquals(
+            listOf(ShepPalette.green),
+            line.spanStyles.map { it.item.color },
+        )
+        assertEquals(0, line.spanStyles.single().start)
+        assertEquals("live".length, line.spanStyles.single().end)
+
+        // A status with no second word still renders, and still is not `live`.
+        assertEquals("connecting", connectionLine("connecting").text)
+
+        // The failing status is the WORD only. A transport error in here
+        // overran the title and wrapped "unpair" onto two lines; the banner
+        // built for that message (`offlineNotice`) is where it belongs.
+        assertEquals("reconnect", connectionLine(RECONNECTING).text)
+        assertFalse(RECONNECTING.contains(":"))
     }
 
     /**

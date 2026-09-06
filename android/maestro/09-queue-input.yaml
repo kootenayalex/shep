@@ -10,7 +10,6 @@ appId: dev.shep.companion
 - evalScript: "${output.mark = typeof MARK === 'undefined' ? 'maestro' : MARK}"
 - launchApp
 - tapOn: "agents"
-- tapOn: "all.*"
 - tapOn: "agent ${output.agent}"
 # The chip is "⇥ queue"; a plain string is a full-text regex, not a substring.
 - tapOn: ".*queue"

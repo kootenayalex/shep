@@ -7,7 +7,6 @@ appId: dev.shep.companion
 - evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
 - launchApp
 - tapOn: "agents"
-- tapOn: "all.*"
 - tapOn: "agent ${output.agent}"
 - assertVisible: "esc"
 - tapOn:
