@@ -109,6 +109,12 @@ pub struct PaneSnapshot {
     /// existed, which is why it is optional and `SNAPSHOT_VERSION` did not move.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manual_state: Option<PaneManualStateSnapshot>,
+    /// How long the agent had been in its current state when this was written.
+    /// Carried so a restore — a live handoff above all — does not reset every
+    /// age on the board to zero. Same reason as `manual_state` for being
+    /// optional: files written before it existed simply do not have it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_age_seconds: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -438,6 +444,12 @@ fn capture_tab(
             .and_then(|pane| terminals.get(&pane.attached_terminal_id))
             .and_then(|terminal| terminal.manual_state.as_ref())
             .map(PaneManualStateSnapshot::from_override);
+        let state_age_seconds = tab
+            .panes
+            .get(id)
+            .and_then(|pane| terminals.get(&pane.attached_terminal_id))
+            .and_then(|terminal| terminal.agent_state_age(std::time::Instant::now()))
+            .map(|age| age.as_secs());
         panes.insert(
             id.raw(),
             PaneSnapshot {
@@ -447,6 +459,7 @@ fn capture_tab(
                 agent_session,
                 launch_argv,
                 manual_state,
+                state_age_seconds,
             },
         );
     }
@@ -690,6 +703,7 @@ mod tests {
                 agent_session: None,
                 launch_argv: None,
                 manual_state: None,
+                state_age_seconds: None,
             },
         );
         panes.insert(
@@ -709,6 +723,7 @@ mod tests {
                         tier: crate::api::schema::ManualStateTier::Review,
                     }),
                 }),
+                state_age_seconds: Some(14_400),
             },
         );
 
@@ -751,6 +766,10 @@ mod tests {
         assert_eq!(restored.workspaces.len(), 1);
         let restored_panes = &restored.workspaces[0].tabs[0].panes;
         assert!(restored_panes[&0].manual_state.is_none());
+        // An age travels with the pane so a restart — a live handoff above all
+        // — does not reset every counter on the board to zero.
+        assert_eq!(restored_panes[&0].state_age_seconds, None);
+        assert_eq!(restored_panes[&1].state_age_seconds, Some(14_400));
         let manual = restored_panes[&1]
             .manual_state
             .clone()
@@ -1268,6 +1287,7 @@ mod tests {
                 agent_session: None,
                 launch_argv: None,
                 manual_state: None,
+                state_age_seconds: None,
             },
         );
         panes.insert(
@@ -1281,6 +1301,7 @@ mod tests {
                 agent_session: None,
                 launch_argv: None,
                 manual_state: None,
+                state_age_seconds: None,
             },
         );
 

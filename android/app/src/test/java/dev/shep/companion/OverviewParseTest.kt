@@ -182,4 +182,16 @@ class OverviewParseTest {
         assertEquals("4m", formatAge(240))
         assertEquals("2h", formatAge(7200))
     }
+
+    @Test
+    fun `an age keeps counting between the answers that state it`() {
+        // The server said "40s" ninety seconds ago, so it is 2m now — not the
+        // 40s it would still read without a local clock.
+        assertEquals("2m", formatAge(ageCarriedForward(40, 90_000)!!))
+        // No age from the server stays no age; a clock cannot invent one.
+        assertNull(ageCarriedForward(null, 90_000))
+        // A monotonic clock that goes backwards (it should not) must not make
+        // an agent younger than the server said it was.
+        assertEquals(40L, ageCarriedForward(40, -5_000))
+    }
 }

@@ -48,6 +48,7 @@ data class AgentRow(
      */
     val manualState: ManualState? = null,
 ) {
+
     /**
      * Where this agent lives, the way the desktop board writes it: the tab's
      * name when it has one, and a pane number only when the tab holds more
@@ -246,6 +247,18 @@ fun humanBytes(bytes: Long): String {
     }
     return "${bytes}B"
 }
+
+/**
+ * An age the server stated [sinceMs] milliseconds ago, carried forward on the
+ * local clock.
+ *
+ * The server answers "this agent has been idle 4m" as of the moment it answered.
+ * An idle agent then sends no events, so nothing rebuilds the row and the number
+ * sits at 4m for as long as the screen is open — which is why the counter only
+ * appeared to move when you left the board and came back.
+ */
+fun ageCarriedForward(stateAgeSeconds: Long?, sinceMs: Long): Long? =
+    stateAgeSeconds?.let { it + (sinceMs.coerceAtLeast(0L) / 1000L) }
 
 /** `4m`, `2h` — the desktop board's compact age format. */
 fun formatAge(seconds: Long): String = when {

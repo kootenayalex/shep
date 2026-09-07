@@ -23,6 +23,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,6 +49,7 @@ import dev.shep.companion.SessionHost
 import dev.shep.companion.SessionTotals
 import dev.shep.companion.GroupNode
 import dev.shep.companion.asAgentRow
+import dev.shep.companion.ageCarriedForward
 import dev.shep.companion.formatAge
 import dev.shep.companion.nowLine
 import dev.shep.companion.parseOverview
@@ -66,6 +68,7 @@ import dev.shep.companion.ui.components.ScreenHeader
 import dev.shep.companion.ui.components.ShepButton
 import dev.shep.companion.ui.components.ShepSheet
 import dev.shep.companion.ui.components.StateGlyph
+import dev.shep.companion.ui.components.rememberSecondsTicker
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepSemantic
 import dev.shep.companion.ui.theme.ShepSize
@@ -287,6 +290,11 @@ fun ChannelsScreen(
     var customStates by remember { mutableStateOf<List<ManualState>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+    // One clock for the whole list rather than one per row: every age on the
+    // screen moves together, and an idle agent that sends no events still
+    // counts up. `rowsStatedAtMs` is when the server last stated those ages.
+    val nowElapsedMs by rememberSecondsTicker()
+    var rowsStatedAtMs by remember { mutableLongStateOf(0L) }
 
     val refreshSignal = remember { CoChannel<Unit>(CoChannel.CONFLATED) }
 
@@ -315,6 +323,7 @@ fun ChannelsScreen(
                 val overview = result.getOrNull()?.let { parseOverview(it) }
                 if (overview != null) {
                     rows = overview.agents
+                    rowsStatedAtMs = android.os.SystemClock.elapsedRealtime()
                     totals = overview.totals
                     host = overview.host
                     customStates = overview.customStates
@@ -331,6 +340,7 @@ fun ChannelsScreen(
             // carries the agents too, just with fewer facts each.
             snapshot.onSuccess {
                 rows = parseSnapshot(it)
+                rowsStatedAtMs = android.os.SystemClock.elapsedRealtime()
                 totals = totalsFromRows(rows)
                 host = SessionHost(version = client.serverVersion)
                 status = "live · shep ${client.serverVersion ?: ""}".trim()
@@ -494,6 +504,8 @@ fun ChannelsScreen(
                             ChannelRow(
                                 modifier = Modifier.animateItem(),
                                 channel = channel,
+                                nowElapsedMs = nowElapsedMs,
+                                statedAtMs = rowsStatedAtMs,
                                 onClick = {
                                     onOpenPane(
                                         channel.row
@@ -802,6 +814,8 @@ private fun SectionHeader(
 @Composable
 private fun ChannelRow(
     channel: Channel,
+    nowElapsedMs: Long,
+    statedAtMs: Long,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -903,7 +917,7 @@ private fun ChannelRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                row?.stateAgeSeconds?.let {
+                ageCarriedForward(row?.stateAgeSeconds, nowElapsedMs - statedAtMs)?.let {
                     Spacer(Modifier.width(ShepSpace.small))
                     Text(formatAge(it), style = ShepType.metaSmall)
                 }

@@ -48,6 +48,7 @@ import dev.shep.companion.net.InputRouter
 import dev.shep.companion.net.StreamEvent
 import dev.shep.companion.net.paneStream
 import dev.shep.companion.screens.ReviewScreen
+import dev.shep.companion.ageCarriedForward
 import dev.shep.companion.formatAge
 import dev.shep.companion.nowLine
 import dev.shep.companion.statusColor
@@ -61,6 +62,7 @@ import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.BackHeader
 import dev.shep.companion.ui.components.ShepChip
 import dev.shep.companion.ui.components.StateGlyph
+import dev.shep.companion.ui.components.rememberSecondsTicker
 import dev.shep.companion.ui.theme.ShepSemantic
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepShape
@@ -453,6 +455,10 @@ private fun PaneTitleBar(
     fontSizeSp: Float,
     onFontSizeSp: (Float) -> Unit,
 ) {
+    // The header states how long the agent has been in this state; without a
+    // clock it would sit at the number the row carried when this screen opened.
+    val nowElapsedMs by rememberSecondsTicker()
+    val openedAtMs = remember(row.paneId) { android.os.SystemClock.elapsedRealtime() }
     BackHeader("agents", onBack) {
         Column(Modifier.weight(1f)) {
             // The name a person chose, not the id shep generated: the id is
@@ -472,7 +478,8 @@ private fun PaneTitleBar(
             Text(
                 listOfNotNull(
                     nowLine(status, row.manualState?.label, row.activityLine),
-                    row.stateAgeSeconds?.let { formatAge(it) },
+                    ageCarriedForward(row.stateAgeSeconds, nowElapsedMs - openedAtMs)
+                        ?.let { formatAge(it) },
                 ).joinToString(" · "),
                 style = ShepType.metaSmall.copy(
                     color = row.manualState?.let { ShepSemantic.manual(it.tier, it.label).color }

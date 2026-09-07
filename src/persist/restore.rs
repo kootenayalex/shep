@@ -489,6 +489,7 @@ fn restore_tab(
         let saved_agent_name = saved_pane.and_then(|p| p.agent_name.clone());
         let saved_launch_argv = saved_pane.and_then(|p| p.launch_argv.clone());
         let saved_manual_state = saved_pane.and_then(|p| p.manual_state.clone());
+        let saved_state_age = saved_pane.and_then(|p| p.state_age_seconds);
         let saved_agent_session = saved_pane.and_then(|p| p.agent_session.as_ref());
         let saved_history =
             old_id.and_then(|old_id| history.and_then(|history| history.panes.get(old_id)));
@@ -553,6 +554,9 @@ fn restore_tab(
             }
             if let Some(manual_state) = saved_manual_state {
                 terminal.restore_manual_state(manual_state.into_override());
+            }
+            if let Some(age) = saved_state_age {
+                terminal.restore_agent_state_age(std::time::Duration::from_secs(age));
             }
             panes.insert(*id, PaneState::new(terminal_id));
             terminals.push(terminal);
@@ -649,6 +653,9 @@ fn restore_tab(
                 }
                 if let Some(manual_state) = saved_manual_state {
                     terminal.restore_manual_state(manual_state.into_override());
+                }
+                if let Some(age) = saved_state_age {
+                    terminal.restore_agent_state_age(std::time::Duration::from_secs(age));
                 }
                 panes.insert(*id, PaneState::new(terminal_id.clone()));
                 terminal_runtimes.insert(terminal_id, runtime);
@@ -1188,6 +1195,7 @@ mod tests {
                             }),
                             launch_argv: None,
                             manual_state: None,
+                            state_age_seconds: None,
                         },
                     )]),
                     zoomed: false,
@@ -1267,6 +1275,7 @@ mod tests {
                                 agent_session: None,
                                 launch_argv: None,
                                 manual_state: None,
+                                state_age_seconds: None,
                             },
                         ),
                         (
@@ -1278,6 +1287,7 @@ mod tests {
                                 agent_session: None,
                                 launch_argv: None,
                                 manual_state: None,
+                                state_age_seconds: None,
                             },
                         ),
                     ]),
@@ -1331,6 +1341,7 @@ mod tests {
                     agent_session: None,
                     launch_argv: None,
                     manual_state: None,
+                    state_age_seconds: None,
                 },
             )
         };
@@ -1346,6 +1357,7 @@ mod tests {
             }),
             launch_argv: None,
             manual_state: None,
+            state_age_seconds: None,
         };
         let snapshot = SessionSnapshot {
             version: super::super::snapshot::SNAPSHOT_VERSION,
@@ -1496,6 +1508,7 @@ mod tests {
                             agent_session: None,
                             launch_argv: None,
                             manual_state: None,
+                            state_age_seconds: None,
                         },
                     )]),
                     zoomed: false,
@@ -1565,6 +1578,7 @@ mod tests {
                             }),
                             launch_argv: None,
                             manual_state: None,
+                            state_age_seconds: None,
                         },
                     )]),
                     zoomed: false,
@@ -1727,6 +1741,7 @@ mod tests {
                 agent_session: None,
                 launch_argv: None,
                 manual_state: None,
+                state_age_seconds: None,
             },
         );
         let history = SessionHistorySnapshot {

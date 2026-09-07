@@ -201,7 +201,11 @@ impl TerminalState {
             context_percent: None,
             activity_lines: Vec::new(),
             last_agent_state_change_seq: None,
-            last_agent_state_change_at: None,
+            // Seeded rather than left empty: a card with no age reads as an
+            // agent nothing is known about, and "since shep first saw it" is
+            // both true and useful. A restore overwrites this with the age it
+            // carried (`restore_agent_state_age`).
+            last_agent_state_change_at: Some(Instant::now()),
             revision: 0,
             launch_argv: None,
             respawn_shell_on_exit: false,
@@ -1473,6 +1477,19 @@ impl TerminalState {
         self.session_facts_mtime = None;
     }
 
+    /// How long this agent has been in the state it is in, for the "age" hint
+    /// every surface shows next to the status.
+    pub fn agent_state_age(&self, now: Instant) -> Option<std::time::Duration> {
+        self.last_agent_state_change_at
+            .map(|at| now.saturating_duration_since(at))
+    }
+
+    /// Adopt an age carried across a restore or a live handoff, so an update
+    /// does not reset every counter on the board to zero.
+    pub fn restore_agent_state_age(&mut self, age: std::time::Duration) {
+        self.last_agent_state_change_at = Instant::now().checked_sub(age);
+    }
+
     /// Re-read the agent's session file if the sample has aged out and the file
     /// has actually changed. Returns whether the facts moved.
     pub fn refresh_session_facts_if_stale(&mut self, now: Instant) -> bool {
@@ -1559,7 +1576,7 @@ impl TerminalState {
         self.stale_full_lifecycle_hook_sessions.clear();
         self.state = AgentState::Unknown;
         self.last_agent_state_change_seq = None;
-        self.last_agent_state_change_at = None;
+        self.last_agent_state_change_at = Some(Instant::now());
         self.launch_argv = None;
         self.respawn_shell_on_exit = false;
         self.recent_agent_process_exit_at = None;
@@ -1657,6 +1674,32 @@ mod tests {
             .join(name)
             .display()
             .to_string()
+    }
+
+    #[test]
+    fn every_agent_has_an_age_to_show() {
+        // A card with no age reads as an agent nothing is known about, so the
+        // clock starts when shep first sees the terminal rather than at its
+        // first state change — which, for a pane restored into a fresh server,
+        // may never come.
+        let terminal = test_terminal();
+        let age = terminal
+            .agent_state_age(Instant::now())
+            .expect("a terminal always has an age");
+        assert!(age < Duration::from_secs(1), "age was {age:?}");
+    }
+
+    #[test]
+    fn a_restored_age_carries_across_the_restart() {
+        let mut terminal = test_terminal();
+        terminal.restore_agent_state_age(Duration::from_secs(4 * 3600));
+        let age = terminal
+            .agent_state_age(Instant::now())
+            .expect("a terminal always has an age");
+        assert!(
+            age >= Duration::from_secs(4 * 3600),
+            "a four-hour-idle agent came back younger: {age:?}"
+        );
     }
 
     #[test]

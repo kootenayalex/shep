@@ -47,6 +47,20 @@
   session's text then sat in the bottom third of a full-height pane. The panes
   now return to the size the desk last had.
 
+- Every agent has an age again, and it counts on its own. A card's age came
+  from the last time the agent's state actually changed, which a pane restored
+  into a fresh server has never done — so after a restart or a live handoff only
+  the agents that had since gone to work carried a counter and the idle ones
+  showed nothing at all. The clock now starts when shep first sees a terminal,
+  and the real age travels in the session snapshot so an update does not reset
+  every counter on the board to zero.
+
+- The age under an agent's status on the phone keeps counting between updates.
+  The server states an age as of the moment it answers, and an idle agent sends
+  no events, so the number sat at whatever it said when the row arrived and only
+  appeared to move when you left the screen and came back. The board and the
+  pane header now carry that age forward on their own clock.
+
 ### Removed
 
 - The review-diff pager is gone from the TUI — the global menu entry, the
