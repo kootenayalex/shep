@@ -12,7 +12,7 @@
 │ ◉ claude · workma… ⇥2 p1  ● claude · emberline      ⠹ codex               p2 │
 │   fix/stripe-webhook  2m    master              6m    feat/design-pass    2m │
 │   blocked                   done                      working                │
-│   stripe webhook retries    pushed 3 commits to m…    reading src/ui/board.… │
+│   Now the refund path's…    pushed 3 commits to m…    reading src/ui/board.… │
 │   …/workmayt ████▍   72%    …emberline █████▎  88%    …sign-pass ███▎    55% │
 │                                                                              │
 │ ⠹ opencode            p2                            ○ claude · shep       p1 │

@@ -12,7 +12,7 @@
 │ ◉ claude ⇥2                                                                                                       p1 │
 │   fix/stripe-webhook                                                                                              2m │
 │   blocked                                                                                                            │
-│   stripe webhook retries                                                                                             │
+│   Now the refund path's idempotency key.                                                                             │
 │   ~/vault/dev/workmayt · plan · +210/-18 · $3.42                                                         ████▍   72% │
 │                                                                                                                      │
 │ ⠹ opencode                                                                                                        p2 │
@@ -54,7 +54,7 @@ alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
 afjlqqqqqqppplllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllffla
 alllffffffffffffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllffla
 ajjjjjjjjjjlllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-ahhhhhhhhhhhhhhhhhhhhhhhhhllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+ahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
 alllfffffffffffffffffffffffeeeefffddddjjjjffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllltttttmsssssla
 alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
 afslqqqqqqqqllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllffla

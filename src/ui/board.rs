@@ -375,7 +375,9 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             }),
             activity,
             activity_lines,
-            summary: facts.title,
+            // The agent's own line about what it is doing beats the session
+            // title, which names the hour rather than the minute.
+            summary: facts.summary.or(facts.title),
             permission_mode: facts.permission_mode,
             cost_usd: facts.cost_usd,
             lines_added: facts.lines_added,

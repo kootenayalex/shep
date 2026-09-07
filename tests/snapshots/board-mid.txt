@@ -12,7 +12,7 @@
 │ ◉ claude · workmayt ⇥2              p1  ● claude · emberline                   ⠹ codex                            p2 │
 │   fix/stripe-webhook                2m    master                           6m    feat/design-pass                 2m │
 │   blocked                                 done                                   working                             │
-│   stripe webhook retries                  pushed 3 commits to master             reading src/ui/board.rs             │
+│   Now the refund path's idempotency k…    pushed 3 commits to master             reading src/ui/board.rs             │
 │   …ev/workmayt · plan      ████▍   72%    …v/emberline · bypass   █████▎  88%    …-worktrees/design-pass ███▎    55% │
 │                                                                                                                      │
 │ ⠹ opencode                          p2                                         ○ claude · shep                    p1 │
@@ -54,7 +54,7 @@ annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 afknsssssssssssssssssrrrnnnnnnnnnnnnnnffnfcnssssssssssssssssssnnnnnnnnnnnnnnnnnnfunsssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnffna
 annnffffffffffffffffffnnnnnnnnnnnnnnnnffnnnnffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnffnnnnffffffffffffffffnnnnnnnnnnnnnnnnnffna
 akkkkkkkkkknnnnnnnnnnnnnnnnnnnnnnnnnnnnnncccccccnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnuuuuuuuuuunnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-ahhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnnnnhhhhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnna
+ahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhnhhhhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnna
 annnfffffffffffffffeeeennnnnnvvvvvouuuuunnnnfffffffffffffffjjjjjjnnnmmmmmmkkkkknnnnfffffffffffffffffffffffniiiioofffffna
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 afunssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfdnsssssssssssssnnnnnnnnnnnnnnnnnnnnffna

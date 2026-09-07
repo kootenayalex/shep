@@ -1,6 +1,16 @@
 # Facts Claude Code writes about its own session, read out of the transcript
 # jsonl that the shep hook already tells us the path of.
 #
+# `tail_bytes` is a megabyte because the facts are not evenly spread: the title
+# and cost records are written every turn, but the line the agent writes before
+# it acts can be a long way back when a stretch of the session is one big tool
+# output after another. Measured across the live transcripts here the last such
+# line sat 3 KB, 6 KB, 78 KB and 384 KB from the end, and parsing a megabyte of
+# this costs about a millisecond — which the five-second sample interval and the
+# mtime guard then pay only when the file has actually changed. A transcript
+# with more than a megabyte between them degrades to the session title, which is
+# the same fail-soft every other missing fact takes.
+#
 # Display hints only — same contract as `activity_lines`. Never detection
 # evidence, never load-bearing. A record that is missing, malformed or older
 # than `tail_bytes` simply yields no fact.
@@ -9,7 +19,7 @@
 # is how a hand-set `custom-title` beats the generated `ai-title`.
 id = "claude"
 format = "jsonl-tail"
-tail_bytes = 262144
+tail_bytes = 1048576
 discriminator = "type"
 
 [[facts]]
@@ -33,3 +43,13 @@ record = "cost-state"
 cost_usd = "totalCostUSD"
 lines_added = "totalLinesAdded"
 lines_removed = "totalLinesRemoved"
+
+# What it is doing right now, in its own words: the line Claude writes just
+# before it acts ("Now the pane screen's header age:"). The path walks into the
+# message's content blocks and takes the first one with text, so a record that
+# is only a tool call is skipped and the newest record that actually says
+# something wins. Last, so a session title someone set by hand still names the
+# session; the board prefers this line because it is the fresher fact.
+[[facts]]
+record = "assistant"
+summary = "message.content.text"

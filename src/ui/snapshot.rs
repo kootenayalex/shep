@@ -403,6 +403,7 @@ mod fixture {
                 seq: 60,
                 facts: crate::session_facts::SessionFacts {
                     title: Some("stripe webhook retries".into()),
+                    summary: Some("Now the refund path's idempotency key.".into()),
                     name: Some("billing".into()),
                     permission_mode: Some("plan".into()),
                     cost_usd: Some(3.42),

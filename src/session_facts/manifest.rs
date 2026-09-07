@@ -22,7 +22,7 @@ const BUNDLED_MANIFESTS: &[(&str, &str)] = &[("claude", include_str!("manifests/
 pub(crate) const FORMAT_JSONL_TAIL: &str = "jsonl-tail";
 
 fn default_tail_bytes() -> u64 {
-    262_144
+    1_048_576
 }
 
 fn default_discriminator() -> String {
@@ -47,10 +47,18 @@ pub(crate) struct SessionFactsManifest {
 }
 
 /// One record type, and which of its JSON fields carry which facts.
+///
+/// A field name is a dotted path, not just a key: `message.content.text`
+/// descends `message`, then `content`, and — because `content` is an array —
+/// takes the first element that has a `text` of its own. That is what lets a
+/// fact live inside a block list without teaching this module the shape of any
+/// particular agent's messages.
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct FactRule {
     pub(crate) record: String,
     pub(crate) title: Option<String>,
+    /// What the agent last said it was doing, in its own words.
+    pub(crate) summary: Option<String>,
     pub(crate) name: Option<String>,
     pub(crate) permission_mode: Option<String>,
     pub(crate) cost_usd: Option<String>,
@@ -121,10 +129,18 @@ mod tests {
         assert_eq!(manifest.id, "claude");
         assert_eq!(manifest.format, FORMAT_JSONL_TAIL);
         assert_eq!(manifest.discriminator, "type");
-        assert_eq!(manifest.facts.len(), 5);
+        assert_eq!(manifest.facts.len(), 6);
         // Precedence: a hand-set title outranks the generated one.
         assert_eq!(manifest.facts[0].record, "custom-title");
         assert_eq!(manifest.facts[1].record, "ai-title");
+        // The narration reads out of the message's content blocks, so its path
+        // has to survive the round trip through TOML as a path, not a key.
+        let assistant = manifest
+            .facts
+            .iter()
+            .find(|rule| rule.record == "assistant")
+            .expect("claude publishes what it is doing");
+        assert_eq!(assistant.summary.as_deref(), Some("message.content.text"));
     }
 
     #[test]

@@ -25,6 +25,17 @@
   exactly as before. `session.overview` publishes `summary` and
   `permission_mode` so the companion can follow.
 
+- A card says what the agent is doing, not what the session is called. Claude
+  writes a line before it acts — "Now the pane screen's header age:" — into its
+  own transcript, and that line is now the card's summary row, falling back to
+  the session title and then to the screen scrape. It is read through the same
+  per-agent manifest as the other session facts, whose field names became dotted
+  paths so a fact can live inside a message's content blocks
+  (`message.content.text`) rather than at the top of a record; a record of the
+  right kind that carries none of a rule's fields is skipped, so the newest
+  message that actually says something wins rather than the newest tool call.
+  `session.overview` carries the same line, so the phone says it too.
+
 - One name means one agent, in both directions: renaming an agent in shep sends
   `/rename` into a Claude pane (queued, so it lands on the next idle rather
   than interrupting a turn), and a name set with `/rename` inside Claude is

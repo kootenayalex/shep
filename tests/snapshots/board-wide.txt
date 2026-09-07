@@ -12,7 +12,7 @@
 │ ◉ claude · workmayt ⇥2                                        p1  ● claude · emberline                                              ⠹ codex                                                       p2 │
 │   fix/stripe-webhook                                          2m    master                                                      6m    feat/design-pass                                            2m │
 │   blocked                                                           done                                                              working                                                        │
-│   stripe webhook retries                                            pushed 3 commits to master                                        reading src/ui/board.rs                                        │
+│   Now the refund path's idempotency key.                            pushed 3 commits to master                                        reading src/ui/board.rs                                        │
 │   ~/vault/dev/workmayt · plan · +210/-18 · $3.42     ████▍   72%    ~/vault/dev/emberline · bypass · +12/-0            █████▎  88%    ~/vault/dev/shep-worktrees/design-pass             ███▎    55% │
 │                                                                                                                                                                                                      │
 │ ⠹ opencode                                                    p2                                                                    ○ claude · shep                                               p1 │
@@ -69,7 +69,7 @@ annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 afknsssssssssssssssssrrrnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnffnfcnssssssssssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfunsssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnffna
 annnffffffffffffffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnffnnnnffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnffnnnnffffffffffffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnffna
 akkkkkkkkkknnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnncccccccnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnuuuuuuuuuunnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-ahhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnhhhhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
+ahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnnnnnnnnnnnnnnhhhhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnhhhhhhhhhhhhhhhhhhhhhhhhhhnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 annnfffffffffffffffffffffffeeeefffddddkkkkffffffffnnnnnvvvvvouuuuunnnnffffffffffffffffffffffffjjjjjjfffdddkkknnnnnnnnnnnnmmmmmmkkkkknnnnffffffffffffffffffffffffffffffffffffffnnnnnnnnnnnnniiiioofffffna
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 afunssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfdnsssssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnffna
