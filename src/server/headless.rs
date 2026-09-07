@@ -942,30 +942,39 @@ impl HeadlessServer {
         &mut self,
         start_pending_agent_resumes: bool,
     ) {
-        if self.foreground_client_id.is_none() {
-            return;
-        }
-        let Some(client_id) = self.foreground_client_id else {
-            return;
+        let foreground = self
+            .foreground_client_id
+            .and_then(|client_id| self.clients.get(&client_id));
+        // With nobody at the desk, fall back to the size the desk had last.
+        //
+        // A phone attaching to a pane resizes that pane's pty to the phone —
+        // which is the point of a direct attach — and it used to stay that size
+        // for as long as no client was foreground, because this returned early.
+        // A pane left in a phone-shaped grid is what put a desktop session's
+        // text in the bottom third of its pane hours later.
+        let (cols, rows) = match foreground {
+            Some(_) => self.effective_size,
+            None => match self.last_foreground_size {
+                Some(size) => size,
+                None => return,
+            },
         };
-        let Some(client) = self.clients.get(&client_id) else {
-            return;
-        };
-        let (cols, rows) = self.effective_size;
+        let cell_size = foreground
+            .map(|client| client.cell_size)
+            .filter(|cell_size| self.app.state.kitty_graphics_enabled && cell_size.is_known());
         let area = Rect::new(0, 0, cols, rows);
-        if self.app.state.kitty_graphics_enabled && client.cell_size.is_known() {
-            crate::ui::compute_view_with_cell_size(
+        match cell_size {
+            Some(cell_size) => crate::ui::compute_view_with_cell_size(
                 &mut self.app.state,
                 &self.app.terminal_runtimes,
                 area,
-                client.cell_size,
-            );
-        } else {
-            crate::ui::compute_view_with_runtime_registry(
+                cell_size,
+            ),
+            None => crate::ui::compute_view_with_runtime_registry(
                 &mut self.app.state,
                 &self.app.terminal_runtimes,
                 area,
-            );
+            ),
         }
 
         // Shared runtime size changes affect pane wrapping and foreground-driven
@@ -1726,13 +1735,17 @@ impl HeadlessServer {
         if self.foreground_client_id == Some(client_id) {
             return true;
         }
+        // A departing attach/observe client needs the shared panes recomputed
+        // even when no client is foreground: it may have left a pane pinned to
+        // its own size, and `resize_shared_runtime_to_effective_size` restores
+        // the desk's last geometry in that case.
         matches!(
             self.clients.get(&client_id).map(|client| &client.mode),
             Some(
                 ClientConnectionMode::TerminalAttach { .. }
                     | ClientConnectionMode::TerminalObserve { .. }
             )
-        ) && self.foreground_client_id.is_some()
+        )
     }
 
     fn remove_client_and_resize_if_needed(&mut self, client_id: u64) {
@@ -5339,6 +5352,79 @@ next_tab = ""
             writer,
         }));
         control_rx
+    }
+
+    /// A phone that attaches to a pane must not leave that pane phone-sized
+    /// once it is gone.
+    ///
+    /// Direct attach pins the pane's pty to the attaching client — that is the
+    /// point of it — but the restore afterwards used to need a foreground
+    /// client, so a phone that let go while the desk was detached left the pane
+    /// in a 55x21 grid indefinitely. The desktop session's text then sat in the
+    /// bottom third of a pane that had been full-height for hours.
+    #[test]
+    fn a_phone_that_lets_go_of_a_pane_gives_it_back_at_desk_size() {
+        with_terminal_session_test_server(|server, terminal_id, terminal_id_string, _| {
+            // The desk: an ordinary app client with a big window.
+            let (writer, _control_rx, _render_rx) = test_client_writer();
+            assert!(server.handle_server_event(ServerEvent::ClientConnected {
+                client_id: 1,
+                cols: 167,
+                rows: 54,
+                cell_width_px: 0,
+                cell_height_px: 0,
+                render_encoding: RenderEncoding::TerminalAnsi,
+                keybindings: None,
+                direct_attach_requested: false,
+                writer,
+            }));
+            let desk_size = server
+                .app
+                .terminal_runtimes
+                .get(&terminal_id)
+                .expect("runtime")
+                .current_size();
+            assert_ne!(desk_size, (21, 55), "the desk is not phone-shaped");
+
+            // The phone attaches to one pane, which takes the phone's size.
+            connect_pending_terminal_client(server, 2);
+            if let Some(client) = server.clients.get_mut(&2) {
+                client.terminal_size = (55, 21);
+            }
+            assert!(
+                server.handle_server_event(ServerEvent::ClientAttachTerminal {
+                    client_id: 2,
+                    terminal_id: terminal_id_string.clone(),
+                    takeover: false,
+                })
+            );
+            assert_eq!(
+                server
+                    .app
+                    .terminal_runtimes
+                    .get(&terminal_id)
+                    .expect("runtime")
+                    .current_size(),
+                (21, 55),
+                "a direct attach pins the pane to the attaching client"
+            );
+
+            // The desk goes away, and only then does the phone let go.
+            assert!(server.handle_server_event(ServerEvent::ClientDetach { client_id: 1 }));
+            assert!(server.handle_server_event(ServerEvent::ClientDetach { client_id: 2 }));
+
+            assert!(server.foreground_client_id.is_none());
+            assert_eq!(
+                server
+                    .app
+                    .terminal_runtimes
+                    .get(&terminal_id)
+                    .expect("runtime")
+                    .current_size(),
+                desk_size,
+                "the pane must be back at the size the desk left it"
+            );
+        });
     }
 
     #[test]

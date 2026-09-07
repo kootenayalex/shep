@@ -38,6 +38,15 @@
   `bridge-pair-code` window `shep bridge pair` does, tells you when the phone
   has claimed it, and closing the screen cancels the code.
 
+### Fixed
+
+- A phone that attached to a pane no longer leaves that pane phone-sized. The
+  pty follows the attaching client while it is attached, as before, but the
+  restore afterwards used to need a client at the desk — so a phone letting go
+  of a pane while the desktop was detached left it in a 55x21 grid, and the
+  session's text then sat in the bottom third of a full-height pane. The panes
+  now return to the size the desk last had.
+
 ### Removed
 
 - The review-diff pager is gone from the TUI — the global menu entry, the
