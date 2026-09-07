@@ -1,0 +1,109 @@
+# board-one-lane 120x40 · 20 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                                                 workmayt · 1                                          ◉ 1 blocked
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ session board · what are my agents doing                                                                             │
+│ agents 2  1 need you  ·  blocked 1  ·  done 0  ·  working 1  ·  idle 0  ·  ⇥2 queued  ·  2 tasks                     │
+│ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G                                                       │
+│ workmayt 2                                                                                                           │
+│                                                                                                                      │
+│ ◉ claude ⇥2                                                                                                       p1 │
+│   fix/stripe-webhook                                                                                              2m │
+│   blocked                                                                                                            │
+│   stripe webhook retries                                                                                             │
+│   ~/vault/dev/workmayt · plan · +210/-18 · $3.42                                                         ████▍   72% │
+│                                                                                                                      │
+│ ⠹ opencode                                                                                                        p2 │
+│   fix/stripe-webhook                                                                                             20s │
+│   working                                                                                                            │
+│   Metamorphosing…                                                                                                    │
+│   ~/vault/dev/workmayt/apps/site                                                                         ██▌     41% │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  t tasks  esc/q close                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
+
+--- styles ---
+lbbbblllllllllllllllllllllllllllllllllllllllllllllllllrrrrrrrrfffnllllllllllllllllllllllllllllllllllllllllllkkkkkkkkkkkl
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+abbbbbbbbbbbbbbbffffffffffffffffffffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+affffffffqkkkkkkkkkkkkooooojjjjjjjjqooooocccccqooooossssssssqooooodddddqooooopppppppppoooooqqqqqqqllllllllllllllllllllla
+affffffqqqqqooooofffffqqqffffffffffffoooooffffqqqfffffffffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+agggggggggffllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+afjlqqqqqqppplllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllffla
+alllffffffffffffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllffla
+ajjjjjjjjjjlllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+ahhhhhhhhhhhhhhhhhhhhhhhhhllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllfffffffffffffffffffffffeeeefffddddjjjjffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllltttttmsssssla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+afslqqqqqqqqllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllffla
+alllfffffffffffffffffflllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllfffla
+asssssssssslllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+ahhhhhhhhhhhhhhhhhhlllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllffffffffffffffffffffffffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllliiimmmfffffla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+albbbbbffffffffbffffffffffbbbbbbbbbfffffffbbfffffffffffffbffffffffbbbbbfffffflllllllllllllllllllllllllllllllllllllllllla
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+lbbbbbbfffffffffbfffffffffbffffffbfffffffbffffffflllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
+
+--- legend ---
+. = (unstyled)
+a = fg:accent bg:panel_bg
+b = fg:accent bg:panel_bg bold
+c = fg:blue bg:panel_bg
+d = fg:green bg:panel_bg
+e = fg:mauve bg:panel_bg
+f = fg:overlay0 bg:panel_bg
+g = fg:overlay0 bg:panel_bg bold
+h = fg:overlay0 bg:panel_bg italic
+i = fg:overlay0 bg:surface1
+j = fg:red bg:panel_bg
+k = fg:red bg:panel_bg bold
+l = fg:reset bg:panel_bg
+m = fg:reset bg:surface1
+n = fg:subtext0 bg:panel_bg
+o = fg:surface0 bg:panel_bg
+p = fg:teal bg:panel_bg
+q = fg:text bg:panel_bg
+r = fg:text bg:panel_bg bold
+s = fg:yellow bg:panel_bg
+t = fg:yellow bg:surface1

@@ -119,6 +119,8 @@ impl App {
                 agent_status: crate::app::api_helpers::pane_agent_status(card.state, card.seen),
                 unseen: !card.seen,
                 custom_status: card.status.clone(),
+                summary: card.summary.clone(),
+                permission_mode: card.permission_mode.clone(),
                 manual_state: card.manual_state.clone(),
                 activity_line: card.activity.clone(),
                 activity_lines: card.activity_lines.clone(),

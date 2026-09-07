@@ -4,6 +4,46 @@
 
 ### Added
 
+- The session board's lanes are your own groups, not four fixed state columns.
+  Each lane is one group, in the session's own order, with its name and count
+  as the heading and the selection's lane picked out in accent; state is
+  carried by the card's glyph and colour, where it always was. `<` and `>` (or
+  `shift+h` / `shift+l`) move the selected agent's group along the board, which
+  is the same order every other surface sees. Below the width where the lanes
+  would be too thin to read, the board stacks as before — a threshold that now
+  moves with how many groups you have.
+
+- Cards say what the agent says about itself. Claude writes a brief title, its
+  `/rename` name, its permission mode and a running cost/churn tally into its
+  own transcript, and shep already knew where that file is: the card's fourth
+  line is now that title (falling back to the screen scrape when there is none)
+  and the last line carries `plan` / `bypass`, `+N/-N` and the cost beside the
+  working directory. Which facts to read is a per-agent TOML manifest
+  (`src/session_facts/manifests/`, overridable at
+  `<config dir>/session-facts/<agent>.toml`), so another harness can be taught
+  the same trick without a code change; an agent with no manifest behaves
+  exactly as before. `session.overview` publishes `summary` and
+  `permission_mode` so the companion can follow.
+
+- One name means one agent, in both directions: renaming an agent in shep sends
+  `/rename` into a Claude pane (queued, so it lands on the next idle rather
+  than interrupting a turn), and a name set with `/rename` inside Claude is
+  adopted by shep when nobody here has named the agent. An agent with a name of
+  its own is no longer decorated with `· workspace · branch · location` it did
+  not ask for.
+
+- Pairing a phone is in the global menu ("pair phone"): the QR, the address and
+  the claim code on one screen, which says so and shows the address and code
+  alone when the window is too small for a QR. It arms the same
+  `bridge-pair-code` window `shep bridge pair` does, tells you when the phone
+  has claimed it, and closing the screen cancels the code.
+
+### Removed
+
+- The review-diff pager is gone from the TUI — the global menu entry, the
+  group context-menu entry, and the pager pane it opened. The `workspace.diff`
+  API is untouched, so the companion's review screen is unaffected.
+
 - Pairing the companion is now two steps and a claim code. The first screen
   says what to do — run `shep bridge pair`, then scan the square or enter the
   computer's name and the 8-character code under it — and answers "why do I

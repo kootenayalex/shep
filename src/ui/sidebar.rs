@@ -77,7 +77,7 @@ pub(crate) fn sidebar_section_divider_rect(area: Rect, split_ratio: f32) -> Rect
 
 fn agent_panel_sort_label(sort: AgentPanelSort) -> &'static str {
     match sort {
-        AgentPanelSort::Spaces => "grouped",
+        AgentPanelSort::Grouped => "grouped",
         AgentPanelSort::Priority => "priority",
     }
 }

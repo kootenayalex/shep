@@ -29,7 +29,8 @@ mod widgets;
 use self::board::render_board_overlay;
 use self::dialogs::{
     render_confirm_close_overlay, render_new_linked_worktree_overlay,
-    render_open_existing_worktree_overlay, render_remove_worktree_overlay, render_rename_overlay,
+    render_open_existing_worktree_overlay, render_pair_overlay, render_remove_worktree_overlay,
+    render_rename_overlay,
 };
 use self::keybind_help::render_keybind_help_overlay;
 use self::menus::{
@@ -500,6 +501,7 @@ pub fn render_with_runtime_registry(
         Mode::KeybindHelp => render_keybind_help_overlay(app, frame),
         Mode::Navigator => render_navigator_overlay(app, terminal_runtimes, frame),
         Mode::Board => render_board_overlay(app, terminal_runtimes, frame),
+        Mode::PairPhone => render_pair_overlay(app, frame, frame.area()),
         Mode::Terminal => {}
     }
 }

@@ -847,12 +847,6 @@ impl HeadlessServer {
             crate::render_prof::event("full_render_cause.deferred_worktree_submit");
         }
 
-        if let Some(ws_idx) = self.app.state.request_review_workspace.take() {
-            self.app.open_review_pager(ws_idx);
-            needs_render = true;
-            crate::render_prof::event("full_render_cause.deferred_review_pane");
-        }
-
         if let Some(ws_idx) = self.app.state.request_ship_worktree.take() {
             self.app.ship_worktree(ws_idx);
             needs_render = true;
@@ -4205,6 +4199,16 @@ impl HeadlessServer {
             changed = true;
         }
 
+        // What each agent says about its own session. The phone reads these
+        // through `session.overview`, so they are sampled headless too.
+        if self.app.state.refresh_session_facts(now) {
+            changed = true;
+        }
+
+        if self.app.state.poll_pair_phone() {
+            changed = true;
+        }
+
         if self
             .app
             .selection_autoscroll_deadline
@@ -5987,6 +5991,7 @@ next_tab = ""
                 custom_status: None,
                 seq: None,
                 session_ref: None,
+                agent_session_path: None,
             })
         );
         assert!(

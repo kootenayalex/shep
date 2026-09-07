@@ -48,7 +48,7 @@ mod terminal;
 pub(crate) use self::{
     modal::{
         handle_global_menu_key, handle_keybind_help_key, handle_navigator_key,
-        insert_navigator_search_text, insert_rename_input_text,
+        handle_pair_phone_key, insert_navigator_search_text, insert_rename_input_text,
     },
     navigate::terminal_direct_navigation_action,
     settings::open_settings_at,
@@ -113,6 +113,7 @@ impl App {
                     handle_navigator_key(&mut self.state, &self.terminal_runtimes, key_event)
                 }
                 Mode::Board => self.handle_board_key(key_event),
+                Mode::PairPhone => handle_pair_phone_key(&mut self.state, key_event),
                 Mode::Terminal => unreachable!(),
             },
         }

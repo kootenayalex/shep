@@ -91,6 +91,9 @@ pub enum AppEvent {
         custom_status: Option<String>,
         seq: Option<u64>,
         session_ref: Option<crate::agent_resume::AgentSessionRef>,
+        /// The agent's own session file, when the hook named one. A display
+        /// hint only — `session_facts` reads it; nothing load-bearing does.
+        agent_session_path: Option<String>,
     },
     /// Agent session identity was reported without state authority.
     AgentSessionReported {
@@ -100,6 +103,8 @@ pub enum AppEvent {
         seq: Option<u64>,
         session_ref: Option<crate::agent_resume::AgentSessionRef>,
         session_start_source: Option<String>,
+        /// See [`AppEvent::HookStateReported::agent_session_path`].
+        agent_session_path: Option<String>,
     },
     /// Display-only agent metadata was reported for a pane.
     HookMetadataReported {

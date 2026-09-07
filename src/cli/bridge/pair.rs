@@ -49,39 +49,22 @@ pub(super) fn pair(args: &[String]) -> std::io::Result<i32> {
             }
         }
     }
-    let host = host.unwrap_or_else(|| DEFAULT_BIND.to_string());
-    let host = if host.contains(':') {
-        host
-    } else {
-        format!("{host}:7431")
-    };
-    let token = load_or_create_token()?;
-    let url = format!("ws://{host}/");
-    let payload = format!(
-        "shep://pair?url={}&token={}",
-        percent_encode(&url),
-        percent_encode(&token),
-    );
-    match render_qr(&payload) {
-        Ok(image) => {
-            println!("{image}");
-        }
-        Err(err) => eprintln!("(could not render QR: {err}; use the text values below)"),
+    let window = arm_pairing_window(host.as_deref())?;
+    match &window.qr {
+        Some(image) => println!("{image}"),
+        None => eprintln!("(could not render QR; use the text values below)"),
     }
-    println!("url: {url}");
-    println!("token: {token}");
+    println!("url: {}", window.url);
+    println!("token: {}", window.token);
     println!("scan the QR in the companion app, or paste both into the pairing screen.");
-
-    let code = generate_code()?;
-    let path = code_path();
-    let expires_at = now_unix() + CODE_TTL.as_secs();
-    write_code_at(&path, &code, expires_at)?;
     println!();
     println!(
-        "on the phone: enter {host} and the code {} (expires in {} min)",
-        format_code(&code),
+        "on the phone: enter {} and the code {} (expires in {} min)",
+        window.host,
+        window.formatted_code(),
         CODE_TTL.as_secs() / 60,
     );
+    let path = code_path();
     if !wait {
         return Ok(0);
     }
@@ -106,6 +89,99 @@ pub(super) fn pair(args: &[String]) -> std::io::Result<i32> {
             return Ok(1);
         }
     }
+}
+
+/// A live pairing window: what the person reads off the screen, and the code
+/// the phone will present. Armed by writing the same `bridge-pair-code` file
+/// the CLI writes, so the TUI and `shep bridge pair` arm pairing identically —
+/// no second mechanism, no new IPC.
+pub(crate) struct PairingWindow {
+    /// The bridge address as it will be typed into the phone.
+    pub(crate) host: String,
+    pub(crate) url: String,
+    pub(crate) token: String,
+    /// The terminal QR, or `None` when the payload could not be rendered.
+    pub(crate) qr: Option<String>,
+    pub(crate) code: String,
+    /// Unix seconds after which the code is inert.
+    pub(crate) expires_at: u64,
+}
+
+impl PairingWindow {
+    /// `7K4M-9QP2` — the code as a person reads it aloud.
+    pub(crate) fn formatted_code(&self) -> String {
+        format_code(&self.code)
+    }
+
+    /// Whole minutes left, rounded up, or `0` once it has expired.
+    pub(crate) fn minutes_left(&self) -> u64 {
+        self.expires_at.saturating_sub(now_unix()).div_ceil(60)
+    }
+}
+
+/// Arm a claim window and gather everything a pairing screen shows.
+///
+/// `host` defaults to [`DEFAULT_BIND`], matching the CLI; a host without a port
+/// gets the bridge's default one.
+pub(crate) fn arm_pairing_window(host: Option<&str>) -> std::io::Result<PairingWindow> {
+    let host = host.unwrap_or(DEFAULT_BIND).to_string();
+    let host = if host.contains(':') {
+        host
+    } else {
+        format!("{host}:7431")
+    };
+    let token = load_or_create_token()?;
+    let url = format!("ws://{host}/");
+    let payload = format!(
+        "shep://pair?url={}&token={}",
+        percent_encode(&url),
+        percent_encode(&token),
+    );
+    let qr = render_qr(&payload).ok();
+    let code = generate_code()?;
+    let expires_at = now_unix() + CODE_TTL.as_secs();
+    write_code_at(&code_path(), &code, expires_at)?;
+    Ok(PairingWindow {
+        host,
+        url,
+        token,
+        qr,
+        code,
+        expires_at,
+    })
+}
+
+/// A window with a fixed code and a real QR, for rendering tests. Arms
+/// nothing: no code file is written, so a snapshot never touches the config
+/// dir or a live pairing.
+#[cfg(test)]
+pub(crate) fn test_window(host: &str, code: &str) -> PairingWindow {
+    let url = format!("ws://{host}/");
+    let payload = format!(
+        "shep://pair?url={}&token={}",
+        percent_encode(&url),
+        percent_encode("test-token"),
+    );
+    PairingWindow {
+        host: host.to_string(),
+        url,
+        token: "test-token".to_string(),
+        qr: render_qr(&payload).ok(),
+        code: code.to_string(),
+        expires_at: now_unix() + CODE_TTL.as_secs(),
+    }
+}
+
+/// Close a pairing window early, so a code never outlives the screen showing
+/// it — the same guarantee `pair`'s Ctrl-C handler gives.
+pub(crate) fn cancel_pairing_window() {
+    std::fs::remove_file(code_path()).ok();
+}
+
+/// Whether the armed window has been claimed (the file is gone) — what a
+/// pairing screen polls to know the phone arrived.
+pub(crate) fn pairing_window_claimed() -> bool {
+    !code_path().exists()
 }
 
 fn now_unix() -> u64 {

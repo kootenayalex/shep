@@ -115,7 +115,7 @@ impl App {
 
     pub(super) fn save_agent_panel_sort(&mut self, sort: crate::app::state::AgentPanelSort) {
         let value = match sort {
-            crate::app::state::AgentPanelSort::Spaces => {
+            crate::app::state::AgentPanelSort::Grouped => {
                 crate::config::AgentPanelSortConfig::Spaces.as_str()
             }
             crate::app::state::AgentPanelSort::Priority => {

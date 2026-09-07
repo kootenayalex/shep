@@ -40,6 +40,18 @@ pub(crate) fn rename_button_rects(inner: Rect) -> (Rect, Rect, Rect) {
     (rects[0], rects[1], rects[2])
 }
 
+/// Whether the pane being renamed is the only one in its tab.
+fn lone_pane_in_its_tab(app: &AppState) -> bool {
+    let Some(pane_id) = app.rename_pane_target else {
+        return false;
+    };
+    app.workspaces
+        .iter()
+        .flat_map(|ws| ws.tabs.iter())
+        .find(|tab| tab.panes.contains_key(&pane_id))
+        .is_some_and(|tab| tab.panes.len() == 1)
+}
+
 pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rect) {
     super::dim_background(frame, area);
 
@@ -49,6 +61,9 @@ pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rec
         Mode::QueuePrompt => "queue prompt (delivered when agent is idle)",
         Mode::RenameTab if app.creating_new_tab => "new tab",
         Mode::RenameTab => "rename tab",
+        // A tab holding one pane is an agent, and that is what the person is
+        // naming. "rename pane" is only right where a pane is its own thing.
+        Mode::RenamePane if lone_pane_in_its_tab(app) => "rename agent",
         Mode::RenamePane => "rename pane",
         _ => return,
     };
@@ -323,6 +338,162 @@ pub(super) fn render_new_linked_worktree_overlay(app: &AppState, frame: &mut Fra
             .fg(app.palette.text)
             .bg(app.palette.surface0)
             .add_modifier(Modifier::BOLD),
+    );
+}
+
+/// The pairing screen: a QR to scan, and the same credential as a claim code
+/// to type when there is no camera at hand.
+///
+/// A QR needs roughly 29x15 cells with its quiet zone. Below that the code is
+/// still perfectly usable, so the screen says the window is too small for the
+/// QR and shows the address and code as text rather than drawing a QR nobody
+/// can scan.
+pub(super) fn render_pair_overlay(app: &AppState, frame: &mut Frame, area: Rect) {
+    let Some(pairing) = app.pair_phone.as_ref() else {
+        return;
+    };
+
+    super::dim_background(frame, area);
+
+    let qr_lines: Vec<&str> = pairing
+        .window
+        .qr
+        .as_deref()
+        .map(|qr| qr.lines().collect())
+        .unwrap_or_default();
+    let qr_width = qr_lines
+        .iter()
+        .map(|line| display_width_u16(line))
+        .max()
+        .unwrap_or(0);
+    let qr_height = qr_lines.len() as u16;
+
+    // Six text rows: heading, address, code, expiry, blank, footer.
+    const TEXT_ROWS: u16 = 6;
+    let fits_qr = qr_height > 0
+        && area.width >= qr_width.saturating_add(8)
+        && area.height >= qr_height.saturating_add(TEXT_ROWS).saturating_add(4);
+    let want = if fits_qr {
+        (
+            qr_width.saturating_add(4).max(48),
+            qr_height + TEXT_ROWS + 2,
+        )
+    } else {
+        (48, TEXT_ROWS + 2)
+    };
+    let Some(inner) = render_modal_or_notice(
+        frame,
+        area,
+        want,
+        (36, TEXT_ROWS),
+        "the pairing screen",
+        &app.palette,
+    ) else {
+        return;
+    };
+
+    let (qr_area, text_area) = if fits_qr {
+        let rows = Layout::vertical([Constraint::Length(qr_height), Constraint::Min(TEXT_ROWS)])
+            .areas::<2>(inner);
+        (Some(rows[0]), rows[1])
+    } else {
+        (None, inner)
+    };
+
+    if let Some(qr_area) = qr_area {
+        frame.render_widget(
+            Paragraph::new(
+                qr_lines
+                    .iter()
+                    .map(|line| Line::from((*line).to_string()))
+                    .collect::<Vec<_>>(),
+            )
+            .centered(),
+            qr_area,
+        );
+    }
+
+    let rows = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Min(1),
+    ])
+    .areas::<6>(text_area);
+
+    let label = Style::default().fg(app.palette.overlay0);
+    let value = Style::default().fg(app.palette.text);
+
+    if pairing.paired {
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![Span::styled(
+                " paired",
+                Style::default()
+                    .fg(app.palette.green)
+                    .add_modifier(Modifier::BOLD),
+            )])),
+            rows[0],
+        );
+        frame.render_widget(
+            Paragraph::new(" the phone has the token; the code is spent.").style(label),
+            rows[1],
+        );
+    } else {
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![Span::styled(
+                if fits_qr {
+                    " scan this in the companion app, or type:"
+                } else {
+                    " no room for the QR - type this instead:"
+                },
+                Style::default()
+                    .fg(app.palette.accent)
+                    .add_modifier(Modifier::BOLD),
+            )])),
+            rows[0],
+        );
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(" address  ", label),
+                Span::styled(pairing.window.host.clone(), value),
+            ])),
+            rows[1],
+        );
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(" code     ", label),
+                Span::styled(
+                    pairing.window.formatted_code(),
+                    Style::default()
+                        .fg(app.palette.text)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])),
+            rows[2],
+        );
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(" expires  ", label),
+                Span::styled(
+                    format!(
+                        "in {} min, and after one use",
+                        pairing.window.minutes_left()
+                    ),
+                    label,
+                ),
+            ])),
+            rows[3],
+        );
+    }
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![Span::styled(
+            " esc closes this and cancels the code",
+            label,
+        )])),
+        rows[5],
     );
 }
 

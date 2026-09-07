@@ -80,11 +80,24 @@ impl App {
             }));
         };
         let cleared = normalized_name.is_none();
-        match normalized_name {
+        let is_claude = terminal.effective_agent_label() == Some("claude");
+        match normalized_name.clone() {
             Some(name) => terminal.set_agent_display_name(name),
             None => terminal.clear_agent_display_name(),
         }
         self.state.mark_session_dirty();
+        // One name means one agent, so tell the agent too. Queued, so it lands
+        // on the pane's next idle rather than interrupting a turn.
+        if let Some(name) = normalized_name.filter(|_| is_claude) {
+            if let Err(err) = self.send_or_queue_pane_text(
+                resolved.ws_idx,
+                resolved.pane_id,
+                format!("/rename {name}"),
+                true,
+            ) {
+                tracing::warn!(err = %err, "could not tell the agent its new name");
+            }
+        }
         // A pane whose only claim to agenthood was the manual name stops being
         // an agent the moment that name is cleared, so `agent_info` reports
         // nothing. That is the rename succeeding, not the target going missing

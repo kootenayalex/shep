@@ -227,7 +227,7 @@ fn agent_panel_sort_from_config(
     sort: crate::config::AgentPanelSortConfig,
 ) -> state::AgentPanelSort {
     match sort {
-        crate::config::AgentPanelSortConfig::Spaces => state::AgentPanelSort::Spaces,
+        crate::config::AgentPanelSortConfig::Spaces => state::AgentPanelSort::Grouped,
         crate::config::AgentPanelSortConfig::Priority => state::AgentPanelSort::Priority,
     }
 }
@@ -524,7 +524,7 @@ impl App {
             request_submit_worktree_open: false,
             request_submit_worktree_remove: false,
             request_reload_config: false,
-            request_review_workspace: None,
+            pair_phone: None,
             request_ship_worktree: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
@@ -1013,11 +1013,6 @@ impl App {
             if self.state.request_reload_config {
                 self.state.request_reload_config = false;
                 self.reload_config();
-                needs_render = true;
-            }
-
-            if let Some(ws_idx) = self.state.request_review_workspace.take() {
-                self.open_review_pager(ws_idx);
                 needs_render = true;
             }
 
@@ -1738,6 +1733,9 @@ impl App {
             }
             Mode::GlobalMenu => {
                 input::handle_global_menu_key(&mut self.state, key_event);
+            }
+            Mode::PairPhone => {
+                input::handle_pair_phone_key(&mut self.state, key_event);
             }
             Mode::Onboarding => {
                 self.handle_onboarding_key(key_event);
@@ -3062,7 +3060,7 @@ mod tests {
         std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
 
         let mut app = test_app();
-        assert_eq!(app.state.agent_panel_sort, state::AgentPanelSort::Spaces);
+        assert_eq!(app.state.agent_panel_sort, state::AgentPanelSort::Grouped);
 
         app.save_agent_panel_sort(state::AgentPanelSort::Priority);
 

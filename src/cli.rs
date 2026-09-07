@@ -12,7 +12,7 @@ use crate::api::schema::{
 
 mod agent;
 mod api;
-mod bridge;
+pub(crate) mod bridge;
 mod completion;
 mod integration;
 mod memory;

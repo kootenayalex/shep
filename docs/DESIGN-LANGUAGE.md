@@ -112,7 +112,16 @@ Badges sit beside a name and answer a different question from state.
 | git ahead | `↑N` | green | commits to push |
 | git behind | `↓N` | peach | commits to pull |
 | memory pressure | `mem NN%` | peach | at or over 80% of the cap |
+| plan mode | `plan` | mauve | the agent is planning, not editing |
+| bypassing permissions | `bypass` | peach | the agent is not asking before acting |
+| churn | `+N/-N` | green / red | lines the session has added and removed |
 | worktree | `⑂` (phone) / `· worktree` (desktop) | accent | a linked worktree, not the main checkout |
+
+The permission-mode badges are a warning, never a stop: peach, because red is
+what a blocked agent gets. The ordinary modes say nothing worth a glance and so
+draw nothing. Both, like the churn and the card's summary line, come from the
+agent's own session file (`src/session_facts/`) — display hints, never
+detection evidence.
 
 `✓` means approved and nothing else. It used to be idle's glyph too, which is why
 idle is now `○`.

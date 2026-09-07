@@ -1,77 +1,19 @@
-//! Review flow (M3): inspect a workspace's changes in a pager pane.
+//! Review flow (M3): a workspace's changes, as text, for the clients that show
+//! them.
 //!
-//! Panes are real terminals, so the cheapest correct diff view is a new tab in
-//! the workspace running `git diff` through a pager — delta when installed,
-//! `less -R` otherwise — with a `--stat` header piped in front. For a linked
-//! worktree the diff spans the whole branch (merge-base of the base checkout's
-//! branch) plus uncommitted work; for a plain workspace it is the working tree
-//! against `HEAD`.
+//! For a linked worktree the diff spans the whole branch (merge-base of the
+//! base checkout's branch) plus uncommitted work; for a plain workspace it is
+//! the working tree against `HEAD`.
 //!
-//! Command construction is pure ([`review_pager_command`], tested); the pane
-//! injection writes into the fresh tab's pty, which the kernel buffers until
-//! the shell is up — no readiness race.
+//! The pager itself is gone from the TUI — the phone's `ReviewScreen` reads
+//! `workspace.diff` through the API instead — so what remains here is the diff
+//! target, the diff text, and shipping a worktree.
 
 use std::path::Path;
 
 use bytes::Bytes;
 
 use crate::workspace::WorktreeSpaceMembership;
-
-impl crate::app::App {
-    /// Open a review pager tab for workspace `ws_idx` (focuses it).
-    pub(crate) fn open_review_pager(&mut self, ws_idx: usize) {
-        if ws_idx >= self.state.workspaces.len() {
-            return;
-        }
-        let ws = &self.state.workspaces[ws_idx];
-        let cwd = ws
-            .resolved_identity_cwd_from(&self.state.terminals, &self.terminal_runtimes)
-            .unwrap_or_else(|| ws.identity_cwd.clone());
-        let target = review_diff_target(&cwd, ws.worktree_space());
-        let command = review_pager_command(&target, delta_available());
-
-        // Mirror the API tab-create path (production tab creation is
-        // server-owned; the convenience wrappers in `creation.rs` are
-        // test-only).
-        let (rows, cols) = self.state.estimate_pane_size();
-        let default_shell = self.state.default_shell.clone();
-        let shell_mode = self.state.shell_mode;
-        let scrollback_limit_bytes = self.state.pane_scrollback_limit_bytes;
-        let host_terminal_theme = self.state.host_terminal_theme;
-        let result = self.state.workspaces[ws_idx].create_tab(
-            rows,
-            cols,
-            cwd,
-            scrollback_limit_bytes,
-            host_terminal_theme,
-            crate::pane::PaneShellConfig::new(&default_shell, shell_mode),
-            Vec::new(),
-        );
-        let (tab_idx, terminal, runtime) = match result {
-            Ok(created) => created,
-            Err(err) => {
-                tracing::warn!(err = %err, "failed to open review pane");
-                return;
-            }
-        };
-        self.terminal_runtimes.insert(terminal.id.clone(), runtime);
-        self.state.terminals.insert(terminal.id.clone(), terminal);
-        let ws = &mut self.state.workspaces[ws_idx];
-        ws.tabs[tab_idx].set_custom_name("review".to_string());
-        let root_pane = ws.tabs[tab_idx].root_pane;
-        self.state.remove_alias_shadowed_by_new_pane(root_pane);
-        self.state.switch_workspace_tab(ws_idx, tab_idx);
-        self.state.mode = crate::app::state::Mode::Terminal;
-        self.emit_tab_created_events(ws_idx, tab_idx);
-        self.schedule_session_save();
-        let Some(runtime) = self.lookup_runtime_sender(ws_idx, root_pane) else {
-            return;
-        };
-        if let Err(err) = runtime.try_send_bytes(Bytes::from(command)) {
-            tracing::warn!(err = %err, "failed to inject review command");
-        }
-    }
-}
 
 impl crate::app::App {
     /// Ship a linked-worktree workspace: merge its branch into the base
@@ -362,29 +304,6 @@ fn git_stdout_untrimmed(dir: &Path, args: &[&str]) -> Option<String> {
     (!stdout.is_empty()).then_some(stdout)
 }
 
-/// The line typed into the review pane. Leading space keeps it out of shell
-/// history; the trailing newline submits it. `--stat` first so the pager opens
-/// on the summary.
-pub(crate) fn review_pager_command(diff_target: &str, use_delta: bool) -> String {
-    if use_delta {
-        format!(
-            " clear; {{ git diff --stat '{diff_target}'; echo; git diff '{diff_target}'; }} | delta --paging=always\n"
-        )
-    } else {
-        format!(
-            " clear; {{ git diff --color=always --stat '{diff_target}'; echo; git diff --color=always '{diff_target}'; }} | less -R\n"
-        )
-    }
-}
-
-/// Whether `delta` is on PATH.
-fn delta_available() -> bool {
-    let Some(path) = std::env::var_os("PATH") else {
-        return false;
-    };
-    std::env::split_paths(&path).any(|dir| dir.join("delta").is_file())
-}
-
 /// Trimmed stdout of a git command in `dir`, `None` on any failure or empty
 /// output.
 fn git_stdout(dir: &Path, args: &[&str]) -> Option<String> {
@@ -458,22 +377,6 @@ mod tests {
         let (_target, stat, diff) = workspace_review_diff(&repo, None);
         assert!(stat.is_empty() && diff.is_empty(), "clean tree has no diff");
         std::fs::remove_dir_all(&repo).ok();
-    }
-
-    #[test]
-    fn pager_command_shapes() {
-        let less = review_pager_command("HEAD", false);
-        assert!(less.starts_with(' '), "must stay out of shell history");
-        assert!(less.ends_with('\n'), "must submit itself");
-        assert!(less.contains("--color=always"));
-        assert!(less.contains("--stat 'HEAD'"));
-        assert!(less.contains("less -R"));
-
-        let delta = review_pager_command("abc123", true);
-        assert!(delta.contains("delta --paging=always"));
-        assert!(delta.contains("diff 'abc123'"));
-        // delta colorizes itself; forcing git color would garble it.
-        assert!(!delta.contains("--color=always"));
     }
 
     #[test]

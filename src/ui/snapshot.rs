@@ -304,6 +304,8 @@ mod fixture {
         /// boundaries in `format_event_age` so a slow test run cannot flip it.
         pub age_secs: u64,
         pub seq: u64,
+        /// What the agent says about its own session, when it publishes any.
+        pub facts: crate::session_facts::SessionFacts,
     }
 
     fn apply(
@@ -337,6 +339,7 @@ mod fixture {
         terminal.last_agent_state_change_seq = Some(f.seq);
         terminal.last_agent_state_change_at =
             Some(Instant::now() - Duration::from_secs(f.age_secs));
+        terminal.session_facts = f.facts.clone();
     }
 
     /// A session with every state represented, chrome on, and enough real text
@@ -398,6 +401,14 @@ mod fixture {
                 context: Some(72),
                 age_secs: 130,
                 seq: 60,
+                facts: crate::session_facts::SessionFacts {
+                    title: Some("stripe webhook retries".into()),
+                    name: Some("billing".into()),
+                    permission_mode: Some("plan".into()),
+                    cost_usd: Some(3.42),
+                    lines_added: Some(210),
+                    lines_removed: Some(18),
+                },
             },
         );
         apply(
@@ -414,6 +425,7 @@ mod fixture {
                 context: Some(41),
                 age_secs: 20,
                 seq: 50,
+                facts: crate::session_facts::SessionFacts::default(),
             },
         );
         apply(
@@ -430,6 +442,12 @@ mod fixture {
                 context: Some(88),
                 age_secs: 400,
                 seq: 40,
+                facts: crate::session_facts::SessionFacts {
+                    permission_mode: Some("bypassPermissions".into()),
+                    lines_added: Some(12),
+                    lines_removed: Some(0),
+                    ..Default::default()
+                },
             },
         );
         apply(
@@ -446,6 +464,7 @@ mod fixture {
                 context: Some(12),
                 age_secs: 4000,
                 seq: 30,
+                facts: crate::session_facts::SessionFacts::default(),
             },
         );
         apply(
@@ -462,6 +481,7 @@ mod fixture {
                 context: Some(55),
                 age_secs: 130,
                 seq: 20,
+                facts: crate::session_facts::SessionFacts::default(),
             },
         );
 
@@ -649,6 +669,41 @@ fn snapshot_settings_too_small() {
     let mut state = fixture::session();
     state.mode = Mode::Settings;
     assert_screen(&mut state, "settings-too-small", 24, 7);
+}
+
+/// One group, alone: the lane takes the whole width, which is the layout a
+/// single-project session actually sees.
+#[test]
+fn snapshot_board_one_lane() {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    state.workspaces.truncate(1);
+    state.active = Some(0);
+    assert_screen(&mut state, "board-one-lane", MID.0, MID.1);
+}
+
+/// The pairing screen with room for the QR, and the fallback that shows the
+/// address and code as text when there is not.
+#[test]
+fn snapshot_pair_phone() {
+    let mut state = fixture::session();
+    state.mode = Mode::PairPhone;
+    state.pair_phone = Some(crate::app::state::PairPhoneState {
+        window: crate::cli::bridge::pair::test_window("100.64.0.1:7431", "7K4M9QP2"),
+        paired: false,
+    });
+    assert_screen(&mut state, "pair-phone", WIDE.0, WIDE.1);
+}
+
+#[test]
+fn snapshot_pair_phone_small() {
+    let mut state = fixture::session();
+    state.mode = Mode::PairPhone;
+    state.pair_phone = Some(crate::app::state::PairPhoneState {
+        window: crate::cli::bridge::pair::test_window("100.64.0.1:7431", "7K4M9QP2"),
+        paired: false,
+    });
+    assert_screen(&mut state, "pair-phone-small", SMALL.0, SMALL.1);
 }
 
 #[test]

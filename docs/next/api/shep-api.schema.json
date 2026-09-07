@@ -9232,6 +9232,13 @@
                 "null"
               ]
             },
+            "permission_mode": {
+              "description": "The permission mode the agent is running under (`plan`,\n`bypassPermissions`, …), from the same source.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "queued_input": {
               "description": "Prompts queued for this pane, waiting for it to go idle.",
               "format": "uint64",
@@ -9244,6 +9251,13 @@
               "minimum": 0,
               "type": [
                 "integer",
+                "null"
+              ]
+            },
+            "summary": {
+              "description": "What the agent says this session is about, from the agent's own session\nfile — a display hint, never detection evidence. `None` when the agent\npublishes no such fact.",
+              "type": [
+                "string",
                 "null"
               ]
             },

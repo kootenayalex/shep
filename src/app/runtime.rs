@@ -263,6 +263,16 @@ impl App {
             changed = true;
         }
 
+        // What each agent says about its own session. Not gated on a screen:
+        // the sidebar, the board and the phone all read it.
+        if self.state.refresh_session_facts(now) {
+            changed = true;
+        }
+
+        if self.state.poll_pair_phone() {
+            changed = true;
+        }
+
         // The queue rows cost a second sqlite read, so they are sampled only
         // while the screen that draws them is actually on.
         if self.state.mode == crate::app::state::Mode::Board

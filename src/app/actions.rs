@@ -2657,15 +2657,19 @@ impl AppState {
                 custom_status,
                 seq,
                 session_ref,
+                agent_session_path,
             } => {
+                let session_file = agent_session_path.map(std::path::PathBuf::from);
                 if crate::agent_resume::is_reserved_native_state_source(&source, &agent_label) {
                     self.update_terminal_state(pane_id, |terminal| {
+                        terminal.set_agent_session_file(session_file);
                         terminal.set_agent_session_ref(source, agent_label, session_ref, seq)
                     })
                     .into_iter()
                     .collect()
                 } else {
                     self.update_terminal_state(pane_id, |terminal| {
+                        terminal.set_agent_session_file(session_file);
                         terminal.set_hook_authority_with_session_ref(
                             source,
                             agent_label,
@@ -2687,8 +2691,11 @@ impl AppState {
                 seq,
                 session_ref,
                 session_start_source,
+                agent_session_path,
             } => self
                 .update_terminal_state(pane_id, |terminal| {
+                    terminal
+                        .set_agent_session_file(agent_session_path.map(std::path::PathBuf::from));
                     terminal.set_agent_session_ref_for_session_start(
                         source,
                         agent_label,
@@ -4790,6 +4797,7 @@ mod tests {
             custom_status: None,
             seq: None,
             session_ref: None,
+            agent_session_path: None,
         });
 
         let toast = state.toast.as_ref().unwrap();
@@ -4829,6 +4837,7 @@ mod tests {
             custom_status: None,
             seq: Some(1),
             session_ref: None,
+            agent_session_path: None,
         });
         state.handle_app_event(AppEvent::StateChanged {
             pane_id: bg_pane_id,
@@ -4878,6 +4887,7 @@ mod tests {
             custom_status: None,
             seq: Some(1),
             session_ref: crate::agent_resume::AgentSessionRef::id("claude-session"),
+            agent_session_path: None,
         });
         let terminal = state.terminals.get(&terminal_id).unwrap();
         assert_eq!(terminal.state, AgentState::Working);
@@ -4961,6 +4971,7 @@ mod tests {
             custom_status: None,
             seq: Some(1),
             session_ref: crate::agent_resume::AgentSessionRef::id("devin-session"),
+            agent_session_path: None,
         });
 
         let terminal = state.terminals.get(&terminal_id).unwrap();
@@ -4986,6 +4997,7 @@ mod tests {
             custom_status: None,
             seq: Some(20),
             session_ref: crate::agent_resume::AgentSessionRef::path(first_session),
+            agent_session_path: None,
         });
         assert_eq!(first_updates.len(), 1);
         state.session_dirty = false;
@@ -4999,6 +5011,7 @@ mod tests {
             custom_status: None,
             seq: Some(21),
             session_ref: crate::agent_resume::AgentSessionRef::path(second_session),
+            agent_session_path: None,
         });
 
         assert!(second_updates.is_empty());

@@ -1,0 +1,35 @@
+# Facts Claude Code writes about its own session, read out of the transcript
+# jsonl that the shep hook already tells us the path of.
+#
+# Display hints only — same contract as `activity_lines`. Never detection
+# evidence, never load-bearing. A record that is missing, malformed or older
+# than `tail_bytes` simply yields no fact.
+#
+# Block order is precedence: the first block that resolves a field wins, which
+# is how a hand-set `custom-title` beats the generated `ai-title`.
+id = "claude"
+format = "jsonl-tail"
+tail_bytes = 262144
+discriminator = "type"
+
+[[facts]]
+record = "custom-title"
+title = "customTitle"
+
+[[facts]]
+record = "ai-title"
+title = "aiTitle"
+
+[[facts]]
+record = "agent-name"
+name = "agentName"
+
+[[facts]]
+record = "permission-mode"
+permission_mode = "permissionMode"
+
+[[facts]]
+record = "cost-state"
+cost_usd = "totalCostUSD"
+lines_added = "totalLinesAdded"
+lines_removed = "totalLinesRemoved"

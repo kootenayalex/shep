@@ -88,6 +88,11 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.state.board_move_selection(BoardDir::Down, narrow)
             }
+            // Move the selected agent's whole lane, which is the group's own
+            // order — a shared session fact, so it goes through the API and
+            // survives a handoff rather than living in this client.
+            KeyCode::Char('<') | KeyCode::Char('H') => self.board_move_lane(-1),
+            KeyCode::Char('>') | KeyCode::Char('L') => self.board_move_lane(1),
             KeyCode::Enter => self.board_focus_selected(),
             // Inspect without attaching. Enter stays the fast path straight
             // into the pane; this is the "tell me more first" path.
@@ -123,6 +128,21 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => self.state.board_move_task_selection(1),
             _ => {}
         }
+    }
+
+    /// Move the lane holding the selection one place left or right.
+    ///
+    /// `workspace.move` reorders groups for the whole session, so the board,
+    /// the sidebar and the phone all see the same order afterwards.
+    fn board_move_lane(&mut self, delta: isize) {
+        let Some((ws_idx, _)) = self.state.board_enter_target() else {
+            return;
+        };
+        let target = ws_idx as isize + delta;
+        if target < 0 || target >= self.state.workspaces.len() as isize {
+            return;
+        }
+        self.move_workspace_via_api(ws_idx, target as usize);
     }
 
     fn board_focus_selected(&mut self) {
@@ -188,11 +208,13 @@ mod tests {
     fn move_selection_updates_board_state() {
         let (mut state, root, second) = board_app();
         state.open_board();
-        // Start on the focused working pane.
+        // Both agents share one group, so they share a lane: up and down move
+        // between them, and the blocked one sorts first.
         state.board.selected = Some(root);
-        // Left jumps to the blocked column (leftmost non-empty).
-        state.board_move_selection(BoardDir::Left, false);
+        state.board_move_selection(BoardDir::Up, false);
         assert_eq!(state.board.selected, Some(second));
+        state.board_move_selection(BoardDir::Down, false);
+        assert_eq!(state.board.selected, Some(root));
     }
 
     #[test]

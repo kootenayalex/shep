@@ -798,6 +798,7 @@ pub enum Mode {
     KeybindHelp,
     Navigator,
     Board,
+    PairPhone,
 }
 
 impl Mode {
@@ -892,6 +893,38 @@ impl DashboardSample {
         self.pending_tasks = pending_task_count();
         self.sampled_at = Some(now);
         true
+    }
+}
+
+impl AppState {
+    /// While the pairing screen is up, notice when the phone has claimed the
+    /// code. The armed window is a file, so "claimed" is "the file is gone".
+    pub fn poll_pair_phone(&mut self) -> bool {
+        if self.mode != Mode::PairPhone {
+            return false;
+        }
+        let Some(pairing) = self.pair_phone.as_mut() else {
+            return false;
+        };
+        if pairing.paired || !crate::cli::bridge::pair::pairing_window_claimed() {
+            return false;
+        }
+        pairing.paired = true;
+        true
+    }
+
+    /// Re-read every agent's own session file whose sample has aged out.
+    ///
+    /// Sampled here, beside the dashboard sample, so `render` stays pure — and
+    /// not gated on the board being on screen, because `session.overview`
+    /// publishes these facts to the phone too. Each terminal guards itself on a
+    /// TTL plus the file's mtime, so a quiet session costs one `stat`.
+    pub fn refresh_session_facts(&mut self, now: std::time::Instant) -> bool {
+        let mut changed = false;
+        for terminal in self.terminals.values_mut() {
+            changed |= terminal.refresh_session_facts_if_stale(now);
+        }
+        changed
     }
 }
 
@@ -1066,9 +1099,12 @@ pub(crate) enum CopyModeSelection {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// How the sidebar's agent panel orders itself: by the group an agent is in,
+/// or by who needs the user first. The names follow the surface's own
+/// vocabulary — `grouped` is what the sidebar calls it.
 pub enum AgentPanelSort {
     #[default]
-    Spaces,
+    Grouped,
     Priority,
 }
 
@@ -1314,6 +1350,18 @@ pub enum ContextMenuKind {
     },
 }
 
+/// A pairing window the TUI armed, and what the screen showing it knows.
+///
+/// The window itself is the same `bridge-pair-code` file `shep bridge pair`
+/// writes, so this is presentation state over a shared fact, not a second
+/// pairing mechanism.
+pub struct PairPhoneState {
+    pub window: crate::cli::bridge::pair::PairingWindow,
+    /// Set once the phone has claimed the code — the screen says so instead of
+    /// showing a code that no longer exists.
+    pub paired: bool,
+}
+
 /// Right-click context menu state.
 pub struct ContextMenuState {
     pub kind: ContextMenuKind,
@@ -1333,7 +1381,6 @@ impl ContextMenuState {
             } => &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "New worktree",
@@ -1345,7 +1392,6 @@ impl ContextMenuState {
             } => &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "Ship worktree...",
@@ -1603,9 +1649,6 @@ pub struct AppState {
     pub request_submit_worktree_open: bool,
     pub request_submit_worktree_remove: bool,
     pub request_reload_config: bool,
-    /// Workspace index whose review pager should open; drained by the App/
-    /// headless loops (pane creation cannot happen from AppState input code).
-    pub request_review_workspace: Option<usize>,
     /// Workspace index to ship (merge linked-worktree branch into its base);
     /// drained by the App/headless loops.
     pub request_ship_worktree: Option<usize>,
@@ -1768,6 +1811,9 @@ pub struct AppState {
     pub(crate) plugin_commands_in_flight: usize,
     /// Highlight state for the bottom-right global launcher menu.
     pub global_menu: MenuListState,
+    /// A live phone-pairing window, while its screen is up. `None` means no
+    /// code is armed by the TUI.
+    pub pair_phone: Option<PairPhoneState>,
     /// Resolved host terminal default colors for theming embedded panes.
     pub host_terminal_theme: TerminalTheme,
     /// Sampled host/queue facts for the session-board dashboard. Refreshed on
@@ -2047,7 +2093,6 @@ impl AppState {
             request_submit_worktree_open: false,
             request_submit_worktree_remove: false,
             request_reload_config: false,
-            request_review_workspace: None,
             request_ship_worktree: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
@@ -2125,7 +2170,7 @@ impl AppState {
             sidebar_collapsed: false,
             sidebar_collapsed_mode: crate::config::SidebarCollapsedModeConfig::Compact,
             sidebar_section_split: 0.5,
-            agent_panel_sort: AgentPanelSort::Spaces,
+            agent_panel_sort: AgentPanelSort::Grouped,
             next_agent_state_change_seq: 0,
             mouse_capture: true,
             right_click_passthrough_modifiers: None,
@@ -2192,6 +2237,7 @@ impl AppState {
             next_plugin_command_log_id: 1,
             plugin_commands_in_flight: 0,
             global_menu: MenuListState::new(0),
+            pair_phone: None,
             host_terminal_theme: TerminalTheme::default(),
             dashboard_sample: DashboardSample::default(),
             task_queue: TaskQueueSample::default(),
@@ -2640,7 +2686,6 @@ mod tests {
             &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "Ship worktree...",
@@ -2668,7 +2713,6 @@ mod tests {
             &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "New worktree",

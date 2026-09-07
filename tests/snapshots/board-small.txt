@@ -1,4 +1,4 @@
-# board-small 80x24 · 19 styles
+# board-small 80x24 · 20 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
@@ -7,51 +7,51 @@
 │ session board · what are my agents doing                                     │
 │ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1       │
 │ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G               │
-│ blocked 1                                                                    │
-│ ◉ claude · workmayt ⇥2                                                    p1 │
-│   workmayt · fix/stripe-webhook                                           2m │
-│   blocked                                                                    │
-│   may I run the stripe integration tests?                                    │
-│   ~/vault/dev/workmayt                                           ████▍   72% │
+│ workmayt 2                emberline 1               shep 2                   │
+│                                                                              │
+│ ◉ claude · workma… ⇥2 p1  ● claude · emberline      ⠹ codex               p2 │
+│   fix/stripe-webhook  2m    master              6m    feat/design-pass    2m │
+│   blocked                   done                      working                │
+│   stripe webhook retries    pushed 3 commits to m…    reading src/ui/board.… │
+│   …/workmayt ████▍   72%    …emberline █████▎  88%    …sign-pass ███▎    55% │
+│                                                                              │
+│ ⠹ opencode            p2                            ○ claude · shep       p1 │
+│   fix/stripe-webhook 20s                              feat/design-pass    1h │
+│   working                                             idle                   │
+│   Metamorphosing…                                                            │
+│   …apps/site ██▌     41%                              …/dev/shep ▊       12% │
 │                                                                              │
 │                                                                              │
-│ done 1                                                                       │
-│ ● claude · emberline                                                         │
-│   emberline · master                                                      6m │
-│   done                                                                       │
-│   pushed 3 commits to master                                                 │
-│   ~/vault/dev/emberline                                          █████▎  88% │
 │                                                                              │
-│                                                                              │
-│ enter focus  i inspect  hjkl/↑↓←→ move  t tasks  esc/q close                 │
+│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  t tasks  esc/q close  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
-jbbbbjjjjjjjjjjjjjjjjjjjjjjjjjjjjjppppppppeeeljjjjjjjjjjjjjjjjjjjjjjhhhhhhhhhhhj
+lbbbblllllllllllllllllllllllllllllrrrrrrrreeenlllllllllllllllllllllljjjjjjjjjjjl
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-abbbbbbbbbbbbbbbeeeeeeeeeeeeeeeeeeeeeeeeeejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-aeeeeeeeeohhhhhhhhhhhhmmmmmggggggggommmmmcccccommmmmqqqqqqqqommmmmdddddojjjjjjja
-aeeeeeeooooommmmmeeeeeoooeeeeeeeeeeeemmmmmeeeeoooeeeeeeeeeeeeeeejjjjjjjjjjjjjjja
-ahhhhhhhheejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-aegjooooooooooooooooonnnjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjeeja
-ajjjeeeeeeeeeeeeeeeeeeeeeeeeeeeeejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjeeja
-aggggggggggjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-affffffffffffffffffffffffffffffffffffffffffjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-ajjjeeeeeeeeeeeeeeeeeeeejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjssssskqqqqqja
-ajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-ajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-arrrrreejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-aecjoooooooooooooooooojjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-ajjjeeeeeeeeeeeeeeeeeejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjeeja
-acccccccjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-afffffffffffffffffffffffffffffjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-ajjjeeeeeeeeeeeeeeeeeeeeejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjiiiiiigggggja
-ajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-ajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjja
-ajbbbbbeeeeeeeebeeeeeeeeeebbbbbbbbbeeeeeeebeeeeeeeebbbbbeeeeeejjjjjjjjjjjjjjjjja
+abbbbbbbbbbbbbbbeeeeeeeeeeeeeeeeeeeeeeeeeellllllllllllllllllllllllllllllllllllla
+aeeeeeeeeqjjjjjjjjjjjjoooooiiiiiiiiqooooocccccqooooossssssssqooooodddddqllllllla
+aeeeeeeqqqqqoooooeeeeeqqqeeeeeeeeeeeeoooooeeeeqqqeeeeeeeeeeeeeeellllllllllllllla
+afffffffffeelllllllllllllllffffffffffeellllllllllllllfffffeellllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+aeilqqqqqqqqqqqqqqqqpppleeleclqqqqqqqqqqqqqqqqqqllllleslqqqqqllllllllllllllleela
+allleeeeeeeeeeeeeeeeeelleelllleeeeeelllllllllllllleelllleeeeeeeeeeeeeeeelllleela
+aiiiiiiiiiillllllllllllllllccccccclllllllllllllllllllsssssssssslllllllllllllllla
+aggggggggggggggggggggggggglggggggggggggggggggggggggglgggggggggggggggggggggggggla
+allleeeeeeeeeeltttttmssssslllleeeeeeeeeelkkkkkkiiiiilllleeeeeeeeeelhhhhmmeeeeela
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+aeslqqqqqqqqlllllllllllleellllllllllllllllllllllllllledlqqqqqqqqqqqqqllllllleela
+allleeeeeeeeeeeeeeeeeeleeelllllllllllllllllllllllllllllleeeeeeeeeeeeeeeelllleela
+asssssssssslllllllllllllllllllllllllllllllllllllllllldddddddllllllllllllllllllla
+agggggggggggggggggglllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+allleeeeeeeeeelhhhmmmeeeeelllllllllllllllllllllllllllllleeeeeeeeeelhmmmmmeeeeela
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
+albbbbbeeeeeeeebeeeeeeeeeebbbbbbbbbeeeeeeebbeeeeeeeeeeeeebeeeeeeeebbbbbeeeeeella
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-jbbbbbbeeeeeeeeebeeeeeeeeebeeeeeebeeeeeeebeeeeeeejjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj
+lbbbbbbeeeeeeeeebeeeeeeeeebeeeeeebeeeeeeebeeeeeeelllllllllllllllllllllllllllllll
 
 --- legend ---
 . = (unstyled)
@@ -60,17 +60,18 @@ b = fg:accent bg:panel_bg bold
 c = fg:blue bg:panel_bg
 d = fg:green bg:panel_bg
 e = fg:overlay0 bg:panel_bg
-f = fg:overlay0 bg:panel_bg italic
-g = fg:red bg:panel_bg
-h = fg:red bg:panel_bg bold
-i = fg:red bg:surface1
-j = fg:reset bg:panel_bg
-k = fg:reset bg:surface1
-l = fg:subtext0 bg:panel_bg
-m = fg:surface0 bg:panel_bg
-n = fg:teal bg:panel_bg
-o = fg:text bg:panel_bg
-p = fg:text bg:panel_bg bold
-q = fg:yellow bg:panel_bg
-r = fg:yellow bg:panel_bg bold
-s = fg:yellow bg:surface1
+f = fg:overlay0 bg:panel_bg bold
+g = fg:overlay0 bg:panel_bg italic
+h = fg:overlay0 bg:surface1
+i = fg:red bg:panel_bg
+j = fg:red bg:panel_bg bold
+k = fg:red bg:surface1
+l = fg:reset bg:panel_bg
+m = fg:reset bg:surface1
+n = fg:subtext0 bg:panel_bg
+o = fg:surface0 bg:panel_bg
+p = fg:teal bg:panel_bg
+q = fg:text bg:panel_bg
+r = fg:text bg:panel_bg bold
+s = fg:yellow bg:panel_bg
+t = fg:yellow bg:surface1

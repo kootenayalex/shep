@@ -199,7 +199,7 @@ impl AppState {
     pub(crate) fn global_menu_labels(&self) -> Vec<&'static str> {
         let mut labels = vec![
             "session board",
-            "review diff",
+            "pair phone",
             "settings",
             "keybinds",
             "reload config",
@@ -596,7 +596,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
-                "review diff",
+                "pair phone",
                 "settings",
                 "keybinds",
                 "reload config",
@@ -623,7 +623,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
-                "review diff",
+                "pair phone",
                 "settings",
                 "keybinds",
                 "reload config",
@@ -652,7 +652,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
-                "review diff",
+                "pair phone",
                 "settings",
                 "keybinds",
                 "reload config",

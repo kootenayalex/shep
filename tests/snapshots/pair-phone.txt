@@ -1,0 +1,152 @@
+# pair-phone 200x55 · 33 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                                                                                         workmayt · 1                                                                                  ◉ 1 blocked
+ groups                  │ 1       +
+                         │╭──────────────────────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────╮
+ ◉ workmayt ◆ ⇥2         ││                                                                                      │                                                                                     │
+    ↑2 ↓1 20s mem 87%    ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+ ● emberline             ││                                                                                      │                                                                                     │
+   master 6m             ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+ ⠹ shep                  ││                                                                                      │                                                                                     │
+   feat/design… ↓4 2m    ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                ╭───────────────────────────────────────────────╮                                                                           │
+                         ││                                                │ █████████████████████████████████████████████ │                                                                           │
+                         ││                                                │ █████████████████████████████████████████████ │                                                                           │
+                         ││                                                │ ████ ▄▄▄▄▄ █▄▀ █▄▄▄█  ▄▄▀█ █▄▀█▄ █ ▄▄▄▄▄ ████ │                                                                           │
+                         ││                                                │ ████ █   █ █▀██  ▄ ▀▄▄█ ▄▄▀ █▀ ▀▄█ █   █ ████ │                                                                           │
+                         ││                                                │ ████ █▄▄▄█ █ █▄█ ▄▀█ █▀▀   ▄  █▄██ █▄▄▄█ ████ │                                                                           │
+                         ││                                                │ ████▄▄▄▄▄▄▄█ ▀▄▀ █▄█▄▀ █ █ █ █▄▀▄█▄▄▄▄▄▄▄████ │                                                                           │
+                         ││                                                │ ████ ▀██ ▀▄ ▄ ▄ ▀▄▀█▀█▄ ▀█▄█▄▀   ▄▄▄ ▄▀█▄████ │                                                                           │
+                         ││                                                │ █████▀▄▄█▀▄█▀▀▄▀ ▄ █▄ ██▄▀ █▀▄  █▄█  ▄█▀█████ │                                                                           │
+                         ││                                                │ █████▄█▀ █▄▀▀▄██ ▀█ ▄  ▄▀█▄▄▄██▀▀▄▄▄▀▀█▀▀████ │                                                                           │
+                         ││                                                │ ████▀▀▄ ▄▀▄▀██ ▄▀ ▄  █▄▀▀ ▄▄██ ▄ ▄ ███ ▄█████ │                                                                           │
+                         ││                                                │ ████▀█ █▀█▄▀▄▀ █▄▄██▄▀▀ ▄█▀█ ▀█▀▀▄▄▄▀▄▄█▄████ │                                                                           │
+                         ││                                                │ ████ █▀ ▄ ▄▄▄▄▄█▄█  ▀▀▄ ▀▀▀▄▀▄▀ ▄▄▄▀█▄▄█▀████ │                                                                           │
+                         ││                                                │ █████▀█▄▀█▄ ▀█▄█▀▀▀▀█▄▄█▀ ▀ ▀▀ ▀  ▄█▀▄▄▀ ████ │                                                                           │
+                         ││                                                │ ████▀ █▀▄ ▄▀▀▀ ▄ ▄█ ▀ ▀▀▀█▀  █▄ ███    ▄▀████ │                                                                           │
+ new                 menu││                                                │ ████▀▀▄ ▀█▄▄██▀▀▄▄▀█▀█▄▀▀█▄▀▄▀▀▀ ▄▄█▀ ▄ █████ │                                                                           │
+─────────────────────────││                                                │ ██████▄█  ▄▄ ▀ ▄ ▀██▄ ▀█▄ ▄  █  █ ▀▀▄  ▀█████ │                                                                           │
+ agents           grouped││                                                │ ████▄▄▄█▄▄▄▄▀▀ ▄▄ ▄▄▀  ▄ ▄▀▀ █▄  ▄▄▄ ▄▀▀█████ │                                                                           │
+                         ││                                                │ ████ ▄▄▄▄▄ █▄█▄ ▄▀█▄▀█▄██ ▄ ▄▄ █ █▄█  ▀▄█████ │                                                                           │
+ ◉ workmayt              ││                                                │ ████ █   █ █▄▀▀▄▀▀▄█▄█▀ ▄█▀▀▄▀▀▀ ▄  ▄█▄██████ │                                                                           │
+   blocked · claude · 72%││                                                │ ████ █▄▄▄█ ██▀  ▄██ ▀   ▀  ▄▄▄▀███ ▀▀▀  █████ │                                                                           │
+                         ││                                                │ ████▄▄▄▄▄▄▄█▄▄██▄▄▄█▄▄▄██▄█▄▄▄████████▄▄▄████ │                                                                           │
+ ⠹ workmayt              ││                                                │ █████████████████████████████████████████████ │                                                                           │
+   working · opencode · 4││                                                │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀ │                                                                           │
+                         ││                                                │ scan this in the companion app, or type:      │                                                                           │
+ ● emberline             ││                                                │ address  100.64.0.1:7431                      │                                                                           │
+   done · claude · 88%   ││                                                │ code     7K4M-9QP2                            │                                                                           │
+                         ││                                                │ expires  in 5 min, and after one use          │                                                                           │
+ ○ shep                  ││                                                │                                               │                                                                           │
+   idle · claude · 12%   ││                                                │ esc closes this and cancels the code          │                                                                           │
+                         ││                                                ╰───────────────────────────────────────────────╯                                                                           │
+ ⠹ shep                  ││                                                                                      │                                                                                     │
+   working · codex · 55% ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                         ││                                                                                      │                                                                                     │
+                        «│╰──────────────────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────╯
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
+
+--- styles ---
+uccccuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuEEEEEEEEjjjxuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuurrrrrrrrrrru
+kkkkkkkvvvvvvvvvvvvvvvvvvAoooooooonnnuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+vvvvvvvvvvvvvvvvvvvvvvvvvAddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
+wswFFFFFFFFwhwBBwwwwwwwwwAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+wwwwggwqqwmmmwqqqqqqqwwwwAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vevzzzzzzzzzvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvllllllvllvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vGvzzzzvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvllllllllllllvppvllvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+llllvvvvvvvvvvvvvvvvvllllAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+AAAAAAAAAAAAAAAAAAAAAAAAAAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+kkkkkkkvvvvvvvvvvvkkkkkkkAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+wswFFFFFFFFwwwwwwwwwwwwwwAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+wwwsssssssmmmmmmmmmmmmmmmAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vGvyyyyyyyyvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvGGGGGGGlllllllllllllllAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vevyyyyyyyyyvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaiiiiiiiiiiCCCCCCCCCCCCCCCttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvveeeelllllllllllllllvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaiiiiiiiiiiDDDDDDDDDttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiittttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vfvyyyyvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvatttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvfffflllllllllllllllvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiittttttttttavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vGvyyyyvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvGGGGGGGllllllllllllllvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvvAdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvG
+vvvvvvvvvvvvvvvvvvvvvvvvlAddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
+uccccccjjjjjjjjjcjjjjjjjjjcjjjjjjcjjjjjjjcjjjjjjjuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+
+--- legend ---
+. = (unstyled)
+A = fg:surface_dim bg:reset dim
+B = fg:teal bg:surface_dim dim
+C = fg:text bg:panel_bg
+D = fg:text bg:panel_bg bold
+E = fg:text bg:panel_bg bold+dim
+F = fg:text bg:surface_dim bold+dim
+G = fg:yellow bg:reset dim
+a = fg:accent bg:panel_bg
+b = fg:accent bg:panel_bg bold
+c = fg:accent bg:panel_bg bold+dim
+d = fg:accent bg:reset dim
+e = fg:blue bg:reset dim
+f = fg:green bg:reset dim
+g = fg:green bg:surface_dim dim
+h = fg:mauve bg:surface_dim dim
+i = fg:overlay0 bg:panel_bg
+j = fg:overlay0 bg:panel_bg dim
+k = fg:overlay0 bg:reset bold+dim
+l = fg:overlay0 bg:reset dim
+m = fg:overlay0 bg:surface_dim dim
+n = fg:overlay1 bg:panel_bg dim
+o = fg:panel_bg bg:accent dim
+p = fg:peach bg:reset dim
+q = fg:peach bg:surface_dim dim
+r = fg:red bg:panel_bg bold+dim
+s = fg:red bg:surface_dim dim
+t = fg:reset bg:panel_bg
+u = fg:reset bg:panel_bg dim
+v = fg:reset bg:reset dim
+w = fg:reset bg:surface_dim dim
+x = fg:subtext0 bg:panel_bg dim
+y = fg:subtext0 bg:reset bold+dim
+z = fg:subtext0 bg:reset dim

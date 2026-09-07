@@ -80,13 +80,13 @@ pub(crate) enum GlobalMenuAction {
     ReloadConfig,
     Settings,
     Board,
-    Review,
+    PairPhone,
 }
 
 pub(super) fn global_menu_actions(state: &AppState) -> Vec<GlobalMenuAction> {
     let mut actions = vec![
         GlobalMenuAction::Board,
-        GlobalMenuAction::Review,
+        GlobalMenuAction::PairPhone,
         GlobalMenuAction::Settings,
         GlobalMenuAction::Keybinds,
         GlobalMenuAction::ReloadConfig,
@@ -101,6 +101,49 @@ pub(super) fn global_menu_actions(state: &AppState) -> Vec<GlobalMenuAction> {
 pub(super) fn open_global_menu(state: &mut AppState) {
     state.global_menu = MenuListState::new(0);
     state.mode = Mode::GlobalMenu;
+}
+
+/// Arm a pairing window and show it. A window that cannot be armed (no config
+/// dir, no `/dev/urandom`) says so in a toast rather than opening a screen with
+/// nothing on it.
+pub(super) fn open_pair_phone(state: &mut AppState) {
+    match crate::cli::bridge::pair::arm_pairing_window(None) {
+        Ok(window) => {
+            state.pair_phone = Some(crate::app::state::PairPhoneState {
+                window,
+                paired: false,
+            });
+            state.mode = Mode::PairPhone;
+        }
+        Err(err) => {
+            state.toast = Some(crate::app::state::ToastNotification {
+                kind: crate::app::state::ToastKind::NeedsAttention,
+                title: "could not start pairing".to_string(),
+                context: err.to_string(),
+                position: None,
+                target: None,
+            });
+            leave_modal(state);
+        }
+    }
+}
+
+/// Close the pairing screen, taking the armed code with it: a code must never
+/// outlive the screen that showed it.
+pub(super) fn close_pair_phone(state: &mut AppState) {
+    if let Some(pairing) = state.pair_phone.take() {
+        if !pairing.paired {
+            crate::cli::bridge::pair::cancel_pairing_window();
+        }
+    }
+    leave_modal(state);
+}
+
+pub(crate) fn handle_pair_phone_key(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => close_pair_phone(state),
+        _ => {}
+    }
 }
 
 pub(super) fn open_keybind_help(state: &mut AppState) {
@@ -144,12 +187,7 @@ pub(super) fn apply_global_menu_action(state: &mut AppState, action: GlobalMenuA
         }
         GlobalMenuAction::Settings => super::settings::open_settings(state),
         GlobalMenuAction::Board => state.open_board(),
-        GlobalMenuAction::Review => {
-            // Pane creation happens in the App/headless loop; record the
-            // active workspace and let the drain open the pager.
-            state.request_review_workspace = state.active;
-            leave_modal(state);
-        }
+        GlobalMenuAction::PairPhone => open_pair_phone(state),
     }
 }
 
@@ -816,10 +854,6 @@ pub(super) fn apply_context_menu_action(
             state.request_open_existing_worktree = Some(ws_idx);
             leave_modal(state);
         }
-        (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Review diff")) => {
-            state.request_review_workspace = Some(ws_idx);
-            leave_modal(state);
-        }
         (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Ship worktree...")) => {
             state.request_ship_worktree = Some(ws_idx);
             leave_modal(state);
@@ -1393,10 +1427,6 @@ impl App {
             }
             (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Open worktree...")) => {
                 self.state.request_open_existing_worktree = Some(ws_idx);
-                leave_modal(&mut self.state);
-            }
-            (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Review diff")) => {
-                self.state.request_review_workspace = Some(ws_idx);
                 leave_modal(&mut self.state);
             }
             (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Ship worktree...")) => {

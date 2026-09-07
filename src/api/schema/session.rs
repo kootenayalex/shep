@@ -55,6 +55,15 @@ pub struct SessionOverviewAgent {
     pub unseen: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_status: Option<String>,
+    /// What the agent says this session is about, from the agent's own session
+    /// file — a display hint, never detection evidence. `None` when the agent
+    /// publishes no such fact.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// The permission mode the agent is running under (`plan`,
+    /// `bypassPermissions`, …), from the same source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
     /// A state set by hand (`agent.set_state`), when one is in force. Its
     /// `tier` is what a client should draw; `agent_status` stays the builtin
     /// the override behaves as.

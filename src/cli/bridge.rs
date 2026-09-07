@@ -27,7 +27,7 @@
 //! with a JSON error so a paired phone can never reach `server.stop`, the
 //! config, or the pty of an agent it has no UI for.
 
-mod pair;
+pub(crate) mod pair;
 mod stream;
 mod transcript;
 
@@ -43,7 +43,7 @@ use tungstenite::handshake::server::{ErrorResponse, Request as WsRequest, Respon
 use tungstenite::http::{header, HeaderValue, StatusCode};
 use tungstenite::{Message, WebSocket};
 
-const DEFAULT_BIND: &str = "127.0.0.1:7431";
+pub(crate) const DEFAULT_BIND: &str = "127.0.0.1:7431";
 
 /// API methods a paired companion may relay through the bridge.
 ///

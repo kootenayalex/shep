@@ -12,6 +12,11 @@ use std::time::Instant;
 use crate::detect::{Agent, AgentState};
 use crate::terminal::TerminalId;
 
+/// How stale the session-facts sample may get before the file is re-read. The
+/// facts are a display hint; a few seconds behind is invisible, and a per-frame
+/// read of a multi-megabyte transcript across six panes is not.
+const SESSION_FACTS_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+
 #[path = "metadata.rs"]
 mod metadata;
 pub use metadata::{AgentMetadata, AgentMetadataReport, EffectivePresentation};
@@ -131,6 +136,15 @@ pub struct TerminalState {
     pub hook_authority: Option<HookAuthority>,
     pub agent_metadata: HashMap<String, AgentMetadata>,
     pub persisted_agent_session: Option<crate::agent_resume::PersistedAgentSession>,
+    /// The agent's own session file (Claude's transcript jsonl), as the hook
+    /// reported it. Resume semantics do not use it — it is only where
+    /// [`crate::session_facts`] reads the agent's own account of itself.
+    pub agent_session_file: Option<PathBuf>,
+    /// The last facts read out of `agent_session_file`, and when. Display
+    /// hints, sampled on a TTL so `render` stays pure.
+    pub session_facts: crate::session_facts::SessionFacts,
+    session_facts_sampled_at: Option<Instant>,
+    session_facts_mtime: Option<std::time::SystemTime>,
     pub manual_label: Option<String>,
     pub agent_name: Option<String>,
     hook_report_sequences: HashMap<String, u64>,
@@ -173,6 +187,10 @@ impl TerminalState {
             hook_authority: None,
             agent_metadata: HashMap::new(),
             persisted_agent_session: None,
+            agent_session_file: None,
+            session_facts: crate::session_facts::SessionFacts::default(),
+            session_facts_sampled_at: None,
+            session_facts_mtime: None,
             manual_label: None,
             agent_name: None,
             hook_report_sequences: HashMap::new(),
@@ -1435,6 +1453,76 @@ impl TerminalState {
         self.manual_label = None;
     }
 
+    /// Remember where the agent writes about its own session. A path that does
+    /// not change leaves the sampled facts alone; a new one drops them, so a
+    /// resumed or forked session never shows the previous session's title.
+    pub fn set_agent_session_file(&mut self, path: Option<PathBuf>) {
+        if path.is_none() || self.agent_session_file == path {
+            return;
+        }
+        self.agent_session_file = path;
+        self.session_facts = crate::session_facts::SessionFacts::default();
+        self.session_facts_sampled_at = None;
+        self.session_facts_mtime = None;
+    }
+
+    pub fn clear_session_facts(&mut self) {
+        self.agent_session_file = None;
+        self.session_facts = crate::session_facts::SessionFacts::default();
+        self.session_facts_sampled_at = None;
+        self.session_facts_mtime = None;
+    }
+
+    /// Re-read the agent's session file if the sample has aged out and the file
+    /// has actually changed. Returns whether the facts moved.
+    pub fn refresh_session_facts_if_stale(&mut self, now: Instant) -> bool {
+        let Some(path) = self.agent_session_file.clone() else {
+            return false;
+        };
+        let Some(agent) = self.effective_agent_label().map(str::to_string) else {
+            return false;
+        };
+        if self
+            .session_facts_sampled_at
+            .is_some_and(|at| now.saturating_duration_since(at) < SESSION_FACTS_INTERVAL)
+        {
+            return false;
+        }
+        self.session_facts_sampled_at = Some(now);
+        let mtime = std::fs::metadata(&path)
+            .and_then(|meta| meta.modified())
+            .ok();
+        if mtime.is_some() && mtime == self.session_facts_mtime {
+            return false;
+        }
+        self.session_facts_mtime = mtime;
+        let facts = crate::session_facts::read(&agent, &path);
+        if facts == self.session_facts {
+            return false;
+        }
+        self.session_facts = facts;
+        self.adopt_agent_published_name();
+        true
+    }
+
+    /// Take the name the agent knows itself by, when nobody has given it one
+    /// here.
+    ///
+    /// Precedence, most-wins-first: an explicit shep rename (which sets
+    /// `manual_label`), then the agent's own name, then the tab's custom name,
+    /// then the detected label. Adopting only when unnamed is also what keeps
+    /// the two ends from ping-ponging: shep never overwrites a name it pushed
+    /// into the agent itself.
+    fn adopt_agent_published_name(&mut self) {
+        if self.manual_label.is_some() {
+            return;
+        }
+        let Some(name) = self.session_facts.name.clone() else {
+            return;
+        };
+        self.set_agent_name(name);
+    }
+
     /// Name the agent this terminal is running. Both halves move together:
     /// `agent_name` is the name every surface shows, `manual_label` is the
     /// pane border's, and a rename that set only one left the pane answering
@@ -1465,6 +1553,7 @@ impl TerminalState {
         self.fallback_observed_at = None;
         self.hook_authority = None;
         self.persisted_agent_session = None;
+        self.clear_session_facts();
         self.agent_metadata.clear();
         self.suppressed_full_lifecycle_hook_reports.clear();
         self.stale_full_lifecycle_hook_sessions.clear();
@@ -4643,6 +4732,101 @@ mod tests {
         assert!(change.is_none());
         assert_eq!(terminal.state, AgentState::Working);
         assert!(terminal.hook_authority.is_some());
+    }
+
+    #[test]
+    fn session_facts_are_read_from_the_reported_session_file() {
+        let mut terminal = test_terminal();
+        terminal.set_hook_authority(
+            "shep:claude".into(),
+            "claude".into(),
+            AgentState::Working,
+            None,
+            Some(1),
+        );
+        let path = std::env::temp_dir().join("shep-terminal-session-facts.jsonl");
+        std::fs::write(
+            &path,
+            "{\"type\":\"ai-title\",\"aiTitle\":\"board card layout pass\"}\n",
+        )
+        .expect("write fixture");
+        terminal.set_agent_session_file(Some(path.clone()));
+
+        assert!(terminal.refresh_session_facts_if_stale(Instant::now()));
+        assert_eq!(
+            terminal.session_facts.title.as_deref(),
+            Some("board card layout pass")
+        );
+
+        // Sampling again inside the TTL does not re-read.
+        assert!(!terminal.refresh_session_facts_if_stale(Instant::now()));
+
+        // A respawn drops the facts with the rest of the runtime identity.
+        terminal.clear_agent_runtime_identity_after_respawn();
+        assert!(terminal.agent_session_file.is_none());
+        assert_eq!(
+            terminal.session_facts,
+            crate::session_facts::SessionFacts::default()
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn the_agents_own_name_is_adopted_only_when_nobody_here_named_it() {
+        let path = std::env::temp_dir().join("shep-terminal-adopt-name.jsonl");
+        std::fs::write(
+            &path,
+            "{\"type\":\"agent-name\",\"agentName\":\"board-redesign\"}\n",
+        )
+        .expect("write fixture");
+
+        let mut terminal = test_terminal();
+        terminal.set_hook_authority(
+            "shep:claude".into(),
+            "claude".into(),
+            AgentState::Working,
+            None,
+            Some(1),
+        );
+        terminal.set_agent_session_file(Some(path.clone()));
+        assert!(terminal.refresh_session_facts_if_stale(Instant::now()));
+        assert_eq!(terminal.agent_name.as_deref(), Some("board-redesign"));
+
+        // An explicit shep rename outranks it, and is never overwritten.
+        let mut renamed = test_terminal();
+        renamed.set_hook_authority(
+            "shep:claude".into(),
+            "claude".into(),
+            AgentState::Working,
+            None,
+            Some(1),
+        );
+        renamed.set_agent_display_name("billing".into());
+        renamed.set_agent_session_file(Some(path.clone()));
+        assert!(renamed.refresh_session_facts_if_stale(Instant::now()));
+        assert_eq!(renamed.agent_name.as_deref(), Some("billing"));
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn a_new_session_file_drops_the_previous_session_facts() {
+        let mut terminal = test_terminal();
+        terminal.session_facts.title = Some("stale".into());
+        terminal.set_agent_session_file(Some(PathBuf::from("/tmp/shep-a.jsonl")));
+        assert_eq!(
+            terminal.session_facts,
+            crate::session_facts::SessionFacts::default()
+        );
+
+        terminal.session_facts.title = Some("current".into());
+        // The same path again is not a change, so the facts stand.
+        terminal.set_agent_session_file(Some(PathBuf::from("/tmp/shep-a.jsonl")));
+        assert_eq!(terminal.session_facts.title.as_deref(), Some("current"));
+
+        // A hook report without a path never clears what we already know.
+        terminal.set_agent_session_file(None);
+        assert_eq!(terminal.session_facts.title.as_deref(), Some("current"));
     }
 
     #[test]

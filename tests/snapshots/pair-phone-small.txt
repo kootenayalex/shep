@@ -1,0 +1,88 @@
+# pair-phone-small 80x24 · 31 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                             workmayt · 1                      ◉ 1 blocked
+ groups                  │ 1       +
+                         │╭──────────────────────────┬─────────────────────────╮
+ ◉ workmayt ◆ ⇥2        ▕││                          │                         │
+    ↑2 ↓1 20s mem 87%   ▕││                          │                         │
+                        ▕││                          │                         │
+ ● emberline            ▕││                          │                         │
+   master 6m            ▕││                          │                         │
+                ╭──────────────────────────────────────────────╮               │
+                │ no room for the QR - type this instead:      │               │
+                │ address  100.64.0.1:7431                     │               │
+ new            │ code     7K4M-9QP2                           │               │
+────────────────│ expires  in 5 min, and after one use         │               │
+ agents         │                                              │               │
+                │ esc closes this and cancels the code         │               │
+ ◉ workmayt     ╰──────────────────────────────────────────────╯               │
+   blocked · claude · 72▕││                          │                         │
+                        ▕││                          │                         │
+ ⠹ workmayt             ▕││                          │                         │
+   working · opencode · ▕││                          │                         │
+                        ▕││                          │                         │
+ ● emberline            ▕││                          │                         │
+   done · claude · 88%  «│╰──────────────────────────┴─────────────────────────╯
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
+
+--- styles ---
+sccccsssssssssssssssssssssssssssssCCCCCCCCiiivssssssssssssssssssssssppppppppppps
+jjjjjjjttttttttttttttttttynnnnnnnnmmmsssssssssssssssssssssssssssssssssssssssssss
+tttttttttttttttttttttttttyddddddddddddddddddddddddddddEEEEEEEEEEEEEEEEEEEEEEEEEE
+uquDDDDDDDDuguzzuuuuuuuukydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+uuuuffuooullluooooooouuukydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+ttttttttttttttttttttttttkydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+tetxxxxxxxxxttttttttttttkydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+tttkkkkkktkkttttttttttttkydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+ttttttttttttttttaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaatttttttttttttttE
+ttttttttttttttttabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbrrrrrratttttttttttttttE
+ttttttttttttttttahhhhhhhhhhAAAAAAAAAAAAAAArrrrrrrrrrrrrrrrrrrrratttttttttttttttE
+kkkkttttttttttttahhhhhhhhhhBBBBBBBBBrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttE
+yyyyyyyyyyyyyyyyahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhrrrrrrrrratttttttttttttttE
+jjjjjjjtttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttE
+ttttttttttttttttahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhrrrrrrrrratttttttttttttttE
+uquDDDDDDDDuuuuuaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaatttttttttttttttE
+uuuqqqqqqqllllllllllllllkydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+ttttttttttttttttttttttttkydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+tEtwwwwwwwwtttttttttttttkydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+tttEEEEEEEkkkkkkkkkkkkkkkydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+ttttttttttttttttttttttttyydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+tetwwwwwwwwwttttttttttttyydttttttttttttttttttttttttttdtttttttttttttttttttttttttE
+ttteeeekkkkkkkkkkkkkkkttkyddddddddddddddddddddddddddddEEEEEEEEEEEEEEEEEEEEEEEEEE
+scccccciiiiiiiiiciiiiiiiiiciiiiiiciiiiiiiciiiiiiisssssssssssssssssssssssssssssss
+
+--- legend ---
+. = (unstyled)
+A = fg:text bg:panel_bg
+B = fg:text bg:panel_bg bold
+C = fg:text bg:panel_bg bold+dim
+D = fg:text bg:surface_dim bold+dim
+E = fg:yellow bg:reset dim
+a = fg:accent bg:panel_bg
+b = fg:accent bg:panel_bg bold
+c = fg:accent bg:panel_bg bold+dim
+d = fg:accent bg:reset dim
+e = fg:blue bg:reset dim
+f = fg:green bg:surface_dim dim
+g = fg:mauve bg:surface_dim dim
+h = fg:overlay0 bg:panel_bg
+i = fg:overlay0 bg:panel_bg dim
+j = fg:overlay0 bg:reset bold+dim
+k = fg:overlay0 bg:reset dim
+l = fg:overlay0 bg:surface_dim dim
+m = fg:overlay1 bg:panel_bg dim
+n = fg:panel_bg bg:accent dim
+o = fg:peach bg:surface_dim dim
+p = fg:red bg:panel_bg bold+dim
+q = fg:red bg:surface_dim dim
+r = fg:reset bg:panel_bg
+s = fg:reset bg:panel_bg dim
+t = fg:reset bg:reset dim
+u = fg:reset bg:surface_dim dim
+v = fg:subtext0 bg:panel_bg dim
+w = fg:subtext0 bg:reset bold+dim
+x = fg:subtext0 bg:reset dim
+y = fg:surface_dim bg:reset dim
+z = fg:teal bg:surface_dim dim
