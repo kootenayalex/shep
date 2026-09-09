@@ -41,6 +41,20 @@ pub(crate) struct SessionFactsManifest {
     /// The JSON field naming a record's kind.
     #[serde(default = "default_discriminator")]
     pub(crate) discriminator: String,
+    /// Where the agent's session file lives, when no hook has said.
+    ///
+    /// `{session_id}` is replaced with the session id the agent reported, a
+    /// leading `~/` expands to the home directory, and one `*` path segment may
+    /// stand for a directory whose name shep does not know. The first existing
+    /// match wins; a session id is unique, so "first" is not a choice between
+    /// rivals.
+    ///
+    /// This exists because the transcript path arrives on a hook event, and an
+    /// agent that was already running when the server started has no such event
+    /// left to send — every fact here would stay blank until that agent
+    /// restarted. The session id, unlike the path, is persisted.
+    #[serde(default)]
+    pub(crate) session_file: Option<String>,
     /// Block order is precedence: the first block that resolves a field wins.
     #[serde(default)]
     pub(crate) facts: Vec<FactRule>,

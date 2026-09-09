@@ -36,6 +36,63 @@ pub struct SessionFacts {
     pub lines_removed: Option<u64>,
 }
 
+/// Where `agent` keeps the session file for `session_id`, when no hook has told
+/// us the path.
+///
+/// The path arrives on a hook event, and an agent already running when the
+/// server started has no such event left to send — so after a restart every
+/// fact would stay blank until that agent restarted too. The session id is
+/// persisted, and each agent's manifest says how to get from one to the other.
+///
+/// Returns `None` for an agent with no manifest, no `session_file` template, an
+/// id that could climb out of the directory it names, or a file that is not
+/// there.
+pub fn locate(agent: &str, session_id: &str) -> Option<std::path::PathBuf> {
+    let manifest = manifest::manifest_for(agent)?;
+    let template = manifest.session_file.as_ref()?;
+    // The id is the agent's own word for itself and lands in a path, so it may
+    // not contain a separator or climb.
+    if session_id.is_empty()
+        || session_id.contains(std::path::MAIN_SEPARATOR)
+        || session_id.contains('/')
+        || session_id.contains("..")
+    {
+        return None;
+    }
+    resolve_session_file(template, session_id)
+}
+
+/// The template half of [`locate`], without the manifest lookup, so the path
+/// rules can be tested against a real directory rather than the user's own.
+fn resolve_session_file(template: &str, session_id: &str) -> Option<std::path::PathBuf> {
+    let filled = expand_home(&template.replace("{session_id}", session_id))?;
+    match filled.split_once("/*/") {
+        None => {
+            let path = std::path::PathBuf::from(filled);
+            path.is_file().then_some(path)
+        }
+        Some((base, rest)) => std::fs::read_dir(base).ok()?.flatten().find_map(|entry| {
+            let candidate = entry.path().join(rest);
+            candidate.is_file().then_some(candidate)
+        }),
+    }
+}
+
+/// Expand a leading `~/`. Only leading, and only `~/` — a manifest naming a
+/// path is naming one, not writing shell.
+fn expand_home(path: &str) -> Option<String> {
+    let Some(rest) = path.strip_prefix("~/") else {
+        return Some(path.to_string());
+    };
+    let home = std::env::var_os("HOME")?;
+    Some(
+        std::path::Path::new(&home)
+            .join(rest)
+            .to_string_lossy()
+            .into_owned(),
+    )
+}
+
 /// Read the facts an agent has written about `path`'s session.
 ///
 /// `agent` is the detected agent label; an agent with no manifest yields
@@ -264,6 +321,48 @@ mod tests {
             .expect("a report is still a summary");
         assert_eq!(summary.chars().count(), MAX_SUMMARY + 1, "{summary}");
         assert!(summary.ends_with('\u{2026}'));
+    }
+
+    #[test]
+    fn a_session_file_is_found_from_the_id_when_no_hook_said_where() {
+        // The shape the claude manifest names: a directory shep does not know
+        // the name of, and the session id doing the identifying.
+        let root = std::env::temp_dir().join(format!("shep-locate-{}", std::process::id()));
+        let project = root.join("projects").join("-Users-alex");
+        std::fs::create_dir_all(project.join("-Users-alex-other")).expect("fixture dirs");
+        std::fs::create_dir_all(&project).expect("fixture dirs");
+        let id = "11111111-2222-3333-4444-555555555555";
+        let wanted = project.join(format!("{id}.jsonl"));
+        std::fs::write(&wanted, "{}\n").expect("fixture file");
+
+        let template = format!("{}/projects/*/{{session_id}}.jsonl", root.display());
+        assert_eq!(resolve_session_file(&template, id).as_ref(), Some(&wanted));
+        // A session that is not there yields nothing rather than a path that
+        // would fail to open later.
+        assert_eq!(
+            resolve_session_file(&template, "99999999-0000-0000-0000-000000000000"),
+            None
+        );
+        // The claude manifest is what makes this reachable at all.
+        let claude = claude();
+        assert_eq!(
+            claude.session_file.as_deref(),
+            Some("~/.claude/projects/*/{session_id}.jsonl")
+        );
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn an_id_that_could_climb_out_of_its_directory_finds_nothing() {
+        assert_eq!(locate("claude", "../../etc/passwd"), None);
+        assert_eq!(locate("claude", "sub/dir"), None);
+        assert_eq!(locate("claude", ""), None);
+        // An agent with no manifest has nowhere to look.
+        assert_eq!(
+            locate("codex", "11111111-2222-3333-4444-555555555555"),
+            None
+        );
     }
 
     #[test]

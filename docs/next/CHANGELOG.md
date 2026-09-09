@@ -25,6 +25,14 @@
   exactly as before. `session.overview` publishes `summary` and
   `permission_mode` so the companion can follow.
 
+- Session facts survive a server restart. The path to an agent's session file
+  arrives on a hook event, so an agent that was already running when the server
+  started had no such event left to send and published no facts at all — no
+  title, no permission mode, no cost, no summary — until it was restarted. A
+  manifest can now say where the file lives (`session_file`, with `{session_id}`
+  and one `*` directory segment), and the session id, unlike the path, is
+  persisted; shep looks the file up once and keeps it.
+
 - A card says what the agent is doing, not what the session is called. Claude
   writes a line before it acts — "Now the pane screen's header age:" — into its
   own transcript, and that line is now the card's summary row, falling back to

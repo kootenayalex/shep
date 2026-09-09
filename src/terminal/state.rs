@@ -1493,12 +1493,12 @@ impl TerminalState {
     /// Re-read the agent's session file if the sample has aged out and the file
     /// has actually changed. Returns whether the facts moved.
     pub fn refresh_session_facts_if_stale(&mut self, now: Instant) -> bool {
-        let Some(path) = self.agent_session_file.clone() else {
-            return false;
-        };
         let Some(agent) = self.effective_agent_label().map(str::to_string) else {
             return false;
         };
+        // The interval gates the whole sample, not just the read: finding the
+        // session file can mean a directory listing, and that is no more worth
+        // doing every frame than the read is.
         if self
             .session_facts_sampled_at
             .is_some_and(|at| now.saturating_duration_since(at) < SESSION_FACTS_INTERVAL)
@@ -1506,6 +1506,9 @@ impl TerminalState {
             return false;
         }
         self.session_facts_sampled_at = Some(now);
+        let Some(path) = self.session_file(&agent) else {
+            return false;
+        };
         let mtime = std::fs::metadata(&path)
             .and_then(|meta| meta.modified())
             .ok();
@@ -1520,6 +1523,25 @@ impl TerminalState {
         self.session_facts = facts;
         self.adopt_agent_published_name();
         true
+    }
+
+    /// The agent's session file: the one a hook reported, or — for an agent that
+    /// was already running when this server started, and so has no hook event
+    /// left to send — the one its manifest can find from the session id.
+    ///
+    /// A path found this way is kept, so the lookup happens once rather than
+    /// every sample.
+    fn session_file(&mut self, agent: &str) -> Option<PathBuf> {
+        if let Some(path) = self.agent_session_file.clone() {
+            return Some(path);
+        }
+        let session = self.persisted_agent_session.as_ref()?;
+        if session.session_ref.kind != crate::agent_resume::AgentSessionRefKind::Id {
+            return None;
+        }
+        let found = crate::session_facts::locate(agent, &session.session_ref.value)?;
+        self.agent_session_file = Some(found.clone());
+        Some(found)
     }
 
     /// Take the name the agent knows itself by, when nobody has given it one

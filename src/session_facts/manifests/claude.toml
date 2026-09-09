@@ -22,6 +22,14 @@ format = "jsonl-tail"
 tail_bytes = 1048576
 discriminator = "type"
 
+# Where the transcript is when no hook has said. Claude names the directory
+# after the working directory it was started in, which shep does not reliably
+# know — the pane's cwd moves — so the directory is a wildcard and the session
+# id, which shep persists, does the identifying. Without this, an agent that was
+# already running when the server started publishes no facts at all until it is
+# restarted, because the path only ever arrives on a hook event.
+session_file = "~/.claude/projects/*/{session_id}.jsonl"
+
 [[facts]]
 record = "custom-title"
 title = "customTitle"
