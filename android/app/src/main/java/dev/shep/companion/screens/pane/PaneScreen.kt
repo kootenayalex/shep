@@ -151,6 +151,10 @@ fun PaneScreen(
     var transcript by remember(row.paneId) { mutableStateOf<Transcript?>(null) }
     var transcriptError by remember(row.paneId) { mutableStateOf<String?>(null) }
     var transcriptLoading by remember(row.paneId) { mutableStateOf(false) }
+    var showTodos by remember(row.paneId) { mutableStateOf(false) }
+    var todos by remember(row.paneId) { mutableStateOf<dev.shep.companion.Todos?>(null) }
+    var todosError by remember(row.paneId) { mutableStateOf<String?>(null) }
+    var todosLoading by remember(row.paneId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Keys typed while no stream channel is open go as requests, in order.
@@ -285,6 +289,39 @@ fun PaneScreen(
         }
     }
 
+    // Same shape as the transcript poll, and for the same reason: a whole-file
+    // read on the other end, so it runs only while someone is looking at it.
+    LaunchedEffect(row.paneId, client, showTodos, active) {
+        if (!showTodos || !active) return@LaunchedEffect
+        todosLoading = todos == null
+        while (true) {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    client.call("pane.todos", JSONObject().put("target", row.paneId))
+                }
+            }
+            todosLoading = false
+            result
+                .onSuccess {
+                    todos = dev.shep.companion.parseTodos(it)
+                    todosError = null
+                }
+                .onFailure {
+                    if (todos == null) todosError = it.message ?: "no todos"
+                }
+            kotlinx.coroutines.delay(5000)
+        }
+    }
+
+    if (showTodos) {
+        TodoSheet(
+            todos = todos,
+            error = todosError,
+            loading = todosLoading,
+            onDismiss = { showTodos = false },
+        )
+    }
+
     LaunchedEffect(row.paneId, client, active) {
         if (!active) return@LaunchedEffect
         ended = null
@@ -417,6 +454,7 @@ fun PaneScreen(
                 }
             },
             onReview = { showReview = true },
+            onTodos = { showTodos = true },
         )
 
         when (mode) {
@@ -576,6 +614,7 @@ private fun InputBar(
     output: OutputMode,
     onOutput: (OutputMode) -> Unit,
     onReview: () -> Unit,
+    onTodos: () -> Unit,
 ) {
     Row(
         Modifier
@@ -601,6 +640,12 @@ private fun InputBar(
         ModeChip("live", mode == InputMode.Stream) { onMode(InputMode.Stream) }
         ModeChip("⇥ queue", mode == InputMode.Queue) { onMode(InputMode.Queue) }
         Spacer(Modifier.weight(1f))
+        ActionText(
+            "todos",
+            style = ShepType.hint.copy(color = ShepPalette.accent),
+            description = "what this agent is working through",
+            onClick = onTodos,
+        )
         ActionText(
             "review",
             style = ShepType.hint.copy(color = ShepPalette.accent),

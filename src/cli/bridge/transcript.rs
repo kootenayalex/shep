@@ -109,7 +109,7 @@ fn projects_dir() -> PathBuf {
     dirs_home().join(".claude").join("projects")
 }
 
-fn dirs_home() -> PathBuf {
+pub(super) fn dirs_home() -> PathBuf {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/"))
@@ -126,7 +126,7 @@ pub(super) fn project_slug(cwd: &str) -> String {
         .collect()
 }
 
-fn session_id_from_path(path: &Path) -> Option<String> {
+pub(super) fn session_id_from_path(path: &Path) -> Option<String> {
     path.file_stem()
         .and_then(|stem| stem.to_str())
         .map(str::to_string)
@@ -140,7 +140,7 @@ fn session_id_from_path(path: &Path) -> Option<String> {
 /// session has ever run in this directory. The distinction matters to the
 /// caller: a `matched` transcript is a good guess, not a fact, and the app says
 /// so.
-fn resolve_session_file(
+pub(super) fn resolve_session_file(
     pane: &Map<String, Value>,
     cwd: &str,
     api_socket: &Path,
@@ -362,7 +362,7 @@ fn api_call(api_socket: &Path, method: &str, params: Value) -> Result<Value, Str
 /// Walked recursively rather than indexed by a known path: the snapshot's shape
 /// has moved more than once, and every version has agreed that a pane is the
 /// object carrying `pane_id`.
-fn find_pane(api_socket: &Path, target: &str) -> Result<Map<String, Value>, String> {
+pub(super) fn find_pane(api_socket: &Path, target: &str) -> Result<Map<String, Value>, String> {
     let snapshot = api_call(api_socket, "session.snapshot", json!({}))?;
     let mut found = None;
     walk(&snapshot, &mut |object| {
@@ -720,7 +720,7 @@ fn one_line(text: &str) -> String {
 
 /// Tool results are a string, or a list of content blocks, depending on the
 /// tool.
-fn block_text(content: Option<&Value>) -> String {
+pub(super) fn block_text(content: Option<&Value>) -> String {
     match content {
         Some(Value::String(text)) => text.clone(),
         Some(Value::Array(blocks)) => blocks

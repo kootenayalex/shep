@@ -86,6 +86,14 @@ object ShepSize {
     val focusRing = 2.dp
 
     /**
+     * How tall a list inside a sheet may grow before it scrolls.
+     *
+     * A sheet opens fully expanded, so an unbounded list pushes its own
+     * dismiss off the screen on a long checklist.
+     */
+    val sheetListMax = 420.dp
+
+    /**
      * At or above this, the board and a pane sit side by side.
      *
      * Compared against the *smallest* width the window can have, not the

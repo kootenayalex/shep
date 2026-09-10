@@ -609,6 +609,72 @@ fun parseTree(result: JSONObject): List<GroupNode> {
 }
 
 // --------------------------------------------------------------------------
+// Todos — the checklist the agent is working through right now
+// --------------------------------------------------------------------------
+
+/**
+ * One item on the agent's own checklist.
+ *
+ * [activeForm] is how the agent phrases the work while it is happening
+ * ("Writing the v3 authority docs") as opposed to [subject], which is how it
+ * names the item ("Build v3 scaffolding"). Showing the active form for the
+ * in-progress item is what makes the list read as live.
+ */
+data class TodoItem(
+    val id: String,
+    val subject: String,
+    val activeForm: String,
+    val description: String,
+    val status: String,
+    val blockedBy: List<String>,
+)
+
+/**
+ * The checklist for one pane.
+ *
+ * [source] is where it came from: `store` (the harness's own task files) or
+ * `transcript` (folded back out of the session, because the store had been
+ * emptied). Both are the agent's real state; the difference only matters when
+ * something looks stale.
+ */
+data class Todos(
+    val sessionId: String?,
+    val source: String,
+    val items: List<TodoItem>,
+)
+
+fun todoIsOpen(status: String): Boolean = status != "completed" && status != "cancelled"
+
+fun parseTodos(result: JSONObject): Todos? {
+    val root = result.optJSONObject("todos") ?: return null
+    val arr = root.optJSONArray("items")
+    val items = mutableListOf<TodoItem>()
+    for (i in 0 until (arr?.length() ?: 0)) {
+        val item = arr?.optJSONObject(i) ?: continue
+        val blockedArr = item.optJSONArray("blockedBy")
+        val blockedBy = mutableListOf<String>()
+        for (j in 0 until (blockedArr?.length() ?: 0)) {
+            blockedArr?.optString(j)?.takeIf { it.isNotBlank() }?.let { blockedBy.add(it) }
+        }
+        items.add(
+            TodoItem(
+                id = item.optString("id"),
+                subject = item.optString("subject"),
+                activeForm = item.optString("activeForm"),
+                description = item.optString("description"),
+                status = item.optString("status", "pending"),
+                blockedBy = blockedBy,
+            )
+        )
+    }
+    return Todos(
+        sessionId = root.optStringOrNull("session_id"),
+        source = root.optString("source", "transcript"),
+        items = items,
+    )
+}
+
+// --------------------------------------------------------------------------
 // Transcript — the recorded view of a pane
 // --------------------------------------------------------------------------
 
