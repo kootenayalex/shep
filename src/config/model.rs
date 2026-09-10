@@ -974,6 +974,53 @@ impl NotifyKind {
             Self::Review => "review",
         }
     }
+
+    /// Inverse of [`Self::label`]. `None` for a spelling this build does not
+    /// know — a kind from a newer config, or one a later version dropped.
+    pub fn from_label(label: &str) -> Option<Self> {
+        match label {
+            "idle" => Some(Self::Idle),
+            "working" => Some(Self::Working),
+            "blocked" => Some(Self::Blocked),
+            "unknown" => Some(Self::Unknown),
+            "done" => Some(Self::Done),
+            "task" => Some(Self::Task),
+            "review" => Some(Self::Review),
+            _ => None,
+        }
+    }
+}
+
+/// `notify_on`, tolerant of kinds this build does not know.
+///
+/// A person's config outlives any one shep binary: they downgrade, or a kind
+/// is retired. Rejecting the list would fail the whole `[notifications]`
+/// section, and a section that fails to load is silently replaced by its
+/// default — so one stale word would quietly stop every notification the
+/// person had asked for. Unknown spellings are dropped instead.
+///
+/// The exception is a list where *nothing* is recognised. An empty `notify_on`
+/// means "fire on everything", so filtering the last known kind out would flip
+/// a narrow filter into the widest one. That case keeps the default.
+fn notify_kinds<'de, D>(deserializer: D) -> Result<Vec<NotifyKind>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw = Vec::<String>::deserialize(deserializer)?;
+    let known: Vec<NotifyKind> = raw
+        .iter()
+        .filter_map(|label| {
+            let kind = NotifyKind::from_label(label);
+            if kind.is_none() {
+                tracing::warn!(kind = %label, "ignoring unknown notify_on kind");
+            }
+            kind
+        })
+        .collect();
+    if known.is_empty() && !raw.is_empty() {
+        return Ok(NotificationsConfig::default().notify_on);
+    }
+    Ok(known)
 }
 
 /// What an exec-bridge invocation is asking the receiver to do.
@@ -1014,6 +1061,7 @@ pub struct NotificationsConfig {
     /// Kinds of event that fire the exec-bridge. Empty list = fire on
     /// everything (i.e. the maximal, no-filter behavior). Default:
     /// `["blocked"]`.
+    #[serde(deserialize_with = "notify_kinds")]
     pub notify_on: Vec<NotifyKind>,
     /// Shell command run detached when a transition passes `notify_on`.
     /// Context is passed via `SHEP_NOTIFY_*` env vars. Unset = no exec.
@@ -2046,6 +2094,37 @@ notify_on = ["blocked", "done", "task", "review"]
         assert!(config.notifications.should_notify(NotifyKind::Review));
         assert!(!config.notifications.should_notify(NotifyKind::Working));
         // `done` is a completion, not every trip through idle.
+        assert!(!config.notifications.should_notify(NotifyKind::Idle));
+    }
+
+    /// A word this build does not know must not cost the person the kinds it
+    /// does: the section still loads, minus the stale entry.
+    #[test]
+    fn notifications_drop_an_unknown_kind_and_keep_the_rest() {
+        let toml = r#"
+[notifications]
+notify_on = ["blocked", "sandwich", "review"]
+exec = "voicebox-say"
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert_eq!(
+            config.notifications.notify_on,
+            vec![NotifyKind::Blocked, NotifyKind::Review]
+        );
+        // Proof the whole section survived rather than resetting to default.
+        assert_eq!(config.notifications.exec.as_deref(), Some("voicebox-say"));
+    }
+
+    /// Filtering the last known kind out would turn a narrow filter into the
+    /// widest one, because an empty list means "everything".
+    #[test]
+    fn notifications_fall_back_to_the_default_when_no_kind_is_known() {
+        let toml = r#"
+[notifications]
+notify_on = ["sandwich"]
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert_eq!(config.notifications.notify_on, vec![NotifyKind::Blocked]);
         assert!(!config.notifications.should_notify(NotifyKind::Idle));
     }
 
