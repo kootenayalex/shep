@@ -843,12 +843,10 @@ pub(crate) struct BoardState {
     /// Which board screen is on: the columns, or one of the two detail screens
     /// reached from them. Esc always steps back to the columns before closing.
     pub view: BoardView,
-    /// Selected row on the task-queue screen, by index into the sampled rows.
-    pub task_selected: usize,
 }
 
-/// The board's screens. The columns are the board proper; the other two are
-/// detail screens reached from it and always return to it.
+/// The board's screens. The columns are the board proper; the detail screen is
+/// reached from them and always returns.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum BoardView {
     /// The state columns — the board itself.
@@ -856,12 +854,10 @@ pub(crate) enum BoardView {
     Columns,
     /// Everything known about the selected card's agent, plus its live screen.
     Agent,
-    /// The dispatch queue behind the board's `tasks` count.
-    Tasks,
 }
 
 /// Facts the dashboard shows that are too expensive to read every frame:
-/// host vitals (sysctls / `/proc`) and the task-queue depth (sqlite).
+/// host vitals (sysctls / `/proc`).
 ///
 /// Sampled on a timer and cached here so `render` stays pure. Every field is
 /// optional or zero-defaulted: a sample that has not happened yet, or a source
@@ -869,14 +865,12 @@ pub(crate) enum BoardView {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct DashboardSample {
     pub vitals: crate::platform::HostVitals,
-    /// Tasks in the queue that have not finished.
-    pub pending_tasks: Option<usize>,
     /// When this sample was taken; `None` means "never sampled".
     pub sampled_at: Option<std::time::Instant>,
 }
 
-/// How stale a dashboard sample may get before it is retaken. Host load and
-/// queue depth do not move fast enough to be worth a per-frame syscall.
+/// How stale a dashboard sample may get before it is retaken. Host load does
+/// not move fast enough to be worth a per-frame syscall.
 pub const DASHBOARD_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
 
 impl DashboardSample {
@@ -890,7 +884,6 @@ impl DashboardSample {
             return false;
         }
         self.vitals = crate::platform::host_vitals();
-        self.pending_tasks = pending_task_count();
         self.sampled_at = Some(now);
         true
     }
@@ -926,112 +919,6 @@ impl AppState {
         }
         changed
     }
-}
-
-/// One row of the task-queue screen: everything it draws, resolved at sample
-/// time so rendering never touches sqlite.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TaskQueueRow {
-    pub id: i64,
-    /// First line of the prompt — what the task is.
-    pub prompt: String,
-    pub state: crate::tasks::TaskState,
-    /// Repo directory name, e.g. `workmayt`.
-    pub repo_label: String,
-    pub runtime: crate::tasks::TaskRuntime,
-    pub use_worktree: bool,
-    /// Whether the task has been dispatched into a workspace.
-    pub dispatched: bool,
-    /// Seconds since the row last changed state.
-    pub age_secs: i64,
-}
-
-/// The task queue, cached for the board's task screen. Separate from
-/// `DashboardSample` because it holds rows (not `Copy`) and because it is only
-/// worth reading while that screen is actually open.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct TaskQueueSample {
-    pub rows: Vec<TaskQueueRow>,
-    /// `true` once a read has succeeded or failed; distinguishes "queue is
-    /// empty" from "not sampled yet".
-    pub sampled: bool,
-    pub sampled_at: Option<std::time::Instant>,
-}
-
-impl TaskQueueSample {
-    /// Re-read the queue if the previous sample has aged out. Shares the
-    /// dashboard's interval — the queue does not move faster than that.
-    /// Returns whether anything was re-read.
-    pub fn refresh_if_stale(&mut self, now: std::time::Instant) -> bool {
-        if self
-            .sampled_at
-            .is_some_and(|at| now.saturating_duration_since(at) < DASHBOARD_SAMPLE_INTERVAL)
-        {
-            return false;
-        }
-        self.rows = task_queue_rows().unwrap_or_default();
-        self.sampled = true;
-        self.sampled_at = Some(now);
-        true
-    }
-}
-
-/// Read the unfinished queue into display rows, newest state change last.
-/// `None` when the queue database cannot be read — it is created lazily, so
-/// absence is normal, not an error.
-fn task_queue_rows() -> Option<Vec<TaskQueueRow>> {
-    let conn = crate::tasks::open_store(&crate::tasks::tasks_db_path()).ok()?;
-    let tasks = crate::tasks::list_tasks(&conn).ok()?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    Some(
-        tasks
-            .iter()
-            .filter(|task| !matches!(task.state, crate::tasks::TaskState::Cancelled))
-            .map(|task| TaskQueueRow {
-                id: task.id,
-                prompt: task
-                    .prompt
-                    .lines()
-                    .find(|line| !line.trim().is_empty())
-                    .unwrap_or("")
-                    .trim()
-                    .to_string(),
-                state: task.state,
-                repo_label: task
-                    .repo
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| task.repo.to_string_lossy().into_owned()),
-                runtime: task.runtime,
-                use_worktree: task.use_worktree,
-                dispatched: task.workspace_id.is_some(),
-                age_secs: (now - task.updated_at).max(0),
-            })
-            .collect(),
-    )
-}
-
-/// Count of unfinished tasks in the queue, or `None` when the queue database
-/// cannot be read (it is created lazily, so absence is normal, not an error).
-fn pending_task_count() -> Option<usize> {
-    let conn = crate::tasks::open_store(&crate::tasks::tasks_db_path()).ok()?;
-    let tasks = crate::tasks::list_tasks(&conn).ok()?;
-    Some(
-        tasks
-            .iter()
-            .filter(|task| {
-                matches!(
-                    task.state,
-                    crate::tasks::TaskState::Todo
-                        | crate::tasks::TaskState::Running
-                        | crate::tasks::TaskState::Blocked
-                )
-            })
-            .count(),
-    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1771,8 +1658,6 @@ pub struct AppState {
     pub queued_pane_input: std::collections::HashMap<PaneId, Vec<String>>,
     /// Target pane for the queue-prompt modal.
     pub queue_prompt_target: Option<(usize, PaneId)>,
-    /// Server-owned task-queue policy (`[tasks]`).
-    pub tasks_config: crate::config::TasksConfig,
     /// Custom agent states a person can set by hand (`[states]`).
     pub states_config: crate::config::StatesConfig,
     /// Server-owned exec-bridge notification policy (`[notifications]`).
@@ -1816,13 +1701,10 @@ pub struct AppState {
     pub pair_phone: Option<PairPhoneState>,
     /// Resolved host terminal default colors for theming embedded panes.
     pub host_terminal_theme: TerminalTheme,
-    /// Sampled host/queue facts for the session-board dashboard. Refreshed on
-    /// a timer rather than per frame because reading them touches sysctls and
-    /// the task database; render only ever reads this snapshot.
+    /// Sampled host facts for the session-board dashboard. Refreshed on a
+    /// timer rather than per frame because reading them touches sysctls;
+    /// render only ever reads this snapshot.
     pub dashboard_sample: DashboardSample,
-    /// The dispatch queue, cached for the board's task screen. Sampled only
-    /// while that screen is open, on the same interval as `dashboard_sample`.
-    pub(crate) task_queue: TaskQueueSample,
     /// Set when a persisted session snapshot would change.
     pub session_dirty: bool,
     /// Terminal runtimes that should be shut down by the app/runtime layer
@@ -2151,7 +2033,6 @@ impl AppState {
             config_diagnostic: None,
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
-            tasks_config: Default::default(),
             states_config: Default::default(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
@@ -2240,7 +2121,6 @@ impl AppState {
             pair_phone: None,
             host_terminal_theme: TerminalTheme::default(),
             dashboard_sample: DashboardSample::default(),
-            task_queue: TaskQueueSample::default(),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         }

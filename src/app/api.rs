@@ -914,7 +914,6 @@ impl App {
             }
             Method::WorkspaceDiff(params) => return self.handle_workspace_diff(request.id, params),
             Method::WorkspaceShip(params) => return self.handle_workspace_ship(request.id, params),
-            Method::TaskDispatch(params) => return self.handle_task_dispatch(request.id, params),
             Method::WorkspaceMove(params) => {
                 return self.handle_workspace_move(request.id, params);
             }

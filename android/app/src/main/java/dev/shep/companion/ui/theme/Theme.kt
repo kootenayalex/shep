@@ -19,7 +19,7 @@ import androidx.compose.runtime.Composable
  *
  * Mono is the default and sans is opt-in, not the other way round: nearly every
  * string in this app is shep talking about itself, and the exceptions (agent
- * output, task prompts, memory entries) are few enough to say so explicitly.
+ * output, todo subjects, memory entries) are few enough to say so explicitly.
  */
 @Composable
 fun ShepTheme(content: @Composable () -> Unit) {

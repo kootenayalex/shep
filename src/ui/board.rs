@@ -23,7 +23,7 @@ use super::sidebar::{agent_panel_entries, format_event_age};
 use super::status::{agent_icon_for, state_label};
 use super::text::{display_width, truncate_end, truncate_start};
 use super::widgets::render_panel_shell;
-use crate::app::state::{AppState, BoardView, Palette, TaskQueueRow};
+use crate::app::state::{AppState, BoardView, Palette};
 use crate::detect::AgentState;
 use crate::layout::PaneId;
 
@@ -937,9 +937,6 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
             Style::default().fg(p.teal),
         )]);
     }
-    if let Some(pending) = app.dashboard_sample.pending_tasks.filter(|n| *n > 0) {
-        facts.push(vec![Span::styled(format!("{pending} tasks"), value)]);
-    }
     // Session shape last: it describes the furniture, not the work.
     facts.push(vec![Span::styled(
         format!(
@@ -1030,17 +1027,12 @@ pub(super) fn render_board_overlay(
     let footer_y = inner.y + inner.height.saturating_sub(1);
     render_footer(app, frame, Rect::new(inner.x, footer_y, inner.width, 1));
 
-    // The detail screens replace the dashboard and columns entirely; they keep
+    // The detail screen replaces the dashboard and columns entirely; it keeps
     // only the panel shell, title, and footer so the board stays recognisable.
     match app.board.view {
         BoardView::Agent => {
             let body = detail_body(inner);
             render_agent_detail(app, terminal_runtimes, frame, &model, body);
-            return;
-        }
-        BoardView::Tasks => {
-            let body = detail_body(inner);
-            render_task_queue(app, frame, body);
             return;
         }
         BoardView::Columns => {}
@@ -1092,11 +1084,6 @@ fn render_title(app: &AppState, frame: &mut Frame, area: Rect) {
             Span::styled("/ ", dim),
             Span::styled("agent", title),
         ]),
-        BoardView::Tasks => Line::from(vec![
-            Span::styled(" session board ", dim),
-            Span::styled("/ ", dim),
-            Span::styled("task queue", title),
-        ]),
     };
     frame.render_widget(Paragraph::new(line), area);
 }
@@ -1114,18 +1101,9 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
             ("i", " inspect  "),
             (glyphs::KEYS_ARROWS, " move  "),
             ("<>", " move group  "),
-            ("t", " tasks  "),
             ("esc/q", " close"),
         ],
-        BoardView::Agent => &[
-            ("enter", " attach  "),
-            ("t", " tasks  "),
-            ("esc/q", " back to board"),
-        ],
-        BoardView::Tasks => &[
-            (glyphs::KEYS_VERTICAL, " move  "),
-            ("esc/q/t", " back to board"),
-        ],
+        BoardView::Agent => &[("enter", " attach  "), ("esc/q", " back to board")],
     };
     let mut spans = vec![Span::raw(" ")];
     for (k, label) in hints {
@@ -1690,160 +1668,6 @@ fn render_agent_screen(
     }
 }
 
-/// Colour for a task-queue state, matching the agent-state language: red is
-/// blocked, yellow is running, green is done, dim is waiting.
-/// The dispatch queue behind the dashboard's `tasks` count: what is waiting,
-/// what is running, and which repo each one belongs to.
-fn render_task_queue(app: &AppState, frame: &mut Frame, body: Rect) {
-    if body.width == 0 || body.height == 0 {
-        return;
-    }
-    let p = &app.palette;
-    let dim = Style::default().fg(p.overlay0);
-    let rows = &app.task_queue.rows;
-
-    if !app.task_queue.sampled {
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                format!("reading queue{}", glyphs::ELLIPSIS),
-                dim,
-            ))),
-            Rect::new(body.x, body.y, body.width, 1),
-        );
-        return;
-    }
-    if rows.is_empty() {
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled("queue is empty", dim))),
-            Rect::new(body.x, body.y, body.width, 1),
-        );
-        return;
-    }
-
-    // Header: the same counts the dashboard shows, broken out by state.
-    let running = rows
-        .iter()
-        .filter(|row| row.state == crate::tasks::TaskState::Running)
-        .count();
-    let waiting = rows
-        .iter()
-        .filter(|row| row.state == crate::tasks::TaskState::Todo)
-        .count();
-    let header = Line::from(vec![
-        Span::styled(rows.len().to_string(), Style::default().fg(p.text)),
-        Span::styled(format!(" in queue{}", glyphs::SEP_WIDE), dim),
-        Span::styled(running.to_string(), Style::default().fg(p.yellow)),
-        Span::styled(format!(" running{}", glyphs::SEP_WIDE), dim),
-        Span::styled(waiting.to_string(), Style::default().fg(p.overlay1)),
-        Span::styled(" waiting", dim),
-    ]);
-    frame.render_widget(
-        Paragraph::new(header),
-        Rect::new(body.x, body.y, body.width, 1),
-    );
-
-    // Two rows per task plus a blank separator, same rhythm as a board card.
-    const TASK_STRIDE: u16 = 3;
-    let list_top = body.y + 2;
-    if list_top >= body.y + body.height {
-        return;
-    }
-    let list_height = body.y + body.height - list_top;
-    let capacity = (list_height / TASK_STRIDE).max(1) as usize;
-    // Scroll the window so the selection stays visible.
-    let selected = app.board.task_selected.min(rows.len().saturating_sub(1));
-    let start = selected.saturating_sub(capacity.saturating_sub(1));
-    for (offset, row) in rows[start..].iter().take(capacity).enumerate() {
-        let y = list_top + offset as u16 * TASK_STRIDE;
-        render_task_row(app, frame, row, start + offset == selected, {
-            Rect::new(body.x, y, body.width, 2)
-        });
-    }
-}
-
-fn render_task_row(
-    app: &AppState,
-    frame: &mut Frame,
-    row: &TaskQueueRow,
-    selected: bool,
-    rect: Rect,
-) {
-    if rect.width == 0 || rect.height == 0 {
-        return;
-    }
-    let p = &app.palette;
-    if selected {
-        let buf = frame.buffer_mut();
-        for y in rect.top()..rect.bottom() {
-            for x in rect.left()..rect.right() {
-                buf[(x, y)].set_style(Style::default().bg(p.surface0));
-            }
-        }
-    }
-    let dim = Style::default().fg(p.overlay0);
-    let width = rect.width as usize;
-    let task = super::status::task_appearance(row.state, app.spinner_tick);
-    let color = task.color(p);
-    let marker = if selected { glyphs::MARKER } else { " " };
-    let marker_style = if selected {
-        Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(p.overlay0)
-    };
-
-    // Line 1: marker · state dot · prompt … state label pinned to the right
-    // edge, so the states line up into a column that can be read down.
-    let label = task.label;
-    let prompt_budget = width.saturating_sub(3).saturating_sub(label.len() + 2);
-    let prompt = truncate_end(&row.prompt, prompt_budget);
-    let used = 3 + prompt.chars().count() + label.len();
-    let pad = width.saturating_sub(used).max(2);
-    let line1 = vec![
-        Span::styled(marker.to_string(), marker_style),
-        // The state's own glyph, not a filled dot in five colours: three of
-        // these rows used to be distinguishable by hue alone.
-        Span::styled(format!("{} ", task.glyph), Style::default().fg(color)),
-        Span::styled(prompt, Style::default().fg(p.text)),
-        Span::styled(
-            format!("{}{label}", " ".repeat(pad)),
-            Style::default().fg(color),
-        ),
-    ];
-    frame.render_widget(
-        Paragraph::new(Line::from(line1)),
-        Rect::new(rect.x, rect.y, rect.width, 1),
-    );
-
-    if rect.height < 2 {
-        return;
-    }
-    // Line 2: where it will run.
-    let mut meta = format!(
-        "{} {} {}",
-        row.repo_label,
-        glyphs::SEP,
-        row.runtime.as_str()
-    );
-    if row.use_worktree {
-        meta.push_str(&format!(" {} worktree", glyphs::SEP));
-    }
-    if row.dispatched {
-        meta.push_str(&format!(" {} dispatched", glyphs::SEP));
-    }
-    meta.push_str(&format!(
-        " {} {}",
-        glyphs::SEP,
-        format_event_age(std::time::Duration::from_secs(row.age_secs.max(0) as u64))
-    ));
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            format!("   {}", truncate_end(&meta, width.saturating_sub(3))),
-            dim,
-        ))),
-        Rect::new(rect.x, rect.y + 1, rect.width, 1),
-    );
-}
-
 #[cfg(test)]
 mod tests {
     use ratatui::layout::Direction;
@@ -2109,103 +1933,6 @@ mod tests {
         );
     }
 
-    /// Seed a queue sample so the task screen has something to draw without
-    /// touching the real task database.
-    fn seed_task_queue(state: &mut AppState) {
-        use crate::app::state::TaskQueueRow;
-        use crate::tasks::{TaskRuntime, TaskState};
-        state.task_queue.sampled = true;
-        state.task_queue.sampled_at = Some(std::time::Instant::now());
-        state.task_queue.rows = vec![
-            TaskQueueRow {
-                id: 1,
-                prompt: "harden the stripe webhook signature check".into(),
-                state: TaskState::Running,
-                repo_label: "workmayt".into(),
-                runtime: TaskRuntime::Claude,
-                use_worktree: true,
-                dispatched: true,
-                age_secs: 240,
-            },
-            TaskQueueRow {
-                id: 2,
-                prompt: "draft the 0.9.0 release notes".into(),
-                state: TaskState::Todo,
-                repo_label: "shep".into(),
-                runtime: TaskRuntime::Opencode,
-                use_worktree: false,
-                dispatched: false,
-                age_secs: 1140,
-            },
-            TaskQueueRow {
-                id: 3,
-                prompt: "unblock the gitea 403 on emberline".into(),
-                state: TaskState::Blocked,
-                repo_label: "emberline".into(),
-                runtime: TaskRuntime::Claude,
-                use_worktree: false,
-                dispatched: true,
-                age_secs: 660,
-            },
-        ];
-    }
-
-    #[test]
-    fn task_queue_screen_lists_rows_with_state_and_repo() {
-        use ratatui::{backend::TestBackend, Terminal};
-        let (mut state, _panes) = board_state();
-        seed_task_queue(&mut state);
-        state.board.task_selected = 1;
-
-        let mut terminal = Terminal::new(TestBackend::new(80, 14)).expect("test terminal");
-        terminal
-            .draw(|frame| render_task_queue(&state, frame, Rect::new(0, 0, 80, 14)))
-            .expect("task queue should render");
-
-        let buffer = terminal.backend().buffer();
-        let rows: Vec<String> = (0..14)
-            .map(|y| (0..80).map(|x| buffer[(x, y)].symbol()).collect())
-            .collect();
-        let screen = rows.join("\n");
-        assert!(screen.contains("3 in queue"), "header counts: {screen}");
-        assert!(screen.contains("1 running"), "header counts: {screen}");
-        assert!(
-            screen.contains("harden the stripe webhook"),
-            "prompt: {screen}"
-        );
-        assert!(
-            screen.contains("workmayt · claude · worktree"),
-            "meta line: {screen}"
-        );
-        assert!(screen.contains("blocked"), "state label: {screen}");
-        // The selected row (index 1) carries the marker, no other row does.
-        let marked: Vec<&String> = rows.iter().filter(|row| row.contains('▌')).collect();
-        assert_eq!(marked.len(), 1, "exactly one selection marker: {screen}");
-        assert!(
-            marked[0].contains("draft the 0.9.0 release notes"),
-            "marker on the selected row: {:?}",
-            marked[0]
-        );
-    }
-
-    #[test]
-    fn task_queue_screen_distinguishes_unsampled_from_empty() {
-        use ratatui::{backend::TestBackend, Terminal};
-        let (mut state, _panes) = board_state();
-        let render = |state: &AppState| {
-            let mut terminal = Terminal::new(TestBackend::new(40, 3)).expect("test terminal");
-            terminal
-                .draw(|frame| render_task_queue(state, frame, Rect::new(0, 0, 40, 3)))
-                .expect("render");
-            let buffer = terminal.backend().buffer();
-            (0..40).map(|x| buffer[(x, 0)].symbol()).collect::<String>()
-        };
-        // Never sampled is not the same claim as "you have no tasks".
-        assert!(render(&state).contains("reading queue"));
-        state.task_queue.sampled = true;
-        assert!(render(&state).contains("queue is empty"));
-    }
-
     // Constructing a pane runtime needs a reactor, like the pane render tests.
     #[tokio::test]
     async fn agent_detail_shows_the_panes_live_screen() {
@@ -2305,28 +2032,6 @@ mod tests {
             .expect("render");
         let buffer = term.backend().buffer();
         for y in 0..26 {
-            let row: String = (0..110).map(|x| buffer[(x, y)].symbol()).collect();
-            println!("{}", row.trim_end());
-        }
-    }
-
-    #[test]
-    #[ignore = "visual preview, run with --nocapture"]
-    fn preview_task_queue() {
-        use ratatui::{backend::TestBackend, Terminal};
-        let (mut state, _panes) = board_state();
-        state.view.terminal_area = Rect::new(0, 0, 110, 20);
-        state.view.sidebar_rect = Rect::new(0, 0, 110, 20);
-        state.board.view = crate::app::state::BoardView::Tasks;
-        state.board.task_selected = 1;
-        seed_task_queue(&mut state);
-
-        let mut term = Terminal::new(TestBackend::new(110, 20)).expect("test terminal");
-        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
-            .expect("render");
-        let buffer = term.backend().buffer();
-        for y in 0..20 {
             let row: String = (0..110).map(|x| buffer[(x, y)].symbol()).collect();
             println!("{}", row.trim_end());
         }

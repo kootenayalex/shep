@@ -78,7 +78,6 @@ data class SessionTotals(
     val tabs: Int = 0,
     val panes: Int = 0,
     val queuedInput: Int = 0,
-    val pendingTasks: Int? = null,
 )
 
 /**
@@ -209,7 +208,6 @@ fun parseOverview(result: JSONObject): SessionOverview? {
             tabs = t.optInt("tabs"),
             panes = t.optInt("panes"),
             queuedInput = t.optInt("queued_input"),
-            pendingTasks = t.optIntOrNull("pending_tasks"),
         ),
         host = SessionHost(
             version = h.optStringOrNull("version"),
@@ -386,56 +384,6 @@ fun parseSnapshot(result: JSONObject): List<AgentRow> {
         )
     }
     return rows.sortedWith(compareBy({ statusPriority(it.status) }, { it.workspaceLabel }))
-}
-
-/** One queued/dispatched task from `task.list` (A4). */
-data class TaskRow(
-    val id: Long,
-    val prompt: String,
-    val repo: String,
-    val runtime: String,
-    val useWorktree: Boolean,
-    val state: String,
-    val workspaceId: String?,
-    val assignedPaneId: String? = null,
-)
-
-/** Zeigarnik order: open loops first (running, blocked, todo), finished last. */
-fun taskStatePriority(state: String): Int = when (state) {
-    "running" -> 0
-    "blocked" -> 1
-    "todo" -> 2
-    "done" -> 3
-    "cancelled" -> 4
-    else -> 5
-}
-
-/** A task is still actionable (dispatchable / cancellable) while unfinished. */
-fun taskIsOpen(state: String): Boolean = state == "todo" || state == "blocked"
-
-fun parseTasks(result: JSONObject): List<TaskRow> {
-    val arr = result.optJSONArray("tasks") ?: return emptyList()
-    val rows = mutableListOf<TaskRow>()
-    for (i in 0 until arr.length()) {
-        val t = arr.getJSONObject(i)
-        rows.add(
-            TaskRow(
-                id = t.optLong("id"),
-                prompt = t.optString("prompt"),
-                repo = t.optString("repo"),
-                runtime = t.optString("runtime", "claude"),
-                useWorktree = t.optBoolean("use_worktree"),
-                state = t.optString("state", "todo"),
-                // org.json's optString returns the literal "null" for a JSON null,
-                // so guard with isNull before falling back to empty→null.
-                workspaceId = if (t.isNull("workspace_id")) null
-                else t.optString("workspace_id").ifEmpty { null },
-                assignedPaneId = if (t.isNull("assigned_pane_id")) null
-                else t.optString("assigned_pane_id").ifEmpty { null },
-            )
-        )
-    }
-    return rows.sortedWith(compareBy({ taskStatePriority(it.state) }, { -it.id }))
 }
 
 /** Basename of a repo path, for compact display. */

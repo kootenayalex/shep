@@ -163,9 +163,8 @@ fun ShepChip(
  * A card in a list.
  *
  * Every card in the app is [ShepPalette.surface0] on [ShepPalette.panelBg].
- * Tasks and memory used to be `surfaceDim` — the same colour as the header
- * directly above them — so those two lists had no separation from their own
- * chrome.
+ * The memory list used to be `surfaceDim` — the same colour as the header
+ * directly above it — so it had no separation from its own chrome.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

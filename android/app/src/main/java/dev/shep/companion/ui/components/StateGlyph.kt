@@ -69,31 +69,6 @@ fun StateGlyph(
     )
 }
 
-/**
- * The same, for a queued task rather than a running agent.
- *
- * Separate from [StateGlyph] because the vocabularies are separate: a task goes
- * `todo → running → done`, and "done" there means settled rather than the
- * agent board's "finished, and you have not looked yet".
- */
-@Composable
-fun TaskGlyph(
-    state: String,
-    modifier: Modifier = Modifier,
-    style: TextStyle = ShepType.stateGlyph,
-) {
-    Glyph(
-        appearance = if (state == "running") {
-            val tick by rememberSpinnerTick()
-            ShepSemantic.task(state, tick)
-        } else {
-            ShepSemantic.task(state)
-        },
-        modifier = modifier,
-        style = style,
-    )
-}
-
 @Composable
 private fun Glyph(appearance: StateAppearance, modifier: Modifier, style: TextStyle) {
     // The colour eases; the glyph does not. A shape that morphs is a

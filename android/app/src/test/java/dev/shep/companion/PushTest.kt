@@ -69,7 +69,7 @@ class PushTest {
     /** Parity with `crate::config::NotifyKind::label` on the server. */
     @Test
     fun `every server kind resolves on the phone`() {
-        val serverKinds = listOf("idle", "working", "blocked", "unknown", "done", "task", "review")
+        val serverKinds = listOf("idle", "working", "blocked", "unknown", "done", "review")
         for (wire in serverKinds) {
             assertNotNull("kind $wire", NotifyKind.fromWire(wire))
         }

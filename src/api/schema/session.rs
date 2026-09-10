@@ -107,8 +107,6 @@ pub struct SessionOverviewTotals {
     pub tabs: u64,
     pub panes: u64,
     pub queued_input: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pending_tasks: Option<u64>,
 }
 
 /// Coarse facts about the machine the session runs on.

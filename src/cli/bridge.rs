@@ -22,7 +22,7 @@
 //! reach it from the phone; never bind a public interface.
 //!
 //! Only the methods in [`BRIDGE_ALLOWED_METHODS`] are relayed to the API; the
-//! bridge-local `pane.stream` / `pane.transcript` / `push.*` / `task.*` /
+//! bridge-local `pane.stream` / `pane.transcript` / `pane.todos` / `push.*` /
 //! `memory.*` handlers run ahead of that check. Everything else is answered
 //! with a JSON error so a paired phone can never reach `server.stop`, the
 //! config, or the pty of an agent it has no UI for.
@@ -72,7 +72,6 @@ const BRIDGE_ALLOWED_METHODS: &[&str] = &[
     "tab.focus",
     "tab.move",
     "tab.rename",
-    "task.dispatch",
     "workspace.close",
     "workspace.create",
     "workspace.diff",
@@ -417,12 +416,11 @@ fn handle_client_frame(
     }
     // Some methods are handled on the bridge itself rather than proxied to the
     // JSON API. Push registration is a companion-only fact (the phone's
-    // UnifiedPush URL); task add/list/cancel/remove/clear/assign and memory
-    // show/add/replace/remove are local file operations on `<state>/tasks.db` and the memory files —
-    // exactly what the `shep task`/`shep memory` CLIs do, so exposing them here
-    // (not as new API methods) keeps them out of the herdr API contract /
-    // protocol version. `task.dispatch` is NOT local: it must spawn a pane, so
-    // it proxies through to the server like everything else.
+    // UnifiedPush URL); memory show/add/replace/remove are local file
+    // operations on the memory files — exactly what the `shep memory` CLI does.
+    // A pane's transcript and its checklist are read out of the harness's own
+    // session files the same way. Exposing all of it here (not as new API
+    // methods) keeps it out of the herdr API contract / protocol version.
     let method = request.get("method").and_then(|m| m.as_str());
     if let Some(method) = method {
         let params = request.get("params");
@@ -444,7 +442,6 @@ fn handle_client_frame(
             return;
         }
         let local = push::handle_local_method(method, params)
-            .or_else(|| task_local::handle_local_method(method, params))
             .or_else(|| memory_local::handle_local_method(method, params))
             .or_else(|| transcript::handle_local_method(method, params, api_socket))
             .or_else(|| todo::handle_local_method(method, params, api_socket));
@@ -1025,7 +1022,6 @@ mod push {
             workspace: String::new(),
             pane_id: String::new(),
             title: "test notification".to_string(),
-            task_id: String::new(),
             message: "if you can see this, push works".to_string(),
         };
         let mut sent = 0usize;
@@ -1094,7 +1090,6 @@ mod push {
             workspace: std::env::var("SHEP_NOTIFY_WORKSPACE").unwrap_or_default(),
             pane_id,
             title: std::env::var("SHEP_NOTIFY_TITLE").unwrap_or_default(),
-            task_id: std::env::var("SHEP_NOTIFY_TASK_ID").unwrap_or_default(),
             message: truncate(
                 &std::env::var("SHEP_NOTIFY_MESSAGE").unwrap_or_default(),
                 400,
@@ -1175,7 +1170,6 @@ mod push {
         pub(super) workspace: String,
         pub(super) pane_id: String,
         pub(super) title: String,
-        pub(super) task_id: String,
         pub(super) message: String,
     }
 
@@ -1190,7 +1184,6 @@ mod push {
                 "workspace": self.workspace,
                 "pane_id": self.pane_id,
                 "title": self.title,
-                "task_id": self.task_id,
                 "message": self.message,
             })
         }
@@ -1793,7 +1786,7 @@ mod push {
             assert_eq!(loaded.len(), 1);
             assert_eq!(loaded[0].transport, unified("https://ntfy.sh/abc?up=1"));
             assert!(loaded[0].kinds.is_none());
-            for kind in ["blocked", "done", "task", "review"] {
+            for kind in ["blocked", "done", "idle", "review"] {
                 assert!(loaded[0].wants(kind));
             }
             std::fs::remove_file(&path).ok();
@@ -1809,7 +1802,7 @@ mod push {
             assert!(endpoint.wants("blocked"));
             assert!(endpoint.wants("review"));
             assert!(!endpoint.wants("done"));
-            assert!(!endpoint.wants("task"));
+            assert!(!endpoint.wants("working"));
             // An exec that reports no kind still gets through: dropping it
             // would turn an upgrade mismatch into total silence.
             assert!(endpoint.wants(""));
@@ -1931,203 +1924,6 @@ mod push {
                 resolve_publish_url("not-a-url", Some("http://127.0.0.1:2587")),
                 "not-a-url"
             );
-        }
-    }
-}
-
-/// Bridge-local task queue methods (`task.list`/`add`/`cancel`/`remove`/
-/// `clear`/`assign`).
-///
-/// These mirror the `shep task` CLI: add/list/cancel are direct operations on
-/// the local `<state>/tasks.db` (they work server-up-or-not), so the bridge —
-/// which runs on the same box — performs them itself rather than inventing new
-/// JSON API methods. `task.dispatch` is deliberately absent here: dispatching
-/// must spawn a pane, which only the server can do, so it proxies through the
-/// existing `task.dispatch` API method.
-mod task_local {
-    use crate::tasks::{self, TaskRecord, TaskRuntime};
-    use serde_json::{json, Value};
-
-    pub(super) fn handle_local_method(
-        method: &str,
-        params: Option<&Value>,
-    ) -> Option<Result<Value, String>> {
-        match method {
-            "task.list" => Some(list()),
-            "task.add" => Some(add(params)),
-            "task.cancel" => Some(cancel(params)),
-            "task.remove" => Some(remove(params)),
-            "task.clear" => Some(clear()),
-            "task.assign" => Some(assign(params)),
-            _ => None,
-        }
-    }
-
-    fn open() -> Result<rusqlite::Connection, String> {
-        tasks::open_store(&tasks::tasks_db_path()).map_err(|err| err.to_string())
-    }
-
-    fn record_json(task: &TaskRecord) -> Value {
-        json!({
-            "id": task.id,
-            "prompt": task.prompt,
-            "repo": task.repo.display().to_string(),
-            "runtime": task.runtime.as_str(),
-            "use_worktree": task.use_worktree,
-            "state": task.state.as_str(),
-            "workspace_id": task.workspace_id,
-            "assigned_pane_id": task.assigned_pane_id,
-            "created_at": task.created_at,
-            "updated_at": task.updated_at,
-        })
-    }
-
-    fn list() -> Result<Value, String> {
-        let db = tasks::tasks_db_path();
-        if !db.exists() {
-            return Ok(json!({ "tasks": [] }));
-        }
-        let conn = open()?;
-        let records = tasks::list_tasks(&conn).map_err(|err| err.to_string())?;
-        let tasks: Vec<Value> = records.iter().map(record_json).collect();
-        Ok(json!({ "tasks": tasks }))
-    }
-
-    fn add(params: Option<&Value>) -> Result<Value, String> {
-        let params = params.ok_or("missing params")?;
-        let prompt = params
-            .get("prompt")
-            .and_then(|value| value.as_str())
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        if prompt.is_empty() {
-            return Err("missing prompt".to_string());
-        }
-        // The phone has no cwd to infer a repo from, so `repo` is required and
-        // must resolve to a git repo root (same rule as `shep task add --repo`).
-        let repo_path = params
-            .get("repo")
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .ok_or("missing repo (path to a git repository)")?;
-        let repo = crate::memory::resolve_repo_root(Some(std::path::Path::new(repo_path)))
-            .map_err(|err| err.to_string())?;
-        let runtime = match params.get("runtime").and_then(|value| value.as_str()) {
-            Some(raw) => TaskRuntime::parse(raw)
-                .ok_or_else(|| format!("invalid runtime {raw} (claude|opencode)"))?,
-            None => TaskRuntime::Claude,
-        };
-        let use_worktree = params
-            .get("worktree")
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        let conn = open()?;
-        let id = tasks::add_task(
-            &conn,
-            &prompt,
-            &repo,
-            runtime,
-            use_worktree,
-            tasks::unix_now(),
-        )
-        .map_err(|err| err.to_string())?;
-        Ok(json!({ "id": id, "use_worktree": use_worktree }))
-    }
-
-    fn cancel(params: Option<&Value>) -> Result<Value, String> {
-        let id = params
-            .and_then(|params| params.get("id"))
-            .and_then(|value| value.as_i64())
-            .ok_or("missing id")?;
-        let conn = open()?;
-        let cancelled =
-            tasks::cancel_task(&conn, id, tasks::unix_now()).map_err(|err| err.to_string())?;
-        Ok(json!({ "cancelled": cancelled }))
-    }
-
-    fn task_id(params: Option<&Value>) -> Result<i64, String> {
-        params
-            .and_then(|params| params.get("id"))
-            .and_then(|value| value.as_i64())
-            .ok_or_else(|| "missing id".to_string())
-    }
-
-    fn remove(params: Option<&Value>) -> Result<Value, String> {
-        let id = task_id(params)?;
-        let conn = open()?;
-        let removed = tasks::delete_task(&conn, id).map_err(|err| err.to_string())?;
-        Ok(json!({ "removed": removed }))
-    }
-
-    /// Sweep every finished task. Absent store is an empty sweep, not an error —
-    /// a phone clearing a queue that was never created has nothing to fix.
-    fn clear() -> Result<Value, String> {
-        if !tasks::tasks_db_path().exists() {
-            return Ok(json!({ "removed": 0 }));
-        }
-        let conn = open()?;
-        let removed = tasks::clear_finished(&conn).map_err(|err| err.to_string())?;
-        Ok(json!({ "removed": removed }))
-    }
-
-    /// Hand an open task to a workspace whose agent is already running. The
-    /// caller sends the prompt itself (`agent.send`); this records the linkage
-    /// so the server's state tracker carries the task to blocked/done.
-    fn assign(params: Option<&Value>) -> Result<Value, String> {
-        let id = task_id(params)?;
-        let workspace_id = params
-            .and_then(|params| params.get("workspace_id"))
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .ok_or("missing workspace_id")?;
-        let pane_id = params
-            .and_then(|params| params.get("pane_id"))
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .ok_or("missing pane_id")?;
-        let conn = open()?;
-        let assigned = tasks::assign_task(&conn, id, workspace_id, pane_id, tasks::unix_now())
-            .map_err(|err| err.to_string())?;
-        Ok(json!({ "assigned": assigned }))
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn only_owns_task_add_list_cancel() {
-            assert!(handle_local_method("task.dispatch", None).is_none());
-            assert!(handle_local_method("session.snapshot", None).is_none());
-            assert!(handle_local_method("task.list", None).is_some());
-            assert!(handle_local_method("task.remove", None).is_some());
-            assert!(handle_local_method("task.clear", None).is_some());
-            assert!(handle_local_method("task.assign", None).is_some());
-        }
-
-        #[test]
-        fn remove_and_assign_validate_their_params() {
-            assert!(remove(Some(&json!({}))).is_err());
-            assert!(assign(Some(&json!({ "id": 1 }))).is_err());
-            assert!(assign(Some(&json!({ "workspace_id": "w1" }))).is_err());
-            assert!(assign(Some(&json!({ "id": 1, "workspace_id": "  " }))).is_err());
-        }
-
-        #[test]
-        fn add_requires_prompt_and_repo() {
-            let missing_prompt = json!({ "repo": "/tmp" });
-            assert!(add(Some(&missing_prompt)).is_err());
-            let missing_repo = json!({ "prompt": "do a thing" });
-            assert!(add(Some(&missing_repo)).is_err());
-        }
-
-        #[test]
-        fn cancel_requires_id() {
-            assert!(cancel(Some(&json!({}))).is_err());
         }
     }
 }

@@ -12,7 +12,7 @@ import dev.shep.companion.R
  *
  * Anything that is shep's own vocabulary — agent names, pane ids, states,
  * badges, numbers, paths, the terminal itself — is mono. Prose is sans, and
- * prose here means only three things: what an agent said, what a task asks for,
+ * prose here means only three things: what an agent said, what a todo asks for,
  * and what a memory entry records. Everything else on these screens is shep
  * talking about itself, and shep talks in mono.
  *
@@ -23,7 +23,7 @@ import dev.shep.companion.R
  * **Every size in the app comes from this file.** A JVM test fails the build on
  * an `.sp` literal anywhere else — see `ThemeTokensTest`. Before this pass the
  * app used twelve font sizes across 126 inline literals, and the bundled font
- * was reaching only the pane views: the board, groups, tasks, memory, settings
+ * was reaching only the pane views: the board, groups, memory, settings
  * and pairing screens all rendered in Roboto, which is the single loudest way
  * the companion failed to look like shep.
  */
@@ -39,7 +39,7 @@ object ShepType {
 
     // ── Headings ────────────────────────────────────────────────────────────
 
-    /** The one word at the top of a tab: "board", "agents", "tasks", "memory". */
+    /** The one word at the top of a tab: "agents", "memory", "shep". */
     val screenTitle = mono.copy(
         fontSize = 22.sp,
         fontWeight = FontWeight.Bold,
@@ -118,7 +118,7 @@ object ShepType {
      */
     val stateGlyph = mono.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold)
 
-    /** A state glyph one level in: the groups tree, a title bar, a task row. */
+    /** A state glyph one level in: the groups tree, a title bar, an agent row. */
     val stateGlyphSmall = mono.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold)
 
     /** Ids, ages, paths, counts — the quiet second line of nearly every row. */
@@ -211,7 +211,7 @@ object ShepType {
     // ── Prose — the only sans on these screens ──────────────────────────────
 
     /**
-     * What an agent said, what a task asks for, what a memory entry records.
+     * What an agent said, what a todo asks for, what a memory entry records.
      *
      * Line height is generous because this is the only text on the phone anyone
      * reads a paragraph of; mono at the same measure would be a wall.

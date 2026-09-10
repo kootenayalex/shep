@@ -324,7 +324,6 @@ fn api_method_name(method: &Method) -> &'static str {
         Method::WorkspaceSetReviewState(_) => "workspace.set_review_state",
         Method::WorkspaceDiff(_) => "workspace.diff",
         Method::WorkspaceShip(_) => "workspace.ship",
-        Method::TaskDispatch(_) => "task.dispatch",
         Method::WorkspaceMove(_) => "workspace.move",
         Method::WorkspaceClose(_) => "workspace.close",
         Method::WorktreeList(_) => "worktree.list",

@@ -157,7 +157,6 @@ impl App {
                 tabs: summary.tabs as u64,
                 panes: summary.panes as u64,
                 queued_input: summary.queued_input as u64,
-                pending_tasks: self.state.dashboard_sample.pending_tasks.map(|n| n as u64),
             },
             host: SessionOverviewHost {
                 version: crate::build_info::version(),

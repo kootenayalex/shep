@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "protocol": 17,
+  "protocol": 18,
   "schema_version": 1,
   "schemas": {
     "error_response": {
@@ -3658,19 +3658,6 @@
           ],
           "type": "object"
         },
-        "TaskDispatchParams": {
-          "properties": {
-            "task_id": {
-              "description": "Task to dispatch; omitted = oldest queued task.",
-              "format": "int64",
-              "type": [
-                "integer",
-                "null"
-              ]
-            }
-          },
-          "type": "object"
-        },
         "ToastShepPosition": {
           "enum": [
             "top-left",
@@ -4191,22 +4178,6 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/WorkspaceTarget"
-            }
-          },
-          "required": [
-            "method",
-            "params"
-          ],
-          "type": "object"
-        },
-        {
-          "properties": {
-            "method": {
-              "const": "task.dispatch",
-              "type": "string"
-            },
-            "params": {
-              "$ref": "#/schemas/request/$defs/TaskDispatchParams"
             }
           },
           "required": [
@@ -8055,27 +8026,6 @@
             },
             {
               "properties": {
-                "task_id": {
-                  "format": "int64",
-                  "type": "integer"
-                },
-                "type": {
-                  "const": "task_dispatched",
-                  "type": "string"
-                },
-                "workspace_id": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "task_id",
-                "workspace_id"
-              ],
-              "type": "object"
-            },
-            {
-              "properties": {
                 "diff": {
                   "type": "string"
                 },
@@ -9377,14 +9327,6 @@
               "format": "uint64",
               "minimum": 0,
               "type": "integer"
-            },
-            "pending_tasks": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
             },
             "queued_input": {
               "format": "uint64",

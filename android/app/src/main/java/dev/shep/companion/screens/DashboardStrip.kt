@@ -79,10 +79,6 @@ fun DashboardStrip(totals: SessionTotals, host: SessionHost, statusColor: (Strin
                     style = ShepType.metaSmall.copy(color = ShepPalette.teal),
                 )
             }
-            totals.pendingTasks?.takeIf { it > 0 }?.let {
-                Separator()
-                Value("$it tasks")
-            }
         }
 
         Row(

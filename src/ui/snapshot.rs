@@ -285,9 +285,7 @@ fn assert_screen(state: &mut AppState, name: &str, width: u16, height: u16) {
 
 mod fixture {
     use super::*;
-    use crate::app::state::TaskQueueRow;
     use crate::detect::{Agent, AgentState};
-    use crate::tasks::{TaskRuntime, TaskState};
     use crate::workspace::Workspace;
     use ratatui::layout::Direction;
 
@@ -500,43 +498,7 @@ mod fixture {
             memory_total_bytes: Some(64 * 1024 * 1024 * 1024),
             memory_used_bytes: Some(41 * 1024 * 1024 * 1024),
         };
-        state.dashboard_sample.pending_tasks = Some(2);
         state.dashboard_sample.sampled_at = Some(Instant::now());
-
-        state.task_queue.sampled = true;
-        state.task_queue.sampled_at = Some(Instant::now());
-        state.task_queue.rows = vec![
-            TaskQueueRow {
-                id: 1,
-                prompt: "harden the stripe webhook signature check".into(),
-                state: TaskState::Running,
-                repo_label: "workmayt".into(),
-                runtime: TaskRuntime::Claude,
-                use_worktree: true,
-                dispatched: true,
-                age_secs: 240,
-            },
-            TaskQueueRow {
-                id: 2,
-                prompt: "draft the 0.9.0 release notes".into(),
-                state: TaskState::Todo,
-                repo_label: "shep".into(),
-                runtime: TaskRuntime::Opencode,
-                use_worktree: false,
-                dispatched: false,
-                age_secs: 1140,
-            },
-            TaskQueueRow {
-                id: 3,
-                prompt: "unblock the gitea 403 on emberline".into(),
-                state: TaskState::Blocked,
-                repo_label: "emberline".into(),
-                runtime: TaskRuntime::Claude,
-                use_worktree: false,
-                dispatched: true,
-                age_secs: 7200,
-            },
-        ];
 
         state
     }
@@ -583,30 +545,14 @@ fn snapshot_board_agent_detail() {
     assert_screen(&mut state, "board-agent-detail", MID.0, MID.1);
 }
 
-#[test]
-fn snapshot_board_task_queue() {
-    let mut state = fixture::session();
-    state.mode = Mode::Board;
-    state.board.view = BoardView::Tasks;
-    assert_screen(&mut state, "board-task-queue", MID.0, MID.1);
-}
-
-/// The two detail screens at 80x24, where their key/value columns have the
-/// least room to be wrong quietly.
+/// The detail screen at 80x24, where its key/value columns have the least
+/// room to be wrong quietly.
 #[test]
 fn snapshot_board_agent_detail_small() {
     let mut state = fixture::session();
     state.mode = Mode::Board;
     state.board.view = BoardView::Agent;
     assert_screen(&mut state, "board-agent-detail-small", SMALL.0, SMALL.1);
-}
-
-#[test]
-fn snapshot_board_task_queue_small() {
-    let mut state = fixture::session();
-    state.mode = Mode::Board;
-    state.board.view = BoardView::Tasks;
-    assert_screen(&mut state, "board-task-queue-small", SMALL.0, SMALL.1);
 }
 
 /// The normal working screen: titlebar, sidebar, tab bar, pane grid, hint bar.

@@ -18,7 +18,7 @@ class OverviewParseTest {
         """
         {"overview":{
           "totals":{"agents":2,"blocked":1,"done":0,"working":1,"idle":0,"attention":1,
-                    "workspaces":2,"tabs":3,"panes":5,"queued_input":2,"pending_tasks":4},
+                    "workspaces":2,"tabs":3,"panes":5,"queued_input":2},
           "host":{"version":"0.7.3","load_percent":26,"cores":12,
                   "memory_percent":17,"memory_total_bytes":25769803776,
                   "memory_used_bytes":4380866641},
@@ -63,7 +63,6 @@ class OverviewParseTest {
         assertEquals(2, overview.totals.agents)
         assertEquals(1, overview.totals.attention)
         assertEquals(5, overview.totals.panes)
-        assertEquals(4, overview.totals.pendingTasks)
         assertEquals(12, overview.host.cores)
         assertEquals(25769803776L, overview.host.memoryTotalBytes)
     }
@@ -123,7 +122,6 @@ class OverviewParseTest {
         assertNull(overview.host.loadPercent)
         assertNull(overview.host.memoryPercent)
         assertNull(overview.host.version)
-        assertNull(overview.totals.pendingTasks)
         val row = overview.agents.single()
         assertNull(row.contextPercent)
         assertNull(row.activityLine)
@@ -163,7 +161,6 @@ class OverviewParseTest {
         assertEquals(1, totals.queuedInput)
         // Session shape and vitals are genuinely unknown from a snapshot.
         assertEquals(0, totals.panes)
-        assertNull(totals.pendingTasks)
     }
 
     private fun row(status: String, queued: Int = 0) = AgentRow(

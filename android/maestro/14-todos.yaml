@@ -1,0 +1,32 @@
+# An agent's own checklist, read back out of its session.
+# Needs a paired app (run 01 first) against a bridge with at least one agent.
+# Text anchors only (no ids) per device-testing conventions.
+#
+# Deliberately types nothing: the todo view is read-only, and this runs
+# against Alex's real agents.
+appId: dev.shep.companion
+---
+- launchApp
+- tapOn: "agents"
+- tapOn:
+    text: "agent .*"
+    index: 0
+
+# The action row carries it beside review, not as a third output mode.
+- assertVisible: "todos"
+- tapOn: "todos"
+
+# The sheet says one of three things, and every one of them is an answer:
+# a count, an empty checklist, or why it could not read the session. An
+# agent with no checklist is the common case on a real machine, so the flow
+# passes on any of them rather than seeding state it cannot clean up.
+- assertVisible:
+    text: "(.* left.*|no checklist in this session|reading the session…|.*not a claude.*|.*no session.*)"
+
+# Read-only: nothing in the sheet offers to change the list.
+- assertNotVisible: "add"
+- assertNotVisible: "save"
+
+# And it closes back to the pane, which still has its own controls.
+- tapOn: "cancel"
+- assertVisible: "out"

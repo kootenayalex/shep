@@ -59,10 +59,6 @@ enum class NotifyKind(
         "review", "review", "shep_review", "Ready for review",
         "A group is ready to review", NotificationManager.IMPORTANCE_DEFAULT,
     ),
-    Task(
-        "task", "task", "shep_task", "Task queue",
-        "A queued task changed state", NotificationManager.IMPORTANCE_LOW,
-    ),
     Working(
         "working", "working", "shep_working", "Agent working",
         "An agent started working", NotificationManager.IMPORTANCE_LOW,
@@ -185,8 +181,8 @@ sealed class NotificationPlan {
 
 /**
  * Turn a message into a plan. Approve/Deny appear only when an agent is
- * actually waiting on an answer — offering them on a "task done" would send a
- * keystroke nobody asked for.
+ * actually waiting on an answer — offering them on a "run finished" would send
+ * a keystroke nobody asked for.
  */
 fun planNotification(notification: ShepNotification): NotificationPlan {
     val agent = notification.agent.ifEmpty { "agent" }
@@ -200,13 +196,12 @@ fun planNotification(notification: ShepNotification): NotificationPlan {
             NotifyKind.Blocked -> "needs your attention"
             NotifyKind.Done -> "finished"
             NotifyKind.Review -> "ready for review"
-            NotifyKind.Task -> "task queue changed"
             NotifyKind.Working -> "working"
             NotifyKind.Idle -> "went quiet"
             NotifyKind.Unknown -> "state unknown"
         }
     }
-    // Task and review events name themselves ("task #4 done"); agent events are
+    // A review event names itself ("wG is ready for review"); agent events are
     // identified by who and where instead.
     val title = notification.title.ifEmpty {
         if (notification.workspace.isNotEmpty()) "$agent · ${notification.workspace}" else agent

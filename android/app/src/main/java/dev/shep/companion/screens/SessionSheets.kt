@@ -47,12 +47,10 @@ enum class SessionRuntime(val label: String, val argv: List<String>, val agentNa
 }
 
 /**
- * Start a session without queueing a task first.
+ * Start a session.
  *
- * A task is a thing you want done; a session is a place to work. Requiring the
- * first to get the second is the wrong shape — this sheet asks only where, what
- * to run, and (optionally) what to call it, which is the whole of what shep
- * needs to open a workspace.
+ * The sheet asks only where, what to run, and (optionally) what to call it,
+ * which is the whole of what shep needs to open a workspace.
  *
  * `recentRepos` are paths already visible on the board, so the common case is
  * two taps and no typing.
@@ -166,70 +164,3 @@ fun RenameSessionSheet(row: AgentRow, onDismiss: () -> Unit, onRename: (String) 
     }
 }
 
-/**
- * Pick which running session gets a queued task.
- *
- * This is the answer to "the queue is not useful": a task stops being an
- * orphan prompt waiting for a pane to be spawned for it, and becomes work you
- * hand to a named agent that is already in the right repo. Sessions in the
- * task's own repo are offered first because that is nearly always the intent.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AssignTaskSheet(
-    task: dev.shep.companion.TaskRow,
-    sessions: List<AgentRow>,
-    names: Map<String, String>,
-    onDismiss: () -> Unit,
-    onAssign: (AgentRow) -> Unit,
-) {
-    val wanted = repoName(task.repo)
-    val ordered = sessions.sortedByDescending { row ->
-        row.cwd?.let { repoName(it) == wanted } == true
-    }
-
-    ShepSheet(title = "send #${task.id} to…", onDismiss = onDismiss) {
-            // The task's own words, so sans: this is the one line in the
-            // sheet that a person wrote rather than shep generated.
-            Text(
-                task.prompt,
-                style = ShepType.bodySmall.copy(color = ShepPalette.overlay0),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(ShepSpace.medium))
-            if (ordered.isEmpty()) {
-                Text(
-                    "no sessions running — start one from the board first",
-                    style = ShepType.emptyState,
-                )
-            }
-            ordered.forEach { row ->
-                val sameRepo = row.cwd?.let { repoName(it) == wanted } == true
-                Spacer(Modifier.height(ShepSpace.small))
-                ShepCard(shape = ShepShape.field, onClick = { onAssign(row) }) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            names[row.paneId] ?: row.agent,
-                            style = ShepType.itemName,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        if (sameRepo) {
-                            Spacer(Modifier.width(ShepSpace.small))
-                            Text("same repo", style = ShepType.badge.copy(color = ShepPalette.teal))
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Text(row.status, style = ShepType.meta.copy(color = ShepPalette.overlay1))
-                    }
-                    Text(
-                        listOfNotNull(row.cwd, row.branch).joinToString(" · "),
-                        style = ShepType.metaSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-            }
-        }
-    }
-}

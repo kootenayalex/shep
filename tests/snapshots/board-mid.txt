@@ -5,7 +5,7 @@
  shep                                                 workmayt · 1                                          ◉ 1 blocked
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ session board · what are my agents doing                                                                             │
-│ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  ⇥2 queued  ·  2 tasks                     │
+│ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  ⇥2 queued  ·  3 ws · 3 tabs · 5 panes     │
 │ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G                                                       │
 │ workmayt 2                              emberline 1                            shep 2                                │
 │                                                                                                                      │
@@ -39,7 +39,7 @@
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
-│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  t tasks  esc/q close                                          │
+│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  esc/q close                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
@@ -47,7 +47,7 @@
 nbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnttttttttfffpnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnllllllllllln
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 abbbbbbbbbbbbbbbffffffffffffffffffffffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-affffffffsllllllllllllqqqqqkkkkkkkksqqqqqcccccsqqqqquuuuuuuusqqqqqdddddsqqqqqrrrrrrrrrqqqqqsssssssnnnnnnnnnnnnnnnnnnnnna
+affffffffsllllllllllllqqqqqkkkkkkkksqqqqqcccccsqqqqquuuuuuuusqqqqqdddddsqqqqqrrrrrrrrrqqqqqfffffffffffffffffffffffnnnnna
 affffffsssssqqqqqfffffsssffffffffffffqqqqqffffsssfffffffffffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 agggggggggffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnggggggggggffnnnnnnnnnnnnnnnnnnnnnnnnnnngggggffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
@@ -81,7 +81,7 @@ annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-anbbbbbffffffffbffffffffffbbbbbbbbbfffffffbbfffffffffffffbffffffffbbbbbffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
+anbbbbbffffffffbffffffffffbbbbbbbbbfffffffbbfffffffffffffbbbbbffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 nbbbbbbfffffffffbfffffffffbffffffbfffffffbfffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 

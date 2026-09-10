@@ -5,7 +5,8 @@ device gates owed). A0–A2 shipped + tails closed (bottom-nav
 shell, event-driven home, filter chips, ANSI pane render, QR pairing, version
 gating). A3 notifications rebuilt on FCM 2026-09-03: one notification per
 agent that a newer event bumps, withdrawn when the agent is looked at on any
-surface; the lock-screen gate is AVD-verified, real-phone check owed. A4 tasks + memory tabs built and live-verified over the bridge. A5 review &
+surface; the lock-screen gate is AVD-verified, real-phone check owed. A4 tasks + memory tabs built and live-verified over the bridge; the Tasks tab
+was retired with the task queue itself (see "Retired" below). A5 review &
 ship built (workspace.diff/ship JSON API methods + review screen). A6 polish
 built (widget, launcher shortcut, voice add-task, tablet two-pane, Maestro
 E2E). Feature parity with the desktop ADE, re-shaped for a
@@ -16,8 +17,8 @@ psychology contract as the desktop-feel pass (`.local/prd/desktop-feel-pass.md`)
 
 The companion is NOT a terminal replacement (Termux + mosh already covers
 "I need a shell"). It is the ADE meta-layer, mobile-shaped: *which agent needs
-me, approve/deny it, queue the next prompt, review and ship, dispatch a task —
-from anywhere on the tailnet.* The single most valuable interaction is
+me, approve/deny it, queue the next prompt, review and ship, see what it is
+working through — from anywhere on the tailnet.* The single most valuable interaction is
 answering a blocked agent's permission prompt from a lock-screen notification
 without opening anything.
 
@@ -78,15 +79,15 @@ shep server (macmini)
 | Review diff (pager pane) | Native diff screen from `git diff` output fetched through the bridge; file list → per-file hunks. |
 | Request changes modal | Bottom sheet with text field → routes into the origin pane (existing API path). |
 | Ship worktree | Ship button with loss-aversion-honest confirm ("merge task/41 → master · 12 commits · then remove worktree") → `✓ shipped` success moment. |
-| Task queue CLI | Tasks tab: list with states, add-task sheet (repo picker, runtime, `--worktree` toggle), cancel, dispatch-now. |
+| An agent's checklist | `todos` sheet on the pane's action row: the list the agent is working through, read out of the harness's own session files. Read-only. |
 | `shep memory` CLI | Memory tab: USER/repo files, `§`-entry list, add/edit/remove, search (FTS5), cap meter with the >80% nudge. |
 | Toasts | Snackbars in-app; FCM notifications out-of-app. |
 | Modals | Bottom sheets (thumb reach), destructive ones red-headed with an explicit noun ("Close workspace *api*?"). |
 
 ## Navigation
 
-- **Bottom nav, 4 tabs** (Hick's law ceiling): **Agents · Tasks · Memory · Shep**
-  (the last = server status, theme, notification rules, bridge pairing).
+- **Bottom nav, 3 tabs** (under the Hick's law ceiling): **Agents · Memory ·
+  Shep** (the last = server status, theme, notification rules, bridge pairing).
   Review is not a tab — review state lives on the workspace, so it's reached
   *through* Agents (list → workspace → Review/Ship actions), keeping one mental
   model with the TUI's context menu.
@@ -116,11 +117,11 @@ shep server (macmini)
   shep theme ON. People don't change defaults; ship the right ones.
 - **Loss aversion / framing** — destructive confirms state the concrete loss,
   not "Are you sure?".
-- **Peak-end** — ship success and task completion get explicit success
-  moments; sessions tend to end right after an approval or a ship, so those
-  states are the app's last impression.
-- **Zeigarnik** — Tasks tab leads with in-progress/queued (open loops), done
-  collapses.
+- **Peak-end** — ship success gets an explicit success moment; sessions tend
+  to end right after an approval or a ship, so those states are the app's last
+  impression.
+- **Zeigarnik** — the todo sheet leads with what is left ("3 of 8 left"), not
+  with what is finished.
 - **Spatial memory** — fixed tab order, stable card layout; state changes
   reorder *within* the list but never relocate chrome.
 
@@ -207,6 +208,22 @@ shep server (macmini)
   rotated (re-pair per android-adb-repair, a manual pairing-code step) and the
   S22 USB showed `unauthorized`; widget pinning on the S22 home screen; voice
   recognizer on real hardware (AVDs ship no STT app).
+
+## Retired
+
+- **The Tasks tab, 2026-09-10.** The queue it drew was empty on every machine
+  it ever ran on: `shep task add` was a place to write down work that shep then
+  had no way to make anyone do, and the harnesses grew their own checklists in
+  the meantime. It is replaced by a `todos` sheet on the pane's action row,
+  reading the agent's real list out of the harness's own session files
+  (bridge-local `pane.todos`) — a viewer over what is actually there rather
+  than a second store nobody wrote to.
+- What went with it: `Tab.Tasks` and `TasksScreen`, the `shep://tasks/new`
+  deep link and its launcher shortcut, the voice add-task chip, `parseTasks` /
+  `TaskRow` / `TaskGlyph` / `ShepSemantic.task`, `pending_tasks` on
+  `session.overview` (which is why the wire protocol went to 18), and the
+  `02-tasks.yaml` / `04-new-task-shortcut.yaml` Maestro flows. `14-todos.yaml`
+  replaces them.
 
 ## Security (2026-09-04)
 

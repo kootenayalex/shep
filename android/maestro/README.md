@@ -33,18 +33,16 @@ maestro --device <serial> test \
   maestro/01-pair-and-home.yaml
 
 # Then, in any order:
-maestro --device <serial> test maestro/02-tasks.yaml
 maestro --device <serial> test maestro/03-memory.yaml
-maestro --device <serial> test maestro/04-new-task-shortcut.yaml
 
 # Tablet two-pane (wide AVD only):
 maestro --device <tablet-serial> test maestro/05-tablet-two-pane.yaml
 
 # Groups, output/input modes, live and queued input, the key bar,
-# notification clearing, move-to-group, manual state:
+# notification clearing, move-to-group, manual state, todos:
 maestro --device <serial> test maestro/06-groups.yaml
 maestro --device <serial> test maestro/07-pane-output-modes.yaml
-maestro --device <serial> test maestro/08-live-input.yaml     # …13
+maestro --device <serial> test maestro/08-live-input.yaml     # …14
 ```
 
 Flows 08–13 type into a plain shell agent named `shell` (`-e AGENT=` to

@@ -57,10 +57,6 @@ pub enum ResponseResult {
     WorkspaceInfo {
         workspace: WorkspaceInfo,
     },
-    TaskDispatched {
-        task_id: i64,
-        workspace_id: String,
-    },
     WorkspaceDiff {
         workspace_id: String,
         target: String,

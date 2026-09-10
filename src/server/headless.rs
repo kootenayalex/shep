@@ -244,8 +244,6 @@ pub struct HeadlessServer {
     /// last told about, and when. Cleared again once the pane is looked at
     /// (see [`Self::fire_notify_exec_clears`]) or leaves the notify set.
     notify_exec_fired: HashMap<PaneId, NotifyExecFired>,
-    /// Keeps the M4 filesystem watchers alive for the server's lifetime.
-    _fs_watchers: Option<notify::RecommendedWatcher>,
 }
 
 #[derive(Debug, Default)]
@@ -259,11 +257,9 @@ struct NotifyExecContext {
     message: Option<String>,
     /// One line naming what happened, for a notification that has a headline
     /// and a body. Agent-state events leave it unset and let the receiver
-    /// phrase it; task and review events set it because "task #4 is done" is
+    /// phrase it; a review event sets it because "wG is ready for review" is
     /// not derivable from a pane id.
     title: Option<String>,
-    /// Set only for `task` events.
-    task_id: Option<i64>,
 }
 
 /// What the exec-bridge was last told about one pane, so the same notification
@@ -271,8 +267,8 @@ struct NotifyExecContext {
 /// has looked at the pane.
 #[derive(Debug, Clone, Copy)]
 struct NotifyExecFired {
-    /// The agent state that fired, or `None` for a task/review event, which
-    /// is not about the agent's state and must not debounce a later one.
+    /// The agent state that fired, or `None` for a review event, which is not
+    /// about the agent's state and must not debounce a later one.
     state: Option<AgentState>,
     kind: crate::config::NotifyKind,
     at: Instant,
@@ -289,8 +285,7 @@ const NOTIFY_CLEAR_SETTLE: Duration = Duration::from_millis(1500);
 /// thread waits on the child so it does not become a zombie.
 ///
 /// `state` is the agent state for agent-state events, and `None` for events
-/// that are not about a pane's agent (a task moving, a workspace becoming
-/// reviewable). `SHEP_NOTIFY_STATE` stays the agent state so existing exec
+/// that are not about a pane's agent (a workspace becoming reviewable). `SHEP_NOTIFY_STATE` stays the agent state so existing exec
 /// commands keep working; `SHEP_NOTIFY_KIND` is what tells the receiver which
 /// of the four subscriptions this belongs to.
 fn spawn_notify_exec(
@@ -321,10 +316,6 @@ fn spawn_notify_exec(
     );
     cmd.env("SHEP_NOTIFY_MESSAGE", context.message.unwrap_or_default());
     cmd.env("SHEP_NOTIFY_TITLE", context.title.unwrap_or_default());
-    cmd.env(
-        "SHEP_NOTIFY_TASK_ID",
-        context.task_id.map(|id| id.to_string()).unwrap_or_default(),
-    );
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
@@ -537,23 +528,6 @@ impl HeadlessServer {
             server_event_rx,
             server_event_tx,
             notify_exec_fired: HashMap::new(),
-            _fs_watchers: {
-                let path = super::watchers::watchers_config_path();
-                match std::fs::read_to_string(&path) {
-                    Ok(raw) => {
-                        let (entries, diagnostics) = super::watchers::parse_watchers_config(&raw);
-                        for diagnostic in diagnostics {
-                            tracing::warn!("{diagnostic}");
-                        }
-                        super::watchers::spawn_watchers(entries)
-                    }
-                    Err(err) if err.kind() == io::ErrorKind::NotFound => None,
-                    Err(err) => {
-                        tracing::warn!(err = %err, "cannot read watchers.toml");
-                        None
-                    }
-                }
-            },
         })
     }
 
@@ -1415,7 +1389,7 @@ impl HeadlessServer {
             });
 
         if let Some(title) = review_title {
-            self.fire_notify_exec_event(pane_id, crate::config::NotifyKind::Review, title, None);
+            self.fire_notify_exec_event(pane_id, crate::config::NotifyKind::Review, title);
         }
     }
 
@@ -1537,8 +1511,8 @@ impl HeadlessServer {
 
     /// Fire the exec-bridge for an event that is not an agent-state change.
     ///
-    /// Task and review events arrive already de-duplicated — the callers only
-    /// reach here on a real change — so this deliberately skips the per-pane
+    /// A review event arrives already de-duplicated — the caller only reaches
+    /// here on a real change — so this deliberately skips the per-pane
     /// state debounce, which exists for a different problem (an agent being
     /// re-reported in the state it is already in). It is still remembered as
     /// fired, so looking at the pane withdraws it like any other.
@@ -1547,7 +1521,6 @@ impl HeadlessServer {
         pane_id: PaneId,
         kind: crate::config::NotifyKind,
         title: String,
-        task_id: Option<i64>,
     ) {
         if !self.app.state.notifications.should_notify(kind) {
             return;
@@ -1565,7 +1538,6 @@ impl HeadlessServer {
         };
         let mut context = self.notify_exec_context(pane_id);
         context.title = Some(title);
-        context.task_id = task_id;
         spawn_notify_exec(
             &exec,
             pane_id,
@@ -4719,7 +4691,6 @@ mod tests {
             server_event_rx,
             server_event_tx,
             notify_exec_fired: HashMap::new(),
-            _fs_watchers: None,
         }
     }
 

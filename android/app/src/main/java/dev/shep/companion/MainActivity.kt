@@ -47,7 +47,6 @@ import dev.shep.companion.screens.ChannelsScreen
 import dev.shep.companion.screens.MemoryScreen
 import dev.shep.companion.screens.PairingScreen
 import dev.shep.companion.screens.ServerScreen
-import dev.shep.companion.screens.TasksScreen
 import dev.shep.companion.screens.pane.PaneScreen
 import dev.shep.companion.ui.components.EmptyState
 import dev.shep.companion.ui.components.HintBar
@@ -72,7 +71,7 @@ import dev.shep.companion.ui.theme.ShepMotion
 // Bridge protocol the app was built against (shep src/protocol/wire.rs
 // PROTOCOL_VERSION at vendor time). A mismatch soft-warns; it does not brick a
 // personal sideload. Bump alongside the vendored schema (1f follow-up).
-const val EXPECTED_PROTOCOL = 17
+const val EXPECTED_PROTOCOL = 18
 
 /** An agent state's colour, for the places that tint a label rather than draw a glyph. */
 fun statusColor(status: String): Color = ShepSemantic.agentColor(status)
@@ -96,8 +95,6 @@ fun offlineNotice(error: String?): String =
 class MainActivity : ComponentActivity() {
     // Pane id from a `shep://pane?pane=…` notification tap; consumed by NavShell.
     private val deepLinkPane = mutableStateOf<String?>(null)
-    // A6: `shep://tasks/new` (launcher shortcut / widget) → Tasks tab, add sheet.
-    private val deepLinkNewTask = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Before super: this is what swaps Theme.Shep (the splash) for
@@ -109,15 +106,12 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         deepLinkPane.value = paneFromIntent(intent)
-        deepLinkNewTask.value = newTaskFromIntent(intent)
         setContent {
             ShepTheme {
                 ShepApp(
                     getSharedPreferences("shep", Context.MODE_PRIVATE),
                     deepLinkPane = deepLinkPane.value,
                     onDeepLinkConsumed = { deepLinkPane.value = null },
-                    newTask = deepLinkNewTask.value,
-                    onNewTaskConsumed = { deepLinkNewTask.value = false },
                 )
             }
         }
@@ -127,7 +121,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         paneFromIntent(intent)?.let { deepLinkPane.value = it }
-        if (newTaskFromIntent(intent)) deepLinkNewTask.value = true
     }
 
     private fun paneFromIntent(intent: Intent?): String? {
@@ -135,23 +128,16 @@ class MainActivity : ComponentActivity() {
         if (data.scheme != "shep" || data.host != "pane") return null
         return data.getQueryParameter("pane")?.takeIf { it.isNotBlank() }
     }
-
-    private fun newTaskFromIntent(intent: Intent?): Boolean {
-        val data = intent?.data ?: return false
-        return data.scheme == "shep" && data.host == "tasks" &&
-            data.pathSegments.firstOrNull() == "new"
-    }
 }
 
 /**
  * Hint-bar destinations. Shortcuts mirror the TUI vocabulary without adding
  * an icon dependency or making the phone carry a second navigation model.
  *
- * Four is the Hick's-law ceiling used by the desktop and the prototype.
+ * Three, under the Hick's-law ceiling the desktop and the prototype use.
  */
 enum class Tab(val label: String, val shortcut: String) {
     Agents("agents", "a"),
-    Tasks("tasks", "t"),
     Memory("memory", "m"),
     Shep("shep", "s"),
 }
@@ -161,8 +147,6 @@ fun ShepApp(
     prefs: android.content.SharedPreferences,
     deepLinkPane: String? = null,
     onDeepLinkConsumed: () -> Unit = {},
-    newTask: Boolean = false,
-    onNewTaskConsumed: () -> Unit = {},
 ) {
     var client by remember { mutableStateOf<BridgeClient?>(null) }
     var paired by remember { mutableStateOf(false) }
@@ -378,8 +362,6 @@ fun ShepApp(
                         initialTab = startTab,
                         deepLinkPane = deepLinkPane,
                         onDeepLinkConsumed = onDeepLinkConsumed,
-                        newTask = newTask,
-                        onNewTaskConsumed = onNewTaskConsumed,
                         onUnpair = {
                             paired = false
                             online = false
@@ -399,8 +381,7 @@ fun ShepApp(
  * The paired experience: a hint-bar Scaffold over the four destinations, with
  * the pane view pushed as a full-screen detail over the Chats tab on phones, or
  * docked side-by-side on iPad-class widths (A6 two-pane). A3 deep-links route
- * here by setting the tab + selecting a pane; the A6 `shep://tasks/new`
- * deep-link opens the Tasks tab with the add sheet already up.
+ * here by setting the tab + selecting a pane.
  */
 @Composable
 fun NavShell(
@@ -409,13 +390,9 @@ fun NavShell(
     initialTab: Tab = Tab.Agents,
     deepLinkPane: String? = null,
     onDeepLinkConsumed: () -> Unit = {},
-    newTask: Boolean = false,
-    onNewTaskConsumed: () -> Unit = {},
 ) {
     var tab by remember { mutableStateOf(initialTab) }
     var paneDetail by remember { mutableStateOf<AgentRow?>(null) }
-    // Hoisted from TasksScreen so the new-task deep-link can pre-open the sheet.
-    var tasksShowAdd by remember { mutableStateOf(false) }
     // Hoisted out of the list for a different reason: opening a pane replaces
     // the whole scaffold on a phone, so a group collapsed in the list itself is
     // re-expanded the moment you look at an agent and come back.
@@ -450,15 +427,6 @@ fun NavShell(
         }?.find { it.paneId == target }
         if (row != null) paneDetail = row
         onDeepLinkConsumed()
-    }
-
-    // Launcher shortcut / widget (shep://tasks/new): Tasks tab, sheet open.
-    LaunchedEffect(newTask) {
-        if (newTask) {
-            tab = Tab.Tasks
-            tasksShowAdd = true
-            onNewTaskConsumed()
-        }
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -525,11 +493,6 @@ fun NavShell(
                                 onUnpair = onUnpair,
                                 collapsed = collapsedSpaces,
                                 onCollapsedChange = { collapsedSpaces = it },
-                            )
-                            Tab.Tasks -> TasksScreen(
-                                client = client,
-                                showAdd = tasksShowAdd,
-                                onShowAddChange = { tasksShowAdd = it },
                             )
                             Tab.Memory -> MemoryScreen(client)
                             Tab.Shep -> ServerScreen(client = client, onRePair = onUnpair)

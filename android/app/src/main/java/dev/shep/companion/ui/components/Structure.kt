@@ -111,7 +111,7 @@ fun Notice(
     tone: NoticeTone = NoticeTone.Info,
     onDismiss: (() -> Unit)? = null,
 ) {
-    // An Info notice is a receipt — "renamed to x", "queued task" — and a
+    // An Info notice is a receipt — "renamed to x", "queued input" — and a
     // receipt has a shelf life. It clears itself after
     // [ShepMotion.NOTICE_MS] so the screen stops asserting something that
     // stopped being true minutes ago. An Alert does not: a protocol mismatch

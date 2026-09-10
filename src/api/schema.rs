@@ -10,7 +10,6 @@ pub mod response;
 pub mod server;
 pub mod session;
 pub mod tabs;
-pub mod tasks;
 pub mod workspaces;
 pub mod worktrees;
 
@@ -24,7 +23,6 @@ pub use response::*;
 pub use server::*;
 pub use session::*;
 pub use tabs::*;
-pub use tasks::*;
 pub use workspaces::*;
 pub use worktrees::*;
 
@@ -81,8 +79,6 @@ pub enum Method {
     WorkspaceDiff(WorkspaceTarget),
     #[serde(rename = "workspace.ship")]
     WorkspaceShip(WorkspaceTarget),
-    #[serde(rename = "task.dispatch")]
-    TaskDispatch(TaskDispatchParams),
     #[serde(rename = "workspace.move")]
     WorkspaceMove(WorkspaceMoveParams),
     #[serde(rename = "workspace.close")]

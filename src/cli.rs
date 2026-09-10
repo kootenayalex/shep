@@ -24,7 +24,6 @@ mod server;
 mod spec;
 mod status;
 mod tab;
-mod task;
 mod workspace;
 mod worktree;
 
@@ -80,7 +79,6 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "wait" => run_wait_command(&args[2..])?,
         "integration" => integration::run_integration_command(&args[2..])?,
         "memory" => memory::run_memory_command(&args[2..])?,
-        "task" => task::run_task_command(&args[2..])?,
         "session" => run_session_command(&args[2..])?,
         _ => return Ok(CommandOutcome::NotCli),
     };

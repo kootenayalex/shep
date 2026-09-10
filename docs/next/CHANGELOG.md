@@ -4,6 +4,15 @@
 
 ### Added
 
+- An agent's own checklist, on the phone. A pane's action row has a `todos`
+  sheet: the list the agent is working through right now, read out of the
+  harness's own task store when it has one and folded back out of the session
+  transcript when it does not — most session directories on a real machine have
+  been emptied, so the fold is the durable derivation rather than the fallback
+  of last resort. It is read-only by design: the checklist is the agent's
+  working state, and a phone ticking an item off would be telling it something
+  it did not do. Bridge-local (`pane.todos`), so it needs no API method.
+
 - The session board's lanes are your own groups, not four fixed state columns.
   Each lane is one group, in the session's own order, with its name and count
   as the heading and the selection's lane picked out in accent; state is
@@ -59,6 +68,14 @@
 
 ### Fixed
 
+- A stale word in `[notifications] notify_on` no longer costs you every
+  notification. A section that fails to deserialize is silently replaced by its
+  default, so one unrecognised kind turned the whole filter back into
+  blocked-only without saying anything. Unknown kinds are now warned about and
+  dropped, and the rest of the section survives; a list where nothing at all is
+  recognised keeps the default rather than the filtered empty list, because
+  empty means "fire on everything".
+
 - A phone that attached to a pane no longer leaves that pane phone-sized. The
   pty follows the attaching client while it is attached, as before, but the
   restore afterwards used to need a client at the desk — so a phone letting go
@@ -81,6 +98,22 @@
   pane header now carry that age forward on their own clock.
 
 ### Removed
+
+- The task queue is gone — `shep task`, `tasks.db`, the board's task screen and
+  its `t` key, the Tasks tab on the phone, the `shep://tasks/new` launcher
+  shortcut, the `task.*` bridge methods, the `task.dispatch` API method, the
+  `[tasks]` config section and the `task` notify kind. It was a place to write
+  down work that shep then had no way to make anyone do, and on the machine it
+  was built on it never held a single row. What replaces it is a viewer: the
+  `todos` sheet reads the checklist the agent actually keeps.
+
+  Two consequences worth knowing. `session.overview` no longer carries
+  `pending_tasks`, which is a wire break — **the protocol version is now 18**,
+  and a companion older than this release will refuse to connect until it is
+  updated. And `needs_review` used to be set only by the queue, so it had never
+  once fired; a finished run in a worktree group now opens the review gate
+  instead, which is narrower than "every finished run" and matches how
+  review/ship is actually used.
 
 - The review-diff pager is gone from the TUI — the global menu entry, the
   group context-menu entry, and the pager pane it opened. The `workspace.diff`

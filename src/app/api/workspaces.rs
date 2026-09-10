@@ -200,23 +200,6 @@ impl App {
         encode_success(id, ResponseResult::Ok {})
     }
 
-    pub(super) fn handle_task_dispatch(
-        &mut self,
-        id: String,
-        params: crate::api::schema::TaskDispatchParams,
-    ) -> String {
-        match self.dispatch_task(params.task_id) {
-            Ok((task, workspace_id)) => encode_success(
-                id,
-                ResponseResult::TaskDispatched {
-                    task_id: task.id,
-                    workspace_id,
-                },
-            ),
-            Err(message) => encode_error(id, "task_dispatch_failed", message),
-        }
-    }
-
     /// `workspace.diff` — the review diff for a workspace as text (target ref,
     /// `--stat` summary, unified diff). Read-only; the same target logic as the
     /// TUI review pager, for phone clients that render the diff themselves.

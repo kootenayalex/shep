@@ -39,7 +39,7 @@
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
-│ enter attach  t tasks  esc/q back to board                                                                           │
+│ enter attach  esc/q back to board                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
@@ -81,7 +81,7 @@ aggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg
 agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 agggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
-agbbbbbcccccccccbccccccccbbbbbccccccccccccccggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
+agbbbbbcccccccccbbbbbccccccccccccccgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggga
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 gbbbbbbcccccccccbcccccccccbccccccbcccccccbcccccccggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg
 

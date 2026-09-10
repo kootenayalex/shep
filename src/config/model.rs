@@ -301,7 +301,6 @@ pub struct Config {
     pub experimental: ExperimentalConfig,
     pub remote: RemoteConfig,
     pub notifications: NotificationsConfig,
-    pub tasks: TasksConfig,
     pub states: StatesConfig,
 }
 
@@ -927,9 +926,8 @@ impl Default for RemoteConfig {
 /// The first four mirror `crate::detect::AgentState` and are what `notify_on`
 /// has always accepted. `Done` is deliberately not the same as `Idle`: an agent
 /// going idle because it finished a run is the interesting half, and an agent
-/// that was idle all along is noise. `Task` and `Review` are not agent states
-/// at all — they are the queue and the review gate reaching a state a human
-/// wanted to hear about.
+/// that was idle all along is noise. `Review` is not an agent state at all —
+/// it is the review gate reaching a state a human wanted to hear about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum NotifyKind {
@@ -939,8 +937,6 @@ pub enum NotifyKind {
     Unknown,
     /// An agent went idle after working — a run completed.
     Done,
-    /// A queued task changed state.
-    Task,
     /// A workspace is ready for review.
     Review,
 }
@@ -970,7 +966,6 @@ impl NotifyKind {
             Self::Blocked => "blocked",
             Self::Unknown => "unknown",
             Self::Done => "done",
-            Self::Task => "task",
             Self::Review => "review",
         }
     }
@@ -984,7 +979,6 @@ impl NotifyKind {
             "blocked" => Some(Self::Blocked),
             "unknown" => Some(Self::Unknown),
             "done" => Some(Self::Done),
-            "task" => Some(Self::Task),
             "review" => Some(Self::Review),
             _ => None,
         }
@@ -1082,40 +1076,6 @@ impl NotificationsConfig {
     /// matches everything.
     pub fn should_notify(&self, kind: NotifyKind) -> bool {
         self.notify_on.is_empty() || self.notify_on.contains(&kind)
-    }
-}
-
-/// `[tasks]` — the M4 task queue. Auto-dispatch is opt-in; launch commands are
-/// overridable so permission flags / model choices stay the user's call.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default)]
-pub struct TasksConfig {
-    /// Dispatch the next queued task automatically when an agent transitions
-    /// to idle or done. Default: false.
-    pub auto_dispatch: bool,
-    /// Launch command for claude tasks; the prompt is appended as one quoted
-    /// shell argument.
-    pub claude_command: String,
-    /// Launch command for opencode tasks.
-    pub opencode_command: String,
-}
-
-impl Default for TasksConfig {
-    fn default() -> Self {
-        Self {
-            auto_dispatch: false,
-            claude_command: "claude".to_string(),
-            opencode_command: "opencode --prompt".to_string(),
-        }
-    }
-}
-
-impl TasksConfig {
-    pub fn runtime_command(&self, runtime: crate::tasks::TaskRuntime) -> &str {
-        match runtime {
-            crate::tasks::TaskRuntime::Claude => &self.claude_command,
-            crate::tasks::TaskRuntime::Opencode => &self.opencode_command,
-        }
     }
 }
 
@@ -2047,7 +2007,6 @@ switch_ascii_input_source_in_prefix = true
         assert!(!config.notifications.should_notify(NotifyKind::Idle));
         assert!(!config.notifications.should_notify(NotifyKind::Working));
         assert!(!config.notifications.should_notify(NotifyKind::Done));
-        assert!(!config.notifications.should_notify(NotifyKind::Task));
         assert!(!config.notifications.should_notify(NotifyKind::Review));
     }
 
@@ -2067,7 +2026,6 @@ exec = "voicebox-say"
             NotifyKind::Blocked,
             NotifyKind::Unknown,
             NotifyKind::Done,
-            NotifyKind::Task,
             NotifyKind::Review,
         ] {
             assert!(config.notifications.should_notify(kind));
@@ -2078,17 +2036,12 @@ exec = "voicebox-say"
     fn notifications_parses_multiple_kinds() {
         let toml = r#"
 [notifications]
-notify_on = ["blocked", "done", "task", "review"]
+notify_on = ["blocked", "done", "review"]
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         assert_eq!(
             config.notifications.notify_on,
-            vec![
-                NotifyKind::Blocked,
-                NotifyKind::Done,
-                NotifyKind::Task,
-                NotifyKind::Review
-            ]
+            vec![NotifyKind::Blocked, NotifyKind::Done, NotifyKind::Review]
         );
         assert!(config.notifications.should_notify(NotifyKind::Done));
         assert!(config.notifications.should_notify(NotifyKind::Review));

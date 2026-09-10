@@ -23,7 +23,7 @@
 │                                                                              │
 │                                                                              │
 │                                                                              │
-│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  t tasks  esc/q close  │
+│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  esc/q close           │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
@@ -49,7 +49,7 @@ allleeeeeeeeeelhhhmmmeeeeelllllllllllllllllllllllllllllleeeeeeeeeelhmmmmmeeeeela
 alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
 alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
 alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-albbbbbeeeeeeeebeeeeeeeeeebbbbbbbbbeeeeeeebbeeeeeeeeeeeeebeeeeeeeebbbbbeeeeeella
+albbbbbeeeeeeeebeeeeeeeeeebbbbbbbbbeeeeeeebbeeeeeeeeeeeeebbbbbeeeeeellllllllllla
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 lbbbbbbeeeeeeeeebeeeeeeeeebeeeeeebeeeeeeebeeeeeeelllllllllllllllllllllllllllllll
 

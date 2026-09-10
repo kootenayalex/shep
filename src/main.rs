@@ -92,7 +92,6 @@ mod server;
 mod session;
 mod session_facts;
 mod sound;
-mod tasks;
 mod terminal;
 mod terminal_modes;
 mod terminal_notify;

@@ -18,7 +18,6 @@ mod runtime;
 mod runtime_mutations;
 mod session;
 pub mod state;
-mod tasks;
 mod terminal_targets;
 mod theme_sync;
 mod worktrees;
@@ -592,7 +591,6 @@ impl App {
             config_diagnostic,
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
-            tasks_config: config.tasks.clone(),
             states_config: config.states.clone(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
@@ -671,7 +669,6 @@ impl App {
             global_menu: state::MenuListState::new(0),
             host_terminal_theme: crate::terminal_theme::TerminalTheme::default(),
             dashboard_sample: crate::app::state::DashboardSample::default(),
-            task_queue: crate::app::state::TaskQueueSample::default(),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         };
@@ -1439,10 +1436,6 @@ impl App {
 
         if !invalid_section("notifications") {
             self.state.notifications = config.notifications.clone();
-        }
-
-        if !invalid_section("tasks") {
-            self.state.tasks_config = config.tasks.clone();
         }
 
         if !invalid_section("states") {
@@ -2604,7 +2597,7 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(
             &path,
-            "[terminal]\ndefault_shell = \"nu\"\nshell_mode = \"non_login\"\nnew_cwd = \"home\"\n[keys]\nnew_workspace = \"prefix+m\"\nprefix = \"ctrl+a\"\n[update]\nversion_check = false\nmanifest_check = false\n[ui]\nagent_panel_scope = \"current\"\nagent_panel_sort = \"priority\"\nredraw_on_focus_gained = false\nright_click_passthrough_modifier = \"ctrl\"\n[ui.toast]\ndelivery = \"shep\"\n[experimental]\nswitch_ascii_input_source_in_prefix = true\n[notifications]\nnotify_on = [\"idle\"]\nexec = \"notify.sh\"\n[tasks]\nauto_dispatch = true\nclaude_command = \"claude --custom\"\n",
+            "[terminal]\ndefault_shell = \"nu\"\nshell_mode = \"non_login\"\nnew_cwd = \"home\"\n[keys]\nnew_workspace = \"prefix+m\"\nprefix = \"ctrl+a\"\n[update]\nversion_check = false\nmanifest_check = false\n[ui]\nagent_panel_scope = \"current\"\nagent_panel_sort = \"priority\"\nredraw_on_focus_gained = false\nright_click_passthrough_modifier = \"ctrl\"\n[ui.toast]\ndelivery = \"shep\"\n[experimental]\nswitch_ascii_input_source_in_prefix = true\n[notifications]\nnotify_on = [\"idle\"]\nexec = \"notify.sh\"\n",
         )
         .unwrap();
         std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
@@ -2650,8 +2643,6 @@ mod tests {
         // Live reload must carry the shep sections (regression: they were
         // missing from load_live_config's section list and silently reset).
         assert_eq!(app.state.notifications.exec.as_deref(), Some("notify.sh"));
-        assert!(app.state.tasks_config.auto_dispatch);
-        assert_eq!(app.state.tasks_config.claude_command, "claude --custom");
         assert!(app.state.config_diagnostic.is_none());
         let toast = app.state.toast.as_ref().unwrap();
         assert_eq!(toast.kind, crate::app::state::ToastKind::UpdateInstalled);

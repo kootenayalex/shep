@@ -65,6 +65,12 @@ Lifecycle verbs (claude-squad): **launch / pause / review / ship**.
 - **Watchers**: `~/.config/shep/watchers.toml` (`dir → prompt template`, `{file}` substitution) via `notify` crate → enqueue task (damon-ade `watcher.ts`).
 - Board overlay (M1) gains task columns — becomes the full kanban.
 
+> **Retired 2026-09-10.** All of M4 is gone: the queue never held a row on any
+> machine it ran on, because writing a prompt down is not the hard part of
+> getting work done. What survives the idea is a viewer — `pane.todos` reads
+> the checklist the agent keeps for itself out of the harness's own session
+> files. See the Removed entry in `docs/next/CHANGELOG.md`.
+
 ### M5 — Flagship polish (as time/value allows, in order)
 1. **Model/runtime bar**: relaunch same worktree under a different runtime/model, incl. local models via `ANTHROPIC_BASE_URL=http://127.0.0.1:1234/v1` → claude-code on the local LM Studio server.
 2. **Tab-to-queue input** (codex): queue a prompt to a busy session, fires when it goes idle.
@@ -98,16 +104,11 @@ Architect+delegate: this plan is the architecture; execution runs as **Opus 4.8 
 M0–M4 are landed and green (`just check`, 2,756 tests). From M5, tab-to-queue
 is landed (`shep agent send --queue`, pane "Queue prompt..." menu).
 
-**Model routing (M5.1) is config, not code**: `[tasks]` launch commands are
-free-form shell, so local-model dispatch is
-
-```toml
-[tasks]
-claude_command = "ANTHROPIC_BASE_URL=http://127.0.0.1:1234/v1 claude"
-```
-
-(local LM Studio server). Per-task model choice = a second config profile or an
-inline env prefix; a first-class model bar remains open.
+**Model routing (M5.1) was config, not code**: the `[tasks]` launch commands
+were free-form shell, so local-model dispatch was an env prefix on
+`claude_command`. That section went with the queue on 2026-09-10, and a
+first-class model bar remains open — as does where its launch command should
+live now.
 
 ### Landed since 2026-07-11
 
