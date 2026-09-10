@@ -265,6 +265,10 @@ pub(crate) fn assign_task(
 ///
 /// The workspace fallback upgrades queues created before exact assignment was
 /// added; once their state changes, the caller writes the exact pane id.
+// Its only production caller was the task bookkeeping in `maybe_task_transition`,
+// removed when `needs_review` was rewired off the queue. Kept (with its tests)
+// until the queue itself is deleted in the follow-up commit.
+#[allow(dead_code)]
 pub(crate) fn task_for_pane(
     conn: &Connection,
     pane_id: &str,

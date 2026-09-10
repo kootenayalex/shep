@@ -1367,13 +1367,12 @@ impl HeadlessServer {
     /// Run the `[notifications]` exec-bridge for an effective agent-state
     /// transition. Debounced to at most one exec per pane per state-transition.
     /// Server-side shared behavior — never blocks the event loop (spawn-and-forget).
-    /// Task-queue reactions to an effective agent-state transition (M4):
-    /// track the dispatched task's state through its workspace, flip the
-    /// workspace to needs_review when its task finishes, and auto-dispatch the
-    /// next queued task when capacity frees up (opt-in via `[tasks]
-    /// auto_dispatch`). Fail-quiet: a missing/broken store must never disturb
-    /// the session loop.
-    fn maybe_task_transition(
+    /// Reactions to an effective agent-state transition that are not the
+    /// notification itself: deliver input queued while the agent was busy, and
+    /// mark a worktree group as needing review once a run there finishes.
+    ///
+    /// Fail-quiet: nothing here may disturb the session loop.
+    fn maybe_state_side_effects(
         &mut self,
         pane_id: PaneId,
         prev_state: AgentState,
@@ -1389,101 +1388,34 @@ impl HeadlessServer {
                 tracing::info!(delivered, "flushed queued pane input");
             }
         }
-        let db_path = crate::tasks::tasks_db_path();
-        let has_store = db_path.exists();
-        let finished = prev_state == AgentState::Working && new_state == AgentState::Idle;
-        // Collected rather than fired inline: the task/review bookkeeping below
-        // holds a `&mut` borrow of the workspaces, and firing needs `&self`.
-        let mut notify_events: Vec<(crate::config::NotifyKind, String, Option<i64>)> = Vec::new();
-
-        if has_store {
-            let Ok(conn) = crate::tasks::open_store(&db_path) else {
-                return;
-            };
-            // Track the task dispatched into this pane's workspace.
-            let ws_id = self
-                .app
-                .state
-                .workspaces
-                .iter()
-                .find(|ws| ws.tabs.iter().any(|tab| tab.panes.contains_key(&pane_id)))
-                .map(|ws| ws.id.clone());
-            if let Some(ws_id) = ws_id {
-                let public_pane_id = self.app.state.workspaces.iter().find_map(|ws| {
-                    if !ws.tabs.iter().any(|tab| tab.panes.contains_key(&pane_id)) {
-                        return None;
-                    }
-                    let pane_number = ws.public_pane_number(pane_id)?;
-                    Some(crate::workspace::public_pane_id_for_number(
-                        &ws.id,
-                        pane_number,
-                    ))
-                });
-                if let Some(public_pane_id) = public_pane_id {
-                    if let Ok(Some(task)) =
-                        crate::tasks::task_for_pane(&conn, &public_pane_id, &ws_id)
-                    {
-                        let next = match new_state {
-                            AgentState::Blocked => Some(crate::tasks::TaskState::Blocked),
-                            AgentState::Working => Some(crate::tasks::TaskState::Running),
-                            AgentState::Idle if finished => Some(crate::tasks::TaskState::Done),
-                            _ => None,
-                        };
-                        if let Some(next) = next.filter(|next| *next != task.state) {
-                            let now = crate::tasks::unix_now();
-                            if let Err(err) = crate::tasks::set_task_state(
-                                &conn,
-                                task.id,
-                                next,
-                                Some(&ws_id),
-                                Some(&public_pane_id),
-                                now,
-                            ) {
-                                tracing::warn!(err = %err, task_id = task.id, "task state update failed");
-                            }
-                            // Already gated on a real change by the filter above,
-                            // so every arrival here is worth reporting once.
-                            notify_events.push((
-                                crate::config::NotifyKind::Task,
-                                format!("task #{} {}", task.id, next.as_str()),
-                                Some(task.id),
-                            ));
-                            if next == crate::tasks::TaskState::Done {
-                                if let Some(ws) = self
-                                    .app
-                                    .state
-                                    .workspaces
-                                    .iter_mut()
-                                    .find(|ws| ws.id == ws_id)
-                                {
-                                    ws.review_state = crate::api::schema::ReviewState::NeedsReview;
-                                    notify_events.push((
-                                        crate::config::NotifyKind::Review,
-                                        format!(
-                                            "{} is ready for review",
-                                            ws.custom_name.as_deref().unwrap_or(&ws.id)
-                                        ),
-                                        None,
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            // Capacity freed: dispatch the next queued task if enabled.
-            if finished && self.app.state.tasks_config.auto_dispatch {
-                if let Ok(Some(_)) = crate::tasks::next_todo(&conn) {
-                    drop(conn);
-                    if let Err(err) = self.app.dispatch_task(None) {
-                        tracing::warn!(err = %err, "auto-dispatch failed");
-                    }
-                }
-            }
+        if prev_state != AgentState::Working || new_state != AgentState::Idle {
+            return;
         }
+        // A finished run in a worktree group is the reviewable unit: the branch
+        // is isolated, so "done" there means there is a diff worth looking at.
+        // Runs outside a worktree share the checkout and have no such boundary,
+        // so they stay silent rather than marking every idle agent for review.
+        //
+        // Collected rather than fired inline: the search below holds a `&mut`
+        // borrow of the workspaces, and firing needs `&self`.
+        let review_title = self
+            .app
+            .state
+            .workspaces
+            .iter_mut()
+            .find(|ws| ws.tabs.iter().any(|tab| tab.panes.contains_key(&pane_id)))
+            .filter(|ws| ws.worktree_space.is_some())
+            .filter(|ws| ws.review_state != crate::api::schema::ReviewState::NeedsReview)
+            .map(|ws| {
+                ws.review_state = crate::api::schema::ReviewState::NeedsReview;
+                format!(
+                    "{} is ready for review",
+                    ws.custom_name.as_deref().unwrap_or(&ws.id)
+                )
+            });
 
-        for (kind, title, task_id) in notify_events {
-            self.fire_notify_exec_event(pane_id, kind, title, task_id);
+        if let Some(title) = review_title {
+            self.fire_notify_exec_event(pane_id, crate::config::NotifyKind::Review, title, None);
         }
     }
 
@@ -2367,7 +2299,7 @@ impl HeadlessServer {
                 // Exec-bridge: fire the user's notification command on an
                 // effective transition that passes the `notify_on` filter.
                 self.maybe_fire_notify_exec(pane_id_val, prev_state, next_state);
-                self.maybe_task_transition(pane_id_val, prev_state, next_state);
+                self.maybe_state_side_effects(pane_id_val, prev_state, next_state);
 
                 if self.app.state.toast_config.delay_seconds == 0
                     && self.app.state.sound.allows(agent_val)
@@ -2464,7 +2396,7 @@ impl HeadlessServer {
                 // Exec-bridge: fire the user's notification command on an
                 // effective transition that passes the `notify_on` filter.
                 self.maybe_fire_notify_exec(pane_id_val, prev_state, next_state);
-                self.maybe_task_transition(pane_id_val, prev_state, next_state);
+                self.maybe_state_side_effects(pane_id_val, prev_state, next_state);
 
                 if self.app.state.toast_config.delay_seconds == 0
                     && self.app.state.sound.allows(agent_val)
@@ -3572,13 +3504,12 @@ impl HeadlessServer {
 
             // Exec-bridge for state changes that landed during an API request.
             self.maybe_fire_notify_exec(*pane_id, *prev_state, new_state);
-            // ...and the same task bookkeeping the output-driven paths do.
+            // ...and the same side effects the output-driven paths run.
             // An agent that reports its own state through `pane.report_agent`
             // — which is how hook-driven runtimes report — otherwise never
-            // moved its task out of `running` or marked the workspace for
-            // review, so the queue silently stopped tracking exactly the
-            // agents that report most reliably.
-            self.maybe_task_transition(*pane_id, *prev_state, new_state);
+            // flushed its queued input or marked its group for review, so we
+            // silently skipped exactly the agents that report most reliably.
+            self.maybe_state_side_effects(*pane_id, *prev_state, new_state);
         }
 
         if !skip_default_workspace && latest_app_client(&self.clients).is_some() {
@@ -9597,5 +9528,122 @@ next_tab = ""
             serde_json::from_value(json).expect("older manifest deserializes");
         assert_eq!(legacy.last_foreground_size, None);
         assert_eq!(handoff_import_foreground_size(&legacy), Some((204, 50)));
+    }
+
+    fn worktree_membership(label: &str) -> crate::workspace::WorktreeSpaceMembership {
+        crate::workspace::WorktreeSpaceMembership {
+            key: label.into(),
+            label: label.into(),
+            repo_root: std::path::PathBuf::from("/tmp/repo"),
+            checkout_path: std::path::PathBuf::from("/tmp/repo-worktrees/feature"),
+            is_linked_worktree: true,
+        }
+    }
+
+    /// Tab-to-queue (M5) rides on the same transition hook as the review gate.
+    /// It used to live inside the task bookkeeping, so it is pinned separately
+    /// here: the queue must drain on a *detected* idle, not only a manual one.
+    #[test]
+    fn queued_input_still_flushes_when_an_agent_goes_idle() {
+        let mut server = test_headless_server();
+        let ws = crate::workspace::Workspace::test_new("queued");
+        let pane_id = ws.tabs[0].root_pane;
+        server.app.state.workspaces = vec![ws];
+        server
+            .app
+            .state
+            .queued_pane_input
+            .insert(pane_id, vec!["typed while busy".into()]);
+
+        server.maybe_state_side_effects(pane_id, AgentState::Working, AgentState::Idle);
+
+        assert!(
+            !server.app.state.queued_pane_input.contains_key(&pane_id),
+            "going idle must consume the queue"
+        );
+    }
+
+    #[test]
+    fn a_finished_run_in_a_worktree_group_marks_it_for_review() {
+        let mut server = test_headless_server();
+        let mut ws = crate::workspace::Workspace::test_new("feature");
+        let pane_id = ws.tabs[0].root_pane;
+        ws.worktree_space = Some(worktree_membership("feature"));
+        server.app.state.workspaces = vec![ws];
+        // `notify_on` defaults to blocked-only, so opt in: the gate opening and
+        // the human being told about it are two different decisions.
+        server.app.state.notifications.notify_on = vec![crate::config::NotifyKind::Review];
+
+        server.maybe_state_side_effects(pane_id, AgentState::Working, AgentState::Idle);
+
+        assert_eq!(
+            server.app.state.workspaces[0].review_state,
+            crate::api::schema::ReviewState::NeedsReview
+        );
+        assert!(
+            server.notify_exec_fired.contains_key(&pane_id),
+            "the review notification must fire"
+        );
+    }
+
+    /// The gate is state, the notification is a preference. A default config
+    /// (blocked-only) must still mark the group, just quietly.
+    #[test]
+    fn the_review_gate_opens_even_when_review_notifications_are_filtered_out() {
+        let mut server = test_headless_server();
+        let mut ws = crate::workspace::Workspace::test_new("feature");
+        let pane_id = ws.tabs[0].root_pane;
+        ws.worktree_space = Some(worktree_membership("feature"));
+        server.app.state.workspaces = vec![ws];
+        assert_eq!(
+            server.app.state.notifications.notify_on,
+            vec![crate::config::NotifyKind::Blocked]
+        );
+
+        server.maybe_state_side_effects(pane_id, AgentState::Working, AgentState::Idle);
+
+        assert_eq!(
+            server.app.state.workspaces[0].review_state,
+            crate::api::schema::ReviewState::NeedsReview
+        );
+        assert!(!server.notify_exec_fired.contains_key(&pane_id));
+    }
+
+    /// The old trigger was "a dispatched task finished". Without a worktree
+    /// there is no isolated branch to diff, so a plain idle agent must not
+    /// drag the whole session into the review gate.
+    #[test]
+    fn a_finished_run_outside_a_worktree_leaves_review_state_alone() {
+        let mut server = test_headless_server();
+        let ws = crate::workspace::Workspace::test_new("plain");
+        let pane_id = ws.tabs[0].root_pane;
+        server.app.state.workspaces = vec![ws];
+
+        server.maybe_state_side_effects(pane_id, AgentState::Working, AgentState::Idle);
+
+        assert_eq!(
+            server.app.state.workspaces[0].review_state,
+            crate::api::schema::ReviewState::None
+        );
+        assert!(!server.notify_exec_fired.contains_key(&pane_id));
+    }
+
+    /// Only a finished run is reviewable: an agent that merely became blocked,
+    /// or that was idle already, must leave the gate untouched.
+    #[test]
+    fn only_a_working_to_idle_transition_opens_the_review_gate() {
+        let mut server = test_headless_server();
+        let mut ws = crate::workspace::Workspace::test_new("feature");
+        let pane_id = ws.tabs[0].root_pane;
+        ws.worktree_space = Some(worktree_membership("feature"));
+        server.app.state.workspaces = vec![ws];
+
+        server.maybe_state_side_effects(pane_id, AgentState::Working, AgentState::Blocked);
+        server.maybe_state_side_effects(pane_id, AgentState::Unknown, AgentState::Idle);
+
+        assert_eq!(
+            server.app.state.workspaces[0].review_state,
+            crate::api::schema::ReviewState::None
+        );
     }
 }
