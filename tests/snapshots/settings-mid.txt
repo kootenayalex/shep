@@ -1,95 +1,95 @@
-# settings-mid 120x40 · 37 styles
+# settings-mid 120x40 · 38 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                                                 workmayt · 1                                          ◉ 1 blocked
- groups                  │ 1       +
+ groups          grouped │ 1       +
                          │╭──────────────────────────────────────────────┬─────────────────────────────────────────────╮
  ◉ workmayt ◆ ⇥2         ││                                              │                                             │
     ↑2 ↓1 20s mem 87%    ││                                              │                                             │
+   ◉ claude  blocked 72% ││                                              │                                             │
+   ⠹ opencode    working ││                                              │                                             │
                          ││                                              │                                             │
  ● emberline             ││                                              │                                             │
-   master 6m             ││                                              │                                             │
-                         ││                                              │                                             │
- ⠹ shep               ╭──────────────────────────────────────────────────────────────────────────╮                     │
-   feat/design… ↓4 2m │ settings                                                                 │                     │
+   master 6m          ╭──────────────────────────────────────────────────────────────────────────╮                     │
+   ● claude     done 8│ settings                                                                 │                     │
                       │ theme   sound   toasts   pane labels   integrations   experiments        │                     │
-                      │──────────────────────────────────────────────────────────────────────────│                     │
-                      │                                                                          │                     │
-                      │ ▸ shep                                                                   │                     │
-                      │   catppuccin ✓                                                           │                     │
+ ⠹ shep               │──────────────────────────────────────────────────────────────────────────│                     │
+   feat/design… ↓4 2m │                                                                          │                     │
+   ○ claude     idle 1│ ▸ shep                                                                   │                     │
+   ⠹ codex   working 5│   catppuccin ✓                                                           │                     │
                       │   catppuccin-latte                                                       │                     │
                       │   terminal                                                               │                     │
                       │   tokyo-night                                                            │                     │
- new                 m│   tokyo-night-day                                                        │                     │
-──────────────────────│   dracula                                                                │                     │
- agents           grou│   nord                                                                   │                     │
+                      │   tokyo-night-day                                                        │                     │
+                      │   dracula                                                                │                     │
+                      │   nord                                                                   │                     │
                       │   gruvbox                                                                │                     │
- ◉ workmayt           │   gruvbox-light                                                          │                     │
-   blocked · claude · │   one-dark                                                               │                     │
+                      │   gruvbox-light                                                          │                     │
+                      │   one-dark                                                               │                     │
                       │   one-light                                                              │                     │
- ⠹ workmayt           │   solarized                                                              │                     │
-   working · opencode │                                                                          │                     │
+                      │   solarized                                                              │                     │
+                      │                                                                          │                     │
                       │ ↑↓ select  tab section                                                   │                     │
- ● emberline          │                           ↵ apply    esc close                           │                     │
-   done · claude · 88%╰──────────────────────────────────────────────────────────────────────────╯                     │
+                      │                           ↵ apply    esc close                           │                     │
+                      ╰──────────────────────────────────────────────────────────────────────────╯                     │
                          ││                                              │                                             │
- ○ shep                  ││                                              │                                             │
-   idle · claude · 12%   ││                                              │                                             │
                          ││                                              │                                             │
- ⠹ shep                  ││                                              │                                             │
-   working · codex · 55% ││                                              │                                             │
                          ││                                              │                                             │
-                        «│╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
+                         ││                                              │                                             │
+                         ││                                              │                                             │
+                         ││                                              │                                             │
+                         ││                                              │                                             │
+ new               menu «│╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
 wbbbbwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwHHHHHHHHjjjAwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwtttttttttttw
-kkkkkkkxxxxxxxxxxxxxxxxxxEqqqqqqqqooowwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+kkkkkkkxxxxxxxxxxkkkkkkkxEqqqqqqqqooowwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
 xxxxxxxxxxxxxxxxxxxxxxxxxEccccccccccccccccccccccccccccccccccccccccccccccccKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
 yuyJJJJJJJJyhyFFyyyyyyyyyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
 yyyyggyssymmmysssssssyyyyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
+yyyuyJJJJJJyyuuuuuuuymmmyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
+yyyLyCCCCCCCCyyyyLLLLLLLyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
 xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xdxCCCCCCCCCxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxllllllxllxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xKxCCCCxxxxxxxxxxxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxxxxxxxK
-xxxllllllllllllxrrxllxaGGGGGGGGGvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
+xdxBBBBBBBBBxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
+xxxllllllxllxxxxxxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxxxxxxxK
+xxxdxBBBBBBxxxxxddddxlaGGGGGGGGGvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
 xxxxxxxxxxxxxxxxxxxxxxanpppppnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaxxxxxxxxxxxxxxxxxxxxxK
+xKxBBBBxxxxxxxxxxxxxxxaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaxxxxxxxxxxxxxxxxxxxxxK
+xxxllllllllllllxrrxllxavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
+xxxfxBBBBBBxxxxxffffxlaIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIaxxxxxxxxxxxxxxxxxxxxxK
+xxxKxBBBBBxxxKKKKKKKxlazzzzzzzzzzzzzeezzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
 xxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxaIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzeezzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-llllxxxxxxxxxxxxxxxxxlazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-EEEEEEEEEEEEEEEEEEEEEEazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-kkkkkkkxxxxxxxxxxxkkkkazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-yuyJJJJJJJJyyyyyyyyyyyazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-yyyuuuuuuummmmmmmmmmmmazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xKxBBBBBBBBxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxKKKKKKKllllllllllllavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
 xxxxxxxxxxxxxxxxxxxxxxaiiinnnnnnnnniiinnnnnnnnvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xdxBBBBBBBBBxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvvvvvvpppppppppvvIIIIIIIIIIIvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xxxddddlllllllllllllllaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvvvvvvpppppppppvvIIIIIIIIIIIvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxxxxxxxK
 xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xfxBBBBxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxfffflllllllllllllllxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
 xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xKxBBBBxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxKKKKKKKllllllllllllllxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
 xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxlEccccccccccccccccccccccccccccccccccccccccccccccccKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
+xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
+xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
+llllxxxxxxxxxxxxxxxllllxlEccccccccccccccccccccccccccccccccccccccccccccccccKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
 wbbbbbbjjjjjjjjjbjjjjjjjjjbjjjjjjbjjjjjjjbjjjjjjjwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
 
 --- legend ---
 . = (unstyled)
 A = fg:subtext0 bg:panel_bg dim
-B = fg:subtext0 bg:reset bold+dim
-C = fg:subtext0 bg:reset dim
+B = fg:subtext0 bg:reset dim
+C = fg:subtext0 bg:surface_dim dim
 D = fg:surface0 bg:panel_bg
 E = fg:surface_dim bg:reset dim
 F = fg:teal bg:surface_dim dim
@@ -98,6 +98,7 @@ H = fg:text bg:panel_bg bold+dim
 I = fg:text bg:surface0 bold
 J = fg:text bg:surface_dim bold+dim
 K = fg:yellow bg:reset dim
+L = fg:yellow bg:surface_dim dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold+dim
 c = fg:accent bg:reset dim

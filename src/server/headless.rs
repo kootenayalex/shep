@@ -1084,7 +1084,6 @@ impl HeadlessServer {
             self.app.state.active,
             self.app.state.selected,
             self.app.state.sidebar_width,
-            self.app.state.sidebar_section_split,
             self.app.state.collapsed_space_keys.clone(),
         );
 
@@ -9459,7 +9458,6 @@ next_tab = ""
             active: None,
             selected: 0,
             sidebar_width: None,
-            sidebar_section_split: None,
             collapsed_space_keys: std::collections::HashSet::new(),
         };
         crate::server::handoff::manifest_for(snapshot, panes, None, None, last_foreground_size)

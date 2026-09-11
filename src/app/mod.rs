@@ -372,7 +372,6 @@ impl App {
             selected,
             sidebar_width,
             sidebar_width_source,
-            sidebar_section_split,
             collapsed_space_keys,
         ) = if no_session {
             (
@@ -381,7 +380,6 @@ impl App {
                 0,
                 config.ui.sidebar_width,
                 state::SidebarWidthSource::ConfigDefault,
-                0.5_f32,
                 std::collections::HashSet::new(),
             )
         } else if let Some(snap) = crate::persist::load() {
@@ -417,7 +415,6 @@ impl App {
                     } else {
                         state::SidebarWidthSource::ConfigDefault
                     },
-                    snap.sidebar_section_split.unwrap_or(0.5),
                     snap.collapsed_space_keys,
                 )
             } else {
@@ -434,7 +431,6 @@ impl App {
                     } else {
                         state::SidebarWidthSource::ConfigDefault
                     },
-                    snap.sidebar_section_split.unwrap_or(0.5),
                     snap.collapsed_space_keys,
                 )
             }
@@ -445,7 +441,6 @@ impl App {
                 0,
                 config.ui.sidebar_width,
                 state::SidebarWidthSource::ConfigDefault,
-                0.5_f32,
                 std::collections::HashSet::new(),
             )
         };
@@ -554,7 +549,6 @@ impl App {
             board: state::BoardState::default(),
             copy_mode: None,
             workspace_scroll: 0,
-            agent_panel_scroll: 0,
             tab_scroll: 0,
             tab_scroll_follow_active: true,
             mobile_switcher_scroll: 0,
@@ -608,7 +602,6 @@ impl App {
             sidebar_width_auto: false,
             sidebar_collapsed: false,
             sidebar_collapsed_mode: config.ui.sidebar_collapsed_mode,
-            sidebar_section_split,
             agent_panel_sort,
             next_agent_state_change_seq: 0,
             mouse_capture: config.ui.mouse_capture,
@@ -823,9 +816,6 @@ impl App {
         if let Some(width) = snapshot.sidebar_width {
             app.state.sidebar_width = width;
             app.state.sidebar_width_source = state::SidebarWidthSource::Persisted;
-        }
-        if let Some(split) = snapshot.sidebar_section_split {
-            app.state.sidebar_section_split = split;
         }
         app.state.collapsed_space_keys = snapshot.collapsed_space_keys.clone();
         app.state.mode = if app.state.active.is_some() {
@@ -1424,7 +1414,6 @@ impl App {
                 self.state.escape_returns_to_board = config.ui.escape_returns_to_board;
                 self.state.agent_panel_sort =
                     agent_panel_sort_from_config(config.ui.agent_panel_sort);
-                self.state.agent_panel_scroll = 0;
                 self.state.accent = crate::config::parse_color(&config.ui.accent);
                 if !self.state.local_sound_playback && self.state.sound != config.ui.sound {
                     self.state.request_client_config_reload = true;

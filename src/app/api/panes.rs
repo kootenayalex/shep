@@ -1179,7 +1179,7 @@ impl App {
             return pane_not_found(id, &params.pane_id);
         };
         // Renaming a pane is renaming the agent in it: one name, so the
-        // border, the agent panel, the board and the phone cannot disagree.
+        // border, the sidebar tree, the board and the phone cannot disagree.
         match params.label.map(|label| label.trim().to_string()) {
             Some(label) if !label.is_empty() => terminal.set_agent_display_name(label),
             _ => terminal.clear_agent_display_name(),

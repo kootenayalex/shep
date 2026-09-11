@@ -1,18 +1,23 @@
-# navigator-mid 120x40 · 33 styles
+# navigator-mid 120x40 · 30 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                                                 workmayt · 1                                          ◉ 1 blocked
- groups                  │ 1       +
+ groups          grouped │ 1       +
                          │╭──────────────────────────────────────────────┬─────────────────────────────────────────────╮
  ◉ workmayt ◆ ⇥2         ││                                              │                                             │
     ↑2 ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮      │
-       │ / search panes                                                                                       5 │      │
- ● embe│────────────────────────────────────────────────────────────────────────────────────────────────────────│      │
-   mast│ ▸ → ◆ ◉ workmayt (2)                                                        1 blocked · 1 working      │      │
-       │ ▸     ● emberline (1)                                                       1 done                     │      │
- ⠹ shep│ ▸     ⠹ shep (2)                                                            1 working                  │      │
+   ◉ cl│ / search panes                                                                                       5 │      │
+   ⠹ op│────────────────────────────────────────────────────────────────────────────────────────────────────────│      │
+       │ ▸ → ◆ ◉ workmayt (2)                                                        1 blocked · 1 working      │      │
+ ● embe│ ▸     ● emberline (1)                                                       1 done                     │      │
+   mast│ ▸     ⠹ shep (2)                                                            1 working                  │      │
+   ● cl│                                                                                                        │      │
+       │                                                                                                        │      │
+ ⠹ shep│                                                                                                        │      │
    feat│                                                                                                        │      │
+   ○ cl│                                                                                                        │      │
+   ⠹ co│                                                                                                        │      │
        │                                                                                                        │      │
        │                                                                                                        │      │
        │                                                                                                        │      │
@@ -21,102 +26,94 @@
        │                                                                                                        │      │
        │                                                                                                        │      │
        │                                                                                                        │      │
- new   │                                                                                                        │      │
-───────│                                                                                                        │      │
- agents│                                                                                                        │      │
        │                                                                                                        │      │
- ◉ work│                                                                                                        │      │
-   bloc│                                                                                                        │      │
        │                                                                                                        │      │
- ⠹ work│                                                                                                        │      │
-   work│                                                                                                        │      │
        │                                                                                                        │      │
- ● embe│                                                                                                        │      │
-   done│                                                                                                        │      │
        │                                                                                                        │      │
- ○ shep│                                                                                                        │      │
-   idle│ workmayt · 2 panes · 1 blocked · 1 working─────────────────────────────────────────────────────────────│      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │                                                                                                        │      │
+       │ workmayt · 2 panes · 1 blocked · 1 working─────────────────────────────────────────────────────────────│      │
        │ enter switch  / search  b/w/i/d/a states  j/k/↑↓ move  esc close                                       │      │
- ⠹ shep╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯      │
-   working · codex · 55% ││                                              │                                             │
+       ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯      │
                          ││                                              │                                             │
-                        «│╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
+                         ││                                              │                                             │
+ new               menu «│╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
-tbbbbtttttttttttttttttttttttttttttttttttttttttttttttttCCCCCCCCkkkvttttttttttttttttttttttttttttttttttttttttttrrrrrrrrrrrt
-mmmmmmm..................zppppppppooottttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
-.........................zccccccccccccccccccccccccccccccccccccccccccccccccFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-usuDDDDDDDDujuAAuuuuuuuuuzc..............................................c.............................................F
-uuuuiiuaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......F
-.......akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka......F
-.e.wwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......F
-...llllapppppppqpqqqqqqqqqqqqpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa......F
-.......akkkkkkkdBvvvvvvvvvvvvvBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBkkkkkkkkkkkkkkkkkkkkkkkkkkkka......F
-.F.wwwwakkkkkkkEBvvvvvvvvBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBkkkkkkkkkkkkkkkkkkkkkkkkkkkka......F
-...llllatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-llll...atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-zzzzzzzatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-mmmmmmmatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-usuDDDDatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-uuussssatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.F.xxxxatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-...GGGGatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.e.xxxxatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-...ffffatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.......atttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-.g.xxxxatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......F
-...hhhhakkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka......F
-.......abbbbbbkkkkkkkkkbkkkkkkkkkbbbbbbbbbkkkkkkkkkbbbbbbkkkkkkkbbbkkkkkkttttttttttttttttttttttttttttttttttttttta......F
-.F.xxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......F
-...GGGGGGGnnnnnnnnnnnnnn.zc..............................................c.............................................F
-.........................zc..............................................c.............................................F
-........................lzccccccccccccccccccccccccccccccccccccccccccccccccFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-tbbbbbbkkkkkkkkkbkkkkkkkkkbkkkkkkbkkkkkkkbkkkkkkkttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
+qbbbbqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzzzzzzzziiisqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqoooooooooooq
+kkkkkkk..........kkkkkkk.wmmmmmmmmlllqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+.........................wccccccccccccccccccccccccccccccccccccccccccccccccCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+rprAAAAAAAArhrxxrrrrrrrrrwc..............................................c.............................................C
+rrrrggraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......C
+rrrprAAaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia......C
+rrrDruuavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvva......C
+.......ammmmmmmnmnnnnnnnnnnnnmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmma......C
+.e.ttttaiiiiiiidysssssssssssssyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyiiiiiiiiiiiiiiiiiiiiiiiiiiiia......C
+...jjjjaiiiiiiiByssssssssyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyiiiiiiiiiiiiiiiiiiiiiiiiiiiia......C
+...e.ttaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.C.ttttaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+...jjjjaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+...f.ttaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+...C.ttaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiia......C
+.......abbbbbbiiiiiiiiibiiiiiiiiibbbbbbbbbiiiiiiiiibbbbbbiiiiiiibbbiiiiiiqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa......C
+.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......C
+.........................wc..............................................c.............................................C
+.........................wc..............................................c.............................................C
+jjjj...............jjjj.jwccccccccccccccccccccccccccccccccccccccccccccccccCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+qbbbbbbiiiiiiiiibiiiiiiiiibiiiiiibiiiiiiibiiiiiiiqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
 
 --- legend ---
 . = (unstyled)
-A = fg:teal bg:surface_dim
-B = fg:text bg:panel_bg
-C = fg:text bg:panel_bg bold
-D = fg:text bg:surface_dim bold
-E = fg:yellow bg:panel_bg
-F = fg:yellow bg:reset
-G = fg:yellow bg:reset dim
+A = fg:text bg:surface_dim bold
+B = fg:yellow bg:panel_bg
+C = fg:yellow bg:reset
+D = fg:yellow bg:surface_dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:reset
 d = fg:blue bg:panel_bg
 e = fg:blue bg:reset
-f = fg:blue bg:reset dim
-g = fg:green bg:reset
-h = fg:green bg:reset dim
-i = fg:green bg:surface_dim
-j = fg:mauve bg:surface_dim
-k = fg:overlay0 bg:panel_bg
-l = fg:overlay0 bg:reset
-m = fg:overlay0 bg:reset bold
-n = fg:overlay0 bg:reset dim
-o = fg:overlay1 bg:panel_bg
-p = fg:panel_bg bg:accent
-q = fg:panel_bg bg:accent bold
-r = fg:red bg:panel_bg bold
-s = fg:red bg:surface_dim
-t = fg:reset bg:panel_bg
-u = fg:reset bg:surface_dim
-v = fg:subtext0 bg:panel_bg
-w = fg:subtext0 bg:reset
-x = fg:subtext0 bg:reset bold
-y = fg:surface1 bg:panel_bg
-z = fg:surface_dim bg:reset
+f = fg:green bg:reset
+g = fg:green bg:surface_dim
+h = fg:mauve bg:surface_dim
+i = fg:overlay0 bg:panel_bg
+j = fg:overlay0 bg:reset
+k = fg:overlay0 bg:reset bold
+l = fg:overlay1 bg:panel_bg
+m = fg:panel_bg bg:accent
+n = fg:panel_bg bg:accent bold
+o = fg:red bg:panel_bg bold
+p = fg:red bg:surface_dim
+q = fg:reset bg:panel_bg
+r = fg:reset bg:surface_dim
+s = fg:subtext0 bg:panel_bg
+t = fg:subtext0 bg:reset
+u = fg:subtext0 bg:surface_dim
+v = fg:surface1 bg:panel_bg
+w = fg:surface_dim bg:reset
+x = fg:teal bg:surface_dim
+y = fg:text bg:panel_bg
+z = fg:text bg:panel_bg bold

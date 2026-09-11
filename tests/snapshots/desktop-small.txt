@@ -1,65 +1,66 @@
-# desktop-small 80x24 · 27 styles
+# desktop-small 80x24 · 28 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- groups                  │ 1       +
+ groups          grouped │ 1       +
                          │╭──────────────────────────┬─────────────────────────╮
- ◉ workmayt ◆ ⇥2        ▕││                          │                         │
-    ↑2 ↓1 20s mem 87%   ▕││                          │                         │
-                        ▕││                          │                         │
- ● emberline            ▕││                          │                         │
-   master 6m            ▕││                          │                         │
-                        ▕││                          │                         │
-                        ▕││                          │                         │
-                        ▕││                          │                         │
- new                 menu││                          │                         │
-─────────────────────────││                          │                         │
- agents           grouped││                          │                         │
+ ◉ workmayt ◆ ⇥2         ││                          │                         │
+    ↑2 ↓1 20s mem 87%    ││                          │                         │
+   ◉ claude  blocked 72% ││                          │                         │
+   ⠹ opencode    working ││                          │                         │
                          ││                          │                         │
- ◉ workmayt             ▕││                          │                         │
-   blocked · claude · 72▕││                          │                         │
-                        ▕││                          │                         │
- ⠹ workmayt             ▕││                          │                         │
-   working · opencode · ▕││                          │                         │
-                        ▕││                          │                         │
- ● emberline            ▕││                          │                         │
-   done · claude · 88%  «│╰──────────────────────────┴─────────────────────────╯
+ ● emberline             ││                          │                         │
+   master 6m             ││                          │                         │
+   ● claude     done 88% ││                          │                         │
+                         ││                          │                         │
+ ⠹ shep                  ││                          │                         │
+   feat/design… ↓4 2m    ││                          │                         │
+   ○ claude     idle 12% ││                          │                         │
+   ⠹ codex   working 55% ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+ new               menu «│╰──────────────────────────┴─────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
-qaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqxxxxxxxxgggsqqqqqqqqqqqqqqqqqqqqqqoooooooooooq
-iiiiiii..................vmmmmmmmmlllqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-.........................vbbbbbbbbbbbbbbbbbbbbbbbbbbbbzzzzzzzzzzzzzzzzzzzzzzzzzz
-rpryyyyyyyyrfrwwrrrrrrrrhvb..........................b.........................z
-rrrreernnrkkkrnnnnnnnrrrhvb..........................b.........................z
-........................hvb..........................b.........................z
-.c.ttttttttt............hvb..........................b.........................z
-...hhhhhh.jj............hvb..........................b.........................z
-........................vvb..........................b.........................z
-........................vvb..........................b.........................z
-........................vvb..........................b.........................z
-hhhh.................hhhhvb..........................b.........................z
-vvvvvvvvvvvvvvvvvvvvvvvvvvb..........................b.........................z
-iiiiiii...........iiiiiiivb..........................b.........................z
-.........................vb..........................b.........................z
-rpryyyyyyyyrrrrrrrrrrrrrhvb..........................b.........................z
-rrrpppppppkkkkkkkkkkkkkkhvb..........................b.........................z
-........................hvb..........................b.........................z
-.z.uuuuuuuu.............hvb..........................b.........................z
-...AAAAAAAjjjjjjjjjjjjjjhvb..........................b.........................z
-........................vvb..........................b.........................z
-.c.uuuuuuuuu............vvb..........................b.........................z
-...ddddjjjjjjjjjjjjjjj..hvbbbbbbbbbbbbbbbbbbbbbbbbbbbbzzzzzzzzzzzzzzzzzzzzzzzzzz
-qaaaaaagggggggggagggggggggaggggggagggggggagggggggqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+raaaarrrrrrrrrrrrrrrrrrrrrrrrrrrrryyyyyyyygggtrrrrrrrrrrrrrrrrrrrrrrpppppppppppr
+iiiiiii..........iiiiiii.wmmmmmmmmlllrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+.........................wbbbbbbbbbbbbbbbbbbbbbbbbbbbbAAAAAAAAAAAAAAAAAAAAAAAAAA
+sqszzzzzzzzsfsxxssssssssswb..........................b.........................A
+sssseesooskkksooooooosssswb..........................b.........................A
+sssqszzzzzzssqqqqqqqskkkswb..........................b.........................A
+sssBsvvvvvvvvssssBBBBBBBswb..........................b.........................A
+.........................wb..........................b.........................A
+.c.uuuuuuuuu.............wb..........................b.........................A
+...hhhhhh.jj.............wb..........................b.........................A
+...c.uuuuuu.....cccc.jjj.wb..........................b.........................A
+.........................wb..........................b.........................A
+.A.uuuu..................wb..........................b.........................A
+...hhhhhhhhhhhh.nn.jj....wb..........................b.........................A
+...d.uuuuuu.....dddd.jjj.wb..........................b.........................A
+...A.uuuuu...AAAAAAA.jjj.wb..........................b.........................A
+.........................wb..........................b.........................A
+.........................wb..........................b.........................A
+.........................wb..........................b.........................A
+.........................wb..........................b.........................A
+.........................wb..........................b.........................A
+.........................wb..........................b.........................A
+hhhh...............hhhh.hwbbbbbbbbbbbbbbbbbbbbbbbbbbbbAAAAAAAAAAAAAAAAAAAAAAAAAA
+raaaaaagggggggggagggggggggaggggggagggggggagggggggrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
 
 --- legend ---
 . = (unstyled)
-A = fg:yellow bg:reset dim
+A = fg:yellow bg:reset
+B = fg:yellow bg:surface_dim
 a = fg:accent bg:panel_bg bold
 b = fg:accent bg:reset
 c = fg:blue bg:reset
-d = fg:blue bg:reset dim
+d = fg:green bg:reset
 e = fg:green bg:surface_dim
 f = fg:mauve bg:surface_dim
 g = fg:overlay0 bg:panel_bg
@@ -69,16 +70,16 @@ j = fg:overlay0 bg:reset dim
 k = fg:overlay0 bg:surface_dim dim
 l = fg:overlay1 bg:panel_bg
 m = fg:panel_bg bg:accent
-n = fg:peach bg:surface_dim
-o = fg:red bg:panel_bg bold
-p = fg:red bg:surface_dim
-q = fg:reset bg:panel_bg
-r = fg:reset bg:surface_dim
-s = fg:subtext0 bg:panel_bg
-t = fg:subtext0 bg:reset
-u = fg:subtext0 bg:reset bold
-v = fg:surface_dim bg:reset
-w = fg:teal bg:surface_dim
-x = fg:text bg:panel_bg bold
-y = fg:text bg:surface_dim bold
-z = fg:yellow bg:reset
+n = fg:peach bg:reset
+o = fg:peach bg:surface_dim
+p = fg:red bg:panel_bg bold
+q = fg:red bg:surface_dim
+r = fg:reset bg:panel_bg
+s = fg:reset bg:surface_dim
+t = fg:subtext0 bg:panel_bg
+u = fg:subtext0 bg:reset
+v = fg:subtext0 bg:surface_dim
+w = fg:surface_dim bg:reset
+x = fg:teal bg:surface_dim
+y = fg:text bg:panel_bg bold
+z = fg:text bg:surface_dim bold

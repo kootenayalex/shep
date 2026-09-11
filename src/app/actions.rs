@@ -1315,12 +1315,12 @@ impl AppState {
 
         if self.active == Some(ws_idx) && self.workspaces[ws_idx].focused_pane_id() == Some(pane_id)
         {
-            self.ensure_agent_panel_entry_visible(idx);
+            self.ensure_agent_pane_visible(pane_id);
             return true;
         }
 
         if self.focus_pane_in_workspace(ws_idx, pane_id) {
-            self.ensure_agent_panel_entry_visible(idx);
+            self.ensure_agent_pane_visible(pane_id);
             return true;
         }
         false
@@ -1397,30 +1397,48 @@ impl AppState {
         self.focus_pane_in_workspace(ws_idx, pane_id)
     }
 
-    pub(crate) fn ensure_agent_panel_entry_visible(&mut self, idx: usize) {
+    /// Scroll the sidebar tree until this agent's own row is on screen.
+    ///
+    /// The agent list is not a separate panel any more, so "show me that agent"
+    /// and "show me that group" are the same scroll.
+    pub(crate) fn ensure_agent_pane_visible(&mut self, pane_id: crate::layout::PaneId) {
         if self.sidebar_collapsed {
             return;
         }
 
-        let (_, detail_area) = crate::ui::expanded_sidebar_sections(
+        let rows = crate::ui::sidebar_rows(self);
+        let Some(target_row) = rows.iter().position(|row| {
+            matches!(row, crate::ui::SidebarRow::Agent { pane_id: candidate, .. } if *candidate == pane_id)
+        }) else {
+            return;
+        };
+
+        self.workspace_scroll = crate::ui::normalized_workspace_scroll(
+            self,
             self.view.sidebar_rect,
-            self.sidebar_section_split,
+            self.workspace_scroll,
         );
-        let metrics = crate::ui::agent_panel_scroll_metrics(self, detail_area);
-        let visible = metrics.viewport_rows;
-        if visible == 0 {
+        if target_row < self.workspace_scroll {
+            self.workspace_scroll = target_row;
             return;
         }
 
-        if idx < self.agent_panel_scroll {
-            self.agent_panel_scroll = idx;
-        } else if idx >= self.agent_panel_scroll.saturating_add(visible) {
-            self.agent_panel_scroll = idx.saturating_add(1).saturating_sub(visible);
+        let on_screen = |state: &Self| {
+            crate::ui::compute_workspace_card_areas(state, state.view.sidebar_rect)
+                .iter()
+                .any(|card| card.agent().is_some_and(|(_, _, id)| id == pane_id))
+        };
+        // Scrolling past the target row can never bring it on screen, and a
+        // sidebar with no room to draw never shows anything, so the walk is
+        // bounded by the row itself rather than by the clamp.
+        while !on_screen(self) && self.workspace_scroll < target_row {
+            self.workspace_scroll = self.workspace_scroll.saturating_add(1);
         }
-
-        let max_scroll =
-            crate::ui::agent_panel_scroll_metrics(self, detail_area).max_offset_from_bottom;
-        self.agent_panel_scroll = self.agent_panel_scroll.min(max_scroll);
+        self.workspace_scroll = crate::ui::normalized_workspace_scroll(
+            self,
+            self.view.sidebar_rect,
+            self.workspace_scroll,
+        );
     }
 
     pub(crate) fn terminal_ids_for_workspace(
@@ -4063,7 +4081,7 @@ mod tests {
     }
 
     #[test]
-    fn previous_agent_keeps_wrapped_target_visible_in_agent_panel() {
+    fn previous_agent_keeps_wrapped_target_visible_in_the_tree() {
         let mut workspace = Workspace::test_new("one");
         let root = workspace.tabs[0].root_pane;
         for idx in 1..8 {
@@ -4087,7 +4105,16 @@ mod tests {
 
         let last_idx = state.workspaces[0].tabs.len() - 1;
         assert_eq!(state.workspaces[0].active_tab, last_idx);
-        assert!(state.agent_panel_scroll > 0);
+        let wrapped_pane = state.workspaces[0].tabs[last_idx].root_pane;
+        crate::ui::compute_view(&mut state, ratatui::layout::Rect::new(0, 0, 80, 14));
+        assert!(
+            state
+                .view
+                .workspace_card_areas
+                .iter()
+                .any(|card| card.agent().is_some_and(|(_, _, id)| id == wrapped_pane)),
+            "the agent it wrapped to is off screen"
+        );
         state.assert_invariants_for_test();
     }
 

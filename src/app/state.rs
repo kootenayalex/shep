@@ -594,11 +594,35 @@ impl Palette {
     }
 }
 
+/// What a sidebar card stands for: the group itself, or one agent inside it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkspaceCardKind {
+    Group,
+    Agent {
+        tab_idx: usize,
+        pane_id: crate::layout::PaneId,
+    },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkspaceCardArea {
     pub ws_idx: usize,
     pub rect: Rect,
     pub indented: bool,
+    pub kind: WorkspaceCardKind,
+}
+
+impl WorkspaceCardArea {
+    pub fn agent(&self) -> Option<(usize, usize, crate::layout::PaneId)> {
+        match self.kind {
+            WorkspaceCardKind::Group => None,
+            WorkspaceCardKind::Agent { tab_idx, pane_id } => Some((self.ws_idx, tab_idx, pane_id)),
+        }
+    }
+
+    pub fn is_group(&self) -> bool {
+        matches!(self.kind, WorkspaceCardKind::Group)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -986,9 +1010,10 @@ pub(crate) enum CopyModeSelection {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-/// How the sidebar's agent panel orders itself: by the group an agent is in,
-/// or by who needs the user first. The names follow the surface's own
-/// vocabulary — `grouped` is what the sidebar calls it.
+/// How agents order themselves inside their group, on the board, and for the
+/// next/previous agent keys: in tab order, or by who needs the user first. The
+/// names follow the surface's own vocabulary — `grouped` is what the sidebar
+/// calls it.
 pub enum AgentPanelSort {
     #[default]
     Grouped,
@@ -1169,9 +1194,6 @@ pub(crate) enum DragTarget {
     WorkspaceListScrollbar {
         grab_row_offset: u16,
     },
-    AgentPanelScrollbar {
-        grab_row_offset: u16,
-    },
     PaneSplit {
         path: Vec<bool>,
         direction: Direction,
@@ -1192,7 +1214,6 @@ pub(crate) enum DragTarget {
         grab_row_offset: u16,
     },
     SidebarDivider,
-    SidebarSectionDivider,
 }
 
 /// Active mouse drag on a split border or sidebar divider.
@@ -1563,7 +1584,6 @@ pub struct AppState {
     pub(crate) board: BoardState,
     pub copy_mode: Option<CopyModeState>,
     pub workspace_scroll: usize,
-    pub agent_panel_scroll: usize,
     pub tab_scroll: usize,
     pub tab_scroll_follow_active: bool,
     pub mobile_switcher_scroll: usize,
@@ -1606,7 +1626,6 @@ pub struct AppState {
     pub sidebar_collapsed: bool,
     pub sidebar_collapsed_mode: crate::config::SidebarCollapsedModeConfig,
     /// Ratio of sidebar height allocated to the workspaces section.
-    pub sidebar_section_split: f32,
     pub agent_panel_sort: AgentPanelSort,
     pub next_agent_state_change_seq: u64,
     /// Capture mouse input for Shep's own mouse UI. When false, Shep only
@@ -1996,7 +2015,6 @@ impl AppState {
             board: BoardState::default(),
             copy_mode: None,
             workspace_scroll: 0,
-            agent_panel_scroll: 0,
             tab_scroll: 0,
             tab_scroll_follow_active: true,
             mobile_switcher_scroll: 0,
@@ -2050,7 +2068,6 @@ impl AppState {
             sidebar_width_auto: false,
             sidebar_collapsed: false,
             sidebar_collapsed_mode: crate::config::SidebarCollapsedModeConfig::Compact,
-            sidebar_section_split: 0.5,
             agent_panel_sort: AgentPanelSort::Grouped,
             next_agent_state_change_seq: 0,
             mouse_capture: true,

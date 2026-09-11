@@ -305,7 +305,7 @@ fn location_label(
     }
 }
 
-/// Build the board model from the same agent panel entries the sidebar uses:
+/// Build the board model from the same agent entries the sidebar tree uses:
 /// one lane per group, in session order, each lane sorted by attention priority
 /// (then most-recent state change), so ordering agrees with the sidebar's
 /// priority sort.

@@ -1,4 +1,4 @@
-# keybind-help-small 80x24 · 23 styles
+# keybind-help-small 80x24 · 22 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
@@ -8,49 +8,49 @@
  ◉│ available commands and configured shortcuts                              │ │
   │                                                                          │ │
   │ global                                                                  ▐│ │
- ●│ ctrl+b                       prefix mode                                ▐│ │
+  │ ctrl+b                       prefix mode                                ▐│ │
   │ prefix+?                     keybinds                                   ▐│ │
-  │ prefix+s                     settings                                   ▐│ │
+ ●│ prefix+s                     settings                                   ▐│ │
   │ prefix+q                     detach                                     ▕│ │
   │ prefix+shift+r               reload config                              ▕│ │
- n│ prefix+o                     open notification target                   ▕│ │
-──│                                                                         ▕│ │
- a│ navigation                                                              ▕│ │
+  │ prefix+o                     open notification target                   ▕│ │
+ ⠹│                                                                         ▕│ │
+  │ navigation                                                              ▕│ │
   │ esc                          back                                       ▕│ │
- ◉│ up / down                    group list                                 ▕│ │
+  │ up / down                    group list                                 ▕│ │
   │ h / j / k / l / left / right move focus                                 ▕│ │
   │ tab / shift+tab              cycle pane                                 ▕│ │
- ⠹│ enter                        open group                                 ▕│ │
+  │ enter                        open group                                 ▕│ │
   │ 1..9                         switch group                               ▕│ │
   │                                                                          │ │
- ●│ scroll jk/↑↓ or wheel ↑↓  ·  jump pgup / pgdn  ·  close esc / enter      │ │
-  ╰──────────────────────────────────────────────────────────────────────────╯─╯
+  │ scroll jk/↑↓ or wheel ↑↓  ·  jump pgup / pgdn  ·  close esc / enter      │ │
+ n╰──────────────────────────────────────────────────────────────────────────╯─╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
-occccooooooooooooooooooooooooooooovvvvvvvvgggroooooooooooooooooooooolllllllllllo
+occccooooooooooooooooooooooooooooouuuuuuuugggroooooooooooooooooooooolllllllllllo
 hhaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaoo
-ppauuuuuuuunnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkaww
-qmajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjapw
-qqannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnapw
-ppabbbbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapw
-pdaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeetttttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapw
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapw
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapw
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeetttttttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-iiaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttttttttttttttttnnnnnnnnnnnnnnnnnnnfapw
-ssannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-hhabbbbbbbbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-qmaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-qqaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-pwaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeettttttttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapw
-ppannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnapw
-pdafffffffftttttffffttttttttfffffffffttttttttttttfffffffffftttttttttttttnnnnnapw
-ppaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaww
+ppattttttttnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkavv
+qmajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjapv
+qqannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnapv
+qqabbbbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapv
+qqaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeesssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapv
+pdaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnjapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeesssssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssssssssssssssnnnnnnnnnnnnnnnnnnnfapv
+pvannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppabbbbbbbbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnfapv
+ppannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnapv
+ppaffffffffsssssffffssssssssfffffffffssssssssssssffffffffffsssssssssssssnnnnnapv
+iiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavv
 occccccgggggggggcgggggggggcggggggcgggggggcgggggggooooooooooooooooooooooooooooooo
 
 --- legend ---
@@ -73,8 +73,7 @@ o = fg:reset bg:panel_bg dim
 p = fg:reset bg:reset dim
 q = fg:reset bg:surface_dim dim
 r = fg:subtext0 bg:panel_bg dim
-s = fg:surface_dim bg:reset dim
-t = fg:text bg:panel_bg
-u = fg:text bg:panel_bg bold
-v = fg:text bg:panel_bg bold+dim
-w = fg:yellow bg:reset dim
+s = fg:text bg:panel_bg
+t = fg:text bg:panel_bg bold
+u = fg:text bg:panel_bg bold+dim
+v = fg:yellow bg:reset dim

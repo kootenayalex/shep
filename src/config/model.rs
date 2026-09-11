@@ -357,9 +357,9 @@ pub struct KeysConfig {
     pub previous_workspace: BindingConfig,
     /// Select the next workspace. Unset by default.
     pub next_workspace: BindingConfig,
-    /// Focus the previous agent shown in the agent panel. Unset by default.
+    /// Focus the previous agent in the sidebar tree. Unset by default.
     pub previous_agent: BindingConfig,
-    /// Focus the next agent shown in the agent panel. Unset by default.
+    /// Focus the next agent in the sidebar tree. Unset by default.
     pub next_agent: BindingConfig,
     /// Focus the next blocked pane across workspaces and tabs. Unset by default
     /// (suggested binding: `prefix+b`, which requires rebinding toggle_sidebar).

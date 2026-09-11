@@ -319,8 +319,9 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # without it shift+esc arrives as bare Esc and agents cannot be interrupted.
 # escape_returns_to_board = true
 
-# Agent panel ordering: "spaces" (grouped by space) or "priority" (attention queue).
-# "workspaces" is accepted as an alias for "spaces".
+# Agent ordering, in the sidebar tree, on the board, and for the next/previous
+# agent keys: "spaces" (each space's agents in tab order) or "priority"
+# (attention first). "workspaces" is accepted as an alias for "spaces".
 # agent_panel_sort = "spaces"
 
 # Accent color for highlights, borders, and navigation UI.

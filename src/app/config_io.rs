@@ -122,7 +122,7 @@ impl App {
                 crate::config::AgentPanelSortConfig::Priority.as_str()
             }
         };
-        if self.update_config_file("agent panel sort", |content| {
+        if self.update_config_file("agent sort", |content| {
             crate::config::upsert_section_value(
                 content,
                 "ui",

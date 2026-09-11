@@ -84,6 +84,21 @@
   `bridge-pair-code` window `shep bridge pair` does, tells you when the phone
   has claimed it, and closing the screen cancels the code.
 
+### Changed
+
+- The expanded sidebar is one tree: every group, with its own agents nested
+  under it. It used to be two stacked panels over the same objects — a group
+  list on top, a flat list of every agent below — so a screen with three groups
+  printed each group's name three times, once as a group and once on each of
+  its agents, and the group's glyph was never more than a summary of rows
+  already visible under it. An agent row now says only what its group cannot:
+  which agent, how it is doing, and how much context it has left, with those
+  facts pinned to the right edge and dropped whole rather than truncated when
+  the name needs the room. The whole list scrolls as one, so the draggable
+  divider between the two panels is gone, and `agent_panel_sort` now orders
+  each group's agents in place: `spaces` keeps tab order, `priority` puts the
+  agent that wants something first.
+
 ### Fixed
 
 - Pairing a phone advertises the address the bridge is actually on. Both the

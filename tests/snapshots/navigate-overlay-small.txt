@@ -1,72 +1,68 @@
-# navigate-overlay-small 80x24 · 33 styles
+# navigate-overlay-small 80x24 · 29 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- groups                  │ 1       +
+ groups          grouped │ 1       +
                          │╭──────────────────────────┬─────────────────────────╮
- ◉ workmayt ◆ ⇥2        ▕││                          │                         │
-    ↑2 ↓1 20s mem 87%   ▕││                          │                         │
-                        ▕││                          │                         │
- ● emberline            ▕││                          │                         │
-   master 6m            ▕││                          │                         │
-                        ▕││                          │                         │
-                        ▕││                          │                         │
-                        ▕││                          │                         │
- new                 menu││                          │                         │
-─────────────────────────││                          │                         │
- agents           grouped││                          │                         │
+ ◉ workmayt ◆ ⇥2         ││                          │                         │
+    ↑2 ↓1 20s mem 87%    ││                          │                         │
+   ◉ claude  blocked 72% ││                          │                         │
+   ⠹ opencode    working ││                          │                         │
                          ││                          │                         │
- ◉ workmayt             ▕││                          │                         │
-   blocked · claude · 72▕││                          │                         │
-                        ▕││                          │                         │
- ⠹ workmayt             ▕││                          │                         │
-   working · opencode · ▕││                          │                         │
-                        ▕││                          │                         │
- ● emberline            ▕││                          │                         │
-   done · claude · 88%  «│╰──────────────────────────┴─────────────────────────╯
+ ● emberline             ││                          │                         │
+   master 6m             ││                          │                         │
+   ● claude     done 88% ││                          │                         │
+                         ││                          │                         │
+ ⠹ shep                  ││                          │                         │
+   feat/design… ↓4 2m    ││                          │                         │
+   ○ claude     idle 12% ││                          │                         │
+   ⠹ codex   working 55% ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+                         ││                          │                         │
+ new               menu «│╰──────────────────────────┴─────────────────────────╯
  NAVIGATE  esc back  up / down ws  ⇥ pane  g navigator  c new tab  v split│  - s
 
 --- styles ---
-uaaaauuuuuuuuuuuuuuuuuuuuuuuuuuuuuCCCCCCCChhhxuuuuuuuuuuuuuuuuuuuuuurrrrrrrrrrru
-jjjjjjj..................boooooooonnnuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
-.........................bbbbbbbbbbbbbbbbbbbbbbbbbbbbbFFFFFFFFFFFFFFFFFFFFFFFFFF
-csvDDDDDDDDvgvBBvvvvvvvvibb..........................b.........................F
-vvvvffvqqvlllvqqqqqqqvvvibb..........................b.........................F
-........................ibb..........................b.........................F
-.d.yyyyyyyyy............ibb..........................b.........................F
-...iiiiii.kk............ibb..........................b.........................F
-........................Abb..........................b.........................F
-........................Abb..........................b.........................F
-........................Abb..........................b.........................F
-iiii.................iiiibb..........................b.........................F
-AAAAAAAAAAAAAAAAAAAAAAAAAbb..........................b.........................F
-jjjjjjj...........jjjjjjjbb..........................b.........................F
-.........................bb..........................b.........................F
-wtwEEEEEEEEwwwwwwwwwwwwwibb..........................b.........................F
-wwwtttttttmmmmmmmmmmmmmmibb..........................b.........................F
-........................ibb..........................b.........................F
-.F.zzzzzzzz.............ibb..........................b.........................F
-...GGGGGGGkkkkkkkkkkkkkkibb..........................b.........................F
-........................Abb..........................b.........................F
-.d.zzzzzzzzz............Abb..........................b.........................F
-...eeeekkkkkkkkkkkkkkk..ibbbbbbbbbbbbbbbbbbbbbbbbbbbbbFFFFFFFFFFFFFFFFFFFFFFFFFF
-ppppppppppuaaahhhhhhhaaaaaaaaahhhhhahhhhhhhahhhhhhhhhhhhahhhhhhhhhhahhhhhhhhhahh
+taaaatttttttttttttttttttttttttttttzzzzzzzzhhhvttttttttttttttttttttttrrrrrrrrrrrt
+jjjjjjj..........jjjjjjj.bnnnnnnnnmmmttttttttttttttttttttttttttttttttttttttttttt
+.........................bbbbbbbbbbbbbbbbbbbbbbbbbbbbbBBBBBBBBBBBBBBBBBBBBBBBBBB
+csuAAAAAAAAuguyyuuuuuuuuubb..........................b.........................B
+uuuuffuqqullluqqqqqqquuuubb..........................b.........................B
+uuusuAAAAAAuusssssssulllubb..........................b.........................B
+uuuCuxxxxxxxxuuuuCCCCCCCubb..........................b.........................B
+.........................bb..........................b.........................B
+.d.wwwwwwwww.............bb..........................b.........................B
+...iiiiii.kk.............bb..........................b.........................B
+...d.wwwwww.....dddd.kkk.bb..........................b.........................B
+.........................bb..........................b.........................B
+.B.wwww..................bb..........................b.........................B
+...iiiiiiiiiiii.pp.kk....bb..........................b.........................B
+...e.wwwwww.....eeee.kkk.bb..........................b.........................B
+...B.wwwww...BBBBBBB.kkk.bb..........................b.........................B
+.........................bb..........................b.........................B
+.........................bb..........................b.........................B
+.........................bb..........................b.........................B
+.........................bb..........................b.........................B
+.........................bb..........................b.........................B
+.........................bb..........................b.........................B
+iiii...............iiii.ibbbbbbbbbbbbbbbbbbbbbbbbbbbbbBBBBBBBBBBBBBBBBBBBBBBBBBB
+ooooooooootaaahhhhhhhaaaaaaaaahhhhhahhhhhhhahhhhhhhhhhhhahhhhhhhhhhahhhhhhhhhahh
 
 --- legend ---
 . = (unstyled)
-A = fg:surface_dim bg:reset
-B = fg:teal bg:surface0
-C = fg:text bg:panel_bg bold
-D = fg:text bg:surface0 bold
-E = fg:text bg:surface_dim bold
-F = fg:yellow bg:reset
-G = fg:yellow bg:reset dim
+A = fg:text bg:surface0 bold
+B = fg:yellow bg:reset
+C = fg:yellow bg:surface0
 a = fg:accent bg:panel_bg bold
 b = fg:accent bg:reset
 c = fg:accent bg:surface0
 d = fg:blue bg:reset
-e = fg:blue bg:reset dim
+e = fg:green bg:reset
 f = fg:green bg:surface0
 g = fg:mauve bg:surface0
 h = fg:overlay0 bg:panel_bg
@@ -74,17 +70,17 @@ i = fg:overlay0 bg:reset
 j = fg:overlay0 bg:reset bold
 k = fg:overlay0 bg:reset dim
 l = fg:overlay0 bg:surface0 dim
-m = fg:overlay0 bg:surface_dim dim
-n = fg:overlay1 bg:panel_bg
-o = fg:panel_bg bg:accent
-p = fg:panel_bg bg:accent bold
+m = fg:overlay1 bg:panel_bg
+n = fg:panel_bg bg:accent
+o = fg:panel_bg bg:accent bold
+p = fg:peach bg:reset
 q = fg:peach bg:surface0
 r = fg:red bg:panel_bg bold
 s = fg:red bg:surface0
-t = fg:red bg:surface_dim
-u = fg:reset bg:panel_bg
-v = fg:reset bg:surface0
-w = fg:reset bg:surface_dim
-x = fg:subtext0 bg:panel_bg
-y = fg:subtext0 bg:reset
-z = fg:subtext0 bg:reset bold
+t = fg:reset bg:panel_bg
+u = fg:reset bg:surface0
+v = fg:subtext0 bg:panel_bg
+w = fg:subtext0 bg:reset
+x = fg:subtext0 bg:surface0
+y = fg:teal bg:surface0
+z = fg:text bg:panel_bg bold

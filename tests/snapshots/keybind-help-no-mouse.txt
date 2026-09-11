@@ -1,4 +1,4 @@
-# keybind-help-no-mouse 80x24 · 22 styles
+# keybind-help-no-mouse 80x24 · 21 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
@@ -8,49 +8,49 @@
  ◉│ available commands and configured shortcuts                              │ │
   │                                                                          │ │
   │ global                                                                  ▐│ │
- ●│ ctrl+b                       prefix mode                                ▐│ │
+  │ ctrl+b                       prefix mode                                ▐│ │
   │ prefix+?                     keybinds                                   ▐│ │
-  │ prefix+s                     settings                                   ▐│ │
+ ●│ prefix+s                     settings                                   ▐│ │
   │ prefix+q                     detach                                     ▕│ │
   │ prefix+shift+r               reload config                              ▕│ │
   │ prefix+o                     open notification target                   ▕│ │
-──│                                                                         ▕│ │
- a│ navigation                                                              ▕│ │
+ ⠹│                                                                         ▕│ │
+  │ navigation                                                              ▕│ │
   │ esc                          back                                       ▕│ │
- ◉│ up / down                    group list                                 ▕│ │
+  │ up / down                    group list                                 ▕│ │
   │ h / j / k / l / left / right move focus                                 ▕│ │
   │ tab / shift+tab              cycle pane                                 ▕│ │
- ⠹│ enter                        open group                                 ▕│ │
+  │ enter                        open group                                 ▕│ │
   │ 1..9                         switch group                               ▕│ │
   │                                                                          │ │
- ●│ scroll jk/↑↓  ·  jump pgup / pgdn  ·  close esc / enter                  │ │
+  │ scroll jk/↑↓  ·  jump pgup / pgdn  ·  close esc / enter                  │ │
   ╰──────────────────────────────────────────────────────────────────────────╯─╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
-nccccnnnnnnnnnnnnnnnnnnnnnnnnnnnnnuuuuuuuugggqnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkn
+nccccnnnnnnnnnnnnnnnnnnnnnnnnnnnnnttttttttgggqnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkn
 hhaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaann
-ooattttttttmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmjjjjjjjjjjjavv
-plaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiaov
-ppammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaov
-ooabbbbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaov
-odaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeesssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeesssssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssssssssssssssmmmmmmmmmmmmmmmmmmmfaov
-rrammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-hhabbbbbbbbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-plaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ovaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeessssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaov
-ooammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaov
-odaffffffffsssssfffffffffssssssssssssffffffffffsssssssssssssmmmmmmmmmmmmmmmmmaov
-ooaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavv
+ooassssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmjjjjjjjjjjjauu
+plaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiaou
+ppammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaou
+ppabbbbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaou
+ppaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaou
+odaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrrrrrrrrrrrrrrrmmmmmmmmmmmmmmmmmmmfaou
+ouammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooabbbbbbbbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeerrrrrrrrrrrrmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmfaou
+ooammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaou
+ooaffffffffrrrrrfffffffffrrrrrrrrrrrrffffffffffrrrrrrrrrrrrrmmmmmmmmmmmmmmmmmaou
+ooaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauu
 nccccccgggggggggcgggggggggcggggggcgggggggcgggggggnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 
 --- legend ---
@@ -72,8 +72,7 @@ n = fg:reset bg:panel_bg dim
 o = fg:reset bg:reset dim
 p = fg:reset bg:surface_dim dim
 q = fg:subtext0 bg:panel_bg dim
-r = fg:surface_dim bg:reset dim
-s = fg:text bg:panel_bg
-t = fg:text bg:panel_bg bold
-u = fg:text bg:panel_bg bold+dim
-v = fg:yellow bg:reset dim
+r = fg:text bg:panel_bg
+s = fg:text bg:panel_bg bold
+t = fg:text bg:panel_bg bold+dim
+u = fg:yellow bg:reset dim
