@@ -183,9 +183,30 @@ impl App {
         if name.is_empty() {
             return Err(AgentStartError::InvalidName);
         }
-        if params.argv.is_empty() {
-            return Err(AgentStartError::EmptyArgv);
-        }
+        let (argv, extra_env) = match params.runtime.as_deref().map(str::trim) {
+            Some(runtime) if !runtime.is_empty() => {
+                if !params.argv.is_empty() {
+                    return Err(AgentStartError::RuntimeAndArgv);
+                }
+                let resolved = crate::runtimes::resolve_launch(
+                    runtime,
+                    &self.state.runtimes_config,
+                    &crate::runtimes::find_on_path,
+                )
+                .map_err(AgentStartError::Runtime)?;
+                // The recipe's env is the floor; what the caller passed wins.
+                let mut env = resolved.env;
+                env.retain(|(key, _)| !extra_env.iter().any(|(given, _)| given == key));
+                env.extend(extra_env);
+                (resolved.argv, env)
+            }
+            _ => {
+                if params.argv.is_empty() {
+                    return Err(AgentStartError::EmptyArgv);
+                }
+                (params.argv, extra_env)
+            }
+        };
         let conflicts = self.agent_name_conflicts(&name, "");
         if !conflicts.is_empty() {
             return Err(AgentStartError::DuplicateName {
@@ -199,7 +220,6 @@ impl App {
             .map(PathBuf::from)
             .or_else(|| std::env::current_dir().ok())
             .unwrap_or_else(|| PathBuf::from("/"));
-        let argv = params.argv;
         let focus = params.focus;
         let (rows, cols) = self.state.estimate_pane_size();
 
@@ -301,6 +321,14 @@ impl App {
             AgentStartError::EmptyArgv => crate::api::schema::ErrorBody {
                 code: "invalid_agent_argv".into(),
                 message: "agent start argv must not be empty".into(),
+            },
+            AgentStartError::RuntimeAndArgv => crate::api::schema::ErrorBody {
+                code: "invalid_agent_argv".into(),
+                message: "agent start takes either a runtime name or argv, not both".into(),
+            },
+            AgentStartError::Runtime(err) => crate::api::schema::ErrorBody {
+                code: err.code().into(),
+                message: err.to_string(),
             },
             AgentStartError::TargetNotFound { target } => crate::api::schema::ErrorBody {
                 code: "agent_placement_not_found".into(),
@@ -555,6 +583,8 @@ impl App {
 pub(super) enum AgentStartError {
     InvalidName,
     EmptyArgv,
+    RuntimeAndArgv,
+    Runtime(crate::runtimes::RuntimeResolveError),
     TargetNotFound {
         target: String,
     },

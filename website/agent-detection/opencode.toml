@@ -1,8 +1,21 @@
 id = "opencode"
-version = "2026.09.04.1"
+version = "2026.09.11.1"
 min_engine_version = 1
-updated_at = "2026-09-04T00:00:00Z"
+updated_at = "2026-09-11T00:00:00Z"
 aliases = ["open-code", "shep:opencode"]
+
+[launch]
+bin = "opencode"
+fallback_bins = ["opencode-cli"]
+version_args = ["--version"]
+argv = ["opencode"]
+
+# `opencode run` reads the message from stdin when none is given as an
+# argument; a literal `-` is parsed as a positional message by 1.14.x.
+[headless]
+argv = ["opencode", "run"]
+prompt = "stdin"
+output = "text"
 
 [[rules]]
 id = "permission_required"

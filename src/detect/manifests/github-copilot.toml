@@ -1,8 +1,19 @@
 id = "copilot"
-version = "2026.07.07.1"
+version = "2026.09.11.1"
 min_engine_version = 1
-updated_at = "2026-07-07T14:15:00Z"
+updated_at = "2026-09-11T00:00:00Z"
 aliases = ["github-copilot", "ghcs"]
+
+[launch]
+bin = "copilot"
+version_args = ["--version"]
+argv = ["copilot"]
+
+# copilot runs non-interactively when its prompt arrives on a stdin pipe.
+[headless]
+argv = ["copilot"]
+prompt = "stdin"
+output = "text"
 
 [[rules]]
 id = "selection_blocker"

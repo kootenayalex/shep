@@ -78,6 +78,22 @@ impl App {
         encode_success(id, ResponseResult::AgentStarted { agent, argv })
     }
 
+    pub(super) fn handle_runtime_list(&mut self, id: String) -> String {
+        let runtimes = crate::runtimes::list_runtimes(
+            &self.state.runtimes_config,
+            &crate::runtimes::find_on_path,
+        )
+        .into_iter()
+        .map(|runtime| crate::api::schema::RuntimeInfo {
+            name: runtime.name,
+            launchable: runtime.launchable,
+            bin_resolved: runtime.bin_resolved.map(|path| path.display().to_string()),
+            headless: runtime.headless,
+        })
+        .collect();
+        encode_success(id, ResponseResult::RuntimeList { runtimes })
+    }
+
     pub(super) fn handle_agent_read(
         &mut self,
         id: String,

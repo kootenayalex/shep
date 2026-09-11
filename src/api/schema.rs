@@ -109,6 +109,8 @@ pub enum Method {
     TabClose(TabTarget),
     #[serde(rename = "session.overview")]
     SessionOverview(EmptyParams),
+    #[serde(rename = "runtime.list")]
+    RuntimeList(EmptyParams),
     #[serde(rename = "agent.list")]
     AgentList(EmptyParams),
     #[serde(rename = "agent.get")]

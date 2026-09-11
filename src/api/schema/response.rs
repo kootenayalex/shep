@@ -55,6 +55,9 @@ pub enum ResponseResult {
     SessionOverview {
         overview: Box<super::session::SessionOverview>,
     },
+    RuntimeList {
+        runtimes: Vec<super::agents::RuntimeInfo>,
+    },
     WorkspaceInfo {
         workspace: WorkspaceInfo,
     },

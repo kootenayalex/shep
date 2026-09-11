@@ -106,9 +106,12 @@ Raw socket method names use dot notation:
 | Pane | `pane.split`, `pane.swap`, `pane.move`, `pane.zoom`, `pane.layout`, `pane.process_info`, `pane.neighbor`, `pane.edges`, `pane.focus_direction`, `pane.resize`, `pane.list`, `pane.current`, `pane.get`, `pane.rename`, `pane.send_text`, `pane.send_keys`, `pane.send_input`, `pane.scroll`, `pane.read`, `pane.report_agent`, `pane.report_agent_session`, `pane.report_metadata`, `pane.clear_agent_authority`, `pane.release_agent`, `pane.close`, `pane.mark_seen`, `pane.wait_for_output` |
 | Layout | `layout.export`, `layout.apply`, `layout.set_split_ratio` |
 | Agent | `agent.list`, `agent.get`, `agent.read`, `agent.explain`, `agent.send`, `agent.rename`, `agent.focus`, `agent.start`, `agent.set_state`, `agent.clear_state` |
+| Runtime | `runtime.list` |
 | Events | `events.subscribe`, `events.wait` |
 | Integrations | `integration.install`, `integration.uninstall` |
 | Plugins | `plugin.link`, `plugin.list`, `plugin.unlink`, `plugin.enable`, `plugin.disable`, `plugin.action.list`, `plugin.action.invoke`, `plugin.log.list`, `plugin.pane.open`, `plugin.pane.focus`, `plugin.pane.close` |
+
+`agent.start` takes either `argv` or a `runtime` name (`claude`, `opencode`, …); the name is resolved through the runtime manifest's `[launch]` recipe or a `[runtimes.<name>]` config table, and `runtime.list` reports every nameable runtime with `launchable`, `bin_resolved` and `headless` so a client can offer only what this server can start. See [Agents](/docs/agents/#launch-and-headless-recipes).
 
 Some CLI commands are conveniences around these methods. For example, `herdr agent wait` resolves an agent target and then subscribes to pane agent state events.
 

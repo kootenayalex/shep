@@ -156,7 +156,7 @@ line_regex = ["^exact line$"]
 #[test]
 fn remote_manifest_loads_between_local_override_and_bundled() {
     with_manifest_dirs("remote-source", || {
-        write_remote_codex(&remote_manifest("2026.06.10.5", "blocked", "remote-ready"));
+        write_remote_codex(&remote_manifest("2026.09.11.5", "blocked", "remote-ready"));
 
         let explain = explain(Agent::Codex, "remote-ready");
 
@@ -165,10 +165,10 @@ fn remote_manifest_loads_between_local_override_and_bundled() {
             explain.source,
             Some(ManifestSource::Remote { .. })
         ));
-        assert_eq!(explain.manifest_version.as_deref(), Some("2026.06.10.5"));
+        assert_eq!(explain.manifest_version.as_deref(), Some("2026.09.11.5"));
         assert_eq!(
             explain.cached_remote_version.as_deref(),
-            Some("2026.06.10.5")
+            Some("2026.09.11.5")
         );
     });
 }
@@ -176,7 +176,7 @@ fn remote_manifest_loads_between_local_override_and_bundled() {
 #[test]
 fn fallback_explain_preserves_active_manifest_version() {
     with_manifest_dirs("fallback-version", || {
-        write_remote_codex(&remote_manifest("2026.06.10.5", "blocked", "remote-ready"));
+        write_remote_codex(&remote_manifest("2026.09.11.5", "blocked", "remote-ready"));
 
         let explain = explain(Agent::Codex, "ordinary prompt text");
 
@@ -185,7 +185,7 @@ fn fallback_explain_preserves_active_manifest_version() {
             explain.fallback_reason.as_deref(),
             Some(DEFAULT_KNOWN_AGENT_IDLE_FALLBACK)
         );
-        assert_eq!(explain.manifest_version.as_deref(), Some("2026.06.10.5"));
+        assert_eq!(explain.manifest_version.as_deref(), Some("2026.09.11.5"));
         assert!(matches!(
             explain.source,
             Some(ManifestSource::Remote { .. })
@@ -196,7 +196,7 @@ fn fallback_explain_preserves_active_manifest_version() {
 #[test]
 fn older_cached_remote_manifest_does_not_shadow_newer_bundled_manifest() {
     with_manifest_dirs("older-remote-bundled-fallback", || {
-        write_remote_codex(&remote_manifest("2026.06.10.0", "blocked", "remote-ready"));
+        write_remote_codex(&remote_manifest("2026.09.11.0", "blocked", "remote-ready"));
 
         let explain = explain(Agent::Codex, "remote-ready");
 
@@ -204,7 +204,7 @@ fn older_cached_remote_manifest_does_not_shadow_newer_bundled_manifest() {
         assert!(matches!(explain.source, Some(ManifestSource::Bundled)));
         assert_eq!(
             explain.cached_remote_version.as_deref(),
-            Some("2026.06.10.0")
+            Some("2026.09.11.0")
         );
         assert!(explain
             .warning
@@ -216,7 +216,7 @@ fn older_cached_remote_manifest_does_not_shadow_newer_bundled_manifest() {
 #[test]
 fn local_override_shadows_cached_remote_manifest() {
     with_manifest_dirs("local-shadows-remote", || {
-        write_remote_codex(&remote_manifest("2026.06.10.5", "blocked", "remote-ready"));
+        write_remote_codex(&remote_manifest("2026.09.11.5", "blocked", "remote-ready"));
         write_local_codex(&local_manifest("idle", "local-ready"));
 
         let explain = explain(Agent::Codex, "local-ready");
@@ -226,7 +226,7 @@ fn local_override_shadows_cached_remote_manifest() {
         assert!(explain.local_override_shadowing_remote);
         assert_eq!(
             explain.cached_remote_version.as_deref(),
-            Some("2026.06.10.5")
+            Some("2026.09.11.5")
         );
     });
 }
@@ -234,7 +234,7 @@ fn local_override_shadows_cached_remote_manifest() {
 #[test]
 fn invalid_local_override_falls_back_to_cached_remote_manifest() {
     with_manifest_dirs("invalid-local-remote-fallback", || {
-        write_remote_codex(&remote_manifest("2026.06.10.5", "blocked", "remote-ready"));
+        write_remote_codex(&remote_manifest("2026.09.11.5", "blocked", "remote-ready"));
         write_local_codex("id = ");
 
         let explain = explain(Agent::Codex, "remote-ready");
@@ -251,7 +251,7 @@ fn invalid_local_override_falls_back_to_cached_remote_manifest() {
 #[test]
 fn detection_uses_cached_manifest_until_explicit_reload() {
     with_manifest_dirs("cache-boundary", || {
-        write_remote_codex(&remote_manifest("2026.06.10.5", "blocked", "cached-ready"));
+        write_remote_codex(&remote_manifest("2026.09.11.5", "blocked", "cached-ready"));
 
         let cached = explain(Agent::Codex, "cached-ready");
         assert_eq!(cached.state, AgentState::Blocked);
@@ -261,7 +261,7 @@ fn detection_uses_cached_manifest_until_explicit_reload() {
             Some("test")
         );
 
-        write_remote_codex_without_reload(&remote_manifest("2026.06.10.6", "working", "new-ready"));
+        write_remote_codex_without_reload(&remote_manifest("2026.09.11.6", "working", "new-ready"));
 
         let unchanged = explain(Agent::Codex, "new-ready");
         assert_eq!(unchanged.state, AgentState::Idle);
@@ -271,7 +271,7 @@ fn detection_uses_cached_manifest_until_explicit_reload() {
         );
         assert_eq!(
             unchanged.cached_remote_version.as_deref(),
-            Some("2026.06.10.5")
+            Some("2026.09.11.5")
         );
 
         reload_manifests();
@@ -280,7 +280,7 @@ fn detection_uses_cached_manifest_until_explicit_reload() {
         assert_eq!(reloaded.state, AgentState::Working);
         assert_eq!(
             reloaded.cached_remote_version.as_deref(),
-            Some("2026.06.10.6")
+            Some("2026.09.11.6")
         );
         assert_eq!(
             reloaded.matched_rule.as_ref().map(|rule| rule.id.as_str()),
@@ -357,6 +357,107 @@ fn devin_manifest_detects_idle_working_and_blocked_states() {
     );
     assert_eq!(permission_prompt.state, AgentState::Blocked);
     assert!(permission_prompt.visible_blocker);
+}
+
+#[test]
+fn manifest_parses_launch_and_headless_sections_and_rejects_their_typos() {
+    let manifest = parse_manifest(
+        r#"
+id = "claude"
+
+[launch]
+bin = "claude"
+fallback_bins = ["openclaude"]
+version_args = ["--version"]
+argv = ["claude"]
+env = { CLAUDE_QUIET = "1" }
+
+[headless]
+argv = ["claude", "-p", "--output-format", "text"]
+prompt = "stdin"
+output = "text"
+
+[[rules]]
+id = "working"
+state = "working"
+contains = ["Working"]
+"#,
+    )
+    .unwrap();
+    let launch = manifest.launch.as_ref().unwrap();
+    assert_eq!(launch.bin, "claude");
+    assert_eq!(launch.fallback_bins, vec!["openclaude"]);
+    assert_eq!(launch.env["CLAUDE_QUIET"], "1");
+    let headless = manifest.headless.as_ref().unwrap();
+    assert_eq!(headless.prompt, HeadlessPrompt::Stdin);
+    assert_eq!(headless.output, HeadlessOutput::Text);
+
+    // Both sections are optional and default their inner fields.
+    let manifest = parse_manifest(
+        r#"
+id = "claude"
+
+[headless]
+argv = ["claude", "-p"]
+
+[[rules]]
+id = "working"
+state = "working"
+contains = ["Working"]
+"#,
+    )
+    .unwrap();
+    assert!(manifest.launch.is_none());
+    assert_eq!(manifest.headless.unwrap().prompt, HeadlessPrompt::Stdin);
+
+    for body in [
+        "[launch]
+binary = \"claude\"
+",
+        "[launch]
+bin = \"\"
+",
+        "[headless]
+argv = []
+",
+        "[headless]
+argv = [\"claude\"]
+prompt = \"file\"
+",
+        "[headless]
+argv = [\"claude\"]
+output = \"json\"
+",
+    ] {
+        let content = format!(
+            "id = \"claude\"
+{body}
+[[rules]]
+id = \"working\"
+state = \"working\"
+contains = [\"Working\"]
+"
+        );
+        assert!(parse_manifest(&content).is_err(), "accepted {body:?}");
+    }
+}
+
+#[test]
+fn bundled_manifests_declare_launch_recipes_for_the_headless_capable_runtimes() {
+    for agent in [
+        Agent::Claude,
+        Agent::OpenCode,
+        Agent::Codex,
+        Agent::Gemini,
+        Agent::GithubCopilot,
+    ] {
+        let launch = bundled_manifest(agent).and_then(|manifest| manifest.launch);
+        assert!(launch.is_some(), "{agent:?} has no [launch]");
+        let headless = bundled_manifest(agent).and_then(|manifest| manifest.headless);
+        let headless = headless.unwrap_or_else(|| panic!("{agent:?} has no [headless]"));
+        assert_eq!(headless.prompt, HeadlessPrompt::Stdin);
+    }
+    assert!(bundled_manifest(Agent::Pi).unwrap().launch.is_none());
 }
 
 #[test]

@@ -79,6 +79,28 @@ herdr agent explain --file screen.txt --agent codex --json
 
 Live explain is evaluated by the running server, so it reflects the active manifest cache. The explain output shows the agent, final state, whether screen detection was skipped by a full lifecycle authority, manifest source and version, cached remote version, local override shadowing, remote update status, matched rule, visible evidence flags, matcher and region evidence for evaluated rules, skipped-update reason for transcript viewers, and the idle fallback reason when no rule matched.
 
+### Launch and headless recipes
+
+A manifest may also say how to *start* the runtime it detects, so the CLI, a plugin, or the phone can name a runtime instead of spelling out argv. Both sections are optional; a manifest without them still detects, it just is not launchable by name.
+
+```toml
+[launch]
+bin = "claude"                      # looked up on PATH first
+fallback_bins = ["openclaude"]      # tried in order when bin is missing
+version_args = ["--version"]        # how the binary prints its version
+argv = ["claude"]                   # what agent.start runs; defaults to [bin]
+env = {}                            # environment the runtime needs
+
+[headless]
+argv = ["claude", "-p", "--output-format", "text"]
+prompt = "stdin"                    # or "arg": appended as the last argument
+output = "text"                     # or "stream-json"
+```
+
+`[launch]` is what `agent.start { runtime = "claude" }` and `shep agent start <name> --runtime claude` run. When `bin` is not on `PATH` the first `fallback_bins` entry that is takes its place in `argv[0]`; when none is, the error `runtime_not_launchable` names every binary tried. `[headless]` is the one-shot question command behind `shep runtime ask`: the prompt goes on stdin by default so a long prompt never hits an argv limit. The bundled manifests carry both sections for `claude`, `opencode`, `codex`, `gemini` and `copilot`; `shep runtime list` shows which runtimes this machine can actually launch.
+
+A `[runtimes.<name>]` table in `config.toml` overrides either recipe without editing a manifest (see [Configuration](/docs/configuration/#runtimes)). A local detection override that omits the sections does not make a runtime unlaunchable: the bundled recipe still applies.
+
 Herdr can run inside tmux as the outer terminal environment. Agent detection does not inspect tmux sessions launched inside a Herdr pane. If a shell framework auto-enters tmux inside Herdr, Herdr sees `tmux` as the pane process instead of the agent behind it.
 
 ## State rollups
@@ -139,6 +161,12 @@ You can place that agent in a specific workspace or tab:
 
 ```bash
 herdr agent start docs --workspace w1 --tab w1:t1 -- claude
+```
+
+Or name the runtime and let its manifest's `[launch]` recipe supply the argv:
+
+```bash
+shep agent start docs --runtime claude
 ```
 
 Use `herdr pane ...` commands for ordinary terminals, servers, tests, shells, and low-level terminal input. For example, use `pane split` and `pane run` for `cargo test`, not `agent start`, unless that terminal is intentionally being treated as an agent target.

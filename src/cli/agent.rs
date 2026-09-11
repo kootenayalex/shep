@@ -269,22 +269,31 @@ fn matched_rule_region_preview<'a>(
         .filter(|preview| !preview.is_empty())
 }
 
+const AGENT_START_USAGE: &str = "usage: shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--new-workspace] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] (--runtime NAME | -- <argv...>)";
+
 fn agent_start(args: &[String]) -> std::io::Result<i32> {
     let Some(name) = args.first() else {
-        eprintln!("usage: shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--new-workspace] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
+        eprintln!("{AGENT_START_USAGE}");
         return Ok(2);
     };
 
-    let Some(separator) = args.iter().position(|arg| arg == "--") else {
-        eprintln!("usage: shep agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--new-workspace] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>");
+    // With `--runtime` the separator is optional: the manifest supplies argv.
+    let separator = args.iter().position(|arg| arg == "--");
+    let names_runtime = args[..separator.unwrap_or(args.len())]
+        .iter()
+        .any(|arg| arg == "--runtime");
+    if separator.is_none() && !names_runtime {
+        eprintln!("{AGENT_START_USAGE}");
         return Ok(2);
-    };
-    if separator == args.len() - 1 {
+    }
+    if separator == Some(args.len() - 1) {
         eprintln!("agent start requires argv after --");
         return Ok(2);
     }
+    let separator = separator.unwrap_or(args.len());
 
     let mut cwd = None;
+    let mut runtime = None;
     let mut workspace_id = None;
     let mut tab_id = None;
     let mut new_workspace = false;
@@ -339,6 +348,14 @@ fn agent_start(args: &[String]) -> std::io::Result<i32> {
                 focus = false;
                 index += 1;
             }
+            "--runtime" => {
+                let Some(value) = args.get(index + 1).filter(|_| index + 1 < separator) else {
+                    eprintln!("missing value for --runtime");
+                    return Ok(2);
+                };
+                runtime = Some(value.clone());
+                index += 2;
+            }
             "--env" => {
                 let Some(value) = args.get(index + 1).filter(|_| index + 1 < separator) else {
                     eprintln!("missing value for --env");
@@ -371,7 +388,11 @@ fn agent_start(args: &[String]) -> std::io::Result<i32> {
             new_workspace,
             split,
             focus,
-            argv: args[separator + 1..].to_vec(),
+            argv: args
+                .get(separator + 1..)
+                .map(<[String]>::to_vec)
+                .unwrap_or_default(),
+            runtime,
             env,
         }),
     })?)

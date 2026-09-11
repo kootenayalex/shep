@@ -1,8 +1,22 @@
 id = "claude"
-version = "2026.09.04.1"
+version = "2026.09.11.1"
 min_engine_version = 2
-updated_at = "2026-09-04T00:00:00Z"
+updated_at = "2026-09-11T00:00:00Z"
 aliases = ["claude-code"]
+
+# How to start claude by name (`shep agent start <name> --runtime claude`) and
+# how to ask it one question without a terminal (`shep runtime ask claude`).
+# Mirrors Open Design's runtime registry: bin, fallback bins, version probe.
+[launch]
+bin = "claude"
+fallback_bins = ["openclaude"]
+version_args = ["--version"]
+argv = ["claude"]
+
+[headless]
+argv = ["claude", "-p", "--output-format", "text"]
+prompt = "stdin"
+output = "text"
 
 [[rules]]
 id = "osc_title_working"

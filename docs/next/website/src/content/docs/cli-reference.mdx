@@ -274,9 +274,12 @@ herdr agent focus <target>
 herdr agent wait <target> --status <idle|working|blocked|unknown> [--timeout MS]
 herdr agent attach <target> [--takeover]
 herdr agent start <name> [--cwd PATH] [--workspace ID] [--tab ID] [--split right|down] [--env KEY=VALUE] [--focus|--no-focus] -- <argv...>
+herdr agent start <name> [...] --runtime <runtime>
 herdr agent explain <target> [--json|--verbose]
 herdr agent explain --file PATH --agent LABEL [--json|--verbose]
 ```
+
+`agent start --runtime claude` starts a runtime by name instead of spelling out argv: the manifest's `[launch]` recipe (or a `[runtimes.claude]` table in `config.toml`) says what to run. `--runtime` and `-- argv` are mutually exclusive. See [Runtimes](#runtimes).
 
 Agent targets can be terminal IDs, unique agent names, detected or reported agent labels, or legacy pane IDs. Names and labels are agent identities. Terminal IDs and legacy pane IDs are low-level escape hatches.
 
@@ -287,6 +290,17 @@ Agent targets can be terminal IDs, unique agent names, detected or reported agen
 `agent explain` asks the running server to classify the same bottom-buffer detection snapshot used by screen detection, so live output reflects the server's active manifest cache. Because this uses the `agent.explain` socket method, restart or hand off to an updated server after upgrading Herdr before using live explain. Use `--file PATH --agent LABEL` to explain a saved fixture locally instead. The default output shows the agent, final state, manifest source and version, matched rule with its region evidence, and any fallback, skip, or warning reasons. Add `--verbose` for visible evidence flags, cached remote version, local override shadowing, remote update status, and the full evaluated-rules list with matcher and region evidence. Add `--json` for issue reports or tests.
 
 Use `pane send-text`, `pane send-keys`, `pane run`, and `terminal attach` for ordinary terminals, servers, tests, shells, or low-level terminal control. Use `pane run` when you want to submit a command with Enter.
+
+## Runtimes
+
+```bash
+shep runtime list [--json]
+shep runtime ask <runtime> <prompt|-> [--timeout SECS] [--cwd PATH]
+```
+
+`runtime list` asks the running server which runtimes it can name — every bundled detection manifest plus any `[runtimes.<name>]` table in `config.toml` — and, for each, whether it is `launchable` (a `[launch]` recipe exists and its program is on the server's `PATH`, with the resolved path) and whether it has a `headless` recipe.
+
+`runtime ask` runs the runtime's `[headless]` recipe once with the prompt on stdin (or as the last argument, when the recipe says `prompt = "arg"`), streams the runtime's stdout and stderr through, and exits with the runtime's exit code. `-` reads the prompt from stdin. `--timeout` (default 120 seconds) kills the runtime and exits 124 when it does not answer in time. Exit code 2 means the runtime is unknown (`runtime_unknown`) or has no headless recipe (`runtime_not_launchable`). It runs locally, so it needs no server.
 
 ## Direct terminal attach
 

@@ -71,6 +71,7 @@ const BRIDGE_ALLOWED_METHODS: &[&str] = &[
     "pane.send_keys",
     "pane.send_text",
     "pane.split",
+    "runtime.list",
     "session.overview",
     "session.snapshot",
     "tab.close",

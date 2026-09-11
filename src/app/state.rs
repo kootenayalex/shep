@@ -1947,6 +1947,8 @@ pub struct AppState {
     pub queue_prompt_target: Option<(usize, PaneId)>,
     /// Custom agent states a person can set by hand (`[states]`).
     pub states_config: crate::config::StatesConfig,
+    /// `[runtimes.<name>]` overrides for launching a runtime by name.
+    pub runtimes_config: crate::config::RuntimesConfig,
     /// Server-owned exec-bridge notification policy (`[notifications]`).
     /// Governs the exec-bridge only; toast/sound policy is unchanged.
     pub notifications: NotificationsConfig,
@@ -2336,6 +2338,7 @@ impl AppState {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             states_config: Default::default(),
+            runtimes_config: Default::default(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
             copy_feedback: None,

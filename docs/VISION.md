@@ -114,6 +114,14 @@ were free-form shell, so local-model dispatch was an env prefix on
 first-class model bar remains open — as does where its launch command should
 live now.
 
+**Resolved 2026-09-11 (Phase 2, deliverable A):** the launch command lives on
+the runtime's detection manifest as `[launch]` (bin, fallback bins, argv, env)
+with `[headless]` beside it for one-shot questions, overridable per machine
+by `[runtimes.<name>]` in `config.toml`. `agent.start { runtime }`,
+`shep agent start --runtime`, `runtime.list` and `shep runtime ask` are the
+surfaces; the model bar can now be a `[runtimes.<name>] argv` override rather
+than new core state.
+
 ### Landed since 2026-07-11
 
 - **Live pane streaming + bridge** — `pane.stream` over the JSON API, and

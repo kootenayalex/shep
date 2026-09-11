@@ -4,6 +4,25 @@
 
 ### Added
 
+- Runtimes declare how to launch. The bundled detection manifests for
+  `claude`, `opencode`, `codex`, `gemini` and `copilot` carry two new
+  optional sections: `[launch]` (`bin`, `fallback_bins`, `version_args`,
+  `argv`, `env` — what to run when a caller names the runtime) and
+  `[headless]` (`argv`, `prompt = "stdin"|"arg"`, `output` — how to ask the
+  CLI one question without a terminal). `agent.start` takes an optional
+  `runtime` name in place of `argv` and resolves it through `[launch]`,
+  trying `bin` then each fallback on the server's `PATH` and answering
+  `runtime_not_launchable` with every binary tried, or `runtime_unknown`;
+  `shep agent start <name> --runtime claude` is the CLI form and the
+  `-- argv` form is unchanged. A `[runtimes.<name>]` table in `config.toml`
+  (`argv`, `env`, `headless_argv`, `headless_prompt`) overrides either recipe
+  and is live-reloaded. `runtime.list` (also relayed by the bridge) and
+  `shep runtime list` report every nameable runtime with `launchable`,
+  `bin_resolved` and `headless`. `shep runtime ask <runtime> <prompt|->
+  [--timeout SECS]` runs the headless recipe with the prompt on stdin,
+  streams the answer, passes the exit code through and exits 124 on timeout.
+  The wire protocol is unchanged: the new `agent.start` field is optional.
+
 - `shep doctor [--json]` checks a shep install in one deterministic pass and
   prints the fix beside every finding: the server (ping, version, protocol —
   a mismatch warns `restart_needed`), whether a process actually holds the

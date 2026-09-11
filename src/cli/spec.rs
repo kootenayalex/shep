@@ -42,7 +42,8 @@ pub(super) fn command() -> Command {
         .subcommand(integration_command())
         .subcommand(plugin_command())
         .subcommand(docket_command())
-        .subcommand(doctor_command());
+        .subcommand(doctor_command())
+        .subcommand(runtime_command());
     disable_auto_help(command)
 }
 
@@ -305,6 +306,9 @@ fn agent_command() -> Command {
                 .arg(option("tab", "ID"))
                 .arg(split_option())
                 .arg(env_option())
+                .arg(option("runtime", "NAME").help(
+                    "Start a runtime by name via its manifest [launch] recipe instead of -- argv",
+                ))
                 .arg(flag("focus"))
                 .arg(flag("no-focus")),
         )
@@ -787,6 +791,25 @@ fn doctor_command() -> Command {
         .arg(json_flag())
 }
 
+fn runtime_command() -> Command {
+    Command::new("runtime")
+        .about("The runtime launch registry: what shep runs when you name a runtime")
+        .subcommand(
+            Command::new("list")
+                .visible_alias("ls")
+                .about("Runtimes shep can name, and whether the server can launch or ask them")
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("ask")
+                .about("Ask a runtime one question through its [headless] recipe; `-` reads the prompt from stdin")
+                .arg(required("name", "NAME"))
+                .arg(required("prompt", "PROMPT"))
+                .arg(option("timeout", "SECS"))
+                .arg(path_option("cwd", "PATH")),
+        )
+}
+
 fn docket_kind_option() -> Arg {
     option("kind", "KIND").value_parser(["captured", "slated", "recurring"])
 }
@@ -991,6 +1014,18 @@ mod tests {
             .get_arguments()
             .any(|arg| arg.get_long() == Some("entrypoint")));
         assert!(option_values(open, "placement").contains(&"zoomed".to_string()));
+    }
+
+    #[test]
+    fn spec_includes_runtime_verbs_and_agent_start_runtime_option() {
+        let cmd = super::command();
+        let runtime = command_path(&cmd, &["runtime"]);
+        command_path(runtime, &["list"]);
+        let ask = command_path(runtime, &["ask"]);
+        assert!(has_option(ask, "timeout"));
+        assert!(has_option(ask, "cwd"));
+        let agent_start = command_path(&cmd, &["agent", "start"]);
+        assert!(has_option(agent_start, "runtime"));
     }
 
     #[test]

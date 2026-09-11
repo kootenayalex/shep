@@ -313,6 +313,25 @@ pub struct Config {
     pub remote: RemoteConfig,
     pub notifications: NotificationsConfig,
     pub states: StatesConfig,
+    pub runtimes: RuntimesConfig,
+}
+
+/// `[runtimes.<name>]` — a per-runtime override of what the bundled manifest
+/// says about launching it. Only what is set overrides; an empty `argv` keeps
+/// the manifest's `[launch]`, an empty `headless_argv` keeps its `[headless]`.
+pub type RuntimesConfig = std::collections::BTreeMap<String, RuntimeOverrideConfig>;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RuntimeOverrideConfig {
+    /// Argv `agent.start { runtime }` runs instead of the manifest's.
+    pub argv: Vec<String>,
+    /// Environment added to that launch (a caller's `env` still wins).
+    pub env: std::collections::BTreeMap<String, String>,
+    /// Argv `shep runtime ask` runs instead of the manifest's `[headless]`.
+    pub headless_argv: Vec<String>,
+    /// How the prompt reaches `headless_argv`: `stdin` (default) or `arg`.
+    pub headless_prompt: Option<crate::detect::manifest::HeadlessPrompt>,
 }
 
 #[derive(Debug)]

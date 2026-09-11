@@ -15,8 +15,22 @@ DEFAULT_BUNDLED_DIR = PROJECT_ROOT / "src" / "detect" / "manifests"
 DEFAULT_WEBSITE_DIR = PROJECT_ROOT / "website" / "agent-detection"
 ENGINE_SOURCE = PROJECT_ROOT / "src" / "detect" / "manifest_update.rs"
 
-MANIFEST_KEYS = {"id", "version", "min_engine_version", "updated_at", "aliases", "rules", "extractors"}
+MANIFEST_KEYS = {
+    "id",
+    "version",
+    "min_engine_version",
+    "updated_at",
+    "aliases",
+    "rules",
+    "extractors",
+    "launch",
+    "headless",
+}
 EXTRACTOR_KEYS = {"id", "region", "regex", "capture"}
+LAUNCH_KEYS = {"bin", "fallback_bins", "version_args", "argv", "env"}
+HEADLESS_KEYS = {"argv", "prompt", "output"}
+HEADLESS_PROMPTS = {"stdin", "arg"}
+HEADLESS_OUTPUTS = {"text", "stream-json"}
 RULE_KEYS = {
     "id",
     "state",
@@ -139,8 +153,67 @@ def validate_manifest(path: Path, engine_version: int) -> dict:
         validate_rule(path, index, rule, complexity)
 
     validate_extractors(path, manifest.get("extractors", []))
+    if "launch" in manifest:
+        validate_launch(path, manifest["launch"])
+    if "headless" in manifest:
+        validate_headless(path, manifest["headless"])
 
     return manifest
+
+
+def string_list(path: Path, label: str, value: object) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise CheckError(f"{path}: {label} must be an array of strings")
+    return value
+
+
+def validate_launch(path: Path, launch: object) -> None:
+    """`[launch]` says how `agent.start` runs the runtime when given its name.
+
+    Mirrors `LaunchSpec` in src/detect/manifest.rs: a `bin` looked up on PATH,
+    optional `fallback_bins`, `version_args`, an `argv` (default `[bin]`) and
+    an `env` table of strings.
+    """
+    if not isinstance(launch, dict):
+        raise CheckError(f"{path}: launch must be a table")
+    unknown = sorted(set(launch) - LAUNCH_KEYS)
+    if unknown:
+        raise CheckError(f"{path}: launch has unknown field(s): {', '.join(unknown)}")
+    bin_name = launch.get("bin")
+    if not isinstance(bin_name, str) or not bin_name.strip():
+        raise CheckError(f"{path}: launch bin must be a non-empty string")
+    for key in ("fallback_bins", "version_args", "argv"):
+        string_list(path, f"launch {key}", launch.get(key, []))
+    argv = launch.get("argv", [])
+    if argv and not argv[0].strip():
+        raise CheckError(f"{path}: launch argv[0] must not be empty")
+    env = launch.get("env", {})
+    if not isinstance(env, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in env.items()
+    ):
+        raise CheckError(f"{path}: launch env must be a table of strings")
+
+
+def validate_headless(path: Path, headless: object) -> None:
+    """`[headless]` is the one-shot question command (`shep runtime ask`).
+
+    Mirrors `HeadlessSpec`: a non-empty `argv`, `prompt` = stdin|arg (default
+    stdin) and `output` = text|stream-json (default text).
+    """
+    if not isinstance(headless, dict):
+        raise CheckError(f"{path}: headless must be a table")
+    unknown = sorted(set(headless) - HEADLESS_KEYS)
+    if unknown:
+        raise CheckError(f"{path}: headless has unknown field(s): {', '.join(unknown)}")
+    argv = string_list(path, "headless argv", headless.get("argv"))
+    if not argv or not argv[0].strip():
+        raise CheckError(f"{path}: headless argv must name a program")
+    prompt = headless.get("prompt", "stdin")
+    if prompt not in HEADLESS_PROMPTS:
+        raise CheckError(f"{path}: headless prompt must be one of {sorted(HEADLESS_PROMPTS)}")
+    output = headless.get("output", "text")
+    if output not in HEADLESS_OUTPUTS:
+        raise CheckError(f"{path}: headless output must be one of {sorted(HEADLESS_OUTPUTS)}")
 
 
 def validate_extractors(path: Path, extractors: object) -> None:

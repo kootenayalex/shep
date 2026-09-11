@@ -537,6 +537,23 @@ When enabled, Herdr switches input sources after prefix mode is entered, keeps t
 
 You can also toggle it from Settings > Experiments > switch to ascii input source in prefix (macOS).
 
+## Runtimes
+
+The bundled detection manifests say how to start a runtime by name (`[launch]`) and how to ask it one question (`[headless]`); see [Agents](/docs/agents/#launch-and-headless-recipes). A `[runtimes.<name>]` table overrides either recipe for this machine — a model flag, a wrapper script, a local model behind a different CLI — and can also introduce a name no manifest knows:
+
+```toml
+[runtimes.claude]
+argv = ["claude", "--model", "sonnet"]
+env = { CLAUDE_CONFIG_DIR = "/home/me/.claude-work" }
+
+[runtimes.local-llm]
+argv = ["llm", "chat"]
+headless_argv = ["llm", "ask"]
+headless_prompt = "arg"            # default "stdin"
+```
+
+Only what is set overrides: an empty `argv` keeps the manifest's `[launch]`, an empty `headless_argv` keeps its `[headless]`. `argv[0]` must be on the server's `PATH` (or be an absolute path) for `agent.start` to accept the runtime. The section is live-reloaded with the rest of the config.
+
 ## Environment variables
 
 | Variable | Purpose |

@@ -1294,6 +1294,7 @@
         "AgentStartParams": {
           "properties": {
             "argv": {
+              "description": "What to run. Empty when `runtime` names the recipe instead.",
               "items": {
                 "type": "string"
               },
@@ -1322,6 +1323,13 @@
               "description": "Place the agent in a fresh workspace rooted at argv, instead of\nsplitting into an existing workspace/tab. Conflicts with workspace_id\nand tab_id.",
               "type": "boolean"
             },
+            "runtime": {
+              "description": "A runtime name (`claude`, `opencode`, …) resolved through the\nmanifest's `[launch]` recipe or `[runtimes.<name>]` in config.toml.\nMutually exclusive with a non-empty `argv`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "split": {
               "anyOf": [
                 {
@@ -1346,8 +1354,7 @@
             }
           },
           "required": [
-            "name",
-            "argv"
+            "name"
           ],
           "type": "object"
         },
@@ -4606,6 +4613,22 @@
           "properties": {
             "method": {
               "const": "session.overview",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/EmptyParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "runtime.list",
               "type": "string"
             },
             "params": {
@@ -8427,6 +8450,25 @@
             },
             {
               "properties": {
+                "runtimes": {
+                  "items": {
+                    "$ref": "#/schemas/success_response/$defs/RuntimeInfo"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "runtime_list",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "runtimes"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
                 "type": {
                   "const": "workspace_info",
                   "type": "string"
@@ -9504,6 +9546,35 @@
             "approved"
           ],
           "type": "string"
+        },
+        "RuntimeInfo": {
+          "description": "One row of `runtime.list`: a runtime shep can name and whether this\nserver could start it or ask it a question right now.",
+          "properties": {
+            "bin_resolved": {
+              "description": "Absolute path of the program that would run.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "headless": {
+              "description": "A `[headless]` recipe (or config override) exists.",
+              "type": "boolean"
+            },
+            "launchable": {
+              "description": "A `[launch]` recipe (or config override) exists and its program is on\nthe server's `PATH`.",
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "launchable",
+            "headless"
+          ],
+          "type": "object"
         },
         "ServerCapabilities": {
           "properties": {

@@ -59,6 +59,53 @@ capture = 2
             with self.assertRaises(check.CheckError):
                 check.load_manifest_dir(bundled, engine_version=1)
 
+    def test_accepts_launch_and_headless_sections(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundled = Path(tmp)
+            (bundled / "codex.toml").write_text(
+                manifest("codex", "2026.06.10.1")
+                + """
+[launch]
+bin = "codex"
+fallback_bins = ["codex-cli"]
+version_args = ["--version"]
+argv = ["codex"]
+env = { CODEX_QUIET = "1" }
+
+[headless]
+argv = ["codex", "exec"]
+prompt = "stdin"
+output = "text"
+"""
+            )
+            manifests = check.load_manifest_dir(bundled, engine_version=1)
+            self.assertEqual(manifests["codex"][1]["launch"]["bin"], "codex")
+            self.assertEqual(manifests["codex"][1]["headless"]["argv"], ["codex", "exec"])
+
+    def test_rejects_unknown_launch_field_and_bad_headless_prompt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundled = Path(tmp)
+            (bundled / "codex.toml").write_text(
+                manifest("codex", "2026.06.10.1")
+                + """
+[launch]
+bin = "codex"
+binary = "codex"
+"""
+            )
+            with self.assertRaises(check.CheckError):
+                check.load_manifest_dir(bundled, engine_version=1)
+            (bundled / "codex.toml").write_text(
+                manifest("codex", "2026.06.10.1")
+                + """
+[headless]
+argv = ["codex", "exec"]
+prompt = "file"
+"""
+            )
+            with self.assertRaises(check.CheckError):
+                check.load_manifest_dir(bundled, engine_version=1)
+
     def test_validates_bundled_and_matching_website_catalog(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

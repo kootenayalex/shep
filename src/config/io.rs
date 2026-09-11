@@ -10,6 +10,7 @@ const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
     "keys",
     "onboarding",
     "remote",
+    "runtimes",
     "notifications",
     "session",
     "states",
@@ -363,6 +364,14 @@ fn load_live_config_from_str(content: &str) -> Result<LoadedConfig, Vec<String>>
         |section: crate::config::StatesConfig| config.states = section,
     );
     config.states.validate(&mut diagnostics);
+    load_live_section(
+        table,
+        "runtimes",
+        "runtimes config",
+        &mut diagnostics,
+        &mut invalid_sections,
+        |section| config.runtimes = section,
+    );
 
     Ok(LoadedConfig {
         config,
@@ -700,6 +709,45 @@ delivery = "shep"
             loaded.config.ui.toast.delivery,
             super::super::ToastDelivery::Shep
         );
+    }
+
+    #[test]
+    fn load_live_config_reads_runtimes_overrides_without_warning() {
+        let loaded = load_live_config_from_str(
+            r#"
+[runtimes.claude]
+argv = ["claude", "--model", "sonnet"]
+env = { CLAUDE_CONFIG_DIR = "/tmp/cc" }
+
+[runtimes.local-llm]
+headless_argv = ["llm", "ask"]
+headless_prompt = "arg"
+"#,
+        )
+        .unwrap();
+
+        assert!(loaded.diagnostics.is_empty(), "{:?}", loaded.diagnostics);
+        let claude = &loaded.config.runtimes["claude"];
+        assert_eq!(claude.argv, vec!["claude", "--model", "sonnet"]);
+        assert_eq!(claude.env["CLAUDE_CONFIG_DIR"], "/tmp/cc");
+        assert!(claude.headless_argv.is_empty());
+        let local = &loaded.config.runtimes["local-llm"];
+        assert_eq!(local.headless_argv, vec!["llm", "ask"]);
+        assert_eq!(
+            local.headless_prompt,
+            Some(crate::detect::manifest::HeadlessPrompt::Arg)
+        );
+
+        // A typo in the table is a section diagnostic, not a silent reset.
+        let loaded = load_live_config_from_str(
+            r#"
+[runtimes.claude]
+args = ["claude"]
+"#,
+        )
+        .unwrap();
+        assert_eq!(loaded.invalid_sections, vec!["runtimes"]);
+        assert!(loaded.diagnostics[0].starts_with("invalid runtimes config"));
     }
 
     #[test]

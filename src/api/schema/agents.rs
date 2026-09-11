@@ -63,9 +63,31 @@ pub struct AgentStartParams {
     pub split: Option<SplitDirection>,
     #[serde(default)]
     pub focus: bool,
+    /// What to run. Empty when `runtime` names the recipe instead.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub argv: Vec<String>,
+    /// A runtime name (`claude`, `opencode`, …) resolved through the
+    /// manifest's `[launch]` recipe or `[runtimes.<name>]` in config.toml.
+    /// Mutually exclusive with a non-empty `argv`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub env: HashMap<String, String>,
+}
+
+/// One row of `runtime.list`: a runtime shep can name and whether this
+/// server could start it or ask it a question right now.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RuntimeInfo {
+    pub name: String,
+    /// A `[launch]` recipe (or config override) exists and its program is on
+    /// the server's `PATH`.
+    pub launchable: bool,
+    /// Absolute path of the program that would run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bin_resolved: Option<String>,
+    /// A `[headless]` recipe (or config override) exists.
+    pub headless: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

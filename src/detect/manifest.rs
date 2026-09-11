@@ -1,10 +1,11 @@
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     sync::{Mutex, OnceLock, RwLock},
 };
 
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::{
     agent_label, manifest_update::ManifestVersion, parse_agent_label, Agent, AgentDetection,
@@ -155,6 +156,73 @@ pub(crate) struct AgentManifest {
     /// compatible: manifests without `[[extractors]]` parse unchanged.
     #[serde(default)]
     extractors: Vec<ManifestExtractor>,
+    /// How to start this runtime interactively when a caller names it instead
+    /// of passing argv (`agent.start { runtime }`). Absent = not launchable by
+    /// name; detection still works.
+    #[serde(default)]
+    launch: Option<LaunchSpec>,
+    /// How to ask this runtime one question without a terminal
+    /// (`shep runtime ask`). Absent = no headless mode known.
+    #[serde(default)]
+    headless: Option<HeadlessSpec>,
+}
+
+/// `[launch]`: the interactive launch recipe for a runtime, mirroring the
+/// fields of Open Design's runtime registry (`bin`, `fallbackBins`,
+/// `versionArgs`) so the two stay describable in the same words.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LaunchSpec {
+    /// Executable looked up on `PATH` first.
+    pub bin: String,
+    /// Tried in order when `bin` is not on `PATH` (e.g. a community fork
+    /// installed under another name).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_bins: Vec<String>,
+    /// Arguments that make the binary print its version and exit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub version_args: Vec<String>,
+    /// Full argv to run. Defaults to `[bin]`. When `argv[0]` equals `bin`
+    /// and a fallback binary was the one found, `argv[0]` is swapped for it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub argv: Vec<String>,
+    /// Environment the runtime needs (a caller's `env` wins on conflict).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
+}
+
+/// `[headless]`: one-shot question to the CLI. The prompt goes on stdin by
+/// default so a long situation never hits an argv length limit.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HeadlessSpec {
+    /// Full argv; the prompt is appended as one more argument when
+    /// `prompt = "arg"`.
+    pub argv: Vec<String>,
+    #[serde(default)]
+    pub prompt: HeadlessPrompt,
+    #[serde(default)]
+    pub output: HeadlessOutput,
+}
+
+#[derive(
+    Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Default, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum HeadlessPrompt {
+    #[default]
+    Stdin,
+    Arg,
+}
+
+#[derive(
+    Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Default, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum HeadlessOutput {
+    #[default]
+    Text,
+    StreamJson,
 }
 
 /// A value-extractor rule: captures a numeric percentage (0–100) from a screen
@@ -826,6 +894,23 @@ fn read_remote_manifest(agent: Agent, bundled: &AgentManifest) -> Option<LoadedM
     }
 }
 
+/// The `[launch]` section in force for `agent`: the active manifest's when it
+/// has one, else the bundled manifest's. A local detection override that
+/// omits the section therefore never makes a runtime unlaunchable.
+pub fn launch_spec(agent: Agent) -> Option<LaunchSpec> {
+    load_manifest(agent)
+        .and_then(|loaded| loaded.manifest.launch)
+        .or_else(|| bundled_manifest(agent).and_then(|manifest| manifest.launch))
+}
+
+/// The `[headless]` section in force for `agent`, with the same fallback as
+/// [`launch_spec`].
+pub fn headless_spec(agent: Agent) -> Option<HeadlessSpec> {
+    load_manifest(agent)
+        .and_then(|loaded| loaded.manifest.headless)
+        .or_else(|| bundled_manifest(agent).and_then(|manifest| manifest.headless))
+}
+
 pub fn agent_state_label(state: AgentState) -> &'static str {
     match state {
         AgentState::Idle => "idle",
@@ -932,6 +1017,23 @@ pub(crate) fn parse_remote_manifest_for_agent(
 fn validate_manifest(manifest: &AgentManifest) -> Result<(), String> {
     if manifest.rules.is_empty() {
         return Err("manifest must contain at least one rule".to_string());
+    }
+    if let Some(launch) = &manifest.launch {
+        if launch.bin.trim().is_empty() {
+            return Err("[launch] bin must not be empty".to_string());
+        }
+        if launch.argv.first().is_some_and(|arg| arg.trim().is_empty()) {
+            return Err("[launch] argv[0] must not be empty".to_string());
+        }
+    }
+    if let Some(headless) = &manifest.headless {
+        if headless
+            .argv
+            .first()
+            .is_none_or(|arg| arg.trim().is_empty())
+        {
+            return Err("[headless] argv must name a program".to_string());
+        }
     }
     if manifest.rules.len() > MAX_RULES_PER_MANIFEST {
         return Err(format!(

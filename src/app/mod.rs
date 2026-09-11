@@ -593,6 +593,7 @@ impl App {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             states_config: config.states.clone(),
+            runtimes_config: config.runtimes.clone(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
             copy_feedback: None,
@@ -1444,6 +1445,10 @@ impl App {
 
         if !invalid_section("states") {
             self.state.states_config = config.states.clone();
+        }
+
+        if !invalid_section("runtimes") {
+            self.state.runtimes_config = config.runtimes.clone();
         }
 
         if !invalid_section("experimental") {
@@ -3979,6 +3984,7 @@ mod tests {
                 split: Some(crate::api::schema::SplitDirection::Right),
                 focus: true,
                 argv: vec![exiting_test_command().into()],
+                runtime: None,
                 env: Default::default(),
             }),
         });
@@ -4018,6 +4024,7 @@ mod tests {
                 split: None,
                 focus: false,
                 argv: vec![exiting_test_command().into()],
+                runtime: None,
                 env: Default::default(),
             }),
         });
@@ -4056,6 +4063,7 @@ mod tests {
                 split: None,
                 focus: false,
                 argv: vec![exiting_test_command().into()],
+                runtime: None,
                 env: Default::default(),
             }),
         });
