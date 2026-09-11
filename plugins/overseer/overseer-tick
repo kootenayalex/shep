@@ -1,0 +1,451 @@
+#!/usr/bin/env python3
+"""One overseer tick: sense the session, write the board, propose docket items.
+
+Runs as a shep plugin command (event hook or the `tick` action), so shep hands
+it SHEP_BIN_PATH, SHEP_SOCKET_PATH, SHEP_PLUGIN_STATE_DIR and, when
+`[plugins.overseer]` is set in config.toml, SHEP_PLUGIN_CONFIG_JSON.
+
+HARD RULES (mirrored from the overseer charter; the test suite greps this file
+for the verbs they forbid, so they are enforced by absence, not by discipline):
+
+  1. Never answer for an agent. Nothing here writes to a pane's input — no
+     text, no keys, no yes/no. A blocked agent is the person's to answer; the
+     board may only carry a drafted suggestion.
+  2. Never touch the server process. No stopping, no handing off, no
+     reloading, no signalling any pid. The only calls made are read-only
+     (`doctor`, `session.overview`, `docket list`) plus `docket add` and
+     `runtime ask`.
+  3. Never nudge. This script does not queue prompts either; nudging belongs
+     to a person or to the richer vault skill.
+  4. Capture proposes, the person disposes. Every docket item this script
+     creates is `--kind captured`, landing in the inbox with no due date and
+     no repeat, at most five per tick, deduplicated by `source`.
+
+Two modes:
+  deterministic (default): the board is built from the facts alone.
+  brain: with a runtime configured (SHEP_OVERSEER_RUNTIME, or `runtime` in
+     `[plugins.overseer]`), the facts are handed to `shep runtime ask <runtime>`
+     at most once per ten minutes; the answer replaces the board and its
+     proposals go to the docket. An event hook inside the window only
+     refreshes the situation files and leaves the brain's board standing.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+BRAIN_INTERVAL_SECONDS = 10 * 60
+BRAIN_TIMEOUT_SECONDS = 120
+MAX_BOARD_LINES = 40
+MAX_PROPOSALS_PER_TICK = 5
+SHEP_CALL_TIMEOUT_SECONDS = 30
+
+
+def env(name: str, default: str = "") -> str:
+    return os.environ.get(name, default)
+
+
+def state_dir() -> Path:
+    path = Path(env("SHEP_PLUGIN_STATE_DIR") or Path.cwd() / "state")
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def shep_bin() -> str:
+    return env("SHEP_BIN_PATH") or "shep"
+
+
+def plugin_config() -> dict:
+    raw = env("SHEP_PLUGIN_CONFIG_JSON")
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def brain_runtime() -> str | None:
+    runtime = env("SHEP_OVERSEER_RUNTIME") or plugin_config().get("runtime")
+    if isinstance(runtime, str) and runtime.strip():
+        return runtime.strip()
+    return None
+
+
+# --- SENSE -------------------------------------------------------------------
+
+
+def run_shep(args: list[str]) -> tuple[int, str]:
+    """Run a shep CLI verb; a non-zero exit still returns its stdout."""
+    try:
+        proc = subprocess.run(
+            [shep_bin(), *args],
+            capture_output=True,
+            text=True,
+            timeout=SHEP_CALL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 1, f"{exc}"
+    return proc.returncode, proc.stdout
+
+
+def api_call(method: str, params: dict | None = None) -> dict:
+    """One JSON request over the server socket: a line in, a line back."""
+    sock_path = env("SHEP_SOCKET_PATH")
+    if not sock_path:
+        return {"error": {"code": "no_socket", "message": "SHEP_SOCKET_PATH unset"}}
+    request = json.dumps({"id": "overseer", "method": method, "params": params or {}})
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(10)
+            sock.connect(sock_path)
+            sock.sendall((request + "\n").encode())
+            buf = b""
+            while b"\n" not in buf:
+                chunk = sock.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+    except OSError as exc:
+        return {"error": {"code": "socket_error", "message": str(exc)}}
+    line = buf.split(b"\n", 1)[0]
+    try:
+        return json.loads(line or b"{}")
+    except json.JSONDecodeError as exc:
+        return {"error": {"code": "bad_json", "message": str(exc)}}
+
+
+def sense() -> dict:
+    _, doctor_out = run_shep(["doctor", "--json"])
+    try:
+        health = json.loads(doctor_out) if doctor_out.strip() else []
+    except json.JSONDecodeError:
+        health = [{"level": "warn", "check": "doctor", "detail": "unparseable output"}]
+    if not isinstance(health, list):
+        health = []
+
+    overview_response = api_call("session.overview")
+    overview = overview_response.get("result", {}).get("overview", {}) or {}
+    overview_error = overview_response.get("error")
+
+    _, docket_out = run_shep(["docket", "list", "--json"])
+    try:
+        docket = json.loads(docket_out) if docket_out.strip() else {}
+    except json.JSONDecodeError:
+        docket = {}
+    items = docket.get("result", {}).get("items", []) if isinstance(docket, dict) else []
+
+    return {
+        "at": time.strftime("%Y-%m-%d %H:%M %Z"),
+        "event": env("SHEP_PLUGIN_EVENT") or None,
+        "health": health,
+        "overview": overview,
+        "overview_error": overview_error,
+        "docket": {
+            "today": docket.get("result", {}).get("today") if isinstance(docket, dict) else None,
+            "items": items if isinstance(items, list) else [],
+        },
+    }
+
+
+# --- RENDER ------------------------------------------------------------------
+
+
+def age(seconds) -> str:
+    if not isinstance(seconds, (int, float)):
+        return "?"
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    if seconds < 86400:
+        return f"{seconds // 3600}h{(seconds % 3600) // 60:02d}"
+    return f"{seconds // 86400}d"
+
+
+def agent_line(agent: dict) -> str:
+    name = agent.get("display_name") or agent.get("name") or agent.get("pane_id", "?")
+    status = agent.get("agent_status", "?")
+    manual = agent.get("manual_state") or {}
+    if isinstance(manual, dict) and manual.get("name"):
+        status = f"{manual['name']}·"
+    parts = [f"{name} · {status} {age(agent.get('state_age_seconds'))}"]
+    if agent.get("context_percent") is not None:
+        parts.append(f"ctx {agent['context_percent']}%")
+    if agent.get("queued_input"):
+        parts.append(f"queued {agent['queued_input']}")
+    activity = (agent.get("activity_line") or agent.get("summary") or "").strip()
+    if activity:
+        parts.append(activity[:60])
+    return " · ".join(parts)
+
+
+def situation_markdown(facts: dict) -> str:
+    """The compact human-readable situation the brain reads (and a person can)."""
+    overview = facts["overview"]
+    totals = overview.get("totals", {}) or {}
+    agents = overview.get("agents", []) or []
+    lines = [f"# situation {facts['at']}"]
+    if facts.get("event"):
+        lines.append(f"trigger: {facts['event']}")
+    if facts.get("overview_error"):
+        lines.append(f"session.overview failed: {facts['overview_error'].get('message', '?')}")
+    lines.append(
+        "totals: agents {agents} · blocked {blocked} · working {working} · idle {idle} · done {done} · attention {attention}".format(
+            **{k: totals.get(k, 0) for k in ("agents", "blocked", "working", "idle", "done", "attention")}
+        )
+    )
+    host = overview.get("host") or {}
+    if isinstance(host, dict) and host:
+        host_bits = [f"{k} {v}" for k, v in host.items() if v not in (None, "", [])]
+        if host_bits:
+            lines.append("host: " + " · ".join(str(bit) for bit in host_bits[:6]))
+    lines.append("")
+    lines.append("## agents")
+    if agents:
+        for agent in sorted(agents, key=lambda a: (a.get("agent_status") != "blocked", a.get("display_name", ""))):
+            lines.append("- " + agent_line(agent))
+    else:
+        lines.append("- none")
+    lines.append("")
+    lines.append("## docket")
+    items = facts["docket"]["items"]
+    dated = [i for i in items if i.get("status") == "open" and i.get("due")]
+    inbox = [i for i in items if i.get("status") == "inbox"]
+    for item in dated:
+        mark = "!" if item.get("overdue") else " "
+        lines.append(f"- {mark} #{item['id']} {item.get('kind', '')} due {item['due']} {item['title']}")
+    lines.append(f"- inbox ({len(inbox)}): " + ", ".join(f"#{i['id']} {i['title'][:40]}" for i in inbox[:8]))
+    lines.append("")
+    lines.append("## health")
+    notable = [h for h in facts["health"] if h.get("level") in ("warn", "fail")]
+    if notable:
+        for finding in notable:
+            fix = f" → {finding['fix']}" if finding.get("fix") else ""
+            lines.append(f"- {finding.get('level')} {finding.get('check')}: {finding.get('detail', '')}{fix}")
+    else:
+        lines.append("- ok" if facts["health"] else "- doctor unavailable")
+    return "\n".join(lines) + "\n"
+
+
+def deterministic_board(facts: dict) -> str:
+    """What a stranger with no brain configured gets: still a useful board."""
+    overview = facts["overview"]
+    totals = overview.get("totals", {}) or {}
+    agents = overview.get("agents", []) or []
+    fails = [h for h in facts["health"] if h.get("level") == "fail"]
+    warns = [h for h in facts["health"] if h.get("level") == "warn"]
+    items = facts["docket"]["items"]
+    overdue = [i for i in items if i.get("overdue")]
+    due = [i for i in items if i.get("status") == "open" and i.get("due") and not i.get("overdue")]
+    inbox = [i for i in items if i.get("status") == "inbox"]
+    blocked = [a for a in agents if a.get("agent_status") == "blocked"]
+
+    lines = [
+        f"OVERSEER · {facts['at']} · deterministic",
+        f"agents {totals.get('agents', len(agents))} · blocked {totals.get('blocked', len(blocked))} · working {totals.get('working', 0)} · idle {totals.get('idle', 0)} · health fail {len(fails)} warn {len(warns)} · docket overdue {len(overdue)} inbox {len(inbox)}",
+        "",
+    ]
+    if fails:
+        lines.append("HEALTH")
+        for finding in fails:
+            fix = f" → {finding['fix']}" if finding.get("fix") else ""
+            lines.append(f"  fail {finding.get('check')}: {finding.get('detail', '')}{fix}")
+        lines.append("")
+    if blocked:
+        lines.append("BLOCKED — yours to answer")
+        for agent in blocked:
+            lines.append("  " + agent_line(agent))
+        lines.append("")
+    lines.append("AGENTS")
+    others = [a for a in agents if a.get("agent_status") != "blocked"]
+    for agent in sorted(others, key=lambda a: a.get("display_name", ""))[:12]:
+        lines.append("  " + agent_line(agent))
+    if not agents:
+        lines.append("  none running" + (f" ({facts['overview_error'].get('code')})" if facts.get("overview_error") else ""))
+    lines.append("")
+    if overdue or due:
+        lines.append("DOCKET due")
+        for item in overdue + due:
+            mark = "!" if item.get("overdue") else " "
+            lines.append(f"  {mark} #{item['id']} {item['due']} {item['title'][:56]}")
+    if inbox:
+        lines.append(f"INBOX ({len(inbox)}) — promote, or discard")
+        for item in inbox[:6]:
+            lines.append(f"    #{item['id']} {item['title'][:60]}")
+    if warns:
+        lines.append("")
+        lines.append("WARN " + " · ".join(f"{w.get('check')}" for w in warns[:8]))
+    return "\n".join(lines[:MAX_BOARD_LINES]) + "\n"
+
+
+# --- BRAIN -------------------------------------------------------------------
+
+BRAIN_PROMPT = """You are the overseer of a shep session: a personal assistant that narrates, never acts.
+Hard rules you must respect in what you write:
+1. You never answer for an agent. A blocked agent is the person's to answer; you may draft a suggested answer with a reason.
+2. You never touch the server, restart anything, or kill anything.
+3. You never nudge or queue prompts.
+4. Capture proposes, the person disposes: proposals are inbox items only, no dates, no repeats, at most {max_proposals}, and only for genuinely owed things visible in the situation.
+
+Given the situation below, answer with EXACTLY two fenced blocks and nothing else:
+
+```board
+<a BOARD.md of at most {max_board} lines: a header with totals, one line per agent (name · status age · ctx · activity), blocked agents with the visible prompt and your suggested answer + reason, docket due/overdue then inbox with ids, health fails/warns>
+```
+
+```json
+[{{"title": "<= 80 chars", "source": {{"kind": "situation", "ref": "<pane id or check name>"}}, "notes": "one line of why"}}]
+```
+
+The json list may be empty. Do not propose an item whose source already appears in the docket.
+
+{situation}
+"""
+
+
+def ask_brain(runtime: str, situation: str) -> str | None:
+    prompt = BRAIN_PROMPT.format(
+        max_proposals=MAX_PROPOSALS_PER_TICK, max_board=MAX_BOARD_LINES, situation=situation
+    )
+    try:
+        proc = subprocess.run(
+            [shep_bin(), "runtime", "ask", runtime, "-", "--timeout", str(BRAIN_TIMEOUT_SECONDS)],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=BRAIN_TIMEOUT_SECONDS + 10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        sys.stderr.write(f"overseer: brain call failed: {exc}\n")
+        return None
+    if proc.returncode != 0:
+        sys.stderr.write(f"overseer: brain exited {proc.returncode}: {proc.stderr.strip()[:200]}\n")
+        return None
+    return proc.stdout
+
+
+FENCE_RE = re.compile(r"```(board|json)\s*\n(.*?)```", re.DOTALL)
+
+
+def parse_brain_answer(answer: str) -> tuple[str | None, list[dict]]:
+    """Pull the board and the proposal list out of the brain's reply.
+
+    Anything malformed degrades to "no board, no proposals" rather than to a
+    half-applied answer; the deterministic board then stands.
+    """
+    board = None
+    proposals: list[dict] = []
+    for kind, body in FENCE_RE.findall(answer or ""):
+        if kind == "board" and board is None:
+            board = "\n".join(body.rstrip("\n").splitlines()[:MAX_BOARD_LINES]) + "\n"
+        elif kind == "json":
+            try:
+                value = json.loads(body)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, list):
+                proposals = [
+                    p
+                    for p in value
+                    if isinstance(p, dict) and isinstance(p.get("title"), str) and p["title"].strip()
+                ]
+    return board, proposals[:MAX_PROPOSALS_PER_TICK]
+
+
+def canonical(value) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def new_proposals(proposals: list[dict], existing_items: list[dict]) -> list[dict]:
+    """Rule 4: dedupe by source against everything already in the docket."""
+    seen = {canonical(item.get("source")) for item in existing_items if item.get("source") is not None}
+    fresh = []
+    for proposal in proposals:
+        source = proposal.get("source")
+        key = canonical(source) if source is not None else None
+        if key is not None and key in seen:
+            continue
+        if key is not None:
+            seen.add(key)
+        fresh.append(proposal)
+    return fresh
+
+
+def capture(proposals: list[dict]) -> int:
+    added = 0
+    for proposal in proposals:
+        args = ["docket", "add", proposal["title"].strip()[:80], "--kind", "captured"]
+        if proposal.get("source") is not None:
+            args += ["--source", canonical(proposal["source"])]
+        if isinstance(proposal.get("notes"), str) and proposal["notes"].strip():
+            args += ["--notes", proposal["notes"].strip()[:400]]
+        code, _ = run_shep(args)
+        if code == 0:
+            added += 1
+    return added
+
+
+def brain_allowed(stamp: Path, now: float) -> bool:
+    try:
+        return now - stamp.stat().st_mtime >= BRAIN_INTERVAL_SECONDS
+    except OSError:
+        return True
+
+
+# --- MAIN --------------------------------------------------------------------
+
+
+def main(argv: list[str]) -> int:
+    from_event = "--event" in argv
+    out = state_dir()
+    facts = sense()
+    situation = situation_markdown(facts)
+    (out / "situation.json").write_text(json.dumps(facts, indent=1, sort_keys=True) + "\n")
+    (out / "situation.md").write_text(situation)
+
+    board = deterministic_board(facts)
+    note = "deterministic"
+    source = "deterministic"
+    runtime = brain_runtime()
+    stamp = out / "last-brain"
+    source_file = out / "BOARD.md.source"
+    if runtime and brain_allowed(stamp, time.time()):
+        answer = ask_brain(runtime, situation)
+        stamp.touch()
+        brain_board, proposals = parse_brain_answer(answer or "")
+        if brain_board:
+            board = brain_board
+            note = f"brain {runtime}"
+            source = "brain"
+        added = capture(new_proposals(proposals, facts["docket"]["items"]))
+        if added:
+            note += f" · {added} captured"
+    elif runtime and from_event and source_file.exists() and source_file.read_text().strip() == "brain":
+        # Inside the window an event only refreshes the situation; the
+        # brain's narrative stays on the board until its next turn.
+        board = None
+        note = "deterministic (brain within its 10 min window; board kept)"
+
+    if board is not None:
+        (out / "BOARD.md").write_text(board)
+        source_file.write_text(source + "\n")
+    with (out / "journal.log").open("a") as journal:
+        journal.write(f"{facts['at']} tick {facts.get('event') or 'manual'} {note}\n")
+    sys.stdout.write(board)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

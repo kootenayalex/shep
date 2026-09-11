@@ -241,6 +241,12 @@ under `HERDR_PLUGIN_CONFIG_DIR`, and put local runtime state under
 but it does not validate, sync, or delete their contents. The plugin owns the
 file format and lifecycle.
 
+`SHEP_PLUGIN_CONFIG_JSON` carries the plugin's own `[plugins.<id>]` table from
+`config.toml` as one JSON object (`{}` when unset), for commands and panes
+alike, so a plugin's settings can live in the one config file a person already
+edits and reload with it. shep never interprets the table; the plugin owns its
+keys. See [Configuration](/docs/configuration/#plugins).
+
 `HERDR_PLUGIN_CONTEXT_JSON` can include workspace, tab, focused pane, worktree,
 agent, selected text, clicked URL, and link handler fields when they are
 available for that invocation. Shell plugins can read the individual env vars
@@ -301,6 +307,38 @@ checked in manifest order inside each plugin.
 
 There is no Herdr-managed plugin storage API in v1. Plugins that need durable
 state should own their files or database.
+
+## Overseer
+
+shep ships one plugin in its checkout, `plugins/overseer/`: a personal
+assistant that narrates the session and proposes docket items, and never acts
+for you. Link it from a checkout and open its pane:
+
+```bash
+shep plugin link plugins/overseer
+shep plugin pane open --plugin overseer --entrypoint board
+```
+
+Its two event hooks (`pane.agent_status_changed`, `pane.exited`) run one tick:
+`shep doctor --json`, `session.overview`, `shep docket list --json` become
+`situation.md` in the plugin's state dir and a `BOARD.md` of at most 40 lines
+— blocked agents first, every agent with its state age, health fails and
+warns, docket due and inbox. With nothing configured that deterministic board
+is all it does. Name a brain and it thinks too:
+
+```toml
+[plugins.overseer]
+runtime = "claude"     # any runtime `shep runtime list` marks headless
+```
+
+At most once every ten minutes the tick hands the situation to
+`shep runtime ask <runtime>` and asks for a board and a JSON list of proposed
+inbox items; the board replaces the deterministic one and each proposal whose
+`source` is new becomes `shep docket add … --kind captured`, inbox only, at
+most five per tick. The plugin never sends keys or text to a pane, never
+touches the server process, never nudges, and never promotes or dates a docket
+item; `tests/plugin_overseer.rs` greps its script for the forbidden verbs. See
+`plugins/overseer/README.md`.
 
 ## Marketplace
 

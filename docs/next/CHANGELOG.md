@@ -4,6 +4,26 @@
 
 ### Added
 
+- An overseer plugin, bundled in the checkout at `plugins/overseer/` (link
+  it with `shep plugin link plugins/overseer`). Its `pane.agent_status_changed`
+  and `pane.exited` hooks run one tick: `shep doctor --json`,
+  `session.overview` and `shep docket list --json` become `situation.md` in
+  the plugin's state dir and a `BOARD.md` of at most 40 lines — blocked agents
+  first, every agent with its state age, health fails and warns, docket due
+  and inbox — which its `board` pane redraws every five seconds and its `tick`
+  action refreshes by hand. Name a brain with `[plugins.overseer] runtime =
+  "claude"` (or `SHEP_OVERSEER_RUNTIME`) and, at most once every ten minutes,
+  the tick hands the situation to `shep runtime ask <runtime>` for a board
+  and a list of proposed inbox items, adding each proposal whose `source` is
+  new with `shep docket add --kind captured`. It never sends keys or text to a
+  pane, never touches the server, never nudges, never promotes a docket item;
+  a test greps the script for the forbidden verbs.
+
+- `[plugins.<id>]` tables in `config.toml` reach the plugin: every plugin
+  command and pane receives its own table as `SHEP_PLUGIN_CONFIG_JSON`
+  (`{}` when unset), live-reloaded with the rest of the config. shep never
+  interprets the contents.
+
 - Runtimes declare how to launch. The bundled detection manifests for
   `claude`, `opencode`, `codex`, `gemini` and `copilot` carry two new
   optional sections: `[launch]` (`bin`, `fallback_bins`, `version_args`,

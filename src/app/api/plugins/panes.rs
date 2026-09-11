@@ -219,6 +219,10 @@ impl App {
             entrypoint.to_string(),
         ));
         env.push(("SHEP_PLUGIN_CONTEXT_JSON".to_string(), context_json));
+        env.push((
+            "SHEP_PLUGIN_CONFIG_JSON".to_string(),
+            super::env::plugin_config_json(&self.state.plugins_config, &plugin.plugin_id),
+        ));
         if let Ok(current_exe) = std::env::current_exe() {
             env.push((
                 "SHEP_BIN_PATH".to_string(),

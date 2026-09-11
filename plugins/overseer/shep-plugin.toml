@@ -1,0 +1,32 @@
+id = "overseer"
+name = "Overseer"
+version = "0.1.0"
+min_shep_version = "0.7.3"
+description = "Narrates the session on a one-screen board and proposes docket items; never acts for you"
+platforms = ["linux", "macos"]
+
+# One tick by hand: `shep plugin action invoke tick --plugin overseer`.
+[[actions]]
+id = "tick"
+title = "Overseer: refresh the board"
+description = "Sense the session, rewrite BOARD.md, and (with a brain configured) propose docket items"
+contexts = ["global"]
+command = ["./overseer-tick"]
+
+# Every agent state change and every pane exit refreshes the deterministic
+# board; the brain is consulted at most once per ten minutes.
+[[events]]
+on = "pane.agent_status_changed"
+command = ["./overseer-tick", "--event"]
+
+[[events]]
+on = "pane.exited"
+command = ["./overseer-tick", "--event"]
+
+# The board, as a pane: tails BOARD.md from the plugin's state dir.
+[[panes]]
+id = "board"
+title = "Overseer"
+description = "The overseer's board, refreshed every few seconds"
+placement = "tab"
+command = ["sh", "./overseer-board"]

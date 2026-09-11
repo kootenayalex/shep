@@ -9,6 +9,7 @@ const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
     "experimental",
     "keys",
     "onboarding",
+    "plugins",
     "remote",
     "runtimes",
     "notifications",
@@ -371,6 +372,14 @@ fn load_live_config_from_str(content: &str) -> Result<LoadedConfig, Vec<String>>
         &mut diagnostics,
         &mut invalid_sections,
         |section| config.runtimes = section,
+    );
+    load_live_section(
+        table,
+        "plugins",
+        "plugins config",
+        &mut diagnostics,
+        &mut invalid_sections,
+        |section| config.plugins = section,
     );
 
     Ok(LoadedConfig {
@@ -748,6 +757,31 @@ args = ["claude"]
         .unwrap();
         assert_eq!(loaded.invalid_sections, vec!["runtimes"]);
         assert!(loaded.diagnostics[0].starts_with("invalid runtimes config"));
+    }
+
+    #[test]
+    fn load_live_config_keeps_per_plugin_tables_opaque() {
+        let loaded = load_live_config_from_str(
+            r#"
+[plugins.overseer]
+runtime = "claude"
+quiet_hours = [22, 7]
+
+[plugins."example.layout"]
+preset = "wide"
+"#,
+        )
+        .unwrap();
+
+        assert!(loaded.diagnostics.is_empty(), "{:?}", loaded.diagnostics);
+        assert_eq!(
+            loaded.config.plugins["overseer"]["runtime"].as_str(),
+            Some("claude")
+        );
+        assert_eq!(
+            loaded.config.plugins["example.layout"]["preset"].as_str(),
+            Some("wide")
+        );
     }
 
     #[test]

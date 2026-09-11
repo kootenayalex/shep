@@ -594,6 +594,7 @@ impl App {
             pending_agent_notifications: std::collections::HashMap::new(),
             states_config: config.states.clone(),
             runtimes_config: config.runtimes.clone(),
+            plugins_config: config.plugins.clone(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
             copy_feedback: None,
@@ -1449,6 +1450,10 @@ impl App {
 
         if !invalid_section("runtimes") {
             self.state.runtimes_config = config.runtimes.clone();
+        }
+
+        if !invalid_section("plugins") {
+            self.state.plugins_config = config.plugins.clone();
         }
 
         if !invalid_section("experimental") {

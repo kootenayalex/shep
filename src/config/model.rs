@@ -314,7 +314,14 @@ pub struct Config {
     pub notifications: NotificationsConfig,
     pub states: StatesConfig,
     pub runtimes: RuntimesConfig,
+    pub plugins: PluginsConfig,
 }
+
+/// `[plugins.<id>]` — free-form per-plugin settings. shep does not interpret
+/// them; each plugin command and pane receives its own table as
+/// `SHEP_PLUGIN_CONFIG_JSON`, so a plugin's knobs can live in the one config
+/// file a person already edits and hot-reload with it.
+pub type PluginsConfig = std::collections::BTreeMap<String, toml::Table>;
 
 /// `[runtimes.<name>]` — a per-runtime override of what the bundled manifest
 /// says about launching it. Only what is set overrides; an empty `argv` keeps

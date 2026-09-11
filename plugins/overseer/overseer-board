@@ -1,0 +1,16 @@
+#!/bin/sh
+# The overseer's board as a pane: redraw BOARD.md from the plugin state dir
+# every few seconds. Read-only by construction — this pane never calls shep.
+board="${SHEP_PLUGIN_STATE_DIR:-.}/BOARD.md"
+while :; do
+  printf '\033[H\033[2J'
+  if [ -r "$board" ]; then
+    cat "$board"
+  else
+    echo "overseer: no board yet."
+    echo
+    echo "It appears after the first agent state change, or right now with:"
+    echo "  shep plugin action invoke tick --plugin overseer"
+  fi
+  sleep 5
+done

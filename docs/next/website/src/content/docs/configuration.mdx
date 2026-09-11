@@ -554,6 +554,21 @@ headless_prompt = "arg"            # default "stdin"
 
 Only what is set overrides: an empty `argv` keeps the manifest's `[launch]`, an empty `headless_argv` keeps its `[headless]`. `argv[0]` must be on the server's `PATH` (or be an absolute path) for `agent.start` to accept the runtime. The section is live-reloaded with the rest of the config.
 
+## Plugins
+
+A `[plugins.<id>]` table holds settings for one installed plugin. shep does not
+read them; it hands the table to that plugin's commands and panes as
+`SHEP_PLUGIN_CONFIG_JSON`, so a plugin's knobs sit beside everything else you
+configure and reload with it:
+
+```toml
+[plugins.overseer]
+runtime = "claude"
+
+[plugins."example.layout"]
+preset = "wide"
+```
+
 ## Environment variables
 
 | Variable | Purpose |

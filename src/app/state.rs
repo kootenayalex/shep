@@ -1949,6 +1949,8 @@ pub struct AppState {
     pub states_config: crate::config::StatesConfig,
     /// `[runtimes.<name>]` overrides for launching a runtime by name.
     pub runtimes_config: crate::config::RuntimesConfig,
+    /// `[plugins.<id>]` tables, handed to each plugin command as JSON.
+    pub plugins_config: crate::config::PluginsConfig,
     /// Server-owned exec-bridge notification policy (`[notifications]`).
     /// Governs the exec-bridge only; toast/sound policy is unchanged.
     pub notifications: NotificationsConfig,
@@ -2339,6 +2341,7 @@ impl AppState {
             pending_agent_notifications: std::collections::HashMap::new(),
             states_config: Default::default(),
             runtimes_config: Default::default(),
+            plugins_config: Default::default(),
             queued_pane_input: std::collections::HashMap::new(),
             queue_prompt_target: None,
             copy_feedback: None,
