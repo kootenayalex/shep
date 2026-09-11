@@ -59,6 +59,7 @@ pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rec
         Mode::RenameWorkspace => "rename group",
         Mode::RequestChanges => "request changes",
         Mode::QueuePrompt => "queue prompt (delivered when agent is idle)",
+        Mode::NewDocketItem => "new docket item (lands in the inbox)",
         Mode::RenameTab if app.creating_new_tab => "new tab",
         Mode::RenameTab => "rename tab",
         // A tab holding one pane is an agent, and that is what the person is

@@ -91,7 +91,8 @@ impl App {
                 | Mode::RenameTab
                 | Mode::RenamePane
                 | Mode::RequestChanges
-                | Mode::QueuePrompt => self.handle_rename_key_via_api(key_event),
+                | Mode::QueuePrompt
+                | Mode::NewDocketItem => self.handle_rename_key_via_api(key_event),
                 Mode::NewLinkedWorktree => self.handle_worktree_create_key(key_event),
                 Mode::OpenExistingWorktree => self.handle_worktree_open_key(key_event),
                 Mode::ConfirmRemoveWorktree => self.handle_worktree_remove_key(key_event),
@@ -141,7 +142,8 @@ impl App {
             | Mode::RenameTab
             | Mode::RenamePane
             | Mode::RequestChanges
-            | Mode::QueuePrompt => {
+            | Mode::QueuePrompt
+            | Mode::NewDocketItem => {
                 insert_rename_input_text(&mut self.state, text);
                 true
             }
@@ -522,6 +524,7 @@ pub(crate) fn modal_paste_target_active(state: &AppState) -> bool {
         | Mode::RenameTab
         | Mode::RenamePane
         | Mode::RequestChanges
+        | Mode::NewDocketItem
         | Mode::NewLinkedWorktree => true,
         Mode::OpenExistingWorktree => state
             .worktree_open

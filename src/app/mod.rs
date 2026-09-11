@@ -222,6 +222,13 @@ fn load_plugin_registry(no_session: bool) -> crate::app::state::InstalledPluginR
         .collect()
 }
 
+fn board_view_from_config(view: crate::config::BoardViewConfig) -> state::BoardView {
+    match view {
+        crate::config::BoardViewConfig::Docket => state::BoardView::Docket,
+        crate::config::BoardViewConfig::Agents => state::BoardView::Columns,
+    }
+}
+
 fn agent_panel_sort_from_config(
     sort: crate::config::AgentPanelSortConfig,
 ) -> state::AgentPanelSort {
@@ -619,6 +626,7 @@ impl App {
             titlebar: config.ui.titlebar,
             hint_bar: config.ui.hint_bar,
             escape_returns_to_board: config.ui.escape_returns_to_board,
+            board_default_view: board_view_from_config(config.ui.board_view),
             escape_host_is_legacy: false,
             pane_history_persistence: config.experimental.pane_history,
             reveal_hidden_cursor_for_cjk_ime: config.experimental.reveal_hidden_cursor_for_cjk_ime,
@@ -663,6 +671,8 @@ impl App {
             global_menu: state::MenuListState::new(0),
             host_terminal_theme: crate::terminal_theme::TerminalTheme::default(),
             dashboard_sample: crate::app::state::DashboardSample::default(),
+            docket_sample: crate::app::state::DocketSample::default(),
+            docket_db: crate::docket::docket_db_path(),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         };
@@ -1416,6 +1426,7 @@ impl App {
                 self.state.titlebar = config.ui.titlebar;
                 self.state.hint_bar = config.ui.hint_bar;
                 self.state.escape_returns_to_board = config.ui.escape_returns_to_board;
+                self.state.board_default_view = board_view_from_config(config.ui.board_view);
                 self.state.agent_panel_sort =
                     agent_panel_sort_from_config(config.ui.agent_panel_sort);
                 self.state.accent = crate::config::parse_color(&config.ui.accent);
@@ -1687,7 +1698,8 @@ impl App {
             | Mode::RenameTab
             | Mode::RenamePane
             | Mode::RequestChanges
-            | Mode::QueuePrompt => {
+            | Mode::QueuePrompt
+            | Mode::NewDocketItem => {
                 self.handle_rename_key_via_api(key_event);
             }
             Mode::NewLinkedWorktree => {

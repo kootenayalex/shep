@@ -486,7 +486,8 @@ pub fn render_with_runtime_registry(
         | Mode::RenameTab
         | Mode::RenamePane
         | Mode::RequestChanges
-        | Mode::QueuePrompt => render_rename_overlay(app, frame, frame.area()),
+        | Mode::QueuePrompt
+        | Mode::NewDocketItem => render_rename_overlay(app, frame, frame.area()),
         Mode::NewLinkedWorktree => render_new_linked_worktree_overlay(app, frame, frame.area()),
         Mode::OpenExistingWorktree => {
             render_open_existing_worktree_overlay(app, frame, frame.area())

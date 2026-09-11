@@ -1,8 +1,10 @@
-//! Session board overlay (M1b): a full-screen kanban-style overview answering
-//! "what are all my agents doing right now". Columns are agent state, blocked
-//! leftmost (Blocked | Done | Working | Idle); one card per agent pane. On
-//! narrow terminals it collapses to a single stacked list grouped by state,
-//! blocked group first.
+//! Session board overlay: two full-screen lane boards one key apart.
+//!
+//! The docket board answers "what is owed" — inbox, due, slated, recurring,
+//! done — one card per docket item, drawn from the rows sampled into
+//! `AppState::docket_sample`. The agent board answers "what are all my agents
+//! doing right now": one lane per group, one card per agent pane. On narrow
+//! terminals either collapses to a single stacked list, lane by lane.
 //!
 //! Everything here is pure TUI presentation: the model, geometry, selection
 //! traversal, and enter-focus resolution are computed from `&AppState` so they
@@ -20,18 +22,19 @@ use ratatui::{
 
 use super::glyphs;
 use super::sidebar::{agent_panel_entries, format_event_age};
-use super::status::{agent_icon_for, state_label};
+use super::status::{agent_icon_for, docket_appearance, state_label, DocketUrgency};
 use super::text::{display_width, truncate_end, truncate_start};
 use super::widgets::render_panel_shell;
-use crate::app::state::{AppState, BoardView, Palette};
+use crate::api::schema::{DocketKind, DocketRepeat, DocketStatus};
+use crate::app::state::{AppState, BoardView, DocketSample, Palette};
 use crate::detect::AgentState;
+use crate::docket::dates::Date;
 use crate::layout::PaneId;
 
-/// Visible rows per card: agent line, branch/age line, status line, the
+/// Visible rows per agent card: agent line, branch/age line, status line, the
 /// session's own summary, then where it is working plus the context gauge.
+/// Cards are laid out with a one-row gap between them.
 const CARD_ROWS: u16 = 5;
-/// Card slot height including a one-row gap between cards.
-const CARD_STRIDE: u16 = CARD_ROWS + 1;
 
 /// The card's left gutter: selection marker, state glyph, and the space after
 /// it. Every line below the first indents to here, so the glyph hangs in the
@@ -518,28 +521,56 @@ pub(crate) fn next_selection(
     narrow: bool,
 ) -> Option<PaneId> {
     let model = board_model(app);
-    if model.is_empty() {
+    let lanes: Vec<Vec<PaneId>> = model
+        .lanes
+        .iter()
+        .map(|lane| lane.cards.iter().map(|card| card.pane_id).collect())
+        .collect();
+    step_selection(&lanes, current, dir, narrow)
+}
+
+/// The traversal both boards share, over lanes of card keys.
+///
+/// Wide grid: up/down move within a lane with wraparound; left/right jump to
+/// the nearest non-empty lane in that direction (no horizontal wraparound),
+/// clamping the row. Narrow stacked list: up/down traverse the flattened
+/// order with wraparound; left/right are no-ops. When nothing valid is
+/// selected, the first card is chosen; when there are no cards, `None`.
+fn step_selection<K: Copy + PartialEq>(
+    lanes: &[Vec<K>],
+    current: Option<K>,
+    dir: BoardDir,
+    narrow: bool,
+) -> Option<K> {
+    let flat: Vec<K> = lanes.iter().flatten().copied().collect();
+    if flat.is_empty() {
         return None;
     }
-    let flat = model.flattened();
-    let Some(current) = current.filter(|pane| model.locate(*pane).is_some()) else {
-        return flat.first().map(|card| card.pane_id);
+    let locate = |key: K| -> Option<(usize, usize)> {
+        lanes.iter().enumerate().find_map(|(lane, keys)| {
+            keys.iter()
+                .position(|candidate| *candidate == key)
+                .map(|row| (lane, row))
+        })
+    };
+    let Some(current) = current.filter(|key| locate(*key).is_some()) else {
+        return flat.first().copied();
     };
 
     if narrow {
-        let idx = flat.iter().position(|card| card.pane_id == current)?;
+        let idx = flat.iter().position(|key| *key == current)?;
         let next = match dir {
             BoardDir::Up => (idx + flat.len() - 1) % flat.len(),
             BoardDir::Down => (idx + 1) % flat.len(),
             BoardDir::Left | BoardDir::Right => return Some(current),
         };
-        return flat.get(next).map(|card| card.pane_id);
+        return flat.get(next).copied();
     }
 
-    let (lane, row) = model.locate(current)?;
+    let (lane, row) = locate(current)?;
     match dir {
         BoardDir::Up | BoardDir::Down => {
-            let len = model.cards(lane).len();
+            let len = lanes[lane].len();
             if len == 0 {
                 return Some(current);
             }
@@ -547,28 +578,21 @@ pub(crate) fn next_selection(
                 BoardDir::Up => (row + len - 1) % len,
                 _ => (row + 1) % len,
             };
-            model.cards(lane).get(next_row).map(|card| card.pane_id)
+            lanes[lane].get(next_row).copied()
         }
         BoardDir::Left | BoardDir::Right => {
-            let Some(target) = nearest_occupied_lane(&model, lane, dir) else {
+            // Empty lanes are drawn but not stopped at: there is nothing
+            // there to select.
+            let target = match dir {
+                BoardDir::Left => (0..lane).rev().find(|idx| !lanes[*idx].is_empty()),
+                _ => ((lane + 1)..lanes.len()).find(|idx| !lanes[*idx].is_empty()),
+            };
+            let Some(target) = target else {
                 return Some(current);
             };
-            let len = model.cards(target).len();
-            let clamped = row.min(len.saturating_sub(1));
-            model.cards(target).get(clamped).map(|card| card.pane_id)
+            let clamped = row.min(lanes[target].len().saturating_sub(1));
+            lanes[target].get(clamped).copied()
         }
-    }
-}
-
-/// The nearest lane in `dir` that has a card to land on. Empty lanes are drawn
-/// but not stopped at: there is nothing there to select.
-fn nearest_occupied_lane(model: &BoardModel, lane: usize, dir: BoardDir) -> Option<usize> {
-    match dir {
-        BoardDir::Left => (0..lane).rev().find(|idx| !model.cards(*idx).is_empty()),
-        BoardDir::Right => {
-            ((lane + 1)..model.lanes.len()).find(|idx| !model.cards(*idx).is_empty())
-        }
-        BoardDir::Up | BoardDir::Down => None,
     }
 }
 
@@ -709,52 +733,80 @@ struct CardSlot {
     row: usize,
 }
 
+/// Every agent card is [`CARD_ROWS`] tall.
+fn agent_card_heights(model: &BoardModel) -> Vec<Vec<u16>> {
+    model
+        .lanes
+        .iter()
+        .map(|lane| vec![CARD_ROWS; lane.cards.len()])
+        .collect()
+}
+
 fn wide_slots(model: &BoardModel, body: Rect) -> Vec<CardSlot> {
-    let rects = lane_rects(body, model.lanes.len());
+    wide_slots_for(&agent_card_heights(model), body)
+}
+
+fn narrow_slots(model: &BoardModel, body: Rect) -> (Vec<CardSlot>, Vec<(u16, usize)>) {
+    narrow_slots_for(&agent_card_heights(model), body)
+}
+
+/// Card slots for the wide layout, from each lane's card heights. A card that
+/// does not fit whole below the last one is not drawn at all: half a card
+/// reads as a clipped card, not as "more below".
+fn wide_slots_for(heights: &[Vec<u16>], body: Rect) -> Vec<CardSlot> {
+    let rects = lane_rects(body, heights.len());
     let mut slots = Vec::new();
     for (lane, lane_rect) in rects.iter().enumerate() {
         // One header row + one gap row before the first card.
-        let body_y = lane_rect.y.saturating_add(2);
-        let avail = lane_rect.height.saturating_sub(2);
-        let max_cards = (avail / CARD_STRIDE) as usize;
-        for row in 0..model.cards(lane).len().min(max_cards) {
-            let y = body_y + (row as u16) * CARD_STRIDE;
+        let mut y = lane_rect.y.saturating_add(2);
+        let bottom = lane_rect.y.saturating_add(lane_rect.height);
+        for (row, height) in heights[lane].iter().copied().enumerate() {
+            if y.saturating_add(height) > bottom {
+                break;
+            }
             slots.push(CardSlot {
-                rect: Rect::new(lane_rect.x, y, lane_rect.width, CARD_ROWS),
+                rect: Rect::new(lane_rect.x, y, lane_rect.width, height),
                 lane,
                 row,
             });
+            // One gap row between cards.
+            y = y.saturating_add(height).saturating_add(1);
         }
     }
     slots
 }
 
 /// Card slots plus `(y, lane)` header positions for the stacked layout. An
-/// empty group draws no section header here: stacked, a heading with nothing
+/// empty lane draws no section header here: stacked, a heading with nothing
 /// under it is just a lost row.
-fn narrow_slots(model: &BoardModel, body: Rect) -> (Vec<CardSlot>, Vec<(u16, usize)>) {
+fn narrow_slots_for(heights: &[Vec<u16>], body: Rect) -> (Vec<CardSlot>, Vec<(u16, usize)>) {
     let mut slots = Vec::new();
     let mut headers = Vec::new();
     let bottom = body.y + body.height;
     let mut y = body.y;
-    for lane in 0..model.lanes.len() {
-        if model.cards(lane).is_empty() || y >= bottom {
+    for (lane, lane_heights) in heights.iter().enumerate() {
+        // A heading whose first card would not fit under it is a heading
+        // over nothing, and `due 2 !1` over an empty row reads as a bug.
+        let first = lane_heights.first().copied().unwrap_or(0);
+        if lane_heights.is_empty() || y.saturating_add(1).saturating_add(first) > bottom {
             continue;
         }
         headers.push((y, lane));
         y = y.saturating_add(1);
-        for row in 0..model.cards(lane).len() {
-            if y.saturating_add(CARD_ROWS) > bottom {
+        for (row, height) in lane_heights.iter().copied().enumerate() {
+            if y.saturating_add(height) > bottom {
                 break;
             }
             slots.push(CardSlot {
-                rect: Rect::new(body.x, y, body.width, CARD_ROWS),
+                rect: Rect::new(body.x, y, body.width, height),
                 lane,
                 row,
             });
-            y = y.saturating_add(CARD_STRIDE);
+            y = y.saturating_add(height).saturating_add(1);
         }
-        y = y.saturating_add(1);
+        // The gap after a lane's last card is the gap before the next
+        // heading. A second blank row spent here was the row that kept the
+        // due lane's second card off an 80×24 screen.
     }
     (slots, headers)
 }
@@ -896,7 +948,13 @@ fn fit_strip<'a>(facts: Vec<Vec<Span<'a>>>, sep: &Span<'a>, width: usize) -> Vec
     out
 }
 
-fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &BoardSummary) {
+fn render_dashboard(
+    app: &AppState,
+    frame: &mut Frame,
+    area: Rect,
+    summary: &BoardSummary,
+    docket: &DocketBoardModel,
+) {
     let p = &app.palette;
     let dim = Style::default().fg(p.overlay0);
     let value = Style::default().fg(p.text);
@@ -936,6 +994,32 @@ fn render_dashboard(app: &AppState, frame: &mut Frame, area: Rect, summary: &Boa
             format!("{}{} queued", glyphs::QUEUED, summary.queued_input),
             Style::default().fg(p.teal),
         )]);
+    }
+    // The docket, once it has been read: what is due is a call to action of
+    // its own, so it warms up when the number is not zero. On the docket
+    // board it is the fact worth keeping when the strip runs out of room, so
+    // it rides right behind the head count there; on the agent lanes it
+    // follows the agent states.
+    if app.docket_sample.sampled {
+        let due = docket.due_count();
+        let due_style = if due > 0 {
+            Style::default().fg(p.peach)
+        } else {
+            value
+        };
+        let fact = vec![
+            Span::styled("docket ", dim),
+            Span::styled(due.to_string(), due_style),
+            Span::styled(" due ", dim),
+            Span::styled(glyphs::SEP, Style::default().fg(p.surface1)),
+            Span::styled(format!(" {}", docket.inbox_count()), value),
+            Span::styled(" inbox", dim),
+        ];
+        if app.board.view == BoardView::Docket {
+            facts.insert(1, fact);
+        } else {
+            facts.push(fact);
+        }
     }
     // Session shape last: it describes the furniture, not the work.
     facts.push(vec![Span::styled(
@@ -1027,15 +1111,21 @@ pub(super) fn render_board_overlay(
     let footer_y = inner.y + inner.height.saturating_sub(1);
     render_footer(app, frame, Rect::new(inner.x, footer_y, inner.width, 1));
 
-    // The detail screen replaces the dashboard and columns entirely; it keeps
+    // A detail screen replaces the dashboard and lanes entirely; it keeps
     // only the panel shell, title, and footer so the board stays recognisable.
+    let docket = docket_board_model(&app.docket_sample);
     match app.board.view {
         BoardView::Agent => {
             let body = detail_body(inner);
             render_agent_detail(app, terminal_runtimes, frame, &model, body);
             return;
         }
-        BoardView::Columns => {}
+        BoardView::DocketItem => {
+            let body = detail_body(inner);
+            render_docket_detail(app, frame, &docket, body);
+            return;
+        }
+        BoardView::Columns | BoardView::Docket => {}
     }
 
     let body = board_body(inner);
@@ -1048,10 +1138,15 @@ pub(super) fn render_board_overlay(
             frame,
             Rect::new(inner.x, inner.y + 1, inner.width, rows),
             &summary,
+            &docket,
         );
     }
 
     if body.height == 0 || body.width == 0 {
+        return;
+    }
+    if app.board.view == BoardView::Docket {
+        render_docket_lanes(app, frame, &docket, body);
         return;
     }
     if model.is_empty() {
@@ -1075,6 +1170,15 @@ fn render_title(app: &AppState, frame: &mut Frame, area: Rect) {
     let dim = Style::default().fg(p.overlay0);
     // On a detail screen the title doubles as the breadcrumb back to the board.
     let line = match app.board.view {
+        BoardView::Docket => Line::from(vec![
+            Span::styled(" docket ", title),
+            Span::styled(format!("{} what needs doing", glyphs::SEP), dim),
+        ]),
+        BoardView::DocketItem => Line::from(vec![
+            Span::styled(" docket ", dim),
+            Span::styled("/ ", dim),
+            Span::styled("item", title),
+        ]),
         BoardView::Columns => Line::from(vec![
             Span::styled(" session board ", title),
             Span::styled(format!("{} what are my agents doing", glyphs::SEP), dim),
@@ -1096,11 +1200,32 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
     // screen says what esc does — from a detail screen that is "back", not
     // "close", so the board is always one step away.
     let hints: &[(&str, &str)] = match app.board.view {
+        // The docket's verbs are its keys; the arrows are left unsaid here
+        // because at 80 columns the row has room for the verbs or the
+        // arrows, and the verbs are the ones a person cannot guess.
+        BoardView::Docket => &[
+            ("i", " inspect  "),
+            ("n", " new  "),
+            ("p", " slate  "),
+            ("r", " recur  "),
+            ("d", " done  "),
+            ("x", " discard  "),
+            ("a", " agents  "),
+            ("esc", " close"),
+        ],
+        BoardView::DocketItem => &[
+            ("p", " slate  "),
+            ("r", " recur  "),
+            ("d", " done  "),
+            ("x", " discard  "),
+            ("esc", " back to docket"),
+        ],
         BoardView::Columns => &[
             ("enter", " focus  "),
             ("i", " inspect  "),
             (glyphs::KEYS_ARROWS, " move  "),
             ("<>", " move group  "),
+            ("a", " docket  "),
             ("esc/q", " close"),
         ],
         BoardView::Agent => &[("enter", " attach  "), ("esc/q", " back to board")],
@@ -1109,6 +1234,18 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
     for (k, label) in hints {
         spans.push(Span::styled(*k, key));
         spans.push(Span::styled(*label, dim));
+    }
+    // A refused docket verb says why, in the store's words, where the eye
+    // already is. It rides the footer's right edge and is gone on the next key.
+    if let Some(notice) = app.board.docket_notice.as_deref() {
+        let used: usize = spans.iter().map(|s| display_width(&s.content)).sum();
+        let room = (area.width as usize).saturating_sub(used + 2);
+        let text = truncate_end(&format!("! {notice}"), room);
+        let pad = (area.width as usize)
+            .saturating_sub(used)
+            .saturating_sub(display_width(&text) + 1);
+        spans.push(Span::raw(" ".repeat(pad)));
+        spans.push(Span::styled(text, Style::default().fg(p.peach)));
     }
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
@@ -1668,6 +1805,744 @@ fn render_agent_screen(
     }
 }
 
+// ---------------------------------------------------------------------------
+// The docket board
+// ---------------------------------------------------------------------------
+
+/// The docket's lanes, in reading order: what needs deciding, what is due,
+/// then the two shapes of "later", then what is finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DocketLane {
+    /// Captured items waiting to be promoted or discarded.
+    Inbox,
+    /// Open items due today or earlier — overdue first, by construction of
+    /// the store's order.
+    Due,
+    /// Open one-off items dated later, or undated.
+    Slated,
+    /// Open recurring items not due yet.
+    Recurring,
+    /// The last few completed items, newest first.
+    Done,
+}
+
+impl DocketLane {
+    pub(crate) const ALL: [DocketLane; 5] = [
+        DocketLane::Inbox,
+        DocketLane::Due,
+        DocketLane::Slated,
+        DocketLane::Recurring,
+        DocketLane::Done,
+    ];
+
+    pub(crate) fn title(self) -> &'static str {
+        match self {
+            DocketLane::Inbox => "inbox",
+            DocketLane::Due => "due",
+            DocketLane::Slated => "slated",
+            DocketLane::Recurring => "recurring",
+            DocketLane::Done => "done",
+        }
+    }
+}
+
+/// A stacked docket card: id and title, kind and date.
+const COMPACT_CARD_ROWS: u16 = 2;
+
+/// How many finished items the done lane keeps. The lane is a receipt, not an
+/// archive: `shep docket list` has the rest.
+const DONE_LANE_LIMIT: usize = 10;
+
+/// A docket item's date, relative to today, as the card says it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DueLabel {
+    /// `due < today`, by this many days.
+    Overdue(i64),
+    Today,
+    /// `due > today`, by this many days.
+    In(i64),
+    /// No date.
+    Undated,
+}
+
+impl DueLabel {
+    /// `overdue 3d` / `due today` / `in 5d` / `—`. Overdue reads as a count of
+    /// days late rather than a date: "2026-09-08" is a fact, "overdue 3d" is
+    /// the complaint.
+    pub(crate) fn text(self) -> String {
+        match self {
+            DueLabel::Overdue(days) => format!("overdue {days}d"),
+            DueLabel::Today => "due today".to_string(),
+            DueLabel::In(days) => format!("in {days}d"),
+            DueLabel::Undated => glyphs::DASH.to_string(),
+        }
+    }
+
+    fn urgency(self) -> DocketUrgency {
+        match self {
+            DueLabel::Overdue(_) => DocketUrgency::Overdue,
+            DueLabel::Today => DocketUrgency::Today,
+            DueLabel::In(_) | DueLabel::Undated => DocketUrgency::Later,
+        }
+    }
+}
+
+/// Where a date stands against today. An unparseable date is undated rather
+/// than a guess; `today` unknown (never sampled) means nothing is ever late.
+pub(crate) fn due_label(due: Option<&str>, today: Option<Date>) -> DueLabel {
+    let (Some(due), Some(today)) = (due.and_then(Date::parse), today) else {
+        return DueLabel::Undated;
+    };
+    let delta = due.to_days() - today.to_days();
+    if delta < 0 {
+        DueLabel::Overdue(-delta)
+    } else if delta == 0 {
+        DueLabel::Today
+    } else {
+        DueLabel::In(delta)
+    }
+}
+
+/// One docket item as a card draws it: every field already reduced to the
+/// string the card shows, so render does no parsing.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct DocketCard {
+    pub id: i64,
+    pub title: String,
+    pub kind: DocketKind,
+    pub status: DocketStatus,
+    pub due: DueLabel,
+    /// The date itself, for the detail screen.
+    pub due_date: Option<String>,
+    pub repeat: Option<DocketRepeat>,
+    /// Provenance reduced to one short tag: `board.rs:42` for a file, `pane
+    /// p3` for a session. `None` when the source says nothing a card can use.
+    pub source: Option<String>,
+    /// The same provenance unabridged, for the detail screen.
+    pub source_full: Option<String>,
+    pub notes: Option<String>,
+}
+
+impl DocketCard {
+    /// Only an open item is overdue: the inbox has no date yet and done has
+    /// no date any more.
+    pub(crate) fn overdue(&self) -> bool {
+        self.status == DocketStatus::Open && matches!(self.due, DueLabel::Overdue(_))
+    }
+
+    fn urgency(&self) -> DocketUrgency {
+        if self.status == DocketStatus::Open {
+            self.due.urgency()
+        } else {
+            DocketUrgency::Later
+        }
+    }
+
+    /// The first line of the notes, for the card.
+    fn notes_line(&self) -> Option<&str> {
+        self.notes
+            .as_deref()?
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+    }
+
+    /// Rows the card draws: id and title, kind and date, then a source row and
+    /// a notes row only when there is one. A card says what it has to say and
+    /// no more, so a bare inbox item is two rows and a sourced, annotated one
+    /// is four.
+    pub(crate) fn rows(&self) -> u16 {
+        2 + u16::from(self.source.is_some()) + u16::from(self.notes_line().is_some())
+    }
+}
+
+/// `{"file": "/a/b/memory.md", "line": 12}` -> `(memory.md:12, ~/a/b/memory.md:12)`;
+/// `{"pane": "p3", "session": "s"}` -> `(pane p3, pane p3 · session s)`.
+/// Anything else is not worth a row.
+fn source_tags(source: Option<&serde_json::Value>) -> Option<(String, String)> {
+    let source = source?;
+    let json_text = |value: &serde_json::Value| match value {
+        serde_json::Value::String(text) => text.clone(),
+        other => other.to_string(),
+    };
+    if let Some(file) = source.get("file").and_then(serde_json::Value::as_str) {
+        let base = std::path::Path::new(file)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(file);
+        let full = contract_home(std::path::Path::new(file));
+        return Some(
+            match source.get("line").and_then(serde_json::Value::as_i64) {
+                Some(line) => (format!("{base}:{line}"), format!("{full}:{line}")),
+                None => (base.to_string(), full),
+            },
+        );
+    }
+    if let Some(pane) = source.get("pane") {
+        let short = format!("pane {}", json_text(pane));
+        let full = match source.get("session") {
+            Some(session) => format!(
+                "{short}{}session {}",
+                glyphs::SEP_SPACED,
+                json_text(session)
+            ),
+            None => short.clone(),
+        };
+        return Some((short, full));
+    }
+    None
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct DocketBoardModel {
+    /// One lane per [`DocketLane`], in that order, empty lanes kept.
+    pub lanes: Vec<(DocketLane, Vec<DocketCard>)>,
+}
+
+impl DocketBoardModel {
+    pub(crate) fn flattened(&self) -> Vec<&DocketCard> {
+        self.lanes
+            .iter()
+            .flat_map(|(_, cards)| cards.iter())
+            .collect()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.lanes.iter().all(|(_, cards)| cards.is_empty())
+    }
+
+    fn cards(&self, lane: usize) -> &[DocketCard] {
+        self.lanes
+            .get(lane)
+            .map(|(_, cards)| cards.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// The cards of one lane, by name.
+    pub(crate) fn lane(&self, which: DocketLane) -> &[DocketCard] {
+        self.lanes
+            .iter()
+            .find(|(lane, _)| *lane == which)
+            .map(|(_, cards)| cards.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// `(lane, row)` of an item's card.
+    pub(crate) fn locate(&self, id: i64) -> Option<(usize, usize)> {
+        for (idx, (_, cards)) in self.lanes.iter().enumerate() {
+            if let Some(row) = cards.iter().position(|card| card.id == id) {
+                return Some((idx, row));
+            }
+        }
+        None
+    }
+
+    fn lane_of(&self, id: Option<i64>) -> Option<usize> {
+        self.locate(id?).map(|(lane, _)| lane)
+    }
+
+    /// The card the board treats as selected: the selection when it still
+    /// resolves, else the first card. Seeded lazily this way so opening the
+    /// board never has to read the store to pick something.
+    pub(crate) fn effective_selection(&self, selected: Option<i64>) -> Option<i64> {
+        selected
+            .filter(|id| self.locate(*id).is_some())
+            .or_else(|| self.flattened().first().map(|card| card.id))
+    }
+
+    /// Each card's height, per lane. Stacked, every card is its two leading
+    /// rows: an 80×24 terminal showed three inbox cards and nothing else,
+    /// with the due lane — the one that is a complaint — below the fold.
+    /// Two rows apiece gets the inbox and the due lane on one small screen,
+    /// and the detail screen has the rest.
+    fn card_heights(&self, narrow: bool) -> Vec<Vec<u16>> {
+        self.lanes
+            .iter()
+            .map(|(_, cards)| {
+                cards
+                    .iter()
+                    .map(|card| {
+                        if narrow {
+                            COMPACT_CARD_ROWS
+                        } else {
+                            card.rows()
+                        }
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn keys(&self) -> Vec<Vec<i64>> {
+        self.lanes
+            .iter()
+            .map(|(_, cards)| cards.iter().map(|card| card.id).collect())
+            .collect()
+    }
+
+    /// Open items due today or earlier, and inbox items: the two numbers the
+    /// dashboard strip reports.
+    pub(crate) fn due_count(&self) -> usize {
+        self.lane(DocketLane::Due).len()
+    }
+
+    pub(crate) fn inbox_count(&self) -> usize {
+        self.lane(DocketLane::Inbox).len()
+    }
+}
+
+/// Bucket the sampled rows into lanes. Pure: the sample carries the store's
+/// own "today", so the same rows always make the same board.
+///
+/// Rows keep the store's order inside a lane (dated open items by due, the
+/// rest newest-updated first), except `done`, which is re-cut to its newest
+/// ten. Discarded items are not on the board at all.
+pub(crate) fn docket_board_model(sample: &DocketSample) -> DocketBoardModel {
+    let mut lanes: Vec<(DocketLane, Vec<DocketCard>)> = DocketLane::ALL
+        .iter()
+        .map(|lane| (*lane, Vec::new()))
+        .collect();
+    let mut done: Vec<(&str, DocketCard)> = Vec::new();
+    for item in &sample.rows {
+        let due = due_label(item.due.as_deref(), sample.today);
+        let (source, source_full) = source_tags(item.source.as_ref()).unzip();
+        let card = DocketCard {
+            id: item.id,
+            title: item.title.clone(),
+            kind: item.kind,
+            status: item.status,
+            due,
+            due_date: item.due.clone(),
+            repeat: item.repeat,
+            source,
+            source_full,
+            notes: item.notes.clone(),
+        };
+        let lane = match item.status {
+            DocketStatus::Inbox => DocketLane::Inbox,
+            DocketStatus::Open => match (due, item.kind) {
+                (DueLabel::Overdue(_) | DueLabel::Today, _) => DocketLane::Due,
+                (_, DocketKind::Recurring) => DocketLane::Recurring,
+                _ => DocketLane::Slated,
+            },
+            DocketStatus::Done => {
+                done.push((item.updated.as_str(), card));
+                continue;
+            }
+            DocketStatus::Discarded => continue,
+        };
+        lanes[lane as usize].1.push(card);
+    }
+    done.sort_by(|a, b| b.0.cmp(a.0).then_with(|| b.1.id.cmp(&a.1.id)));
+    lanes[DocketLane::Done as usize].1 = done
+        .into_iter()
+        .take(DONE_LANE_LIMIT)
+        .map(|(_, card)| card)
+        .collect();
+    DocketBoardModel { lanes }
+}
+
+/// The docket board's traversal — the agent board's, over item ids.
+pub(crate) fn next_docket_selection(
+    model: &DocketBoardModel,
+    current: Option<i64>,
+    dir: BoardDir,
+    narrow: bool,
+) -> Option<i64> {
+    step_selection(&model.keys(), current, dir, narrow)
+}
+
+/// Whether the docket board stacks. Five lanes, always: an empty lane keeps
+/// its place so the columns do not shuffle as items move between them.
+pub(crate) fn is_docket_narrow(app: &AppState) -> bool {
+    is_narrow_with_lanes(app, DocketLane::ALL.len())
+}
+
+fn docket_slots_for(app: &AppState, model: &DocketBoardModel) -> Vec<CardSlot> {
+    let Some(inner) = inner_area(board_area(app)) else {
+        return Vec::new();
+    };
+    let body = board_body(inner);
+    let narrow = is_docket_narrow(app);
+    let heights = model.card_heights(narrow);
+    if narrow {
+        narrow_slots_for(&heights, body).0
+    } else {
+        wide_slots_for(&heights, body)
+    }
+}
+
+/// The docket item under a click, if any.
+pub(crate) fn docket_card_at(app: &AppState, col: u16, row: u16) -> Option<i64> {
+    let model = docket_board_model(&app.docket_sample);
+    let slot = docket_slots_for(app, &model)
+        .into_iter()
+        .find(|slot| rect_contains(slot.rect, col, row))?;
+    model.cards(slot.lane).get(slot.row).map(|card| card.id)
+}
+
+fn render_docket_lanes(app: &AppState, frame: &mut Frame, model: &DocketBoardModel, body: Rect) {
+    let p = &app.palette;
+    if body.height == 0 || body.width == 0 {
+        return;
+    }
+    if !app.docket_sample.sampled {
+        frame.render_widget(
+            Paragraph::new(format!(" reading the docket{}", glyphs::ELLIPSIS))
+                .style(Style::default().fg(p.overlay0)),
+            Rect::new(body.x, body.y, body.width, 1),
+        );
+        return;
+    }
+    let selected = model.effective_selection(app.board.docket_selected);
+    let focused = model.lane_of(selected);
+    let narrow = is_docket_narrow(app);
+    let heights = model.card_heights(narrow);
+    if narrow {
+        if model.is_empty() {
+            frame.render_widget(
+                Paragraph::new(" nothing on the docket").style(Style::default().fg(p.overlay0)),
+                Rect::new(body.x, body.y, body.width, 1),
+            );
+            return;
+        }
+        let (slots, headers) = narrow_slots_for(&heights, body);
+        for (y, idx) in headers {
+            let (lane, cards) = &model.lanes[idx];
+            render_docket_lane_header(
+                app,
+                frame,
+                Rect::new(body.x, y, body.width, 1),
+                *lane,
+                cards,
+                focused == Some(idx),
+            );
+        }
+        for slot in slots {
+            if let Some(card) = model.cards(slot.lane).get(slot.row) {
+                render_docket_card(app, frame, slot.rect, card, selected == Some(card.id));
+            }
+        }
+        return;
+    }
+    let rects = lane_rects(body, model.lanes.len());
+    for (idx, lane_rect) in rects.iter().enumerate() {
+        let (lane, cards) = &model.lanes[idx];
+        render_docket_lane_header(
+            app,
+            frame,
+            Rect::new(lane_rect.x, lane_rect.y, lane_rect.width, 1),
+            *lane,
+            cards,
+            focused == Some(idx),
+        );
+    }
+    for slot in wide_slots_for(&heights, body) {
+        if let Some(card) = model.cards(slot.lane).get(slot.row) {
+            render_docket_card(app, frame, slot.rect, card, selected == Some(card.id));
+        }
+    }
+}
+
+/// A docket lane heading. The due lane's count goes peach when any of it is
+/// overdue, with the same `!` the cards carry — the one lane heading that
+/// makes a claim, because it is the one lane whose contents are a complaint.
+fn render_docket_lane_header(
+    app: &AppState,
+    frame: &mut Frame,
+    area: Rect,
+    lane: DocketLane,
+    cards: &[DocketCard],
+    focused: bool,
+) {
+    let p = &app.palette;
+    let overdue = cards.iter().filter(|card| card.overdue()).count();
+    let color = if focused { p.accent } else { p.overlay0 };
+    let count = if overdue > 0 {
+        format!(" {} !{overdue}", cards.len())
+    } else {
+        format!(" {}", cards.len())
+    };
+    let count_style = if overdue > 0 {
+        Style::default().fg(p.peach)
+    } else {
+        Style::default().fg(p.overlay0)
+    };
+    let title_width = area.width.saturating_sub(display_width(&count) as u16 + 1) as usize;
+    let line = Line::from(vec![
+        Span::styled(
+            format!(" {}", truncate_end(lane.title(), title_width)),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(count, count_style),
+    ]);
+    frame.render_widget(Paragraph::new(line), area);
+}
+
+/// One docket card. Same skeleton as an agent card — gutter glyph, bold
+/// name, indented facts, a right-pinned trailing fact — so the two boards
+/// read as one surface with different nouns.
+fn render_docket_card(
+    app: &AppState,
+    frame: &mut Frame,
+    rect: Rect,
+    card: &DocketCard,
+    selected: bool,
+) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+    let p = &app.palette;
+    let width = rect.width as usize;
+    if selected {
+        let buf = frame.buffer_mut();
+        for y in rect.top()..rect.bottom() {
+            for x in rect.left()..rect.right() {
+                buf[(x, y)].set_style(Style::default().bg(p.surface0));
+            }
+        }
+    }
+    let look = docket_appearance(card.status, card.urgency());
+    let marker = if selected { glyphs::MARKER } else { " " };
+    let marker_style = if selected {
+        Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(p.overlay0)
+    };
+    let title_style = if selected {
+        Style::default().fg(p.text).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(p.text)
+    };
+    let dim = Style::default().fg(p.overlay0);
+    let content = width.saturating_sub(CARD_RIGHT_MARGIN);
+    let indent = " ".repeat(CARD_INDENT);
+
+    // Line 1: marker · glyph · #id · title. The id leads because it is what
+    // the CLI verbs take (`shep docket done 3`), and because it is short and
+    // the title is the thing that elides.
+    let id = format!("#{} ", card.id);
+    let title_budget = content
+        .saturating_sub(CARD_INDENT)
+        .saturating_sub(display_width(&id));
+    let title = truncate_end(&card.title, title_budget);
+    let glyph_style = if card.overdue() {
+        look.style(p).add_modifier(Modifier::BOLD)
+    } else {
+        look.style(p)
+    };
+    let line1 = vec![
+        Span::styled(marker.to_string(), marker_style),
+        Span::styled(look.glyph, glyph_style),
+        Span::raw(" "),
+        Span::styled(id, dim),
+        Span::styled(title, title_style),
+    ];
+    frame.render_widget(
+        Paragraph::new(Line::from(line1)),
+        Rect::new(rect.x, rect.y, rect.width, 1),
+    );
+    if rect.height < 2 {
+        return;
+    }
+
+    // Line 2: kind · due · repeat. The date takes the glyph's ink when it is
+    // the reason the glyph is lit; otherwise it is one more dim fact.
+    let due_style = match card.urgency() {
+        DocketUrgency::Overdue | DocketUrgency::Today => look.style(p),
+        DocketUrgency::Later => dim,
+    };
+    let mut facts: Vec<Vec<Span>> = vec![
+        vec![Span::styled(card.kind.as_str(), dim)],
+        vec![Span::styled(card.due.text(), due_style)],
+    ];
+    if let Some(repeat) = card.repeat {
+        facts.push(vec![Span::styled(repeat.as_str(), dim)]);
+    }
+    let strip = fit_strip(
+        facts,
+        &Span::styled(glyphs::SEP_SPACED, dim),
+        content.saturating_sub(CARD_INDENT),
+    );
+    let mut line2 = vec![Span::raw(indent.clone())];
+    line2.extend(strip);
+    frame.render_widget(
+        Paragraph::new(Line::from(line2)),
+        Rect::new(rect.x, rect.y + 1, rect.width, 1),
+    );
+
+    let mut y = rect.y + 2;
+    if let Some(source) = &card.source {
+        if y >= rect.bottom() {
+            return;
+        }
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!(
+                    "{indent}{}",
+                    truncate_end(source, content.saturating_sub(CARD_INDENT))
+                ),
+                dim,
+            ))),
+            Rect::new(rect.x, y, rect.width, 1),
+        );
+        y += 1;
+    }
+    if let Some(notes) = card.notes_line() {
+        if y >= rect.bottom() {
+            return;
+        }
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!(
+                    "{indent}{}",
+                    truncate_end(notes, content.saturating_sub(CARD_INDENT))
+                ),
+                Style::default()
+                    .fg(p.overlay0)
+                    .add_modifier(Modifier::ITALIC),
+            ))),
+            Rect::new(rect.x, y, rect.width, 1),
+        );
+    }
+}
+
+/// The selected docket card, or the first when the selection no longer
+/// resolves (the item can be discarded from under it).
+pub(crate) fn docket_detail_card<'a>(
+    app: &AppState,
+    model: &'a DocketBoardModel,
+) -> Option<&'a DocketCard> {
+    let id = model.effective_selection(app.board.docket_selected)?;
+    model.flattened().into_iter().find(|card| card.id == id)
+}
+
+/// One docket item in full: the card's heading, then every field on its own
+/// row, then the notes whole. The verbs are in the footer.
+fn render_docket_detail(app: &AppState, frame: &mut Frame, model: &DocketBoardModel, body: Rect) {
+    if body.width == 0 || body.height == 0 {
+        return;
+    }
+    let p = &app.palette;
+    let dim = Style::default().fg(p.overlay0);
+    let Some(card) = docket_detail_card(app, model) else {
+        frame.render_widget(
+            Paragraph::new("no docket item selected").style(dim),
+            Rect::new(body.x, body.y, body.width, 1),
+        );
+        return;
+    };
+    let width = body.width as usize;
+    let mut y = body.y;
+    let bottom = body.y + body.height;
+    let row = |frame: &mut Frame, y: &mut u16, line: Line<'static>| {
+        if *y < bottom {
+            frame.render_widget(Paragraph::new(line), Rect::new(body.x, *y, body.width, 1));
+            *y += 1;
+        }
+    };
+
+    let look = docket_appearance(card.status, card.urgency());
+    row(
+        frame,
+        &mut y,
+        Line::from(vec![
+            Span::styled(look.glyph, look.style(p)),
+            Span::raw(" "),
+            Span::styled(
+                truncate_end(&card.title, width.saturating_sub(2)),
+                Style::default().fg(p.text).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+    );
+    row(
+        frame,
+        &mut y,
+        Line::from(Span::styled(
+            format!("#{} {} {}", card.id, glyphs::SEP, look.label),
+            dim,
+        )),
+    );
+    row(frame, &mut y, Line::from(""));
+
+    let value_width = width.saturating_sub(DETAIL_KEY_WIDTH);
+    let kv = |frame: &mut Frame, y: &mut u16, key: &str, value: String, style: Style| {
+        row(
+            frame,
+            y,
+            Line::from(vec![
+                Span::styled(format!("{key:<DETAIL_KEY_WIDTH$}"), dim),
+                Span::styled(truncate_end(&value, value_width), style),
+            ]),
+        );
+    };
+    let text = Style::default().fg(p.text);
+    kv(frame, &mut y, "kind", card.kind.as_str().to_string(), text);
+    kv(
+        frame,
+        &mut y,
+        "status",
+        card.status.as_str().to_string(),
+        text,
+    );
+    let due = match (&card.due_date, card.due) {
+        (Some(date), DueLabel::Undated) => date.clone(),
+        (Some(date), label) => format!("{date} {} {}", glyphs::SEP, label.text()),
+        (None, _) => glyphs::DASH.to_string(),
+    };
+    let due_style = match card.urgency() {
+        DocketUrgency::Overdue | DocketUrgency::Today => look.style(p),
+        DocketUrgency::Later => text,
+    };
+    kv(frame, &mut y, "due", due, due_style);
+    kv(
+        frame,
+        &mut y,
+        "repeat",
+        card.repeat
+            .map(|repeat| repeat.as_str().to_string())
+            .unwrap_or_else(|| glyphs::DASH.to_string()),
+        text,
+    );
+    kv(
+        frame,
+        &mut y,
+        "source",
+        card.source_full
+            .clone()
+            .unwrap_or_else(|| glyphs::DASH.to_string()),
+        text,
+    );
+    row(frame, &mut y, Line::from(""));
+    row(frame, &mut y, Line::from(Span::styled("notes", dim)));
+    match card
+        .notes
+        .as_deref()
+        .filter(|notes| !notes.trim().is_empty())
+    {
+        Some(notes) => {
+            for line in notes.lines() {
+                if y >= bottom {
+                    break;
+                }
+                row(
+                    frame,
+                    &mut y,
+                    Line::from(Span::styled(
+                        format!("  {}", truncate_end(line, width.saturating_sub(2))),
+                        Style::default().fg(p.subtext0),
+                    )),
+                );
+            }
+        }
+        None => row(
+            frame,
+            &mut y,
+            Line::from(Span::styled(format!("  {}", glyphs::DASH), dim)),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ratatui::layout::Direction;
@@ -1729,6 +2604,8 @@ mod tests {
         state.ensure_test_terminals();
         state.active = Some(0);
         state.selected = 0;
+        // These tests are about the agent lanes; the docket opens by default.
+        state.board.view = BoardView::Columns;
         set_state(&mut state, 0, 0, first_root, AgentState::Blocked, true);
         set_state(&mut state, 0, 0, first_second, AgentState::Working, true);
         set_state(&mut state, 1, 0, second_root, AgentState::Idle, false);
@@ -2106,8 +2983,11 @@ mod tests {
         let (state, _) = board_state();
         let summary = board_summary(&state, &board_model(&state));
         let mut term = Terminal::new(TestBackend::new(120, 2)).expect("test terminal");
-        term.draw(|frame| render_dashboard(&state, frame, Rect::new(0, 0, 120, 2), &summary))
-            .expect("dashboard should render");
+        let docket = docket_board_model(&state.docket_sample);
+        term.draw(|frame| {
+            render_dashboard(&state, frame, Rect::new(0, 0, 120, 2), &summary, &docket)
+        })
+        .expect("dashboard should render");
         let buffer = term.backend().buffer();
         let row = |y: u16| -> String { (0..120).map(|x| buffer[(x, y)].symbol()).collect() };
 
@@ -2217,10 +3097,13 @@ mod tests {
         let (state, _) = board_state();
         let model = board_model(&state);
         let summary = board_summary(&state, &model);
+        let docket = docket_board_model(&state.docket_sample);
         for width in 20u16..=140 {
             let mut terminal = Terminal::new(TestBackend::new(width, 2)).expect("test terminal");
             terminal
-                .draw(|frame| render_dashboard(&state, frame, Rect::new(0, 0, width, 2), &summary))
+                .draw(|frame| {
+                    render_dashboard(&state, frame, Rect::new(0, 0, width, 2), &summary, &docket)
+                })
                 .expect("dashboard should render");
             let buffer = terminal.backend().buffer();
             for y in 0..2 {
@@ -2496,5 +3379,401 @@ mod tests {
         // Focus the working pane; it's on the board, so it is preferred.
         state.workspaces[0].tabs[0].layout.focus_pane(panes[1]);
         assert_eq!(initial_selection(&state), Some(panes[1]));
+    }
+
+    // -----------------------------------------------------------------------
+    // The docket board
+    // -----------------------------------------------------------------------
+
+    fn docket_state() -> AppState {
+        let mut state = AppState::test_new();
+        state.docket_sample = DocketSample::test_fixture();
+        state.board.view = BoardView::Docket;
+        state.mode = crate::app::state::Mode::Board;
+        state
+    }
+
+    fn lane_ids(model: &DocketBoardModel, lane: DocketLane) -> Vec<i64> {
+        model.lane(lane).iter().map(|card| card.id).collect()
+    }
+
+    #[test]
+    fn docket_lanes_bucket_by_status_then_date_then_kind() {
+        let model = docket_board_model(&DocketSample::test_fixture());
+        assert_eq!(lane_ids(&model, DocketLane::Inbox), vec![1, 2, 11]);
+        // Overdue and due-today both land in `due`, in the store's order.
+        assert_eq!(lane_ids(&model, DocketLane::Due), vec![3, 4]);
+        // A dated-later or undated one-off is slated; a recurring item not
+        // yet due keeps its own lane.
+        assert_eq!(lane_ids(&model, DocketLane::Slated), vec![5, 6]);
+        assert_eq!(lane_ids(&model, DocketLane::Recurring), vec![7]);
+        // Done is newest-updated first; discarded is not on the board.
+        assert_eq!(lane_ids(&model, DocketLane::Done), vec![8, 9]);
+        assert!(model.locate(10).is_none());
+        assert_eq!(model.due_count(), 2);
+        assert_eq!(model.inbox_count(), 3);
+    }
+
+    #[test]
+    fn the_done_lane_keeps_only_the_newest_ten() {
+        let mut sample = DocketSample::test_fixture();
+        let template = sample.rows[8].clone();
+        for n in 0..15 {
+            let mut row = template.clone();
+            row.id = 100 + n;
+            row.updated = format!("2026-08-{:02}T00:00:00Z", 1 + n);
+            sample.rows.push(row);
+        }
+        let done = lane_ids(&docket_board_model(&sample), DocketLane::Done);
+        assert_eq!(done.len(), DONE_LANE_LIMIT);
+        assert_eq!(&done[..2], &[8, 9], "the fixture's two are the newest");
+        assert_eq!(done[2], 114, "then the synthetic rows, newest first");
+    }
+
+    #[test]
+    fn due_labels_count_days_from_the_samples_today() {
+        let today = Date::parse("2026-09-11");
+        assert_eq!(due_label(Some("2026-09-08"), today), DueLabel::Overdue(3));
+        assert_eq!(due_label(Some("2026-09-11"), today), DueLabel::Today);
+        assert_eq!(due_label(Some("2026-09-16"), today), DueLabel::In(5));
+        assert_eq!(due_label(None, today), DueLabel::Undated);
+        // Garbage dates and an unsampled today are both "no claim", never
+        // an overdue by accident.
+        assert_eq!(due_label(Some("soon"), today), DueLabel::Undated);
+        assert_eq!(due_label(Some("2026-09-08"), None), DueLabel::Undated);
+        assert_eq!(DueLabel::Overdue(3).text(), "overdue 3d");
+        assert_eq!(DueLabel::Today.text(), "due today");
+        assert_eq!(DueLabel::In(5).text(), "in 5d");
+        assert_eq!(DueLabel::Undated.text(), glyphs::DASH);
+    }
+
+    #[test]
+    fn only_an_open_item_is_overdue() {
+        let mut sample = DocketSample::test_fixture();
+        // A done item with a past date is not late; it is finished.
+        sample.rows[8].due = Some("2026-01-01".into());
+        let model = docket_board_model(&sample);
+        let done = model.lane(DocketLane::Done)[0].clone();
+        assert!(!done.overdue());
+        assert_eq!(done.due, DueLabel::Overdue(253));
+        let late = model.lane(DocketLane::Due)[0].clone();
+        assert!(late.overdue());
+    }
+
+    #[test]
+    fn a_card_draws_only_the_rows_it_has() {
+        let model = docket_board_model(&DocketSample::test_fixture());
+        let by_id = |id: i64| {
+            model
+                .flattened()
+                .into_iter()
+                .find(|card| card.id == id)
+                .cloned()
+                .expect("fixture card")
+        };
+        // Source and notes: four rows.
+        assert_eq!(by_id(1).rows(), 4);
+        assert_eq!(
+            by_id(1).source.as_deref(),
+            Some("project_hutch_r1_launcher.md:12")
+        );
+        // A pane source, no notes: three.
+        assert_eq!(by_id(2).rows(), 3);
+        assert_eq!(by_id(2).source.as_deref(), Some("pane p3"));
+        // Nothing but a title and a kind: two.
+        assert_eq!(by_id(5).rows(), 2);
+        // Notes but no source: three, and only the first line shows.
+        assert_eq!(by_id(3).rows(), 3);
+        assert_eq!(
+            by_id(1).notes_line(),
+            Some("billing is wall-clock, not per call")
+        );
+    }
+
+    #[test]
+    fn docket_selection_moves_like_the_agent_board() {
+        let model = docket_board_model(&DocketSample::test_fixture());
+        // Nothing selected: the first card.
+        assert_eq!(
+            next_docket_selection(&model, None, BoardDir::Down, false),
+            Some(1)
+        );
+        // Down wraps within the inbox.
+        assert_eq!(
+            next_docket_selection(&model, Some(11), BoardDir::Down, false),
+            Some(1)
+        );
+        // Right from row 2 of the inbox clamps to the due lane's last row.
+        assert_eq!(
+            next_docket_selection(&model, Some(11), BoardDir::Right, false),
+            Some(4)
+        );
+        // Left from the leftmost lane stays put.
+        assert_eq!(
+            next_docket_selection(&model, Some(1), BoardDir::Left, false),
+            Some(1)
+        );
+        // Narrow: one flattened list, wrapping at both ends.
+        assert_eq!(
+            next_docket_selection(&model, Some(1), BoardDir::Up, true),
+            Some(9)
+        );
+        assert_eq!(
+            next_docket_selection(&model, Some(9), BoardDir::Down, true),
+            Some(1)
+        );
+        // An empty board selects nothing.
+        let empty = docket_board_model(&DocketSample::default());
+        assert_eq!(
+            next_docket_selection(&empty, None, BoardDir::Down, false),
+            None
+        );
+    }
+
+    #[test]
+    fn an_empty_lane_is_skipped_over_not_stopped_at() {
+        let mut sample = DocketSample::test_fixture();
+        sample
+            .rows
+            .retain(|row| row.status != DocketStatus::Open || row.due.is_none());
+        let model = docket_board_model(&sample);
+        assert!(model.lane(DocketLane::Due).is_empty());
+        // Right from the inbox lands in `slated`, two lanes over.
+        assert_eq!(
+            next_docket_selection(&model, Some(1), BoardDir::Right, false),
+            Some(6)
+        );
+    }
+
+    #[test]
+    fn docket_cards_stack_at_their_own_heights() {
+        let model = docket_board_model(&DocketSample::test_fixture());
+        let body = Rect::new(0, 0, 150, 30);
+        let slots = wide_slots_for(&model.card_heights(false), body);
+        let inbox: Vec<(u16, u16)> = slots
+            .iter()
+            .filter(|slot| slot.lane == 0)
+            .map(|slot| (slot.rect.y, slot.rect.height))
+            .collect();
+        // Header + gap, then a four-row card, a gap, a three-row card, a gap,
+        // a two-row card.
+        assert_eq!(inbox, vec![(2, 4), (7, 3), (11, 2)]);
+        // A card that would not fit whole is not drawn at all.
+        let short = Rect::new(0, 0, 150, 9);
+        let slots = wide_slots_for(&model.card_heights(false), short);
+        assert_eq!(slots.iter().filter(|slot| slot.lane == 0).count(), 1);
+    }
+
+    #[test]
+    fn docket_card_reads_id_kind_due_source_and_notes() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let mut state = docket_state();
+        state.view.terminal_area = Rect::new(0, 0, 150, 40);
+        state.view.sidebar_rect = Rect::new(0, 0, 150, 40);
+        state.board.docket_selected = Some(3);
+        let mut term = Terminal::new(TestBackend::new(150, 40)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+            .expect("render");
+        let buffer = term.backend().buffer();
+        let screen: Vec<String> = (0..40)
+            .map(|y| (0..150).map(|x| buffer[(x, y)].symbol()).collect())
+            .collect();
+        let text = screen.join("\n");
+        assert!(text.contains("docket 2 due"), "strip fact: {text}");
+        assert!(text.contains("3 inbox"), "strip fact: {text}");
+        // The overdue card: `!` in the gutter, the days late on row two, the
+        // notes on row three — and the lane heading carries the count.
+        let row = screen
+            .iter()
+            .position(|line| line.contains("sign the four"))
+            .expect("overdue card");
+        assert!(
+            screen[row].contains("! #3 sign the four"),
+            "{:?}",
+            screen[row]
+        );
+        assert!(
+            screen[row + 1].contains("slated · overdue 3d"),
+            "{:?}",
+            screen[row + 1]
+        );
+        assert!(
+            screen[row + 2].contains("Nora has the envelope"),
+            "{:?}",
+            screen[row + 2]
+        );
+        assert!(text.contains("due 2 !1"), "heading count: {text}");
+        // A recurring card names its repeat; a sourced one its file.
+        let row = screen
+            .iter()
+            .position(|line| line.contains("review the Vikunja"))
+            .expect("recurring card");
+        assert!(
+            screen[row + 1].contains("recurring · due today · 1w"),
+            "{:?}",
+            screen[row + 1]
+        );
+        assert!(
+            screen[row + 2].contains("shiftmayt.mjs:1"),
+            "{:?}",
+            screen[row + 2]
+        );
+    }
+
+    #[test]
+    fn the_overdue_mark_is_peach_and_bold() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let mut state = docket_state();
+        state.view.terminal_area = Rect::new(0, 0, 150, 40);
+        state.view.sidebar_rect = Rect::new(0, 0, 150, 40);
+        let mut term = Terminal::new(TestBackend::new(150, 40)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+            .expect("render");
+        let buffer = term.backend().buffer();
+        // The card's gutter mark is bold peach; the lane heading's count is
+        // peach too, but a count is not a mark.
+        let marks = (0..40u16)
+            .flat_map(|y| (0..150u16).map(move |x| (x, y)))
+            .map(|pos| &buffer[pos])
+            .filter(|cell| cell.symbol() == "!" && cell.fg == state.palette.peach)
+            .count();
+        let bold = (0..40u16)
+            .flat_map(|y| (0..150u16).map(move |x| (x, y)))
+            .map(|pos| &buffer[pos])
+            .filter(|cell| {
+                cell.symbol() == "!"
+                    && cell.fg == state.palette.peach
+                    && cell.modifier.contains(Modifier::BOLD)
+            })
+            .count();
+        assert_eq!(marks, 2, "one card mark and one heading count");
+        assert_eq!(bold, 1, "the card mark is bold");
+    }
+
+    #[test]
+    fn stacked_docket_cards_are_two_rows_each() {
+        let model = docket_board_model(&DocketSample::test_fixture());
+        assert!(model
+            .card_heights(true)
+            .iter()
+            .flatten()
+            .all(|height| *height == COMPACT_CARD_ROWS));
+        // Which is what gets the due lane onto an 80×24 screen at all.
+        let body = board_body(Rect::new(1, 1, 78, 22));
+        let (_, headers) = narrow_slots_for(&model.card_heights(true), body);
+        assert!(headers
+            .iter()
+            .any(|(_, lane)| *lane == DocketLane::Due as usize));
+    }
+
+    #[test]
+    fn the_docket_stacks_at_eighty_columns() {
+        let mut state = docket_state();
+        state.view.terminal_area = Rect::new(0, 0, 80, 24);
+        state.view.sidebar_rect = Rect::new(0, 0, 80, 24);
+        assert!(is_docket_narrow(&state));
+        state.view.terminal_area = Rect::new(0, 0, 150, 40);
+        state.view.sidebar_rect = Rect::new(0, 0, 150, 40);
+        assert!(!is_docket_narrow(&state));
+    }
+
+    #[test]
+    fn clicking_a_docket_card_finds_its_id() {
+        let mut state = docket_state();
+        state.view.terminal_area = Rect::new(0, 0, 150, 40);
+        state.view.sidebar_rect = Rect::new(0, 0, 150, 40);
+        let inner = inner_area(board_area(&state)).expect("inner");
+        let body = board_body(inner);
+        let model = docket_board_model(&state.docket_sample);
+        let slots = wide_slots_for(&model.card_heights(false), body);
+        let due_first = slots
+            .iter()
+            .find(|slot| slot.lane == 1 && slot.row == 0)
+            .expect("due lane card");
+        assert_eq!(
+            docket_card_at(&state, due_first.rect.x + 2, due_first.rect.y + 1),
+            Some(3)
+        );
+        // The gap row between cards is nobody's.
+        assert_eq!(
+            docket_card_at(&state, due_first.rect.x + 2, due_first.rect.bottom()),
+            None
+        );
+    }
+
+    #[test]
+    fn docket_detail_shows_every_field() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let mut state = docket_state();
+        state.view.terminal_area = Rect::new(0, 0, 100, 30);
+        state.view.sidebar_rect = Rect::new(0, 0, 100, 30);
+        state.board.view = BoardView::DocketItem;
+        state.board.docket_selected = Some(4);
+        let mut term = Terminal::new(TestBackend::new(100, 30)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+            .expect("render");
+        let buffer = term.backend().buffer();
+        let text: String = (0..30)
+            .map(|y| {
+                (0..100)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect();
+        for needle in [
+            "review the Vikunja board",
+            "#4 · due today",
+            "kind         recurring",
+            "status       open",
+            "due          2026-09-11 · due today",
+            "repeat       1w",
+            "source       ~/vault/agents/vikunja-docket/dockets/shiftmayt.mjs:1",
+            "notes",
+            "p slate",
+            "esc back to docket",
+        ] {
+            assert!(text.contains(needle), "missing {needle:?} in:\n{text}");
+        }
+    }
+
+    #[test]
+    fn a_docket_notice_rides_the_footer() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let mut state = docket_state();
+        state.view.terminal_area = Rect::new(0, 0, 150, 40);
+        state.view.sidebar_rect = Rect::new(0, 0, 150, 40);
+        state.board.docket_notice =
+            Some("docket item 1 is inbox, only open items can be completed".into());
+        let mut term = Terminal::new(TestBackend::new(150, 40)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+            .expect("render");
+        let buffer = term.backend().buffer();
+        let footer: String = (1..149).map(|x| buffer[(x, 38)].symbol()).collect();
+        assert!(footer.contains("! docket item 1 is inbox"), "{footer:?}");
+        assert!(footer.trim_end().ends_with("completed"), "{footer:?}");
+    }
+
+    #[test]
+    #[ignore = "visual preview, run with --nocapture"]
+    fn preview_docket_board() {
+        use ratatui::{backend::TestBackend, Terminal};
+        let mut state = docket_state();
+        state.view.terminal_area = Rect::new(0, 0, 150, 34);
+        state.view.sidebar_rect = Rect::new(0, 0, 150, 34);
+        state.board.docket_selected = Some(3);
+        let mut term = Terminal::new(TestBackend::new(150, 34)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+            .expect("render");
+        let buffer = term.backend().buffer();
+        for y in 0..34 {
+            let row: String = (0..150).map(|x| buffer[(x, y)].symbol()).collect();
+            println!("{}", row.trim_end());
+        }
     }
 }

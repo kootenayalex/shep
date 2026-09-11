@@ -339,12 +339,15 @@ The session board is the full-screen agent overview: `blocked`, `done`, `working
 ```toml
 [ui]
 open_on_board = true
+board_view = "docket"
 escape_returns_to_board = true
 ```
 
 `open_on_board` starts a session on the board instead of dropping straight into a pane, so a session with several agents opens on the overview. Enter focuses the selected pane.
 
-The board has one detail screen. `i` opens the selected agent: its state, status, activity, working directory, and context gauge, plus a live window onto what the pane is showing — everything the card has to truncate, without attaching to it. Esc steps back to the columns before it closes the board.
+The board is two lane boards one key apart, and `board_view` picks which one it opens on. `docket` (the default) is the personal docket — inbox, due, slated, recurring, done — one card per item, with the verbs on keys: `n` captures a new item into the inbox, `p` and `r` promote the selected inbox item as slated or weekly-recurring, `d` completes it (a recurring item rolls its date forward), `x` discards it, and `i` opens the item in full. `agents` is the agent lanes, one per group. `a` flips between the two, and the dashboard strip on either counts what the docket has due and waiting.
+
+Each lane board has a detail screen. `i` opens the selected agent: its state, status, activity, working directory, and context gauge, plus a live window onto what the pane is showing — everything the card has to truncate, without attaching to it. On the docket it opens the item: every field and the notes whole. Esc steps back to the lanes before it closes the board.
 
 `escape_returns_to_board` makes Esc the way back out. In a pane running an agent Herdr recognizes, a bare Esc returns to the board and `shift+esc` sends the interrupt to the agent instead. Panes with no detected agent — shells, editors, pagers — always receive Esc unchanged, so this never breaks the app inside a pane.
 

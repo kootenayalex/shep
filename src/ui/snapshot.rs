@@ -519,6 +519,7 @@ const SMALL: (u16, u16) = (80, 24);
 fn board_at(name: &str, size: (u16, u16)) {
     let mut state = fixture::session();
     state.mode = Mode::Board;
+    state.board.view = BoardView::Columns;
     assert_screen(&mut state, name, size.0, size.1);
 }
 
@@ -543,6 +544,43 @@ fn snapshot_board_agent_detail() {
     state.mode = Mode::Board;
     state.board.view = BoardView::Agent;
     assert_screen(&mut state, "board-agent-detail", MID.0, MID.1);
+}
+
+/// The docket board — what the board opens on — with every lane populated,
+/// an overdue card, a due-today card, and a title long enough to elide.
+fn docket_at(name: &str, size: (u16, u16)) {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    state.board.view = BoardView::Docket;
+    state.docket_sample = crate::app::state::DocketSample::test_fixture();
+    state.board.docket_selected = Some(3);
+    assert_screen(&mut state, name, size.0, size.1);
+}
+
+#[test]
+fn snapshot_docket_wide() {
+    docket_at("docket-wide", WIDE);
+}
+
+#[test]
+fn snapshot_docket_mid() {
+    docket_at("docket-mid", MID);
+}
+
+/// At 80 columns five lanes cannot each hold a card, so the docket stacks.
+#[test]
+fn snapshot_docket_small() {
+    docket_at("docket-small", SMALL);
+}
+
+#[test]
+fn snapshot_docket_item_detail() {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    state.board.view = BoardView::DocketItem;
+    state.docket_sample = crate::app::state::DocketSample::test_fixture();
+    state.board.docket_selected = Some(1);
+    assert_screen(&mut state, "docket-item-detail", MID.0, MID.1);
 }
 
 /// The detail screen at 80x24, where its key/value columns have the least
@@ -624,6 +662,7 @@ fn snapshot_settings_too_small() {
 fn snapshot_board_one_lane() {
     let mut state = fixture::session();
     state.mode = Mode::Board;
+    state.board.view = BoardView::Columns;
     state.workspaces.truncate(1);
     state.active = Some(0);
     assert_screen(&mut state, "board-one-lane", MID.0, MID.1);

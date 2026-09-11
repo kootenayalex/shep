@@ -809,6 +809,8 @@ pub enum Mode {
     RenamePane,
     RequestChanges,
     QueuePrompt,
+    /// Title for a new docket item, captured into the inbox from the board.
+    NewDocketItem,
     NewLinkedWorktree,
     OpenExistingWorktree,
     ConfirmRemoveWorktree,
@@ -861,23 +863,97 @@ impl Mode {
 /// nothing here is serialized into shared session/server state.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct BoardState {
-    /// Currently selected card, identified by its pane. `None` when the board is
-    /// empty or before a selection is established.
+    /// Currently selected agent card, identified by its pane. `None` when the
+    /// agent lanes are empty or before a selection is established.
     pub selected: Option<PaneId>,
-    /// Which board screen is on: the columns, or one of the two detail screens
-    /// reached from them. Esc always steps back to the columns before closing.
+    /// Currently selected docket card, by item id. Kept apart from `selected`
+    /// so flipping between the two boards does not lose either one's place.
+    pub docket_selected: Option<i64>,
+    /// Which board screen is on: one of the two lane boards, or a detail
+    /// screen reached from it. Esc always steps back to the lanes before
+    /// closing.
     pub view: BoardView,
+    /// The last docket verb that failed, in the words of the store, shown on
+    /// the board until the next key. A refused promote is otherwise silent.
+    pub docket_notice: Option<String>,
 }
 
-/// The board's screens. The columns are the board proper; the detail screen is
-/// reached from them and always returns.
+/// The board's screens. The two lane boards are the board proper; each detail
+/// screen is reached from its lanes and always returns there.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum BoardView {
-    /// The state columns — the board itself.
+    /// The docket kanban — inbox, due, slated, recurring, done. What the
+    /// board opens on unless `[ui] board_view = "agents"`.
     #[default]
+    Docket,
+    /// One docket item in full: every field, plus the verbs that apply to it.
+    DocketItem,
+    /// The agent lanes, one per group.
     Columns,
     /// Everything known about the selected card's agent, plus its live screen.
     Agent,
+}
+
+impl BoardView {
+    /// The lane board a detail screen steps back to, or this view when it is
+    /// already a lane board.
+    pub(crate) fn lanes(self) -> BoardView {
+        match self {
+            BoardView::Docket | BoardView::DocketItem => BoardView::Docket,
+            BoardView::Columns | BoardView::Agent => BoardView::Columns,
+        }
+    }
+}
+
+/// The docket rows the board draws, sampled into state so `render` never
+/// opens the store. Separate from [`DashboardSample`] because it holds rows
+/// (not `Copy`), and refreshed only while the board is on screen, where it is
+/// the one thing reading them.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct DocketSample {
+    /// Every row the store returned, in its own order, `done` and
+    /// `discarded` included; the board buckets them.
+    pub rows: Vec<crate::api::schema::DocketItem>,
+    /// The store's idea of today, so due labels agree with what the store
+    /// calls overdue.
+    pub today: Option<crate::docket::dates::Date>,
+    /// `true` once a read has succeeded or failed; distinguishes "the docket
+    /// is empty" from "not sampled yet".
+    pub sampled: bool,
+    pub sampled_at: Option<std::time::Instant>,
+}
+
+impl DocketSample {
+    /// Re-read the docket from `path` if the previous sample has aged out.
+    /// Shares the dashboard's interval — the docket does not move faster than
+    /// that. Returns whether anything was re-read.
+    pub fn refresh_if_stale(&mut self, now: std::time::Instant, path: &std::path::Path) -> bool {
+        if self
+            .sampled_at
+            .is_some_and(|at| now.saturating_duration_since(at) < DASHBOARD_SAMPLE_INTERVAL)
+        {
+            return false;
+        }
+        self.refresh(now, path);
+        true
+    }
+
+    /// Re-read unconditionally — after a mutation, when the cached rows are
+    /// known to be wrong.
+    pub fn refresh(&mut self, now: std::time::Instant, path: &std::path::Path) {
+        match crate::docket::open_store(path).and_then(|conn| crate::docket::list(&conn, None)) {
+            Ok((today, rows)) => {
+                self.today = Some(today);
+                self.rows = rows;
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, path = %path.display(), "docket sample failed");
+                self.rows.clear();
+            }
+        }
+        self.sampled = true;
+        self.sampled_at = Some(now);
+    }
 }
 
 /// Facts the dashboard shows that are too expensive to read every frame:
@@ -930,6 +1006,18 @@ impl AppState {
         true
     }
 
+    /// Re-read the docket if its sample has aged out. Returns whether it did.
+    pub fn refresh_docket_if_stale(&mut self, now: std::time::Instant) -> bool {
+        self.docket_sample.refresh_if_stale(now, &self.docket_db)
+    }
+
+    /// Re-read the docket now — after a mutation from the board, when the
+    /// cached rows are known to be stale.
+    pub fn refresh_docket(&mut self) {
+        self.docket_sample
+            .refresh(std::time::Instant::now(), &self.docket_db);
+    }
+
     /// Re-read every agent's own session file whose sample has aged out.
     ///
     /// Sampled here, beside the dashboard sample, so `render` stays pure — and
@@ -943,6 +1031,181 @@ impl AppState {
         }
         changed
     }
+}
+
+#[cfg(test)]
+impl DocketSample {
+    /// A docket with every lane populated and every card shape represented,
+    /// pinned to a fixed "today" so the due labels never drift. Shared by the
+    /// board's model tests and the screen snapshots.
+    pub(crate) fn test_fixture() -> Self {
+        use crate::api::schema::{DocketItem, DocketKind, DocketRepeat, DocketStatus};
+        fn item(
+            id: i64,
+            title: &str,
+            kind: DocketKind,
+            status: DocketStatus,
+            due: Option<&str>,
+            repeat: Option<DocketRepeat>,
+            updated: &str,
+        ) -> DocketItem {
+            DocketItem {
+                id,
+                title: title.to_string(),
+                kind,
+                status,
+                due: due.map(str::to_string),
+                repeat,
+                source: None,
+                notes: None,
+                created: "2026-09-01T09:00:00Z".to_string(),
+                updated: updated.to_string(),
+                last_fired: None,
+                overdue: false,
+            }
+        }
+        use DocketKind::{Captured, Recurring, Slated};
+        use DocketStatus::{Discarded, Done, Inbox, Open};
+        let mut rows = vec![
+            item(
+                1,
+                "rotate the xAI key",
+                Captured,
+                Inbox,
+                None,
+                None,
+                "2026-09-10T18:00:00Z",
+            ),
+            item(
+                2,
+                "clear the SHIFTSMART / SHYFT trademark risk",
+                Captured,
+                Inbox,
+                None,
+                None,
+                "2026-09-10T17:00:00Z",
+            ),
+            item(
+                11,
+                "offsite backup leg for restic: the google drive leg is dead, one copy only",
+                Captured,
+                Inbox,
+                None,
+                None,
+                "2026-09-09T08:00:00Z",
+            ),
+            item(
+                3,
+                "sign the four incorporation forms",
+                Slated,
+                Open,
+                Some("2026-09-08"),
+                None,
+                "2026-09-02T09:00:00Z",
+            ),
+            item(
+                4,
+                "review the Vikunja board",
+                Recurring,
+                Open,
+                Some("2026-09-11"),
+                Some(DocketRepeat::Weekly),
+                "2026-09-04T09:00:00Z",
+            ),
+            item(
+                5,
+                "pay CIPO $640.10",
+                Slated,
+                Open,
+                Some("2026-09-16"),
+                None,
+                "2026-09-03T09:00:00Z",
+            ),
+            item(
+                6,
+                "dogfood the docket for a week",
+                Slated,
+                Open,
+                None,
+                None,
+                "2026-09-10T12:00:00Z",
+            ),
+            item(
+                7,
+                "A5 annual filing",
+                Recurring,
+                Open,
+                Some("2026-10-07"),
+                Some(DocketRepeat::Monthly),
+                "2026-09-01T09:00:00Z",
+            ),
+            item(
+                8,
+                "land the docket store",
+                Slated,
+                Done,
+                None,
+                None,
+                "2026-09-10T20:00:00Z",
+            ),
+            item(
+                9,
+                "buy the domains",
+                Slated,
+                Done,
+                None,
+                None,
+                "2026-09-09T20:00:00Z",
+            ),
+            item(
+                10,
+                "a queue nobody used",
+                Captured,
+                Discarded,
+                None,
+                None,
+                "2026-09-10T09:00:00Z",
+            ),
+        ];
+        rows[0].source = Some(serde_json::json!({
+            "file": "/Users/alex/.claude/projects/-Users-alex/memory/project_hutch_r1_launcher.md",
+            "line": 12
+        }));
+        rows[0].notes =
+            Some("billing is wall-clock, not per call\nsee the hutch memory file".into());
+        rows[1].source = Some(serde_json::json!({"pane": "p3", "session": "abc"}));
+        rows[3].notes = Some("Nora has the envelope".into());
+        rows[3].overdue = true;
+        rows[4].source = Some(serde_json::json!({
+            "file": "/Users/alex/vault/agents/vikunja-docket/dockets/shiftmayt.mjs",
+            "line": 1
+        }));
+        rows[6].notes = Some("Vaultwarden token still leaked; rotate first".into());
+        Self {
+            rows,
+            today: crate::docket::dates::Date::parse("2026-09-11"),
+            sampled: true,
+            sampled_at: Some(std::time::Instant::now()),
+        }
+    }
+}
+
+/// A docket path no test shares with another or with the real state dir.
+/// Nothing is created until a test actually reads or writes the docket.
+#[cfg(test)]
+pub(crate) fn test_docket_db_path() -> std::path::PathBuf {
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    std::env::temp_dir()
+        .join(format!(
+            "shep-test-docket-{}-{seq}-{nanos}",
+            std::process::id()
+        ))
+        .join("docket.db")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1647,6 +1910,8 @@ pub struct AppState {
     /// Esc in an agent pane returns to the session board; `shift+esc` carries
     /// the interrupt through to the agent instead.
     pub escape_returns_to_board: bool,
+    /// The lane board the session board opens on (`[ui] board_view`).
+    pub board_default_view: BoardView,
     /// The last Esc arrived as a bare `0x1b`: the attached host cannot tell
     /// `shift+esc` from `esc`, so Esc reaches the agent and the hint bar says so.
     pub escape_host_is_legacy: bool,
@@ -1727,6 +1992,12 @@ pub struct AppState {
     /// timer rather than per frame because reading them touches sysctls;
     /// render only ever reads this snapshot.
     pub dashboard_sample: DashboardSample,
+    /// The docket rows the board draws, sampled beside the dashboard.
+    pub(crate) docket_sample: DocketSample,
+    /// Where the docket lives. A path rather than a connection so state stays
+    /// plain data, and so a test can point it at a scratch directory instead
+    /// of the real `<state dir>/docket.db`.
+    pub(crate) docket_db: std::path::PathBuf,
     /// Set when a persisted session snapshot would change.
     pub session_dirty: bool,
     /// Terminal runtimes that should be shut down by the app/runtime layer
@@ -2098,6 +2369,7 @@ impl AppState {
             titlebar: false,
             hint_bar: false,
             escape_returns_to_board: false,
+            board_default_view: BoardView::Docket,
             escape_host_is_legacy: false,
             pane_history_persistence: false,
             reveal_hidden_cursor_for_cjk_ime: false,
@@ -2152,6 +2424,8 @@ impl AppState {
             pair_phone: None,
             host_terminal_theme: TerminalTheme::default(),
             dashboard_sample: DashboardSample::default(),
+            docket_sample: DocketSample::default(),
+            docket_db: test_docket_db_path(),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         }

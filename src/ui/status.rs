@@ -233,6 +233,9 @@ pub(super) enum StateInk {
     /// Waiting on a person, not a process. The review badge's mauve; a manual
     /// "needs review" state borrows it so the two claims read alike.
     Review,
+    /// Behind: the peach of "behind upstream" and "changes requested". An
+    /// overdue docket item, which is a nag and not a stop.
+    Warning,
 }
 
 impl StateInk {
@@ -245,6 +248,7 @@ impl StateInk {
             StateInk::Waiting => p.overlay1,
             StateInk::Absent => p.overlay0,
             StateInk::Review => p.mauve,
+            StateInk::Warning => p.peach,
         }
     }
 
@@ -327,6 +331,37 @@ pub(super) fn state_appearance(state: AgentState, seen: bool, tick: u32) -> Stat
         // else. A state and a badge sharing a mark made both ambiguous.
         (AgentState::Idle, true) => ("○", "idle", StateInk::Settled),
         (AgentState::Unknown, _) => ("·", "idle", StateInk::Absent),
+    };
+    StateAppearance { glyph, label, ink }
+}
+
+/// How close a docket item's date is, for [`docket_appearance`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DocketUrgency {
+    /// `due < today` on an open item.
+    Overdue,
+    /// `due == today`.
+    Today,
+    /// Later, or undated.
+    Later,
+}
+
+/// The docket vocabulary. See `docs/DESIGN-LANGUAGE.md`: the shapes are the
+/// task table's — hollow for undecided, filled for live, green when settled —
+/// and the one new mark is `!`, so an overdue item is never told apart by
+/// colour alone.
+pub(super) fn docket_appearance(
+    status: crate::api::schema::DocketStatus,
+    urgency: DocketUrgency,
+) -> StateAppearance {
+    use crate::api::schema::DocketStatus;
+    let (glyph, label, ink) = match (status, urgency) {
+        (DocketStatus::Inbox, _) => ("○", "inbox", StateInk::Waiting),
+        (DocketStatus::Open, DocketUrgency::Overdue) => ("!", "overdue", StateInk::Warning),
+        (DocketStatus::Open, DocketUrgency::Today) => ("●", "due today", StateInk::Working),
+        (DocketStatus::Open, DocketUrgency::Later) => ("●", "open", StateInk::Waiting),
+        (DocketStatus::Done, _) => ("●", "done", StateInk::Settled),
+        (DocketStatus::Discarded, _) => ("·", "discarded", StateInk::Absent),
     };
     StateAppearance { glyph, label, ink }
 }

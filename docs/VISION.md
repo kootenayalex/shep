@@ -143,7 +143,10 @@ live now.
 
 **Deferred** (open, in rough value order — all confirmed unbuilt 2026-08-06):
 - dispatch-review to a second agent (M3 stretch)
-- board task/review columns (board currently shows agent states only)
+- ~~board task/review columns~~ — replaced 2026-09-11 by the docket board:
+  `BoardView::Docket` is what the board opens on (inbox · due · slated ·
+  recurring · done), the agent lanes are one key away (`a`). Review columns
+  are still not a thing; review state stays a badge on the agent card.
 - approach comparison (two worktrees side-by-side)
 - session recording (asciinema)
 - native width-adaptive diff widget (review currently uses a pager pane)

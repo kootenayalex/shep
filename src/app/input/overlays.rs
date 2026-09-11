@@ -253,13 +253,29 @@ impl App {
         }
 
         if self.state.mode == Mode::Board {
+            use crate::app::state::BoardView;
             // The detail screens draw over the card geometry, so hit-testing
-            // cards there would focus a pane the user never clicked. A click
-            // steps back to the columns instead.
-            if self.state.board.view != crate::app::state::BoardView::Columns {
+            // cards there would act on a card the user never clicked. A click
+            // steps back to the lanes it came from instead.
+            let view = self.state.board.view;
+            if view != view.lanes() {
                 if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left)) {
-                    self.state
-                        .set_board_view(crate::app::state::BoardView::Columns);
+                    self.state.set_board_view(view.lanes());
+                }
+                return true;
+            }
+            if view == BoardView::Docket {
+                // A docket card is selected by a click and opened by a key;
+                // there is no pane behind it to fall into.
+                if matches!(
+                    mouse.kind,
+                    MouseEventKind::Moved | MouseEventKind::Down(MouseButton::Left)
+                ) {
+                    if let Some(id) =
+                        crate::ui::board::docket_card_at(&self.state, mouse.column, mouse.row)
+                    {
+                        self.state.board.docket_selected = Some(id);
+                    }
                 }
                 return true;
             }

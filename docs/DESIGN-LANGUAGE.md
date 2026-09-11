@@ -99,6 +99,45 @@ calling it something else.
 - Desktop: `task_appearance` in `src/ui/status.rs`.
 - Companion: `ShepSemantic.task` in `ui/theme/ShepSemantic.kt`.
 
+## Docket states
+
+A docket item is a reminder, not a process, so its table is short and borrows
+the task table's shapes: hollow for undecided, filled for live, green when
+settled. The one new mark is `!`.
+
+| state | label | glyph | colour |
+|---|---|---|---|
+| inbox | `inbox` | `○` | overlay1 |
+| open, overdue | `overdue` | `!` | peach, bold |
+| open, due today | `due today` | `●` | yellow |
+| open, later or undated | `open` | `●` | overlay1 |
+| done | `done` | `●` | green |
+| discarded | `discarded` | `·` | overlay0 (never drawn on the board) |
+
+**Overdue is a warning, not a stop.** Peach, because red is what a blocked
+agent gets and an item three days late is a nag. And never colour alone: the
+gutter glyph *is* the `!`, the card's date row says `overdue 3d`, and the due
+lane's heading counts them (`due 2 !1`). Due today takes the working tier's
+yellow — it is the thing happening now — and lights the date row the same way.
+
+- Desktop: `docket_appearance` in `src/ui/status.rs`.
+
+### The docket card
+
+Four rows at most, and only the rows the item has something to put on:
+
+| row | content | when |
+|---|---|---|
+| 1 | gutter glyph · `#id` · title (elided) | always |
+| 2 | kind `·` date `·` repeat | always; date is `overdue 3d` / `due today` / `in 5d` / `—`, repeat only when there is one |
+| 3 | source: `memory.md:12` for a file, `pane p3` for a session | when the item has a source |
+| 4 | first line of the notes, italic | when the item has notes |
+
+The id leads the title because the id is what the CLI verbs take. Stacked on
+a narrow terminal every card is its first two rows, so the due lane still
+lands on an 80×24 screen; the detail screen (`i`) has the rest, with the
+source unabridged and the notes whole.
+
 ## Badges
 
 Badges sit beside a name and answer a different question from state.

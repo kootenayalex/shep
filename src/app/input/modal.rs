@@ -369,6 +369,15 @@ pub(super) fn open_request_changes(state: &mut AppState, ws_idx: usize) {
     state.mode = Mode::RequestChanges;
 }
 
+/// Open the new-docket-item prompt from the board. Its title becomes a
+/// captured item in the inbox; Esc and enter both return to the board.
+pub(super) fn open_new_docket_item(state: &mut AppState) {
+    state.rename_pane_target = None;
+    state.name_input = String::new();
+    state.name_input_replace_on_type = false;
+    state.mode = Mode::NewDocketItem;
+}
+
 /// Open the queue-prompt modal for a pane (M5 tab-to-queue).
 pub(super) fn open_queue_prompt(
     state: &mut AppState,
@@ -1120,6 +1129,14 @@ impl App {
                 }
                 return;
             }
+            Mode::NewDocketItem => {
+                let title = self.state.name_input.trim().to_string();
+                cancel_rename_modal(&mut self.state);
+                if !title.is_empty() {
+                    self.state.docket_add_captured(title);
+                }
+                return;
+            }
             Mode::QueuePrompt => {
                 let text = self.state.name_input.trim().to_string();
                 let target = self.state.queue_prompt_target.take();
@@ -1617,12 +1634,19 @@ impl App {
 }
 
 fn cancel_rename_modal(state: &mut AppState) {
+    // The docket prompt was opened from the board, so it hands back to the
+    // board rather than to whatever pane is behind it.
+    let back_to_board = state.mode == Mode::NewDocketItem;
     state.creating_new_tab = false;
     state.requested_new_tab_name = None;
     state.rename_pane_target = None;
     state.name_input.clear();
     state.name_input_replace_on_type = false;
-    leave_modal(state);
+    if back_to_board {
+        state.mode = Mode::Board;
+    } else {
+        leave_modal(state);
+    }
 }
 
 impl AppState {

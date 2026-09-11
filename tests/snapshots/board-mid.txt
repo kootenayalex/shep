@@ -39,7 +39,7 @@
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
-│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  esc/q close                                                   │
+│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  a docket  esc/q close                                         │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
@@ -81,7 +81,7 @@ annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-anbbbbbffffffffbffffffffffbbbbbbbbbfffffffbbfffffffffffffbbbbbffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
+anbbbbbffffffffbffffffffffbbbbbbbbbfffffffbbfffffffffffffbfffffffffbbbbbffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 nbbbbbbfffffffffbfffffffffbffffffbfffffffbfffffffnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 

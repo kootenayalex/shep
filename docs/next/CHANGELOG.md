@@ -100,6 +100,21 @@
 
 ### Changed
 
+- The board opens on the docket. The session board is now two lane boards
+  one key apart: the docket — inbox, due, slated, recurring, done — and the
+  agent lanes it used to be. `[ui] board_view = "docket" | "agents"` picks
+  which one opens (docket by default) and `a` flips between them. A docket
+  card reads `#id title`, then kind, date and repeat, then its source and
+  the first line of its notes when it has them; an overdue item carries `!`
+  in peach so it is never told apart by colour alone, and the due lane's
+  heading counts them. The verbs are keys: `n` captures a new item into the
+  inbox, `p` and `r` promote the selected inbox item as slated or
+  weekly-recurring, `d` completes it, `x` discards it, and `i` opens it in
+  full. A verb the store refuses says why on the footer instead of doing
+  nothing. Stacked on a narrow terminal, docket cards are two rows each so
+  the due lane still makes it onto an 80×24 screen, and the dashboard strip
+  on either board counts what the docket has due and waiting.
+
 - The expanded sidebar is one tree: every group, with its own agents nested
   under it. It used to be two stacked panels over the same objects — a group
   list on top, a flat list of every agent below — so a screen with three groups

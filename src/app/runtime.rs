@@ -263,6 +263,15 @@ impl App {
             changed = true;
         }
 
+        // The docket rows cost a sqlite read, so they are sampled only while
+        // the board is up — any of its screens, since the dashboard strip on
+        // the agent lanes counts them too.
+        if self.state.mode == crate::app::state::Mode::Board
+            && self.state.refresh_docket_if_stale(now)
+        {
+            changed = true;
+        }
+
         // What each agent says about its own session. Not gated on a screen:
         // the sidebar, the board and the phone all read it.
         if self.state.refresh_session_facts(now) {

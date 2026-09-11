@@ -117,6 +117,17 @@ pub enum HostCursorModeConfig {
     Drawn,
 }
 
+/// Which lane board the session board opens on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BoardViewConfig {
+    /// The docket kanban: inbox, due, slated, recurring, done.
+    #[default]
+    Docket,
+    /// The agent lanes, one per group.
+    Agents,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SidebarCollapsedModeConfig {
@@ -848,6 +859,9 @@ pub struct UiConfig {
     /// a session with several agents starts with the overview. Enter focuses
     /// the selected pane. Default: true.
     pub open_on_board: bool,
+    /// Which lane board the session board opens on: the docket kanban or the
+    /// agent lanes. The other is one key (`a`) away. Default: docket.
+    pub board_view: BoardViewConfig,
     /// Make the board the leading screen: a bare Esc in a pane running a
     /// recognized agent returns to the session board instead of reaching the
     /// agent, and `shift+esc` sends the interrupt through instead. Panes with
@@ -1304,6 +1318,7 @@ impl Default for UiConfig {
             titlebar: true,
             hint_bar: true,
             open_on_board: true,
+            board_view: BoardViewConfig::Docket,
             escape_returns_to_board: true,
             agent_panel_sort: AgentPanelSortConfig::Spaces,
             accent: "cyan".into(),
@@ -1549,6 +1564,20 @@ hint_bar = false
         let config: Config = toml::from_str(toml).unwrap();
         assert!(!config.ui.titlebar);
         assert!(!config.ui.hint_bar);
+    }
+
+    #[test]
+    fn board_view_defaults_to_the_docket_and_can_pick_the_agents() {
+        assert_eq!(Config::default().ui.board_view, BoardViewConfig::Docket);
+        let config: Config = toml::from_str(
+            r#"
+[ui]
+board_view = "agents"
+"#,
+        )
+        .expect("config should parse");
+        assert_eq!(config.ui.board_view, BoardViewConfig::Agents);
+        assert!(toml::from_str::<Config>("[ui]\nboard_view = \"tasks\"\n").is_err());
     }
 
     #[test]
