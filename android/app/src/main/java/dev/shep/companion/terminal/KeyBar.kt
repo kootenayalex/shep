@@ -62,21 +62,6 @@ fun KeyBar(
         consumeArmed()
     }
 
-    /**
-     * A literal character, unless a modifier is held — then it is a chord.
-     *
-     * `shift+y` is not the text "y" with a flag; the server resolves it to `Y`,
-     * the same as `ctrl+y` resolves to a control byte. Sending the raw text
-     * instead would drop the modifier on the floor while leaving it lit.
-     */
-    fun fireText(text: String) {
-        val plain = ctrl == ModifierState.Off &&
-            alt == ModifierState.Off &&
-            shift == ModifierState.Off
-        if (plain) onKey(TerminalKey.Text(text)) else fire(text)
-        consumeArmed()
-    }
-
     Column(
         modifier
             .fillMaxWidth()
@@ -84,19 +69,24 @@ fun KeyBar(
             .padding(vertical = ShepSpace.snug),
         verticalArrangement = Arrangement.spacedBy(ShepSpace.snug),
     ) {
-        // Answers to agent prompts are the highest-frequency taps, so they lead
-        // — and so does ⇧⇥, which is how you change claude's mode. A phone
-        // keyboard has no shift+tab at all, so reaching it through the sticky
-        // modifier below would make the app's most-wanted key a two-tap.
+        // The fixed row holds the keys that must never be a scroll away: commit,
+        // cancel, and the two tabs. A phone keyboard has no tab at all and no
+        // shift+tab either, so reaching ⇧⇥ — which is how you change claude's
+        // mode — through the sticky modifier below would make the app's
+        // most-wanted key a two-tap.
+        //
+        // `y` and `n` used to lead here, from when a permission prompt was
+        // answered by typing a letter. Agents ask with a menu now, so the
+        // answer is an arrow and enter; two keys that only ever sent a literal
+        // character were spending the best real estate on the bar.
         Row(
             Modifier.fillMaxWidth().padding(horizontal = ShepSpace.small),
             horizontalArrangement = Arrangement.spacedBy(ShepSpace.snug),
         ) {
-            Key("y", Modifier.weight(1f), ShepPalette.green) { fireText("y") }
-            Key("n", Modifier.weight(1f), ShepPalette.red) { fireText("n") }
             Key("↵", Modifier.weight(1f)) { fire("enter") }
             Key("esc", Modifier.weight(1f)) { fire("esc") }
             Key("⇧⇥", Modifier.weight(1f), tag = "shift-tab") { fire("tab", withShift = true) }
+            Key("⇥", Modifier.weight(1f)) { fire("tab") }
         }
         Row(
             Modifier
@@ -106,6 +96,14 @@ fun KeyBar(
             horizontalArrangement = Arrangement.spacedBy(ShepSpace.snug),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Arrows first: this row scrolls, and picking an answer out of an
+            // agent's menu is the thing you do most often on it. The sticky
+            // modifiers used to hold the left edge and were the thing you
+            // reach for least.
+            Key("↑") { fire("up") }
+            Key("↓") { fire("down") }
+            Key("←") { fire("left") }
+            Key("→") { fire("right") }
             StickyKey("ctrl", ctrl) {
                 ctrl = ctrl.advance(it)
             }
@@ -115,11 +113,6 @@ fun KeyBar(
             StickyKey("shift", shift) {
                 shift = shift.advance(it)
             }
-            Key("⇥") { fire("tab") }
-            Key("↑") { fire("up") }
-            Key("↓") { fire("down") }
-            Key("←") { fire("left") }
-            Key("→") { fire("right") }
             Key("^C") { onKey(TerminalKey.Named("ctrl+c")) }
             Key("^D") { onKey(TerminalKey.Named("ctrl+d")) }
             Key("^L") { onKey(TerminalKey.Named("ctrl+l")) }

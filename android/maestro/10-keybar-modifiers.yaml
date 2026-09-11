@@ -1,6 +1,12 @@
-# Key bar: ^C interrupts, a sticky modifier arms for one key (shift+y reaches
-# the pty as Y), a double tap locks it (the label grows a dot) and a tap on a
-# locked one clears it. Everything is checked on the grid's text.
+# Key bar: ^C interrupts, a double tap locks a sticky modifier (the label grows
+# a dot) and a tap on a locked one clears it.
+#
+# Arming for a single key used to be proved here as `shift` + `y` reaching the
+# pty as `Y`. The bar has no literal-character keys left — agents ask with a
+# menu now, so `y`/`n` went — and an armed modifier looks exactly like an idle
+# one to a text assertion; only Locked carries the dot. That half is pinned
+# where it can actually be asserted instead: `ModifierState.advance` and
+# `keyCombo` in KeyComboTest.kt, and `parse_key_combo` on the server.
 appId: dev.shep.companion
 ---
 # -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
@@ -29,11 +35,6 @@ appId: dev.shep.companion
       text: "\\^C"
     direction: RIGHT
     duration: 400
-# Armed: one key, then off.
-- tapOn: "shift"
-- tapOn: "y"
-- assertVisible: "(?s).*[$%] Y.*"
-- assertNotVisible: "shift•"
 # Locked: the label carries a dot until tapped again. The row may have come
 # back from the control keys short of its start; a swipe from a key that is
 # always visible settles it.

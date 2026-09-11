@@ -4,6 +4,24 @@
 
 ### Added
 
+- A new session on the phone can start unsupervised. The new-session sheet has
+  a "skip permission prompts" switch for runtimes whose flag shep can name —
+  today that is claude, which starts with `--dangerously-skip-permissions`. It
+  is never the default and is never remembered between sheets, because the
+  whole point of the flag is that it is a decision; the switch says what it
+  costs in prose rather than asking whether you are sure, and the start button
+  reads "start claude unsupervised" so the last thing you tap still says what
+  you are doing. Runtimes whose flag is not known carry none: guessing one
+  either fails the launch or is swallowed, leaving a session whose supervision
+  is not what the switch claimed.
+
+- The phone keeps a connection history, on the Shep tab under `connection`.
+  Every attempt, failure and drop, with the address it used and the reason —
+  because "it would not connect" is a question about a history, and a status
+  line can only ever say what is true this second. It is device-local and asks
+  the server nothing, so it still has answers precisely when the connection is
+  the thing that is broken. The address is recorded without its token.
+
 - An agent's own checklist, on the phone. A pane's action row has a `todos`
   sheet: the list the agent is working through right now, read out of the
   harness's own task store when it has one and folded back out of the session
@@ -199,6 +217,14 @@
 - `[notifications] notify_on` now accepts `done`, `task`, and `review` alongside the agent states, so the exec-bridge can page on a run completing, a queued task changing state, and a workspace becoming ready for review — not only on an agent blocking. `done` is a completed run specifically (working → idle), which is why it is separate from `idle`; subscribe to both to hear about every trip through idle. The exec command now also receives `SHEP_NOTIFY_KIND` (which of the four fired), `SHEP_NOTIFY_TITLE`, and `SHEP_NOTIFY_TASK_ID`.
 
 ### Changed
+
+- The phone's key bar drops `y` and `n` and leads its scrolling row with the
+  arrows. Agents ask with a menu now, so an answer is an arrow and enter, not a
+  typed letter — and two keys that only ever sent a literal character were
+  holding the best real estate on the bar. The fixed row is `↵ esc ⇧⇥ ⇥`: a
+  phone keyboard has neither tab nor shift+tab, so neither can be a scroll or a
+  sticky-modifier away. The sticky `ctrl`/`alt`/`shift` move to the right of
+  the arrows, being what you reach for least.
 - The session board is now the leading screen: Esc in a pane running a recognized agent returns to the board instead of reaching the agent, and `shift+esc` sends the interrupt through (`ui.escape_returns_to_board`, default on). Panes with no detected agent keep their own Esc. Needs a host terminal that disambiguates escape codes (Ghostty, kitty, WezTerm); turn it off elsewhere.
 - Panel, modal, toast, and pane borders now use rounded corners.
 - Agent labels on split-pane borders are on by default and carry the agent state (e.g. `claude · working`) in the state-ring color (`ui.show_agent_labels_on_pane_borders`, now default true).

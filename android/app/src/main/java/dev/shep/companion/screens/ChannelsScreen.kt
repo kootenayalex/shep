@@ -400,9 +400,18 @@ fun ChannelsScreen(
      * *splits* into the workspace, which would leave the fresh root shell
      * sitting next to the agent; with `new_workspace` it cannot carry a label.
      */
-    fun startSession(cwd: String, name: String, runtime: SessionRuntime) {
+    fun startSession(
+        cwd: String,
+        name: String,
+        runtime: SessionRuntime,
+        bypass: Boolean = false,
+    ) {
         scope.launch {
-            notice = "starting ${runtime.label}…"
+            notice = if (bypass) {
+                "starting ${runtime.label} unsupervised…"
+            } else {
+                "starting ${runtime.label}…"
+            }
             withContext(Dispatchers.IO) {
                 runCatching {
                     val created = client.call(
@@ -417,11 +426,17 @@ fun ChannelsScreen(
                         ?.takeIf { it.isNotEmpty() }
                         ?: throw IllegalStateException("workspace.create returned no root pane")
                     if (runtime.argv.isNotEmpty()) {
+                        // The flag is appended rather than baked into `argv` so
+                        // the runtime's own command line stays one thing and the
+                        // choice stays another — and so a runtime with no flag
+                        // to name cannot be launched with someone else's.
+                        val argv = runtime.argv +
+                            listOfNotNull(runtime.bypassFlag.takeIf { bypass })
                         client.call(
                             "pane.send_text",
                             JSONObject()
                                 .put("pane_id", paneId)
-                                .put("text", runtime.argv.joinToString(" ") + "\n"),
+                                .put("text", argv.joinToString(" ") + "\n"),
                         )
                     }
                     // Name the agent too, not just the workspace: the row's
@@ -533,9 +548,9 @@ fun ChannelsScreen(
         NewSessionSheet(
             recentRepos = recentRepos,
             onDismiss = { showNew = false },
-            onStart = { cwd, name, runtime ->
+            onStart = { cwd, name, runtime, bypass ->
                 showNew = false
-                startSession(cwd, name, runtime)
+                startSession(cwd, name, runtime, bypass)
             },
         )
     }

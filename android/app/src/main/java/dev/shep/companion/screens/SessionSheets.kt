@@ -1,7 +1,9 @@
 package dev.shep.companion.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,8 +44,22 @@ import dev.shep.companion.ui.theme.ShepType
  * an agent — a login shell, which is a first-class thing to want from the phone
  * and not a degraded agent session.
  */
-enum class SessionRuntime(val label: String, val argv: List<String>, val agentName: String) {
-    Claude("claude", listOf("claude"), "claude"),
+enum class SessionRuntime(
+    val label: String,
+    val argv: List<String>,
+    val agentName: String,
+    /**
+     * The runtime's own "stop asking me" flag, or `null` when it has none that
+     * can be named with certainty.
+     *
+     * Only claude's is listed. The others have their own spellings and their
+     * own blast radius, and guessing a flag that a runtime does not accept
+     * either fails the launch or — worse — is swallowed and leaves a session
+     * you believe is unsupervised behaving normally, or the reverse.
+     */
+    val bypassFlag: String? = null,
+) {
+    Claude("claude", listOf("claude"), "claude", "--dangerously-skip-permissions"),
     Opencode("opencode", listOf("opencode"), "opencode"),
     Grok("grok", listOf("grok"), "grok"),
     Terminal("terminal", emptyList(), "shell");
@@ -60,11 +79,15 @@ enum class SessionRuntime(val label: String, val argv: List<String>, val agentNa
 fun NewSessionSheet(
     recentRepos: List<String>,
     onDismiss: () -> Unit,
-    onStart: (cwd: String, name: String, runtime: SessionRuntime) -> Unit,
+    onStart: (cwd: String, name: String, runtime: SessionRuntime, bypass: Boolean) -> Unit,
 ) {
     var cwd by remember { mutableStateOf(recentRepos.firstOrNull() ?: "") }
     var name by remember { mutableStateOf("") }
     var runtime by remember { mutableStateOf(SessionRuntime.Claude) }
+    // Never remembered across sheets and never the default: the whole point of
+    // the flag is that it is a decision, and a decision made once should not
+    // quietly apply to every session you open afterwards.
+    var bypass by remember { mutableStateOf(false) }
 
     ShepSheet(title = "new session", onDismiss = onDismiss) {
             OutlinedTextField(
@@ -99,6 +122,47 @@ fun NewSessionSheet(
                     ShepChip(option.label, option == runtime) { runtime = option }
                 }
             }
+            runtime.bypassFlag?.let { flag ->
+                Spacer(Modifier.height(ShepSpace.medium))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .minimumInteractiveComponentSize()
+                        .clickable { bypass = !bypass },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "skip permission prompts",
+                            style = ShepType.itemName.copy(
+                                color = if (bypass) ShepPalette.peach else ShepPalette.text,
+                            ),
+                        )
+                        // What it costs, concretely, rather than "are you sure".
+                        // This session will edit files and run commands without
+                        // asking, including while nobody is looking at it.
+                        Text(
+                            if (bypass) {
+                                "starts with $flag — it will edit and run " +
+                                    "without asking you first"
+                            } else {
+                                "it will ask before editing files or running commands"
+                            },
+                            style = ShepType.bodySmall.copy(color = ShepPalette.overlay0),
+                        )
+                    }
+                    Switch(
+                        checked = bypass,
+                        onCheckedChange = { bypass = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = ShepPalette.panelBg,
+                            checkedTrackColor = ShepPalette.peach,
+                            uncheckedThumbColor = ShepPalette.overlay0,
+                            uncheckedTrackColor = ShepPalette.surface0,
+                        ),
+                    )
+                }
+            }
             Spacer(Modifier.height(ShepSpace.medium))
             OutlinedTextField(
                 value = name,
@@ -116,10 +180,10 @@ fun NewSessionSheet(
             )
             Spacer(Modifier.height(ShepSpace.screen))
             ShepButton(
-                "start ${runtime.label}",
+                if (bypass) "start ${runtime.label} unsupervised" else "start ${runtime.label}",
                 enabled = cwd.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { onStart(cwd.trim(), name.trim(), runtime) }
+            ) { onStart(cwd.trim(), name.trim(), runtime, bypass && runtime.bypassFlag != null) }
     }
 }
 

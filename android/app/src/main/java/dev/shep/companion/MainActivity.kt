@@ -208,8 +208,16 @@ fun ShepApp(
         val error = withContext(Dispatchers.IO) {
             runCatching { fresh.connect() }.getOrElse { it.message ?: "connection failed" }
         }
-        if (error != null) return error
+        // Both outcomes are recorded here because this is the one place every
+        // attempt goes through — first auto-connect, manual retry, and every
+        // reconnect the loop below asks for.
+        if (error != null) {
+            ConnectionLog.record(context, ConnectionEvent.Kind.Failed, saved.url, error)
+            return error
+        }
+        ConnectionLog.record(context, ConnectionEvent.Kind.Connected, saved.url)
         fresh.onDisconnect = { reason ->
+            ConnectionLog.record(context, ConnectionEvent.Kind.Dropped, saved.url, reason)
             online = false
             connectError = reason ?: "disconnected"
             reconnectSignal += 1

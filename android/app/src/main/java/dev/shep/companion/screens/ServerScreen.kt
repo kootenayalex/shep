@@ -28,6 +28,8 @@ import dev.shep.companion.FcmManager
 import dev.shep.companion.PairingStore
 import dev.shep.companion.NotifyKind
 import dev.shep.companion.BridgeClient
+import dev.shep.companion.ConnectionEvent
+import dev.shep.companion.ConnectionLog
 import dev.shep.companion.ui.components.ButtonTone
 import dev.shep.companion.ui.components.ExplainLine
 import dev.shep.companion.ui.components.ExplainRow
@@ -60,6 +62,10 @@ fun ServerScreen(
     var kinds by remember { mutableStateOf(FcmManager.selectedKinds(context)) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
+    // Re-read whenever the link changes state, so opening this screen after a
+    // drop shows the drop rather than the history as of the last composition.
+    val history = remember(client, client?.isOpen) { ConnectionLog.entries(context) }
+    var historyOpen by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenHeader("shep")
@@ -98,6 +104,39 @@ fun ServerScreen(
                 Text("connection", style = ShepType.sectionLabel)
                 ServerInfoRow("status", if (client?.isOpen == true) "connected" else "offline")
                 ServerInfoRow("version", client?.serverVersion ?: "unknown")
+                Spacer(Modifier.height(ShepSpace.small))
+                // The status line can only say what is true this second. When
+                // the link is the thing that is broken, the useful question is
+                // what it has been doing — so the history is one tap away,
+                // collapsed by default because it is not the common question.
+                Text(
+                    if (historyOpen) "hide history" else historySummary(history),
+                    style = ShepType.meta.copy(color = ShepPalette.accent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .minimumInteractiveComponentSize()
+                        .clickable { historyOpen = !historyOpen },
+                )
+                if (historyOpen) {
+                    if (history.isEmpty()) {
+                        Text(
+                            "nothing recorded yet — this fills in as the phone " +
+                                "connects and drops.",
+                            style = ShepType.bodySmall.copy(color = ShepPalette.overlay0),
+                        )
+                    } else {
+                        history.forEach { ConnectionHistoryRow(it) }
+                        Spacer(Modifier.height(ShepSpace.small))
+                        ShepButton(
+                            text = "clear history",
+                            tone = ButtonTone.Quiet,
+                            onClick = {
+                                ConnectionLog.clear(context)
+                                historyOpen = false
+                            },
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(ShepSpace.section))
             Text("notify me about", style = ShepType.sectionLabel)
@@ -196,6 +235,51 @@ fun ServerScreen(
                 onClick = onRePair,
             )
             Spacer(Modifier.height(ShepSpace.section))
+        }
+    }
+}
+
+/**
+ * The collapsed line: the last thing that happened, so the history is worth
+ * opening (or obviously is not) without opening it.
+ */
+private fun historySummary(history: List<ConnectionEvent>): String {
+    val last = history.firstOrNull() ?: return "connection history"
+    return "connection history · last ${last.kind.label} ${ago(last.at)}"
+}
+
+/** `4m`, `3h`, `2d` — coarse on purpose; the exact second is never the question. */
+private fun ago(at: Long): String {
+    val seconds = ((System.currentTimeMillis() - at) / 1000).coerceAtLeast(0)
+    return when {
+        seconds < 60 -> "just now"
+        seconds < 3600 -> "${seconds / 60}m ago"
+        seconds < 86_400 -> "${seconds / 3600}h ago"
+        else -> "${seconds / 86_400}d ago"
+    }
+}
+
+@Composable
+private fun ConnectionHistoryRow(event: ConnectionEvent) {
+    val colour = when (event.kind) {
+        ConnectionEvent.Kind.Connected -> ShepPalette.green
+        ConnectionEvent.Kind.Failed -> ShepPalette.red
+        ConnectionEvent.Kind.Dropped -> ShepPalette.peach
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = ShepSpace.tight)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(event.kind.label, style = ShepType.meta.copy(color = colour))
+            Text(ago(event.at), style = ShepType.metaSmall)
+        }
+        // The address matters as much as the outcome: a failure against the
+        // wrong host is a different problem from a failure against the right
+        // one, and that is exactly what a rotated address looks like.
+        Text(event.host, style = ShepType.metaSmall.copy(color = ShepPalette.overlay0))
+        event.detail?.let {
+            Text(it, style = ShepType.metaSmall.copy(color = ShepPalette.overlay0))
         }
     }
 }
