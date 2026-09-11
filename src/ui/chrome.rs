@@ -136,6 +136,13 @@ pub(super) fn render_hint_bar(app: &AppState, frame: &mut Frame, area: Rect) {
     if app.escape_returns_to_board_here() {
         hints.push(("esc".to_string(), "board"));
         hints.push(("shift+esc".to_string(), "interrupt"));
+    } else if app.escape_interrupts_here() {
+        // This host sends a bare Esc, so there is no shift+esc to offer: Esc
+        // stays the interrupt and the board is a key of its own.
+        hints.push(("esc".to_string(), "interrupt"));
+        if let Some(rhs) = prefix_rhs(&app.keybinds.board) {
+            hints.push((rhs, "board"));
+        }
     }
     for (bindings, label) in [
         (&app.keybinds.workspace_picker, "groups"),

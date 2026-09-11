@@ -53,10 +53,7 @@ pub fn parse_raw_input_bytes_with_ranges(data: &[u8]) -> Vec<RawInputEventWithRa
     if !buffer.is_empty() {
         if buffer.as_slice() == [ESC] {
             events.push(RawInputEventWithRange {
-                event: RawInputEvent::Key(TerminalKey::new(
-                    crossterm::event::KeyCode::Esc,
-                    KeyModifiers::empty(),
-                )),
+                event: RawInputEvent::Key(TerminalKey::bare_escape()),
                 start: offset,
                 len: 1,
             });
@@ -159,10 +156,7 @@ impl RawInputFramer {
             .into_iter()
             .filter_map(|chunk| {
                 if chunk.as_slice() == [ESC] {
-                    return Some(RawInputEvent::Key(TerminalKey::new(
-                        crossterm::event::KeyCode::Esc,
-                        KeyModifiers::empty(),
-                    )));
+                    return Some(RawInputEvent::Key(TerminalKey::bare_escape()));
                 }
                 extract_one_event(&chunk).map(|(event, _consumed)| {
                     tracing::debug!(raw_bytes = ?chunk, event = ?event, "raw input event parsed");
@@ -509,10 +503,7 @@ pub(crate) fn drain_complete_input_bytes(buffer: &mut Vec<u8>) -> Vec<Vec<u8>> {
 fn flush_incomplete_buffer(buffer: &mut Vec<u8>, tx: &mpsc::Sender<RawInputEvent>) {
     if let Some(bytes) = flush_incomplete_input_bytes(buffer) {
         if bytes.as_slice() == [ESC] {
-            let _ = tx.blocking_send(RawInputEvent::Key(TerminalKey::new(
-                crossterm::event::KeyCode::Esc,
-                KeyModifiers::empty(),
-            )));
+            let _ = tx.blocking_send(RawInputEvent::Key(TerminalKey::bare_escape()));
             return;
         }
 
@@ -1300,6 +1291,28 @@ mod tests {
             panic!("expected key");
         };
         assert_eq!(key.code, KeyCode::Esc);
+    }
+
+    #[test]
+    fn a_lone_escape_byte_is_a_legacy_escape_but_a_kitty_escape_is_not() {
+        let mut framer = RawInputFramer::default();
+        assert!(
+            framer.push(b"\x1b").is_empty(),
+            "a lone esc waits for a chord"
+        );
+        let flushed = framer.flush_timeout();
+        let [RawInputEvent::Key(key)] = flushed.as_slice() else {
+            panic!("expected one key, got {flushed:?}");
+        };
+        assert_eq!(key.code, KeyCode::Esc);
+        assert!(key.legacy_escape, "a bare 0x1b is the legacy encoding");
+
+        let parsed = framer.push(b"\x1b[27u");
+        let [RawInputEvent::Key(key)] = parsed.as_slice() else {
+            panic!("expected one key, got {parsed:?}");
+        };
+        assert_eq!(key.code, KeyCode::Esc);
+        assert!(!key.legacy_escape, "CSI 27 u is the disambiguated encoding");
     }
 
     #[test]

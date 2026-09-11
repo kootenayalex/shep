@@ -9,6 +9,11 @@ pub struct TerminalKey {
     pub modifiers: KeyModifiers,
     pub kind: crossterm::event::KeyEventKind,
     pub shifted_codepoint: Option<u32>,
+    /// This Esc arrived as a bare `0x1b`, the legacy encoding. A host that
+    /// speaks the kitty keyboard protocol sends Esc as `CSI 27 u`, so a bare
+    /// byte proves the host cannot tell `shift+esc` from `esc` — over mosh,
+    /// in Terminal.app, in any emulator without the protocol.
+    pub legacy_escape: bool,
 }
 
 impl TerminalKey {
@@ -18,6 +23,15 @@ impl TerminalKey {
             modifiers,
             kind: crossterm::event::KeyEventKind::Press,
             shifted_codepoint: None,
+            legacy_escape: false,
+        }
+    }
+
+    /// A plain Esc keypress that reached us as a bare `0x1b`.
+    pub fn bare_escape() -> Self {
+        Self {
+            legacy_escape: true,
+            ..Self::new(KeyCode::Esc, KeyModifiers::empty())
         }
     }
 

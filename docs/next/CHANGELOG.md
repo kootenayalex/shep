@@ -111,6 +111,15 @@
   never been recorded. The aliases now ride along in the session snapshot
   and are re-pointed at the imported panes; a cold restore spawns fresh
   shells and still starts clean.
+- Esc is never swallowed on a host that cannot send `shift+esc`. With
+  `escape_returns_to_board` on, Esc in an agent pane went to the board and
+  `shift+esc` was the interrupt — but only a terminal speaking the kitty
+  keyboard protocol can tell the two apart, and through mosh none can. On such
+  a host every Esc reached shep as a bare byte, went to the board, and the
+  agent could not be interrupted from the keyboard at all. A bare Esc is now
+  taken as proof the host has no `shift+esc` to offer: it is forwarded to the
+  agent, the hint bar says `esc interrupt`, and the board keeps its own key.
+  A kitty-encoded Esc from the same terminal restores the detour.
 - Pairing a phone advertises the address the bridge is actually on. Both the
   `pair phone` screen and `shep bridge pair` fell back to `127.0.0.1:7431`
   whenever no `--host` was given — so on every machine where the bridge is

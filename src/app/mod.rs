@@ -619,6 +619,7 @@ impl App {
             titlebar: config.ui.titlebar,
             hint_bar: config.ui.hint_bar,
             escape_returns_to_board: config.ui.escape_returns_to_board,
+            escape_host_is_legacy: false,
             pane_history_persistence: config.experimental.pane_history,
             reveal_hidden_cursor_for_cjk_ime: config.experimental.reveal_hidden_cursor_for_cjk_ime,
             cjk_ime_agent_filter_configured: !config.experimental.cjk_ime_agents.is_empty(),

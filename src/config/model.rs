@@ -853,10 +853,11 @@ pub struct UiConfig {
     /// agent, and `shift+esc` sends the interrupt through instead. Panes with
     /// no detected agent (shells, editors, pagers) always get Esc unchanged.
     ///
-    /// Requires a host terminal that disambiguates escape codes (Ghostty,
-    /// kitty, WezTerm); on hosts without it `shift+esc` arrives as bare Esc and
-    /// the agent can no longer be interrupted with the keyboard, so set this to
-    /// false there. Default: true.
+    /// The board detour needs a host terminal that disambiguates escape codes
+    /// (Ghostty, kitty, WezTerm, Alacritty — but not through mosh). On a host
+    /// without it every Esc arrives as a bare byte, so shep forwards Esc to the
+    /// agent as the interrupt and leaves the board to its own key; nothing is
+    /// swallowed. Default: true.
     pub escape_returns_to_board: bool,
     /// Agent sidebar ordering. Saved values are "spaces" or "priority". Default: "spaces".
     pub agent_panel_sort: AgentPanelSortConfig,

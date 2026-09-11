@@ -344,11 +344,11 @@ escape_returns_to_board = true
 
 `open_on_board` starts a session on the board instead of dropping straight into a pane, so a session with several agents opens on the overview. Enter focuses the selected pane.
 
-The board has two detail screens. `i` opens the selected agent: its state, status, activity, working directory, and context gauge, plus a live window onto what the pane is showing — everything the card has to truncate, without attaching to it. `t` opens the task queue behind the dashboard's task count, listing each task's state, repo, and runtime. Esc steps back to the columns from either screen before it closes the board.
+The board has one detail screen. `i` opens the selected agent: its state, status, activity, working directory, and context gauge, plus a live window onto what the pane is showing — everything the card has to truncate, without attaching to it. Esc steps back to the columns before it closes the board.
 
 `escape_returns_to_board` makes Esc the way back out. In a pane running an agent Herdr recognizes, a bare Esc returns to the board and `shift+esc` sends the interrupt to the agent instead. Panes with no detected agent — shells, editors, pagers — always receive Esc unchanged, so this never breaks the app inside a pane.
 
-This trade needs a host terminal that disambiguates escape codes, which means Ghostty, kitty, or WezTerm. Without one, `shift+esc` arrives as a bare Esc and the agent can no longer be interrupted from the keyboard; set `escape_returns_to_board = false` on those hosts and use Esc for the interrupt as before.
+This trade needs a host terminal that disambiguates escape codes — Ghostty, kitty, WezTerm, Alacritty — attached directly, not through mosh, which does not relay the protocol. On a host without it every Esc arrives as a bare byte, and Herdr can tell: it forwards that Esc to the agent as the interrupt instead of swallowing it, the hint bar says `esc interrupt`, and the board stays reachable through its own key or the menu. Nothing needs turning off.
 
 Set `mouse_capture = false` if you want your terminal to handle normal clicks, such as command-clicking URLs. With mouse capture enabled, Ctrl-click opens pane links when your terminal sends that modified click to Herdr. This includes macOS; Cmd-click is not reported separately from plain click while Herdr captures mouse input. Use Shift-Ctrl-click on Linux or Shift-Cmd-click on macOS for the terminal-native bypass path.
 

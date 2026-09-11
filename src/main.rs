@@ -315,8 +315,9 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # Make the session board the leading screen: Esc in a pane running a recognized
 # agent returns to the board instead of reaching the agent, and shift+esc sends
 # the interrupt through. Panes with no detected agent always get Esc unchanged.
-# Needs a host terminal that disambiguates escape codes (Ghostty, kitty, WezTerm);
-# without it shift+esc arrives as bare Esc and agents cannot be interrupted.
+# Needs a host terminal that disambiguates escape codes (Ghostty, kitty, WezTerm,
+# Alacritty — not through mosh). On a host without it Esc reaches the agent as
+# the interrupt and the board keeps its own key.
 # escape_returns_to_board = true
 
 # Agent ordering, in the sidebar tree, on the board, and for the next/previous

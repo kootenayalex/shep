@@ -1647,6 +1647,9 @@ pub struct AppState {
     /// Esc in an agent pane returns to the session board; `shift+esc` carries
     /// the interrupt through to the agent instead.
     pub escape_returns_to_board: bool,
+    /// The last Esc arrived as a bare `0x1b`: the attached host cannot tell
+    /// `shift+esc` from `esc`, so Esc reaches the agent and the hint bar says so.
+    pub escape_host_is_legacy: bool,
     pub pane_history_persistence: bool,
     /// Expose the focused pane's cursor anchor to the outer terminal even when
     /// the pane requested `?25l`. See `[experimental] reveal_hidden_cursor_for_cjk_ime`.
@@ -1780,7 +1783,17 @@ impl AppState {
     /// True when Esc should walk back out to the board instead of reaching the
     /// focused pane.
     pub fn escape_returns_to_board_here(&self) -> bool {
-        self.escape_returns_to_board && self.focused_pane_runs_known_agent()
+        self.escape_returns_to_board
+            && !self.escape_host_is_legacy
+            && self.focused_pane_runs_known_agent()
+    }
+
+    /// The remap is on and the pane runs an agent, but this host sends a bare
+    /// Esc, so Esc is the interrupt and the board has to be reached by its key.
+    pub fn escape_interrupts_here(&self) -> bool {
+        self.escape_returns_to_board
+            && self.escape_host_is_legacy
+            && self.focused_pane_runs_known_agent()
     }
 
     /// Prompts queued for `pane_id` (M5 tab-to-queue), still waiting on idle.
@@ -2085,6 +2098,7 @@ impl AppState {
             titlebar: false,
             hint_bar: false,
             escape_returns_to_board: false,
+            escape_host_is_legacy: false,
             pane_history_persistence: false,
             reveal_hidden_cursor_for_cjk_ime: false,
             cjk_ime_agent_filter_configured: false,

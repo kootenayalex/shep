@@ -90,6 +90,11 @@ impl App {
         // Only agent panes are remapped — a shell, editor, or pager still owns
         // its own Esc, where stealing it would break the pane app outright.
         let mut key = key;
+        if key_event.code == KeyCode::Esc && key.kind != crossterm::event::KeyEventKind::Release {
+            // Every Esc says which encoding the host used; the hint bar and the
+            // remap below trust the most recent one.
+            self.state.escape_host_is_legacy = key.legacy_escape;
+        }
         if self.state.escape_returns_to_board
             && key_event.code == KeyCode::Esc
             && key.kind != crossterm::event::KeyEventKind::Release
@@ -99,6 +104,15 @@ impl App {
                 // Send the agent a bare Esc: shift+esc is Shep's own escape
                 // hatch, not something the pane app should have to understand.
                 key.modifiers = crossterm::event::KeyModifiers::empty();
+            } else if key.legacy_escape {
+                // A bare 0x1b means the host cannot produce shift+esc at all
+                // (mosh, Terminal.app, anything without the kitty keyboard
+                // protocol). Swallowing it would leave the agent with no
+                // interrupt, so it goes through; the board keeps its own key.
+                debug!(
+                    ?pane_id,
+                    "host sends legacy esc; forwarding to the agent instead of the board"
+                );
             } else if key_event.modifiers.is_empty() {
                 debug!(
                     ?pane_id,
@@ -270,6 +284,26 @@ mod tests {
         // The agent must see a plain interrupt, not a kitty-encoded shift+esc.
         assert_eq!(forwarded.bytes.as_ref(), &[0x1b]);
         assert_eq!(app.state.mode, Mode::Terminal);
+    }
+
+    #[tokio::test]
+    async fn legacy_escape_in_agent_pane_reaches_the_agent_and_marks_the_host() {
+        let mut app = app_for_escape_test(true);
+
+        let forwarded = app
+            .prepare_terminal_key_forward(TerminalKey::bare_escape())
+            .expect("a host that cannot send shift+esc keeps esc as the interrupt");
+
+        assert_eq!(forwarded.bytes.as_ref(), &[0x1b]);
+        assert_eq!(app.state.mode, Mode::Terminal);
+        assert!(app.state.escape_host_is_legacy);
+
+        // A kitty-encoded esc from the same client clears the mark and goes
+        // back to the board.
+        let forwarded = app.prepare_terminal_key_forward(escape_key(KeyModifiers::empty()));
+        assert!(forwarded.is_none());
+        assert_eq!(app.state.mode, Mode::Board);
+        assert!(!app.state.escape_host_is_legacy);
     }
 
     #[tokio::test]
