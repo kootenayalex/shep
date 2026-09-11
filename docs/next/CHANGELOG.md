@@ -68,6 +68,16 @@
 
 ### Fixed
 
+- Pairing a phone advertises the address the bridge is actually on. Both the
+  `pair phone` screen and `shep bridge pair` fell back to `127.0.0.1:7431`
+  whenever no `--host` was given — so on every machine where the bridge is
+  bound to a reachable address (a tailnet IP, a LAN IP), the QR encoded a
+  host the phone can never dial, and scanning it did nothing. A bridge that
+  binds a routable address now records it in `<config dir>/bridge-addr`, and
+  pairing prefers that. An unspecified (`0.0.0.0`) or loopback bind records
+  nothing, because neither improves on the default. An explicit `--host`
+  still wins.
+
 - A stale word in `[notifications] notify_on` no longer costs you every
   notification. A section that fails to deserialize is silently replaced by its
   default, so one unrecognised kind turned the whole filter back into

@@ -119,12 +119,28 @@ impl PairingWindow {
     }
 }
 
+/// The address a serving bridge last recorded, if it recorded one.
+///
+/// The TUI pairing screen runs in a different process from the bridge, so the
+/// only thing it otherwise knows is [`DEFAULT_BIND`] — and a QR advertising
+/// `127.0.0.1` is unscannable from a phone by construction. A bridge bound to
+/// a routable address writes it down; this reads it back.
+fn recorded_host_at(path: &PathBuf) -> Option<String> {
+    let recorded = std::fs::read_to_string(path).ok()?;
+    let recorded = recorded.trim();
+    (!recorded.is_empty()).then(|| recorded.to_string())
+}
+
 /// Arm a claim window and gather everything a pairing screen shows.
 ///
-/// `host` defaults to [`DEFAULT_BIND`], matching the CLI; a host without a port
-/// gets the bridge's default one.
+/// `host` given explicitly wins. Otherwise the address the serving bridge
+/// recorded, then [`DEFAULT_BIND`]. A host without a port gets the bridge's
+/// default one.
 pub(crate) fn arm_pairing_window(host: Option<&str>) -> std::io::Result<PairingWindow> {
-    let host = host.unwrap_or(DEFAULT_BIND).to_string();
+    let host = host
+        .map(str::to_string)
+        .or_else(|| recorded_host_at(&super::addr_path()))
+        .unwrap_or_else(|| DEFAULT_BIND.to_string());
     let host = if host.contains(':') {
         host
     } else {
@@ -304,6 +320,33 @@ mod tests {
 
     fn temp_path(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!("shep-pair-{}-{name}", std::process::id()))
+    }
+
+    /// The bug this fixes: the TUI pairing screen passes no host, so it used
+    /// to advertise `127.0.0.1` no matter what the bridge was bound to — a QR
+    /// that a phone cannot act on, on every machine where the bridge is
+    /// reachable from anywhere but this one.
+    #[test]
+    fn a_recorded_address_is_preferred_over_the_loopback_default() {
+        let path = temp_path("addr-recorded");
+        std::fs::write(&path, "100.83.179.75:7431\n").unwrap();
+        assert_eq!(
+            recorded_host_at(&path).as_deref(),
+            Some("100.83.179.75:7431")
+        );
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// No bridge has served yet, or it bound loopback and wrote nothing. The
+    /// default still has to stand, or pairing breaks the other way.
+    #[test]
+    fn an_absent_or_empty_record_falls_back() {
+        let path = temp_path("addr-missing");
+        std::fs::remove_file(&path).ok();
+        assert_eq!(recorded_host_at(&path), None);
+        std::fs::write(&path, "   \n").unwrap();
+        assert_eq!(recorded_host_at(&path), None);
+        std::fs::remove_file(&path).ok();
     }
 
     #[test]

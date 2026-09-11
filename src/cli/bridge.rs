@@ -34,7 +34,7 @@ mod transcript;
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{IpAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
@@ -143,6 +143,13 @@ fn serve(args: &[String]) -> std::io::Result<i32> {
     let api_socket = Arc::new(socket_path.unwrap_or_else(crate::api::socket_path));
     let token = load_or_create_token()?;
     let listener = TcpListener::bind(&bind)?;
+    // Fail-quiet: an unwritable config dir must not stop the bridge serving.
+    // The cost is a pairing screen that falls back to the default host.
+    if let Ok(addr) = listener.local_addr() {
+        if let Err(err) = write_bridge_addr_at(&addr_path(), addr) {
+            tracing::warn!(err = %err, "cannot record the bridge's bound address");
+        }
+    }
     eprintln!("shep bridge listening on ws://{bind}/ (api socket: {api_socket:?})");
     let active = Arc::new(AtomicUsize::new(0));
     let throttle = Arc::new(AuthThrottle::default());
@@ -643,6 +650,32 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 
 fn token_path() -> PathBuf {
     crate::config::config_dir().join("bridge-token")
+}
+
+/// Where the serving bridge records the address it actually bound.
+///
+/// The pairing screen has no other way to know: the bridge is a separate
+/// process, started by launchd/systemd with a `--bind` this one never sees.
+pub(super) fn addr_path() -> PathBuf {
+    crate::config::config_dir().join("bridge-addr")
+}
+
+/// Record the bound address so a pairing screen can advertise the address a
+/// phone can actually reach, rather than a compile-time default.
+///
+/// Only a specific, routable address is worth recording. An unspecified bind
+/// (`0.0.0.0`, `::`) names no reachable host, and a loopback bind is what the
+/// default already says — writing either would replace a useful fallback with
+/// a useless literal. Taken from the listener rather than the `--bind` string
+/// so `:0` resolves to the port that was actually granted.
+fn write_bridge_addr_at(path: &PathBuf, addr: SocketAddr) -> std::io::Result<()> {
+    if addr.ip().is_unspecified() || addr.ip().is_loopback() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, format!("{addr}\n"))
 }
 
 fn load_or_create_token() -> std::io::Result<String> {
@@ -2083,6 +2116,37 @@ mod tests {
             builder = builder.header("authorization", auth);
         }
         builder.body(()).unwrap()
+    }
+
+    fn addr_tmp(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("shep-bridge-addr-{}-{name}", std::process::id()))
+    }
+
+    /// A routable bind is exactly the case the loopback default gets wrong, so
+    /// it is the case worth writing down.
+    #[test]
+    fn a_routable_bind_is_recorded_for_the_pairing_screen() {
+        let path = addr_tmp("routable");
+        std::fs::remove_file(&path).ok();
+        write_bridge_addr_at(&path, "100.83.179.75:7431".parse().unwrap()).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap().trim(),
+            "100.83.179.75:7431"
+        );
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// `0.0.0.0` names no host a phone can dial and loopback is what the
+    /// default already says. Recording either would replace a useful fallback
+    /// with a useless literal, so neither is written at all.
+    #[test]
+    fn an_unspecified_or_loopback_bind_is_not_recorded() {
+        for bind in ["0.0.0.0:7431", "[::]:7431", "127.0.0.1:7431", "[::1]:7431"] {
+            let path = addr_tmp("skipped");
+            std::fs::remove_file(&path).ok();
+            write_bridge_addr_at(&path, bind.parse().unwrap()).unwrap();
+            assert!(!path.exists(), "{bind} should not be recorded");
+        }
     }
 
     #[test]
