@@ -2345,3 +2345,130 @@ fn metadata_status_subscription_filter_and_ttl_expiry_are_observable() {
 
     cleanup_spawned_shep(child, base);
 }
+
+#[test]
+fn docket_methods_round_trip_over_socket() {
+    let _lock = test_lock();
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    // A prototype docket.json waiting in the isolated state dir is imported on
+    // the first docket.* call, ids preserved, and retired as .imported.
+    let state_dir = state_home(&config_home).join(if cfg!(debug_assertions) {
+        "shep-dev"
+    } else {
+        "shep"
+    });
+    fs::create_dir_all(&state_dir).unwrap();
+    fs::write(
+        state_dir.join("docket.json"),
+        r#"{"version":1,"items":[{"id":5,"title":"captured in phase 0","kind":"captured","status":"inbox","source":{"file":"MEMORY.md","line":3},"created":"2026-09-11T17:25:08Z","updated":"2026-09-11T17:25:08Z"}]}"#,
+    )
+    .unwrap();
+
+    let child = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    let listed = send_request(
+        &socket_path,
+        r#"{"id":"dk_1","method":"docket.list","params":{}}"#,
+    );
+    assert_eq!(listed["id"], "dk_1");
+    assert_eq!(listed["result"]["type"], "docket_list");
+    assert_eq!(listed["result"]["today"].as_str().unwrap().len(), 10);
+    let items = listed["result"]["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["id"], 5);
+    assert_eq!(items[0]["status"], "inbox");
+    assert_eq!(items[0]["source"]["line"], 3);
+    assert!(!state_dir.join("docket.json").exists());
+    assert!(state_dir.join("docket.json.imported").is_file());
+    assert!(state_dir.join("docket.db").is_file());
+
+    let added = send_request(
+        &socket_path,
+        r#"{"id":"dk_2","method":"docket.add","params":{"title":"check the backups","kind":"recurring","due":"2000-01-01","repeat":"1w"}}"#,
+    );
+    assert_eq!(added["result"]["type"], "docket_item");
+    let recurring_id = added["result"]["item"]["id"].as_i64().unwrap();
+    assert!(recurring_id > 5, "ids continue after the import");
+    assert_eq!(added["result"]["item"]["status"], "open");
+    assert_eq!(added["result"]["item"]["overdue"], true);
+
+    let promoted = send_request(
+        &socket_path,
+        r#"{"id":"dk_3","method":"docket.promote","params":{"id":5,"kind":"slated","due":"2999-10-07"}}"#,
+    );
+    assert_eq!(promoted["result"]["item"]["status"], "open");
+    assert_eq!(promoted["result"]["item"]["kind"], "slated");
+    assert_eq!(promoted["result"]["item"]["due"], "2999-10-07");
+
+    let again = send_request(
+        &socket_path,
+        r#"{"id":"dk_4","method":"docket.promote","params":{"id":5,"kind":"slated"}}"#,
+    );
+    assert_eq!(again["error"]["code"], "docket_invalid_transition");
+
+    let missing = send_request(
+        &socket_path,
+        r#"{"id":"dk_5","method":"docket.complete","params":{"id":404}}"#,
+    );
+    assert_eq!(missing["error"]["code"], "docket_not_found");
+    assert_eq!(missing["error"]["message"], "docket item 404 not found");
+
+    let bad_date = send_request(
+        &socket_path,
+        r#"{"id":"dk_6","method":"docket.update","params":{"id":5,"due":"soon"}}"#,
+    );
+    assert_eq!(bad_date["error"]["code"], "invalid_params");
+
+    let updated = send_request(
+        &socket_path,
+        r#"{"id":"dk_7","method":"docket.update","params":{"id":5,"notes":"filed with the registry"}}"#,
+    );
+    assert_eq!(
+        updated["result"]["item"]["notes"],
+        "filed with the registry"
+    );
+    assert_eq!(updated["result"]["item"]["due"], "2999-10-07");
+
+    let completed = send_request(
+        &socket_path,
+        &format!(r#"{{"id":"dk_8","method":"docket.complete","params":{{"id":{recurring_id}}}}}"#),
+    );
+    let rolled = &completed["result"]["item"];
+    assert_eq!(rolled["id"], recurring_id, "one row per recurring item");
+    assert_eq!(rolled["status"], "open");
+    assert_eq!(rolled["overdue"], false);
+    assert!(rolled["last_fired"].is_string());
+    assert!(rolled["due"].as_str().unwrap() > listed["result"]["today"].as_str().unwrap());
+
+    let discarded = send_request(
+        &socket_path,
+        r#"{"id":"dk_9","method":"docket.discard","params":{"id":5}}"#,
+    );
+    assert_eq!(discarded["result"]["item"]["status"], "discarded");
+
+    // Ordering: the dated open (recurring) item leads, the discarded one trails,
+    // and the status filter narrows.
+    let listed = send_request(
+        &socket_path,
+        r#"{"id":"dk_10","method":"docket.list","params":{}}"#,
+    );
+    let ids: Vec<i64> = listed["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![recurring_id, 5]);
+    let open_only = send_request(
+        &socket_path,
+        r#"{"id":"dk_11","method":"docket.list","params":{"status":"open"}}"#,
+    );
+    assert_eq!(open_only["result"]["items"].as_array().unwrap().len(), 1);
+
+    cleanup_spawned_shep(child, base);
+}

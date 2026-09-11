@@ -40,7 +40,8 @@ pub(super) fn command() -> Command {
         .subcommand(terminal_command())
         .subcommand(session_command())
         .subcommand(integration_command())
-        .subcommand(plugin_command());
+        .subcommand(plugin_command())
+        .subcommand(docket_command());
     disable_auto_help(command)
 }
 
@@ -722,6 +723,79 @@ fn plugin_command() -> Command {
         )
 }
 
+fn docket_command() -> Command {
+    Command::new("docket")
+        .about("Your personal docket over the socket API: captured, slated and recurring items")
+        .subcommand(
+            Command::new("add")
+                .about("Add an item (captured items land in the inbox)")
+                .arg(required("title", "TITLE"))
+                .arg(docket_kind_option())
+                .arg(docket_status_option())
+                .arg(docket_due_option())
+                .arg(docket_repeat_option())
+                .arg(option("notes", "TEXT"))
+                .arg(option("source", "JSON").help("Provenance, e.g. {\"file\":..,\"line\":..}"))
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("list")
+                .visible_alias("ls")
+                .about("List items, overdue first; `!` marks overdue")
+                .arg(docket_status_option())
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("promote")
+                .about("Move an inbox item into the docket as slated or recurring")
+                .arg(required("id", "ID"))
+                .arg(required("kind", "KIND").value_parser(["slated", "recurring"]))
+                .arg(docket_due_option())
+                .arg(docket_repeat_option())
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("done")
+                .visible_alias("complete")
+                .about("Complete an open item (a repeating item rolls its due date forward)")
+                .arg(required("id", "ID"))
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("discard")
+                .about("Discard an inbox or open item")
+                .arg(required("id", "ID"))
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("update")
+                .about("Change an item's title, notes, due date, repeat or kind")
+                .arg(required("id", "ID"))
+                .arg(option("title", "TEXT"))
+                .arg(docket_due_option())
+                .arg(docket_repeat_option())
+                .arg(option("notes", "TEXT"))
+                .arg(docket_kind_option())
+                .arg(json_flag()),
+        )
+}
+
+fn docket_kind_option() -> Arg {
+    option("kind", "KIND").value_parser(["captured", "slated", "recurring"])
+}
+
+fn docket_status_option() -> Arg {
+    option("status", "STATUS").value_parser(["inbox", "open", "done", "discarded"])
+}
+
+fn docket_due_option() -> Arg {
+    option("due", "YYYY-MM-DD")
+}
+
+fn docket_repeat_option() -> Arg {
+    option("repeat", "EVERY").value_parser(["1d", "1w", "2w", "1m"])
+}
+
 fn current_pane_args() -> [Arg; 2] {
     [option("pane", "ID"), flag("current")]
 }
@@ -910,6 +984,30 @@ mod tests {
             .get_arguments()
             .any(|arg| arg.get_long() == Some("entrypoint")));
         assert!(option_values(open, "placement").contains(&"zoomed".to_string()));
+    }
+
+    #[test]
+    fn spec_includes_docket_verbs_and_values() {
+        let cmd = super::command();
+        let docket = command_path(&cmd, &["docket"]);
+        for verb in ["add", "list", "promote", "done", "discard", "update"] {
+            command_path(docket, &[verb]);
+        }
+        let add = command_path(docket, &["add"]);
+        assert_eq!(
+            option_values(add, "kind"),
+            vec!["captured", "slated", "recurring"]
+        );
+        assert_eq!(option_values(add, "repeat"), vec!["1d", "1w", "2w", "1m"]);
+        assert!(has_option(add, "due"));
+        assert!(has_option(add, "source"));
+        let list = command_path(docket, &["list"]);
+        assert_eq!(
+            option_values(list, "status"),
+            vec!["inbox", "open", "done", "discarded"]
+        );
+        assert!(has_option(list, "json"));
+        assert!(has_option(command_path(docket, &["update"]), "title"));
     }
 
     #[test]

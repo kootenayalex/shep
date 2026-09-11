@@ -299,6 +299,9 @@ fn spawn_shep_with_config(
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
+    // Keep the server's state dir (docket.db, history.db) inside the test tree
+    // rather than the developer's own ~/.local/state.
+    cmd.env("XDG_STATE_HOME", config_home.with_file_name("state"));
     cmd.env("SHEP_SOCKET_PATH", socket_path);
     cmd.env_remove("SHEP_CLIENT_SOCKET_PATH");
     cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
@@ -1049,6 +1052,7 @@ fn help_commands_exit_successfully() {
         &["session", "-h"],
         &["session", "attach", "-h"],
         &["integration", "-h"],
+        &["docket", "-h"],
     ];
 
     for args in help_cases {
@@ -2421,6 +2425,84 @@ fn worktree_cli_rejects_local_argument_errors_before_socket_use() {
     }
 
     cleanup_test_base(&base);
+}
+
+#[test]
+fn docket_commands_work() {
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    let shep = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    let empty = run_cli(&socket_path, &["docket", "list"]);
+    assert!(empty.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&empty.stdout).trim(),
+        "docket is empty"
+    );
+
+    let added = run_cli_json(
+        &socket_path,
+        &[
+            "docket",
+            "add",
+            "rotate the xai key",
+            "--kind",
+            "slated",
+            "--due",
+            "2000-01-01",
+            "--source",
+            r#"{"file":"MEMORY.md","line":9}"#,
+            "--json",
+        ],
+    );
+    assert_eq!(added["result"]["type"], "docket_item");
+    let id = added["result"]["item"]["id"].as_i64().unwrap();
+    assert_eq!(added["result"]["item"]["source"]["file"], "MEMORY.md");
+
+    let captured = run_cli(&socket_path, &["docket", "add", "a thought"]);
+    assert!(captured.status.success());
+    let captured_line = String::from_utf8_lossy(&captured.stdout);
+    assert!(captured_line.contains("inbox"), "{captured_line}");
+    assert!(captured_line.contains("captured"), "{captured_line}");
+
+    let listed = run_cli(&socket_path, &["docket", "list"]);
+    assert!(listed.status.success());
+    let listing = String::from_utf8_lossy(&listed.stdout);
+    let first = listing.lines().next().unwrap();
+    assert!(
+        first.starts_with("! #"),
+        "overdue item leads, marked: {listing}"
+    );
+    assert!(first.contains("2000-01-01"), "{listing}");
+    assert!(first.ends_with("rotate the xai key"), "{listing}");
+    assert!(
+        listing.lines().nth(1).unwrap().starts_with("  #"),
+        "{listing}"
+    );
+
+    let bad_due = run_cli(&socket_path, &["docket", "update", "1", "--due", "soon"]);
+    assert_eq!(bad_due.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&bad_due.stderr).contains("YYYY-MM-DD"));
+
+    let hash_id = format!("#{id}");
+    let done = run_cli_json(&socket_path, &["docket", "done", &hash_id, "--json"]);
+    assert_eq!(done["result"]["item"]["status"], "done");
+
+    let done_again = run_cli(&socket_path, &["docket", "done", &hash_id]);
+    assert_eq!(done_again.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&done_again.stderr).contains("docket_invalid_transition"));
+
+    let open_only = run_cli(&socket_path, &["docket", "list", "--status", "open"]);
+    assert_eq!(
+        String::from_utf8_lossy(&open_only.stdout).trim(),
+        "docket is empty"
+    );
+
+    cleanup_spawned_shep(shep, base);
 }
 
 #[test]

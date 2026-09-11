@@ -2,6 +2,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 mod agents;
+mod docket;
 mod env;
 mod integrations;
 mod layouts;
@@ -913,6 +914,14 @@ impl App {
                 return self.handle_workspace_set_review_state(request.id, params)
             }
             Method::WorkspaceDiff(params) => return self.handle_workspace_diff(request.id, params),
+            Method::DocketList(params) => return self.handle_docket_list(request.id, params),
+            Method::DocketAdd(params) => return self.handle_docket_add(request.id, params),
+            Method::DocketUpdate(params) => return self.handle_docket_update(request.id, params),
+            Method::DocketPromote(params) => return self.handle_docket_promote(request.id, params),
+            Method::DocketComplete(target) => {
+                return self.handle_docket_complete(request.id, target)
+            }
+            Method::DocketDiscard(target) => return self.handle_docket_discard(request.id, target),
             Method::WorkspaceShip(params) => return self.handle_workspace_ship(request.id, params),
             Method::WorkspaceMove(params) => {
                 return self.handle_workspace_move(request.id, params);

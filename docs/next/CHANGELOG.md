@@ -4,6 +4,20 @@
 
 ### Added
 
+- A personal docket, owned by the server. `shep docket add|list|promote|done|
+  discard|update` and the matching `docket.*` API methods keep a list of
+  captured, slated and recurring items in `<state dir>/docket.db` — the
+  reminders a personal assistant would keep, not a queue of work for agents to
+  pull from. A captured item waits in the inbox until it is promoted (given a
+  kind and a date) or discarded, so nothing dated or recurring exists without
+  a deliberate decision. A recurring item is one row for its whole life:
+  completing it rolls `due` forward by its repeat until it lands after today
+  and stamps `last_fired`. `list` puts dated open items first (overdue by
+  construction), then the inbox, then the rest, and marks overdue rows with
+  `!`. The first open imports the prototype `docket.json` beside the database,
+  ids preserved, and renames it `.imported`. The wire protocol is unchanged;
+  the docket methods are also relayed by the bridge.
+
 - A new session on the phone can start unsupervised. The new-session sheet has
   a "skip permission prompts" switch for runtimes whose flag shep can name —
   today that is claude, which starts with `--dangerously-skip-permissions`. It

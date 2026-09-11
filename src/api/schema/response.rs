@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::agents::AgentInfo;
 use super::common::{ClientWindowTitleReason, NotificationShowReason};
+use super::docket::DocketItem as DocketItemInfo;
 use super::events::EventEnvelope;
 use super::integrations::{
     IntegrationInstallResult, IntegrationTarget, IntegrationUninstallResult,
@@ -67,6 +68,15 @@ pub enum ResponseResult {
         workspace_id: String,
         message: String,
         worktree_path: String,
+    },
+    DocketList {
+        /// Today's date (`YYYY-MM-DD`, server-local) that `overdue` was judged
+        /// against.
+        today: String,
+        items: Vec<DocketItemInfo>,
+    },
+    DocketItem {
+        item: DocketItemInfo,
     },
     WorkspaceCreated {
         workspace: WorkspaceInfo,

@@ -64,6 +64,7 @@ mod cli;
 mod client;
 mod config;
 mod detect;
+mod docket;
 mod env_compat;
 mod events;
 mod ghostty;
@@ -545,6 +546,7 @@ fn main() -> io::Result<()> {
         println!("       shep wait <subcommand> ...");
         println!("       shep session <subcommand> ...");
         println!("       shep integration <subcommand> ...");
+        println!("       shep docket <subcommand> ...");
         println!();
         println!("Common commands:");
         for (command, description) in [
@@ -611,6 +613,10 @@ fn main() -> io::Result<()> {
             (
                 "shep integration <subcommand>",
                 "Manage built-in agent integrations",
+            ),
+            (
+                "shep docket <subcommand>",
+                "Your docket of captured, slated and recurring items",
             ),
         ] {
             println!("  {command:<32} {description}");

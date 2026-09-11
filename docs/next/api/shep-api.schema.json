@@ -1383,6 +1383,214 @@
           ],
           "type": "object"
         },
+        "DocketAddParams": {
+          "properties": {
+            "due": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/DocketKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to `captured`."
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "repeat": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/DocketRepeat"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source": true,
+            "status": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/DocketStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to `inbox` for captured items and `open` otherwise."
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "type": "object"
+        },
+        "DocketKind": {
+          "description": "Where an item came from and how it is meant to be handled.",
+          "oneOf": [
+            {
+              "const": "captured",
+              "description": "Proposed from a session or a memory file; waits in the inbox until\npromoted or discarded.",
+              "type": "string"
+            },
+            {
+              "const": "slated",
+              "description": "Dated, one-off.",
+              "type": "string"
+            },
+            {
+              "const": "recurring",
+              "description": "Fires by `due`; completing it rolls `due` forward by `repeat`.",
+              "type": "string"
+            }
+          ]
+        },
+        "DocketListParams": {
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/DocketStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only items in this status; omitted = every item."
+            }
+          },
+          "type": "object"
+        },
+        "DocketPromoteParams": {
+          "description": "Move an inbox item into the docket proper as a slated or recurring item.",
+          "properties": {
+            "due": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "$ref": "#/schemas/request/$defs/DocketKind"
+            },
+            "repeat": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/DocketRepeat"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "DocketRepeat": {
+          "description": "How far `due` moves when a recurring item is completed.",
+          "enum": [
+            "1d",
+            "1w",
+            "2w",
+            "1m"
+          ],
+          "type": "string"
+        },
+        "DocketStatus": {
+          "description": "Lifecycle of an item.",
+          "enum": [
+            "inbox",
+            "open",
+            "done",
+            "discarded"
+          ],
+          "type": "string"
+        },
+        "DocketTarget": {
+          "properties": {
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "DocketUpdateParams": {
+          "description": "Fields omitted are left unchanged.",
+          "properties": {
+            "due": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/DocketKind"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "repeat": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/DocketRepeat"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
         "EmptyParams": {
           "type": "object"
         },
@@ -5305,6 +5513,102 @@
             "params"
           ],
           "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "docket.list",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/DocketListParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "docket.add",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/DocketAddParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "docket.update",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/DocketUpdateParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "docket.promote",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/DocketPromoteParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "docket.complete",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/DocketTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "docket.discard",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/DocketTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
         }
       ],
       "properties": {
@@ -5778,6 +6082,119 @@
             "applied",
             "partial",
             "failed"
+          ],
+          "type": "string"
+        },
+        "DocketItem": {
+          "description": "One docket row as the API returns it.",
+          "properties": {
+            "created": {
+              "description": "ISO 8601 UTC.",
+              "type": "string"
+            },
+            "due": {
+              "description": "`YYYY-MM-DD`, local calendar.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "$ref": "#/schemas/success_response/$defs/DocketKind"
+            },
+            "last_fired": {
+              "description": "ISO 8601 UTC; the last time a recurring item was completed.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "overdue": {
+              "default": false,
+              "description": "`status == open && due < today`.",
+              "type": "boolean"
+            },
+            "repeat": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/DocketRepeat"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source": {
+              "description": "Free-form provenance (`{file, line}` or `{pane, session}`); opaque to\nthe server."
+            },
+            "status": {
+              "$ref": "#/schemas/success_response/$defs/DocketStatus"
+            },
+            "title": {
+              "type": "string"
+            },
+            "updated": {
+              "description": "ISO 8601 UTC.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "kind",
+            "status",
+            "created",
+            "updated"
+          ],
+          "type": "object"
+        },
+        "DocketKind": {
+          "description": "Where an item came from and how it is meant to be handled.",
+          "oneOf": [
+            {
+              "const": "captured",
+              "description": "Proposed from a session or a memory file; waits in the inbox until\npromoted or discarded.",
+              "type": "string"
+            },
+            {
+              "const": "slated",
+              "description": "Dated, one-off.",
+              "type": "string"
+            },
+            {
+              "const": "recurring",
+              "description": "Fires by `due`; completing it rolls `due` forward by `repeat`.",
+              "type": "string"
+            }
+          ]
+        },
+        "DocketRepeat": {
+          "description": "How far `due` moves when a recurring item is completed.",
+          "enum": [
+            "1d",
+            "1w",
+            "2w",
+            "1m"
+          ],
+          "type": "string"
+        },
+        "DocketStatus": {
+          "description": "Lifecycle of an item.",
+          "enum": [
+            "inbox",
+            "open",
+            "done",
+            "discarded"
           ],
           "type": "string"
         },
@@ -8073,6 +8490,46 @@
                 "workspace_id",
                 "message",
                 "worktree_path"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "items": {
+                  "items": {
+                    "$ref": "#/schemas/success_response/$defs/DocketItem"
+                  },
+                  "type": "array"
+                },
+                "today": {
+                  "description": "Today's date (`YYYY-MM-DD`, server-local) that `overdue` was judged\nagainst.",
+                  "type": "string"
+                },
+                "type": {
+                  "const": "docket_list",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "today",
+                "items"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "item": {
+                  "$ref": "#/schemas/success_response/$defs/DocketItem"
+                },
+                "type": {
+                  "const": "docket_item",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "item"
               ],
               "type": "object"
             },

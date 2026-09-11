@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod agents;
 pub mod common;
+pub mod docket;
 pub mod events;
 pub mod integrations;
 pub mod panes;
@@ -15,6 +16,7 @@ pub mod worktrees;
 
 pub use agents::*;
 pub use common::*;
+pub use docket::*;
 pub use events::*;
 pub use integrations::*;
 pub use panes::*;
@@ -219,6 +221,18 @@ pub enum Method {
     PluginPaneFocus(PluginPaneFocusParams),
     #[serde(rename = "plugin.pane.close")]
     PluginPaneClose(PluginPaneCloseParams),
+    #[serde(rename = "docket.list")]
+    DocketList(DocketListParams),
+    #[serde(rename = "docket.add")]
+    DocketAdd(DocketAddParams),
+    #[serde(rename = "docket.update")]
+    DocketUpdate(DocketUpdateParams),
+    #[serde(rename = "docket.promote")]
+    DocketPromote(DocketPromoteParams),
+    #[serde(rename = "docket.complete")]
+    DocketComplete(DocketTarget),
+    #[serde(rename = "docket.discard")]
+    DocketDiscard(DocketTarget),
 }
 
 #[cfg(test)]

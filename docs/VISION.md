@@ -70,6 +70,10 @@ Lifecycle verbs (claude-squad): **launch / pause / review / ship**.
 > getting work done. What survives the idea is a viewer — `pane.todos` reads
 > the checklist the agent keeps for itself out of the harness's own session
 > files. See the Removed entry in `docs/next/CHANGELOG.md`.
+> What replaced it (2026-09-11) is not a queue but a personal docket —
+> recurring, slated and captured items served by the server from
+> `<state dir>/docket.db` over `docket.*` / `shep docket`, and rendered by the
+> board.
 
 ### M5 — Flagship polish (as time/value allows, in order)
 1. **Model/runtime bar**: relaunch same worktree under a different runtime/model, incl. local models via `ANTHROPIC_BASE_URL=http://127.0.0.1:1234/v1` → claude-code on the local LM Studio server.
