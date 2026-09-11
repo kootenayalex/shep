@@ -85,6 +85,32 @@ pub fn current_process_is_detached_server_daemon() -> bool {
     unsafe { libc::getsid(0) == libc::getpid() }
 }
 
+/// Bytes still writable by this user on the filesystem holding `path`, or
+/// `None` when the platform cannot say. Shared by the unix implementations.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub fn free_disk_bytes(path: &std::path::Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
+    // SAFETY: `stat` is a zeroed, properly sized statvfs buffer and `c_path`
+    // is NUL-terminated; statvfs only writes into `stat`.
+    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+    let rc = unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) };
+    if rc != 0 {
+        return None;
+    }
+    // The field widths differ per libc (u32 on macOS, u64 on Linux); a generic
+    // widen keeps one body compiling on both without a same-type cast.
+    fn widen<T: Into<u64>>(value: T) -> u64 {
+        value.into()
+    }
+    Some(widen(stat.f_bavail) * widen(stat.f_frsize))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+pub fn free_disk_bytes(_path: &std::path::Path) -> Option<u64> {
+    None
+}
+
 #[cfg(unix)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClipboardCommand {

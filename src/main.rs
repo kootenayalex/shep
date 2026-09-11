@@ -547,6 +547,7 @@ fn main() -> io::Result<()> {
         println!("       shep session <subcommand> ...");
         println!("       shep integration <subcommand> ...");
         println!("       shep docket <subcommand> ...");
+        println!("       shep doctor [--json]");
         println!();
         println!("Common commands:");
         for (command, description) in [
@@ -617,6 +618,10 @@ fn main() -> io::Result<()> {
             (
                 "shep docket <subcommand>",
                 "Your docket of captured, slated and recurring items",
+            ),
+            (
+                "shep doctor [--json]",
+                "Check the server, bridge, hooks, push and state in one pass",
             ),
         ] {
             println!("  {command:<32} {description}");

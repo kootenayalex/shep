@@ -1066,6 +1066,28 @@ pub fn process_exists(pid: u32) -> bool {
     }
 }
 
+/// The launchd domain for this user's GUI session, `gui/<uid>`.
+pub fn launchd_domain() -> String {
+    // SAFETY: getuid has no preconditions and cannot fail.
+    format!("gui/{}", unsafe { libc::getuid() })
+}
+
+/// The text of `launchctl print gui/<uid>/<label>`, or `None` when the job is
+/// not loaded in this user's domain (or launchctl is unavailable).
+pub fn launchd_print(label: &str) -> Option<String> {
+    let output = Command::new("launchctl")
+        .arg("print")
+        .arg(format!("{}/{label}", launchd_domain()))
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

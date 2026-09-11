@@ -15,6 +15,7 @@ mod api;
 pub(crate) mod bridge;
 mod completion;
 mod docket;
+mod doctor;
 mod integration;
 mod memory;
 mod notification;
@@ -81,6 +82,7 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "integration" => integration::run_integration_command(&args[2..])?,
         "memory" => memory::run_memory_command(&args[2..])?,
         "docket" => docket::run_docket_command(&args[2..])?,
+        "doctor" => doctor::run_doctor_command(&args[2..])?,
         "session" => run_session_command(&args[2..])?,
         _ => return Ok(CommandOutcome::NotCli),
     };

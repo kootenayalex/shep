@@ -41,7 +41,8 @@ pub(super) fn command() -> Command {
         .subcommand(session_command())
         .subcommand(integration_command())
         .subcommand(plugin_command())
-        .subcommand(docket_command());
+        .subcommand(docket_command())
+        .subcommand(doctor_command());
     disable_auto_help(command)
 }
 
@@ -780,6 +781,12 @@ fn docket_command() -> Command {
         )
 }
 
+fn doctor_command() -> Command {
+    Command::new("doctor")
+        .about("Check the server, socket, launchd, bridge, hooks, push and state in one pass")
+        .arg(json_flag())
+}
+
 fn docket_kind_option() -> Arg {
     option("kind", "KIND").value_parser(["captured", "slated", "recurring"])
 }
@@ -1008,6 +1015,14 @@ mod tests {
         );
         assert!(has_option(list, "json"));
         assert!(has_option(command_path(docket, &["update"]), "title"));
+    }
+
+    #[test]
+    fn spec_includes_doctor_with_json_flag() {
+        let cmd = super::command();
+        let doctor = command_path(&cmd, &["doctor"]);
+        assert!(has_option(doctor, "json"));
+        assert!(doctor.get_subcommands().next().is_none());
     }
 
     #[test]

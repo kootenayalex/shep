@@ -34,6 +34,18 @@ herdr status server
 herdr status client
 ```
 
+Health check:
+
+```bash
+herdr doctor          # one pass over the server, socket, launchd, bridge, hooks, push and state
+herdr doctor --json   # [{level, check, detail, fix?}]
+```
+
+`herdr doctor` prints one `ok|warn|fail <check>: <detail>` line per probe and
+a `fix:` line under anything that is not ok. It exits 1 only when a probe
+fails (the server is down, the socket file is stale, the bridge address has
+no listener, the docket store will not open); warnings are advice and exit 0.
+
 API schema commands:
 
 ```bash

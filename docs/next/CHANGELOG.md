@@ -4,6 +4,22 @@
 
 ### Added
 
+- `shep doctor [--json]` checks a shep install in one deterministic pass and
+  prints the fix beside every finding: the server (ping, version, protocol —
+  a mismatch warns `restart_needed`), whether a process actually holds the
+  socket (a socket file nothing accepts on is reported as stale), the launchd
+  jobs on macOS (`dev.shep.server`, `dev.shep.bridge`: pid and `runs`, a job
+  loaded with no pid is called out as a KeepAlive spin), the bridge (is
+  something listening on the address in `bridge-addr`), the bridge token
+  (present, `0600`, well-formed), the claude integration hook, the memory
+  hooks audit `shep memory status` already does, push (service account and
+  registered FCM devices), leftover state (`tasks.db`, an unimported
+  `docket.json`), a `launchd-server.err` written in the last 24 hours (quoting
+  its last line), free disk under 15 GiB, and the docket's overdue and inbox
+  counts. Each probe uses the call shep itself uses — a socket connect, a TCP
+  connect, `launchctl print` — never `lsof`. Warnings are advice; the command
+  exits 1 only on a `fail`. `--json` emits `[{level, check, detail, fix?}]`.
+
 - A personal docket, owned by the server. `shep docket add|list|promote|done|
   discard|update` and the matching `docket.*` API methods keep a list of
   captured, slated and recurring items in `<state dir>/docket.db` — the

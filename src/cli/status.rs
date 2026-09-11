@@ -70,7 +70,7 @@ fn parse_status_scope_args(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ServerRuntimeStatus {
+pub(super) enum ServerRuntimeStatus {
     Running {
         version: Option<String>,
         protocol: Option<u32>,
@@ -152,7 +152,7 @@ fn print_server_status_body(server: &ServerRuntimeStatus, indent: &str) {
     }
 }
 
-fn read_server_runtime_status() -> std::io::Result<ServerRuntimeStatus> {
+pub(super) fn read_server_runtime_status() -> std::io::Result<ServerRuntimeStatus> {
     match ApiClient::local().status() {
         Ok(status) => Ok(ServerRuntimeStatus::Running {
             version: status.version,

@@ -1718,6 +1718,66 @@ fn status_commands_report_client_and_server_versions() {
 }
 
 #[test]
+fn doctor_json_reports_the_test_server_and_exits_clean() {
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    let shep = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    // Doctor reads files under the config and state dirs, so point both at
+    // the test tree — never at the real ~/.config/shep.
+    let output = Command::new(env!("CARGO_BIN_EXE_shep"))
+        .args(["doctor", "--json"])
+        .env("SHEP_SOCKET_PATH", &socket_path)
+        .env("XDG_CONFIG_HOME", &config_home)
+        .env("XDG_STATE_HOME", config_home.with_file_name("state"))
+        .env_remove("SHEP_CLIENT_SOCKET_PATH")
+        .env_remove("HERDR_CLIENT_SOCKET_PATH")
+        .env_remove("SHEP_ENV")
+        .env_remove("HERDR_ENV")
+        .current_dir(&base)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let findings: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|err| {
+        panic!(
+            "doctor --json is not valid JSON: {err}\nstdout: {stdout}\nstderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+    });
+    let rows = findings.as_array().expect("a JSON array of findings");
+    let server = rows
+        .iter()
+        .find(|row| row["check"] == "server")
+        .expect("a server row");
+    assert_eq!(server["level"], "ok", "findings: {stdout}");
+    assert!(server["detail"]
+        .as_str()
+        .is_some_and(|detail| detail.starts_with("running v")));
+    let socket = rows
+        .iter()
+        .find(|row| row["check"] == "socket")
+        .expect("a socket row");
+    assert_eq!(socket["level"], "ok", "findings: {stdout}");
+    for row in rows {
+        assert!(row["level"] != "fail", "unexpected fail: {row}");
+        if row["level"] != "ok" {
+            assert!(row["fix"].is_string(), "warn without fix: {row}");
+        }
+    }
+    assert!(
+        output.status.success(),
+        "doctor exited {:?} with findings: {stdout}",
+        output.status.code()
+    );
+
+    cleanup_spawned_shep(shep, base);
+}
+
+#[test]
 fn status_reports_not_running_when_server_socket_is_missing() {
     let base = unique_test_dir();
     let runtime_dir = base.join("runtime");
