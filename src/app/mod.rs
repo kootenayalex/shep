@@ -789,6 +789,8 @@ impl App {
             app.render_dirty.clone(),
         )?;
         let pane_id_aliases = crate::persist::handoff_pane_aliases(snapshot, &workspaces);
+        let public_pane_id_aliases =
+            crate::persist::handoff_public_pane_id_aliases(snapshot, &pane_id_aliases, &workspaces);
 
         app.no_session = false;
         let now = Instant::now();
@@ -804,6 +806,7 @@ impl App {
         }
         app.state.detach_exits = false;
         app.state.pane_id_aliases = pane_id_aliases;
+        app.state.public_pane_id_aliases = public_pane_id_aliases;
         app.state.workspaces = workspaces;
         app.state.terminals = terminals;
         app.terminal_runtimes = runtimes.into();

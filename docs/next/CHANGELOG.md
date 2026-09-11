@@ -101,6 +101,16 @@
 
 ### Fixed
 
+- An agent in a pane that was moved to another group keeps reporting to shep
+  after a live handoff. A moved pane's shell keeps the `SHEP_PANE_ID` it was
+  born with, so every hook in it — Claude's session reports above all — names
+  a pane id that no longer exists. Shep kept an alias for that, but only in
+  memory: the next `live-handoff` forgot it, and from then on every report
+  from those panes came back `pane_not_found`. The visible damage was a
+  restart resuming an agent's *previous* session, because the current one had
+  never been recorded. The aliases now ride along in the session snapshot
+  and are re-pointed at the imported panes; a cold restore spawns fresh
+  shells and still starts clean.
 - Pairing a phone advertises the address the bridge is actually on. Both the
   `pair phone` screen and `shep bridge pair` fell back to `127.0.0.1:7431`
   whenever no `--host` was given — so on every machine where the bridge is

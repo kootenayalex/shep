@@ -24,6 +24,13 @@ pub struct SessionSnapshot {
     pub sidebar_width: Option<u16>,
     #[serde(default)]
     pub collapsed_space_keys: std::collections::HashSet<String>,
+    /// Public pane ids that still name a pane after it moved to another
+    /// group, keyed to the pane's raw id. A moved pane's shell keeps the
+    /// `SHEP_PANE_ID` it was born with, and every agent hook in it reports
+    /// under that id for as long as the process lives — so the alias has to
+    /// outlive a live handoff. A cold restore spawns fresh shells and drops it.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub public_pane_id_aliases: std::collections::HashMap<String, u32>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -258,6 +265,8 @@ struct RawSessionSnapshot {
     sidebar_width: Option<u16>,
     #[serde(default)]
     collapsed_space_keys: std::collections::HashSet<String>,
+    #[serde(default)]
+    public_pane_id_aliases: std::collections::HashMap<String, u32>,
 }
 
 fn migrate_snapshot(raw: RawSessionSnapshot) -> Result<SessionSnapshot, String> {
@@ -272,6 +281,7 @@ fn migrate_snapshot(raw: RawSessionSnapshot) -> Result<SessionSnapshot, String> 
         selected: raw.selected,
         sidebar_width: raw.sidebar_width,
         collapsed_space_keys: raw.collapsed_space_keys,
+        public_pane_id_aliases: raw.public_pane_id_aliases,
     })
 }
 
@@ -333,6 +343,7 @@ pub fn capture(
     selected: usize,
     sidebar_width: u16,
     collapsed_space_keys: std::collections::HashSet<String>,
+    public_pane_id_aliases: &std::collections::HashMap<String, crate::layout::PaneId>,
 ) -> SessionSnapshot {
     SessionSnapshot {
         version: SNAPSHOT_VERSION,
@@ -344,6 +355,10 @@ pub fn capture(
         selected,
         sidebar_width: Some(sidebar_width),
         collapsed_space_keys,
+        public_pane_id_aliases: public_pane_id_aliases
+            .iter()
+            .map(|(public_id, pane_id)| (public_id.clone(), pane_id.raw()))
+            .collect(),
     }
 }
 
@@ -625,6 +640,7 @@ mod tests {
             state.selected,
             state.sidebar_width,
             state.collapsed_space_keys.clone(),
+            &state.public_pane_id_aliases,
         )
     }
 
@@ -651,6 +667,7 @@ mod tests {
             selected: 0,
             sidebar_width: Some(26),
             collapsed_space_keys: std::collections::HashSet::new(),
+            public_pane_id_aliases: Default::default(),
         };
         let json = serde_json::to_string(&snap).unwrap();
         let restored = parse_snapshot(&json).unwrap();
@@ -746,6 +763,7 @@ mod tests {
             selected: 0,
             sidebar_width: Some(26),
             collapsed_space_keys: std::collections::HashSet::new(),
+            public_pane_id_aliases: Default::default(),
             version: SNAPSHOT_VERSION,
         };
 
@@ -1318,6 +1336,7 @@ mod tests {
             selected: 0,
             sidebar_width: Some(26),
             collapsed_space_keys: std::collections::HashSet::new(),
+            public_pane_id_aliases: Default::default(),
         };
 
         let json = serde_json::to_string(&snap).unwrap();

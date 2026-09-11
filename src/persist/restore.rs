@@ -117,6 +117,32 @@ pub fn restore_handoff(
     )
 }
 
+/// Public pane ids a moved pane's shell still reports under, re-pointed at the
+/// pane ids the imported workspaces use. Raw ids can shift across a handoff
+/// (`raw_aliases` says how), and an alias whose pane no longer exists is
+/// dropped rather than left to resolve to nothing.
+#[cfg(unix)]
+pub fn handoff_public_pane_id_aliases(
+    snapshot: &SessionSnapshot,
+    raw_aliases: &HashMap<u32, PaneId>,
+    workspaces: &[Workspace],
+) -> HashMap<String, PaneId> {
+    snapshot
+        .public_pane_id_aliases
+        .iter()
+        .filter_map(|(public_id, &old_raw)| {
+            let pane_id = raw_aliases
+                .get(&old_raw)
+                .copied()
+                .unwrap_or_else(|| PaneId::from_raw(old_raw));
+            workspaces
+                .iter()
+                .any(|ws| ws.find_tab_index_for_pane(pane_id).is_some())
+                .then(|| (public_id.clone(), pane_id))
+        })
+        .collect()
+}
+
 #[cfg(unix)]
 pub fn handoff_pane_aliases(
     snapshot: &SessionSnapshot,
@@ -932,6 +958,41 @@ mod tests {
         "/bin/sh"
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn handoff_keeps_a_moved_panes_old_public_id_pointing_at_the_pane() {
+        // One workspace whose root pane was born elsewhere as "wF:p1". The
+        // handoff renumbered raw 7 to whatever the imported pane got.
+        let ws = Workspace::test_new("home");
+        let live_pane = ws.tabs[0].root_pane;
+        let mut snapshot = SessionSnapshot {
+            version: 3,
+            workspaces: vec![],
+            active: None,
+            selected: 0,
+            sidebar_width: None,
+            collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: HashMap::from([
+                ("wF:p1".to_string(), 7),
+                ("wF:p2".to_string(), 9),
+            ]),
+        };
+        let raw_aliases = HashMap::from([(7, live_pane)]);
+
+        let aliases = handoff_public_pane_id_aliases(&snapshot, &raw_aliases, &[ws]);
+
+        // The moved pane's shell still says wF:p1, and that must land on the
+        // pane it lives in; the alias for a pane that is gone is dropped.
+        assert_eq!(aliases, HashMap::from([("wF:p1".to_string(), live_pane)]));
+
+        // An unrenumbered raw id is used as-is when that pane exists.
+        let ws = Workspace::test_new("home");
+        let live_pane = ws.tabs[0].root_pane;
+        snapshot.public_pane_id_aliases = HashMap::from([("wF:p1".to_string(), live_pane.raw())]);
+        let aliases = handoff_public_pane_id_aliases(&snapshot, &HashMap::new(), &[ws]);
+        assert_eq!(aliases, HashMap::from([("wF:p1".to_string(), live_pane)]));
+    }
+
     #[test]
     fn capture_and_restore_node_round_trip() {
         let node = Node::Split {
@@ -1208,6 +1269,7 @@ mod tests {
             selected: 0,
             sidebar_width: None,
             collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
         };
         let (events, _event_rx) = mpsc::channel(4);
 
@@ -1300,6 +1362,7 @@ mod tests {
             selected: 0,
             sidebar_width: None,
             collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
         };
         let (events, _event_rx) = mpsc::channel(4);
 
@@ -1408,6 +1471,7 @@ mod tests {
             selected: 0,
             sidebar_width: None,
             collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
         };
         let (events, _event_rx) = mpsc::channel(4);
 
@@ -1518,6 +1582,7 @@ mod tests {
             selected: 0,
             sidebar_width: None,
             collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
         };
         let (events, _event_rx) = mpsc::channel(4);
 
@@ -1587,6 +1652,7 @@ mod tests {
             selected: 0,
             sidebar_width: None,
             collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
         };
         let (events, _event_rx) = mpsc::channel(4);
 
@@ -1778,6 +1844,7 @@ mod tests {
             selected: 0,
             sidebar_width: Some(26),
             collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
         };
         (snapshot, history)
     }

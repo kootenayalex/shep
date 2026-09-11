@@ -1085,6 +1085,7 @@ impl HeadlessServer {
             self.app.state.selected,
             self.app.state.sidebar_width,
             self.app.state.collapsed_space_keys.clone(),
+            &self.app.state.public_pane_id_aliases,
         );
 
         let mut handoff_entries = Vec::new();
@@ -9459,6 +9460,7 @@ next_tab = ""
             selected: 0,
             sidebar_width: None,
             collapsed_space_keys: std::collections::HashSet::new(),
+            public_pane_id_aliases: std::collections::HashMap::new(),
         };
         crate::server::handoff::manifest_for(snapshot, panes, None, None, last_foreground_size)
     }

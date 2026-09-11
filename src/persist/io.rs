@@ -206,6 +206,7 @@ mod tests {
             selected: 0,
             sidebar_width: Some(26),
             collapsed_space_keys: std::collections::HashSet::new(),
+            public_pane_id_aliases: std::collections::HashMap::new(),
         }
     }
 
