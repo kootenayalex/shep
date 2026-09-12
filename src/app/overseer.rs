@@ -125,8 +125,6 @@ impl OverseerSample {
     }
 
     /// Look at the dir now, whatever the sample's age.
-    // Read by the board's live open, which lands with the overseer view.
-    #[allow(dead_code)]
     pub fn refresh(&mut self, now: Instant, dir: &Path) -> bool {
         self.sample(now, dir)
     }
@@ -193,6 +191,27 @@ impl OverseerSample {
         };
     }
 
+    /// The narrative as the board reads it: every non-empty line of
+    /// `BOARD.md` after the header the tick writes (`OVERSEER · <at> ·
+    /// <source>`, or the older `# BOARD — …`), trimmed.
+    pub fn narrative_lines(&self) -> Vec<String> {
+        let Some(text) = self.narrative.as_deref() else {
+            return Vec::new();
+        };
+        let mut lines = text
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .peekable();
+        if lines
+            .peek()
+            .is_some_and(|line| line.starts_with("OVERSEER ·") || line.starts_with("# "))
+        {
+            lines.next();
+        }
+        lines.map(str::to_string).collect()
+    }
+
     /// The narrative's opening sentence — what the strip has room for.
     ///
     /// Skips a header line (`# BOARD — …` from the tick's template, or
@@ -215,15 +234,11 @@ impl OverseerSample {
     }
 
     /// How long since a brain last answered, when one ever has.
-    // Read by the board header, which lands with the overseer view.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn brain_age(&self, now: SystemTime) -> Option<Duration> {
         now.duration_since(self.brain_mtime?).ok()
     }
 
     /// Whether the situation is older than `secs` — or was never written.
-    // Read by the board's live open, which decides whether to ask for a tick.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn situation_older_than(&self, secs: u64) -> bool {
         match self.situation_mtime {
             Some(at) => SystemTime::now()
@@ -465,6 +480,21 @@ mod tests {
             sample.narrative = (!text.is_empty()).then(|| text.to_string());
             assert_eq!(sample.first_sentence().as_deref(), want, "{text:?}");
         }
+    }
+
+    #[test]
+    fn narrative_lines_skip_the_header_and_blank_lines() {
+        let mut sample = OverseerSample {
+            narrative: Some("OVERSEER · 07:08 · brain\n\nfirst.\n  second.  \n".into()),
+            ..Default::default()
+        };
+        assert_eq!(sample.narrative_lines(), vec!["first.", "second."]);
+        sample.narrative = Some("# BOARD — now\nonly.".into());
+        assert_eq!(sample.narrative_lines(), vec!["only."]);
+        sample.narrative = Some("no header".into());
+        assert_eq!(sample.narrative_lines(), vec!["no header"]);
+        sample.narrative = None;
+        assert!(sample.narrative_lines().is_empty());
     }
 
     #[test]

@@ -43,7 +43,7 @@ from pathlib import Path
 
 BRAIN_INTERVAL_SECONDS = 10 * 60
 BRAIN_TIMEOUT_SECONDS = 120
-MAX_BOARD_LINES = 40
+MAX_BOARD_LINES = 10
 MAX_PROPOSALS_PER_TICK = 5
 SHEP_CALL_TIMEOUT_SECONDS = 30
 
@@ -239,7 +239,13 @@ def situation_markdown(facts: dict) -> str:
 
 
 def deterministic_board(facts: dict) -> str:
-    """What a stranger with no brain configured gets: still a useful board."""
+    """What a stranger with no brain configured gets: a short read of the room.
+
+    The board is the header line followed by two or three plain sentences —
+    blocked agents first (they are the person's to answer), then what the
+    docket owes, then health. The TUI's overseer view draws the counts and
+    lists itself; the board is the narrative that sits above them.
+    """
     overview = facts["overview"]
     totals = overview.get("totals", {}) or {}
     agents = overview.get("agents", []) or []
@@ -250,42 +256,36 @@ def deterministic_board(facts: dict) -> str:
     due = [i for i in items if i.get("status") == "open" and i.get("due") and not i.get("overdue")]
     inbox = [i for i in items if i.get("status") == "inbox"]
     blocked = [a for a in agents if a.get("agent_status") == "blocked"]
+    working = totals.get("working", 0)
 
-    lines = [
-        f"OVERSEER · {facts['at']} · deterministic",
-        f"agents {totals.get('agents', len(agents))} · blocked {totals.get('blocked', len(blocked))} · working {totals.get('working', 0)} · idle {totals.get('idle', 0)} · health fail {len(fails)} warn {len(warns)} · docket overdue {len(overdue)} inbox {len(inbox)}",
-        "",
-    ]
-    if fails:
-        lines.append("HEALTH")
-        for finding in fails:
-            fix = f" → {finding['fix']}" if finding.get("fix") else ""
-            lines.append(f"  fail {finding.get('check')}: {finding.get('detail', '')}{fix}")
-        lines.append("")
+    sentences: list[str] = []
     if blocked:
-        lines.append("BLOCKED — yours to answer")
-        for agent in blocked:
-            lines.append("  " + agent_line(agent))
-        lines.append("")
-    lines.append("AGENTS")
-    others = [a for a in agents if a.get("agent_status") != "blocked"]
-    for agent in sorted(others, key=lambda a: a.get("display_name", ""))[:12]:
-        lines.append("  " + agent_line(agent))
-    if not agents:
-        lines.append("  none running" + (f" ({facts['overview_error'].get('code')})" if facts.get("overview_error") else ""))
-    lines.append("")
-    if overdue or due:
-        lines.append("DOCKET due")
-        for item in overdue + due:
-            mark = "!" if item.get("overdue") else " "
-            lines.append(f"  {mark} #{item['id']} {item['due']} {item['title'][:56]}")
+        names = ", ".join(a.get("display_name", a.get("pane_id", "?")) for a in blocked[:3])
+        more = f" and {len(blocked) - 3} more" if len(blocked) > 3 else ""
+        verb = "is" if len(blocked) == 1 else "are"
+        sentences.append(f"{names}{more} {verb} blocked and waiting on you.")
+    elif agents:
+        sentences.append(f"Nobody is blocked; {working} working, {totals.get('idle', 0)} idle.")
+    else:
+        code = f" ({facts['overview_error'].get('code')})" if facts.get("overview_error") else ""
+        sentences.append(f"No agents are running{code}.")
+
+    docket_bits = []
+    if overdue:
+        docket_bits.append(f"{len(overdue)} overdue")
+    if due:
+        docket_bits.append(f"{len(due)} due")
     if inbox:
-        lines.append(f"INBOX ({len(inbox)}) — promote, or discard")
-        for item in inbox[:6]:
-            lines.append(f"    #{item['id']} {item['title'][:60]}")
-    if warns:
-        lines.append("")
-        lines.append("WARN " + " · ".join(f"{w.get('check')}" for w in warns[:8]))
+        docket_bits.append(f"{len(inbox)} in the inbox")
+    if docket_bits:
+        sentences.append("The docket has " + ", ".join(docket_bits) + ".")
+
+    if fails:
+        sentences.append("Health fails on " + ", ".join(f.get("check", "?") for f in fails[:4]) + ".")
+    elif warns:
+        sentences.append("Health warns on " + ", ".join(w.get("check", "?") for w in warns[:4]) + ".")
+
+    lines = [f"OVERSEER · {facts['at']} · deterministic", *sentences[:3]]
     return "\n".join(lines[:MAX_BOARD_LINES]) + "\n"
 
 
@@ -301,7 +301,7 @@ Hard rules you must respect in what you write:
 Given the situation below, answer with EXACTLY two fenced blocks and nothing else:
 
 ```board
-<a BOARD.md of at most {max_board} lines: a header with totals, one line per agent (name · status age · ctx · activity), blocked agents with the visible prompt and your suggested answer + reason, docket due/overdue then inbox with ids, health fails/warns>
+<your read of the room in at most {max_board} lines of plain prose: what needs the person first (a blocked agent and its visible prompt, with your suggested answer and why), then what the docket owes, then health. Short sentences, no headings, no tables, no per-agent list — the screen already shows every agent and every docket item.>
 ```
 
 ```json

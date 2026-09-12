@@ -121,8 +121,11 @@ pub enum HostCursorModeConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BoardViewConfig {
-    /// The docket kanban: inbox, due, slated, recurring, done.
+    /// The overseer's screen: needs-you, agents, docket, health, narrative,
+    /// proposals, chat.
     #[default]
+    Overseer,
+    /// The docket kanban: inbox, due, slated, recurring, done.
     Docket,
     /// The agent lanes, one per group.
     Agents,
@@ -895,8 +898,9 @@ pub struct UiConfig {
     /// a session with several agents starts with the overview. Enter focuses
     /// the selected pane. Default: true.
     pub open_on_board: bool,
-    /// Which lane board the session board opens on: the docket kanban or the
-    /// agent lanes. The other is one key (`a`) away. Default: docket.
+    /// Which board view the session board opens on: the overseer's screen,
+    /// the docket kanban or the agent lanes. `a` cycles through the three.
+    /// Default: overseer.
     pub board_view: BoardViewConfig,
     /// Make the board the leading screen: a bare Esc in a pane running a
     /// recognized agent returns to the session board instead of reaching the
@@ -1356,7 +1360,7 @@ impl Default for UiConfig {
             hint_bar: true,
             overseer_strip: true,
             open_on_board: true,
-            board_view: BoardViewConfig::Docket,
+            board_view: BoardViewConfig::Overseer,
             escape_returns_to_board: true,
             agent_panel_sort: AgentPanelSortConfig::Spaces,
             accent: "cyan".into(),
@@ -1608,16 +1612,17 @@ overseer_strip = false
     }
 
     #[test]
-    fn board_view_defaults_to_the_docket_and_can_pick_the_agents() {
-        assert_eq!(Config::default().ui.board_view, BoardViewConfig::Docket);
-        let config: Config = toml::from_str(
-            r#"
-[ui]
-board_view = "agents"
-"#,
-        )
-        .expect("config should parse");
-        assert_eq!(config.ui.board_view, BoardViewConfig::Agents);
+    fn board_view_defaults_to_the_overseer_and_can_pick_the_others() {
+        assert_eq!(Config::default().ui.board_view, BoardViewConfig::Overseer);
+        for (text, want) in [
+            ("overseer", BoardViewConfig::Overseer),
+            ("docket", BoardViewConfig::Docket),
+            ("agents", BoardViewConfig::Agents),
+        ] {
+            let config: Config = toml::from_str(&format!("[ui]\nboard_view = \"{text}\"\n"))
+                .expect("config should parse");
+            assert_eq!(config.ui.board_view, want);
+        }
         assert!(toml::from_str::<Config>("[ui]\nboard_view = \"tasks\"\n").is_err());
     }
 

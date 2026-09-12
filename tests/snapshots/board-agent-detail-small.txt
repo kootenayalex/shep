@@ -1,73 +1,76 @@
-# board-agent-detail-small 80x24 · 16 styles
+# board-agent-detail-small 80x24 · 19 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                              ✦ overseer   ◉ 1  ⠹ 2  ● 1   desktop  board
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ session board / agent                                                        │
-│                                                                              │
-│ ◉ claude · workmayt                                                          │
-│ workmayt · fix/stripe-webhook · p1 · last activity 2m                        │
-│                                                                              │
-│ state        blocked · ⇥2 queued                                             │
-│ activity     may I run the stripe integration tests?                         │
-│ working dir  ~/vault/dev/workmayt                                            │
-│ context      ████▍   72%                                                     │
-│                                                                              │
-│ live screen                                                                  │
-│   (no live screen for this pane)                                             │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│ enter attach  esc/q back to board                                            │
-╰──────────────────────────────────────────────────────────────────────────────╯
- ctrl+alt+b desktop  ? keys
+ tick 07:08  ·  shep 0.7.3                        ▸ open the overseer's session
+
+ ◉ claude · workmayt
+ workmayt · fix/stripe-webhook · p1 · last activity 2m
+
+ state        blocked · ⇥2 queued
+ activity     may I run the stripe integration tests?
+ working dir  ~/vault/dev/workmayt
+ context      ████▍   72%
+
+ live screen
+   (no live screen for this pane)
+
+
+
+
+
+
+
+
+
+
+ ctrl+alt+b desktop  enter attach  esc back
 
 --- styles ---
-kbbbbkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkddddddddddkkkjjjkkpppkkccckkmmmmmmmmmhhhhhhhk
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-aeeeeeeeeeeeeeeeeebbbbbkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akikoooooooooooooooookkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeekkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akeeeeeeeeeeeeeiiiiiiiiiiiiiiiiiiikkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akeeeeeeeeeeeeegggggggggggggggggggggggggggggggggggggggkkkkkkkkkkkkkkkkkkkkkkkkka
-akeeeeeeeeeeeeennnnnnnnnnnnnnnnnnnnkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akeeeeeeeeeeeeefffffleeeeekkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akeeeeeeeeeeekkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeekkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-akbbbbbeeeeeeeeebbbbbeeeeeeeeeeeeeekkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-kbbbbbbbbbbeeeeeeeeeebeeeeekkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+kaaaakkkkkkkkkkkkkkkkkkkkkkkkkkkkkkcccccccccckkkiiikkssskkbbbkknnnnnnnnnhhhhhhhk
+.mmmmmpppppoooooeeeeeeeeee.......................rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+
+.j.qqqqqqqqqqqqqqqqq
+.eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+.eeeeeeeeeeeeejjjjjjjjjjjjjjjjjjj
+.eeeeeeeeeeeeeggggggggggggggggggggggggggggggggggggggg
+.eeeeeeeeeeeeepppppppppppppppppppp
+.eeeeeeeeeeeeefffffleeeee
+
+.eeeeeeeeeee
+.eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+
+
+
+
+
+
+
+
+
+kaaaaaaaaaaddddddddddaaaaadddddddddaaadddddkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
 
 --- legend ---
 . = (unstyled)
-a = fg:accent bg:panel_bg
-b = fg:accent bg:panel_bg bold
-c = fg:blue bg:panel_bg
-d = fg:mauve bg:panel_bg bold
-e = fg:overlay0 bg:panel_bg
+a = fg:accent bg:panel_bg bold
+b = fg:blue bg:panel_bg
+c = fg:mauve bg:panel_bg bold
+d = fg:overlay0 bg:panel_bg
+e = fg:overlay0 bg:reset
 f = fg:overlay0 bg:surface1
-g = fg:overlay1 bg:panel_bg italic
+g = fg:overlay1 bg:reset italic
 h = fg:panel_bg bg:accent bold
-i = fg:red bg:panel_bg
-j = fg:red bg:panel_bg bold
+i = fg:red bg:panel_bg bold
+j = fg:red bg:reset
 k = fg:reset bg:panel_bg
 l = fg:reset bg:surface1
-m = fg:subtext0 bg:surface1
-n = fg:text bg:panel_bg
-o = fg:text bg:panel_bg bold
-p = fg:yellow bg:panel_bg
+m = fg:subtext0 bg:reset
+n = fg:subtext0 bg:surface1
+o = fg:surface1 bg:reset
+p = fg:text bg:reset
+q = fg:text bg:reset bold
+r = fg:text bg:surface1
+s = fg:yellow bg:panel_bg

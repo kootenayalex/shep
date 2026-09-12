@@ -312,8 +312,8 @@ fn agent_status_change_makes_the_overseer_write_a_deterministic_board() {
     let board = server.wait_for_file(&state_dir.join("BOARD.md"), Duration::from_secs(60));
     assert!(board.starts_with("OVERSEER · "), "{board}");
     assert!(board.contains("deterministic"), "{board}");
-    assert!(board.contains("BLOCKED — yours to answer"), "{board}");
-    assert!(board.lines().count() <= 40, "{board}");
+    assert!(board.contains("blocked"), "{board}");
+    assert!(board.lines().count() <= 12, "{board}");
     let facts: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(state_dir.join("situation.json")).unwrap())
             .unwrap();

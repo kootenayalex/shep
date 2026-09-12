@@ -63,6 +63,9 @@ pub(super) const UP_DOWN: &str = "↑↓";
 /// These are `&'static str` because the hint tables are `&[(&str, &str)]` and
 /// a `format!` cannot live there — and because the cluster is the unit a
 /// reader recognises, not the arrows inside it.
+// The board's lane views used to spell this out in their footer; the hint
+// bar now says `hjkl`. Kept for the next surface that needs the cluster.
+#[allow(dead_code)]
 pub(super) const KEYS_ARROWS: &str = "hjkl/↑↓←→";
 pub(super) const KEYS_VERTICAL: &str = "jk/↑↓";
 pub(super) const KEYS_VERTICAL_SLASHED: &str = "j/k/↑↓";
@@ -125,8 +128,6 @@ pub(super) const QUEUED: &str = "⇥";
 /// The overseer — the one voice in the UI that is not an agent's. Mauve,
 /// wherever it is drawn. Not `◆`: that is the needs-review badge, and one
 /// glyph carries one meaning.
-// Pinned ahead of the overseer board that draws it; unused until then.
-#[allow(dead_code)]
 pub(super) const OVERSEER: &str = "✦";
 
 /// The global menu, as a click target beside the sidebar toggle.
@@ -139,8 +140,6 @@ pub(super) const OVERSEER: &str = "✦";
 pub(super) const MENU: &str = "≡";
 
 /// A health finding that needs a look. A warning, not a stop — peach ink.
-// Pinned ahead of the overseer board that draws it; unused until then.
-#[allow(dead_code)]
 pub(super) const WARNING: &str = "⚠";
 
 /// Fold the sidebar away; bring it back. The collapsed mark is the only
@@ -150,6 +149,10 @@ pub(super) const SIDEBAR_EXPAND: &str = "»";
 
 /// Two views, one chord: `desktop ⇄ board`.
 pub(super) const SWITCH: &str = "⇄";
+
+/// A text cursor drawn by shep itself, in an input the terminal's own cursor
+/// does not sit in — the board's chat line.
+pub(super) const CURSOR: &str = "▮";
 
 // ── Meters ──────────────────────────────────────────────────────────────────
 
@@ -215,6 +218,7 @@ mod tests {
             SIDEBAR_COLLAPSE,
             SIDEBAR_EXPAND,
             SWITCH,
+            CURSOR,
         ];
         for glyph in single {
             assert_eq!(display_width(glyph), 1, "{glyph:?} is not one column");
@@ -307,6 +311,7 @@ mod tests {
             SIDEBAR_COLLAPSE,
             SIDEBAR_EXPAND,
             SWITCH,
+            CURSOR,
             SEP,
             // The state vocabulary, from `status.rs`.
             "◉",

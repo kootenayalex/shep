@@ -15,6 +15,7 @@ mod menus;
 mod mobile;
 mod navigator;
 mod onboarding;
+pub(crate) mod overseer;
 mod panes;
 mod release_notes;
 mod scrollbar;
@@ -27,7 +28,7 @@ mod tabs;
 mod text;
 mod widgets;
 
-use self::board::render_board_overlay;
+use self::board::render_board_screen;
 use self::dialogs::{
     render_confirm_close_overlay, render_new_linked_worktree_overlay,
     render_open_existing_worktree_overlay, render_pair_overlay, render_remove_worktree_overlay,
@@ -466,17 +467,26 @@ pub fn render_with_runtime_registry(
 
     if app.view.layout == ViewLayout::Mobile {
         render_mobile_header(app, terminal_runtimes, frame, app.view.mobile_header_rect);
-    } else if sidebar_area.width > 0 {
-        if app.sidebar_collapsed {
-            render_sidebar_collapsed(app, frame, sidebar_area);
-        } else {
-            render_sidebar(app, terminal_runtimes, frame, sidebar_area);
+    }
+    // The board is a screen of its own, not an overlay: while it is up (or a
+    // modal it opened is), the sidebar, tab bar and panes are not drawn at
+    // all. Pane geometry persists in `view`, so the desktop comes back as it
+    // was.
+    if app.board_underlay() {
+        render_board_screen(app, terminal_runtimes, frame, board::board_area(app));
+    } else {
+        if app.view.layout != ViewLayout::Mobile && sidebar_area.width > 0 {
+            if app.sidebar_collapsed {
+                render_sidebar_collapsed(app, frame, sidebar_area);
+            } else {
+                render_sidebar(app, terminal_runtimes, frame, sidebar_area);
+            }
         }
+        if app.view.layout != ViewLayout::Mobile {
+            render_tab_bar(app, frame, tab_bar_area);
+        }
+        render_panes(app, terminal_runtimes, frame, terminal_area);
     }
-    if app.view.layout != ViewLayout::Mobile {
-        render_tab_bar(app, frame, tab_bar_area);
-    }
-    render_panes(app, terminal_runtimes, frame, terminal_area);
 
     // Ambient notifications sit above panes, but below interactive overlays.
     render_notifications(app, frame, terminal_area);
@@ -513,7 +523,7 @@ pub fn render_with_runtime_registry(
         Mode::GlobalMenu => render_global_launcher_menu(app, frame),
         Mode::KeybindHelp => render_keybind_help_overlay(app, frame),
         Mode::Navigator => render_navigator_overlay(app, terminal_runtimes, frame),
-        Mode::Board => render_board_overlay(app, terminal_runtimes, frame),
+        Mode::Board => {}
         Mode::PairPhone => render_pair_overlay(app, frame, frame.area()),
         Mode::Terminal => {}
     }

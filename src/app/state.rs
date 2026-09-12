@@ -878,15 +878,27 @@ pub(crate) struct BoardState {
     /// The last docket verb that failed, in the words of the store, shown on
     /// the board until the next key. A refused promote is otherwise silent.
     pub docket_notice: Option<String>,
+    /// The overseer view's selection: one row anywhere on it, identified by
+    /// what it points at so it survives the model recomputing under it.
+    pub overseer_selected: Option<crate::ui::overseer::OverseerRow>,
+    /// A modal opened from the board (`?`, `n`) hands back to the board when
+    /// it closes, and the board stays drawn underneath it meanwhile.
+    pub suspended: bool,
+    /// The overseer plugin's `tick` the board asked for on opening, by its
+    /// command log id, until it finishes — so reopening does not stack ticks.
+    pub tick_in_flight: Option<String>,
 }
 
 /// The board's screens. The two lane boards are the board proper; each detail
 /// screen is reached from its lanes and always returns there.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum BoardView {
-    /// The docket kanban — inbox, due, slated, recurring, done. What the
-    /// board opens on unless `[ui] board_view = "agents"`.
+    /// The overseer's screen: who needs you, the agents table, the docket's
+    /// due lane, health, the narrative, proposals and chat. What the board
+    /// opens on unless `[ui] board_view` says otherwise.
     #[default]
+    Overseer,
+    /// The docket kanban — inbox, due, slated, recurring, done.
     Docket,
     /// One docket item in full: every field, plus the verbs that apply to it.
     DocketItem,
@@ -901,6 +913,7 @@ impl BoardView {
     /// already a lane board.
     pub(crate) fn lanes(self) -> BoardView {
         match self {
+            BoardView::Overseer => BoardView::Overseer,
             BoardView::Docket | BoardView::DocketItem => BoardView::Docket,
             BoardView::Columns | BoardView::Agent => BoardView::Columns,
         }
@@ -1027,19 +1040,35 @@ impl AppState {
         self.overseer.sample.refresh_if_stale(now, &dir)
     }
 
+    /// Look at the overseer's state dir now — after a tick the board asked
+    /// for has finished, when the files are known to have moved.
+    pub fn refresh_overseer(&mut self) -> bool {
+        let dir = self.overseer.state_dir.clone();
+        self.overseer
+            .sample
+            .refresh(std::time::Instant::now(), &dir)
+    }
+
     /// Whether the desktop chrome shows the overseer strip: the config allows
     /// it, the board — where the narrative has a whole region — is not up,
     /// and there is a narrative to put on it. The desktop layout's
     /// `compute_view` is the only caller that reserves the row; the mobile
     /// layout never asks.
     pub(crate) fn overseer_strip_visible(&self) -> bool {
-        self.overseer_strip && self.mode != Mode::Board && self.overseer.sample.narrative.is_some()
+        self.overseer_strip && !self.board_underlay() && self.overseer.sample.narrative.is_some()
+    }
+
+    /// Whether the board is the screen underneath: the board itself, or a
+    /// modal it opened (`?`, `n`) that will hand back to it. The desktop's
+    /// sidebar, tab bar and panes are not drawn while this holds.
+    pub(crate) fn board_underlay(&self) -> bool {
+        self.mode == Mode::Board || self.board.suspended
     }
 
     /// Whether the overseer's files are worth their stats right now: the
     /// board is up, or the desktop chrome that shows them is.
     pub(crate) fn overseer_sample_wanted(&self) -> bool {
-        self.mode == Mode::Board
+        self.board_underlay()
             || (self.view.layout == ViewLayout::Desktop && (self.titlebar || self.overseer_strip))
     }
 
@@ -1049,7 +1078,7 @@ impl AppState {
     /// the overseer has spoken, so a session without one never opens the
     /// store from the desktop.
     pub(crate) fn docket_sample_wanted(&self) -> bool {
-        self.mode == Mode::Board
+        self.board_underlay()
             || (self.view.layout == ViewLayout::Desktop
                 && self.titlebar
                 && self.overseer.sample.narrative.is_some())
@@ -2456,7 +2485,7 @@ impl AppState {
             hint_bar: false,
             overseer_strip: false,
             escape_returns_to_board: false,
-            board_default_view: BoardView::Docket,
+            board_default_view: BoardView::Overseer,
             escape_host_is_legacy: false,
             pane_history_persistence: false,
             reveal_hidden_cursor_for_cjk_ime: false,

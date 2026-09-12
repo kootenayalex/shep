@@ -41,6 +41,7 @@ mod modal;
 mod mouse;
 mod navigate;
 mod overlays;
+mod overseer;
 mod selection;
 mod settings;
 mod sidebar;

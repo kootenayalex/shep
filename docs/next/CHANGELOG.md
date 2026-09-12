@@ -170,6 +170,29 @@
 
 ### Changed
 
+- The overseer board is a full-screen sibling of the desktop, not a panel
+  over it. `ctrl+alt+b` (`keys.switch_view`) now lands on a one-screen
+  overview: a header strip (`tick`, `brain`, the brain's runtime, the shep
+  version, load and memory, with `▸ open the overseer's session` pinned
+  right), then `needs you` (blocked agents with their visible prompt, done
+  agents you have not looked at), `agents` (one row each: name, group,
+  branch, state age, context gauge), `docket` (the due lane in full, then
+  the newest inbox items) and `health` down the left, and the overseer's
+  `✦ read of the room`, its `proposals` (`a` keeps one as slated, `x` drops
+  it) and a `chat` placeholder down the right; below 120 columns the two
+  columns stack. `j`/`k` walk the rows, Enter focuses an agent's pane or
+  opens a docket item, `a` from the agent or docket lanes cycles
+  overseer → agents → docket, and `?` opens the key help over the board and
+  returns to it. Opening the board also refreshes the overseer: when its
+  situation is missing or older than a minute, the plugin's `tick` action
+  runs once. The agent lanes and the docket views keep the same header row
+  and lose the old panel border, title, footer and dashboard strip; the
+  hint bar names each view's keys and carries the docket's notices at its
+  right edge. `[ui] board_view` accepts `"overseer"` (the new default),
+  `"agents"` and `"docket"`. The plugin's `BOARD.md` is now at most ten
+  lines — a header and a prose read of the room, blocked first, then the
+  docket, then health — and its brain is asked for prose, not a table.
+
 - One chord flips between the desktop and the session board: `ctrl+alt+b`
   (`keys.switch_view`), from a pane, from prefix mode, and from the board
   itself; the board never reached the keymap before, so it could only be

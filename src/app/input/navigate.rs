@@ -409,8 +409,14 @@ impl App {
             NavigateAction::OpenNavigator => {
                 self.state.open_navigator_from(&self.terminal_runtimes)
             }
-            NavigateAction::OpenBoard => self.state.open_board(),
-            NavigateAction::SwitchView => switch_view(&mut self.state),
+            NavigateAction::OpenBoard => self.open_board_live(),
+            NavigateAction::SwitchView => {
+                if self.state.mode == Mode::Board {
+                    super::modal::leave_modal(&mut self.state);
+                } else {
+                    self.open_board_live();
+                }
+            }
         }
 
         finish_action_context(&mut self.state, context, previous_mode);
@@ -1752,7 +1758,10 @@ fn workspace_can_start_worktree_action(
 /// The desktop and the board are two sides of one screen, and one chord
 /// flips between them. From the board it is the board's own leave; from
 /// anywhere else — a pane, prefix mode, the navigate overlay — it opens the
-/// board the way the `board` action does.
+/// board the way the `board` action does. The live app goes through
+/// `App::open_board_live` for the same switch, which also asks the overseer
+/// for a tick; this is the pure shape the state-level tests drive.
+#[cfg(test)]
 pub(super) fn switch_view(state: &mut AppState) {
     if state.mode == Mode::Board {
         super::modal::leave_modal(state);

@@ -120,6 +120,14 @@ impl App {
         {
             self.state.plugin_commands_in_flight =
                 self.state.plugin_commands_in_flight.saturating_sub(1);
+            // The tick the board asked for on opening has landed: read what
+            // it wrote now rather than on the next two-second sample.
+            if self.state.board.tick_in_flight.as_deref() == Some(log_id.as_str()) {
+                self.state.board.tick_in_flight = None;
+                self.state.refresh_overseer();
+                self.render_dirty.store(true, Ordering::Release);
+                self.render_notify.notify_one();
+            }
             if let Some(log) = self
                 .state
                 .plugin_command_logs

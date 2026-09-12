@@ -1,112 +1,116 @@
-# board-mid 120x40 · 23 styles
+# board-mid 120x40 · 27 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                                                  ✦ overseer                  ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ session board · what are my agents doing                                                                             │
-│ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  ⇥2 queued  ·  docket 2 due · 5 inbox      │
-│ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G                                                       │
-│ workmayt 2                              emberline 1                            shep 2                                │
-│                                                                                                                      │
-│ ◉ claude · workmayt ⇥2              p1  ● claude · emberline                   ⠹ codex                            p2 │
-│   fix/stripe-webhook                2m    master                           6m    feat/design-pass                 2m │
-│   blocked                                 done                                   working                             │
-│   Now the refund path's idempotency k…    pushed 3 commits to master             reading src/ui/board.rs             │
-│   …ev/workmayt · plan      ████▍   72%    …v/emberline · bypass   █████▎  88%    …-worktrees/design-pass ███▎    55% │
-│                                                                                                                      │
-│ ⠹ opencode                          p2                                         ○ claude · shep                    p1 │
-│   fix/stripe-webhook               20s                                           feat/design-pass                 1h │
-│   working                                                                        idle                                │
-│   Metamorphosing…                                                                                                    │
-│   …/dev/workmayt/apps/site ██▌     41%                                           ~/vault/dev/shep        ▊       12% │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│ enter focus  i inspect  hjkl/↑↓←→ move  <> move group  a docket  esc/q close                                         │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ctrl+alt+b desktop  ? keys
+ tick 07:08  ·  shep 0.7.3  ·  load 38 % of 12  ·  mem 64 %                               ▸ open the overseer's session
+ workmayt 2                              emberline 1                             shep 2
+
+ ◉ claude · workmayt ⇥2              p1  ● claude · emberline                    ⠹ codex                             p2
+   fix/stripe-webhook                2m    master                            6m    feat/design-pass                  2m
+   blocked                                 done                                    working
+   Now the refund path's idempotency k…    pushed 3 commits to master              reading src/ui/board.rs
+   …ev/workmayt · plan      ████▍   72%    …v/emberline · bypass    █████▎  88%    …p-worktrees/design-pass ███▎    55%
+
+ ⠹ opencode                          p2                                          ○ claude · shep                     p1
+   fix/stripe-webhook               20s                                            feat/design-pass                  1h
+   working                                                                         idle
+   Metamorphosing…
+   …/dev/workmayt/apps/site ██▌     41%                                            ~/vault/dev/shep         ▊       12%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ctrl+alt+b desktop  enter focus  i inspect  hjkl move  <> move group  a docket
 
 --- styles ---
-pbbbbppppppppppppppppppppppppppppppppppppppppppppppppppffffffffffppppppppppppppppppoooppwwwppcccppdddpprrrrrrrrrkkkkkkkp
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-abbbbbbbbbbbbbbbggggggggggggggggggggggggggpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-aggggggggvoooooooooooosssssnnnnnnnnvssssscccccvssssswwwwwwwwvsssssdddddvsssssuuuuuuuuusssssggggggglgggggtvvggggggppppppa
-aggggggvvvvvsssssgggggvvvggggggggggggsssssggggvvvgggggggggggggggpppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-ahhhhhhhhhggppppppppppppppppppppppppppppphhhhhhhhhhggppppppppppppppppppppppppppphhhhhggppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-agnpvvvvvvvvvvvvvvvvvuuuppppppppppppppggpgcpvvvvvvvvvvvvvvvvvvppppppppppppppppppgwpvvvvvppppppppppppppppppppppppppppggpa
-apppggggggggggggggggggppppppppppppppppggppppggggggpppppppppppppppppppppppppppggppppggggggggggggggggpppppppppppppppppggpa
-annnnnnnnnnppppppppppppppppppppppppppppppcccccccppppppppppppppppppppppppppppppppwwwwwwwwwwpppppppppppppppppppppppppppppa
-aiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiipiiiiiiiiiiiiiiiiiiiiiiiiiiiiippppppppppiiiiiiiiiiiiiiiiiiiiiiiiiipppppppppppppa
-apppgggggggggggggggeeeeppppppjjjjjqgggggppppgggggggggggggggllllllpppmmmmmmlllllppppgggggggggggggggggggggggpjjjjqqgggggpa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-agwpvvvvvvvvppppppppppppppppppppppppppggppppppppppppppppppppppppppppppppppppppppgdpvvvvvvvvvvvvvppppppppppppppppppppggpa
-apppggggggggggggggggggpppppppppppppppgggpppppppppppppppppppppppppppppppppppppppppppggggggggggggggggpppppppppppppppppggpa
-awwwwwwwwwwpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppdddddddppppppppppppppppppppppppppppppppa
-aiiiiiiiiiiiiiiiiiippppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-apppggggggggggggggggggggggggpjjjqqqgggggpppppppppppppppppppppppppppppppppppppppppppggggggggggggggggppppppppjqqqqqgggggpa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
-apbbbbbggggggggbggggggggggbbbbbbbbbgggggggbbgggggggggggggbgggggggggbbbbbggggggpppppppppppppppppppppppppppppppppppppppppa
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-pbbbbbbbbbbggggggggggbgggggppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp
+raaaarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrffffffffffrrrrrrrrrrrrrrrrrrppprrzzzrrbbbrrdddrruuuuuuuuummmmmmmr
+.tttttxxxxxvvvvviiiiiiiiiivvvvviiiiiiiiiiiiiiiiiiiiiiiiiiii..............................yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+jjjjjjjjjii.............................jjjjjjjjjjii............................jjjjjii
+
+iq.xxxxxxxxxxxxxxxxxwww..............ii.ic.xxxxxxxxxxxxxxxxxx...................iA.xxxxx.............................ii
+...iiiiiiiiiiiiiiiiii................ii....iiiiii............................ii....iiiiiiiiiiiiiiii..................ii
+qqqqqqqqqq..............................ccccccc.................................AAAAAAAAAA
+kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.kkkkkkkkkkkkkkkkkkkkkkkkkkkkk...........kkkkkkkkkkkkkkkkkkkkkkkkkk
+...iiiiiiiiiiiiiiigggg......lllllsiiiii....iiiiiiiiiiiiiiinnnnnn....oooooonnnnn....iiiiiiiiiiiiiiiiiiiiiiii.llllssiiiii
+
+iA.xxxxxxxx..........................ii.........................................ie.xxxxxxxxxxxxx.....................ii
+...iiiiiiiiiiiiiiiiii...............iii............................................iiiiiiiiiiiiiiii..................ii
+AAAAAAAAAA......................................................................eeeeeee
+kkkkkkkkkkkkkkkkkk
+...iiiiiiiiiiiiiiiiiiiiiiii.lllsssiiiii............................................iiiiiiiiiiiiiiii.........lsssssiiiii
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+raaaaaaaaaahhhhhhhhhhaaaaahhhhhhhhahhhhhhhhhhaaaahhhhhhhaahhhhhhhhhhhhhahhhhhhhrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
 
 --- legend ---
 . = (unstyled)
-a = fg:accent bg:panel_bg
-b = fg:accent bg:panel_bg bold
-c = fg:blue bg:panel_bg
+A = fg:yellow bg:reset
+a = fg:accent bg:panel_bg bold
+b = fg:blue bg:panel_bg
+c = fg:blue bg:reset
 d = fg:green bg:panel_bg
-e = fg:mauve bg:panel_bg
+e = fg:green bg:reset
 f = fg:mauve bg:panel_bg bold
-g = fg:overlay0 bg:panel_bg
-h = fg:overlay0 bg:panel_bg bold
-i = fg:overlay0 bg:panel_bg italic
-j = fg:overlay0 bg:surface1
-k = fg:panel_bg bg:accent bold
-l = fg:peach bg:panel_bg
-m = fg:peach bg:surface1
-n = fg:red bg:panel_bg
-o = fg:red bg:panel_bg bold
-p = fg:reset bg:panel_bg
-q = fg:reset bg:surface1
-r = fg:subtext0 bg:surface1
-s = fg:surface0 bg:panel_bg
-t = fg:surface1 bg:panel_bg
-u = fg:teal bg:panel_bg
-v = fg:text bg:panel_bg
-w = fg:yellow bg:panel_bg
+g = fg:mauve bg:reset
+h = fg:overlay0 bg:panel_bg
+i = fg:overlay0 bg:reset
+j = fg:overlay0 bg:reset bold
+k = fg:overlay0 bg:reset italic
+l = fg:overlay0 bg:surface1
+m = fg:panel_bg bg:accent bold
+n = fg:peach bg:reset
+o = fg:peach bg:surface1
+p = fg:red bg:panel_bg bold
+q = fg:red bg:reset
+r = fg:reset bg:panel_bg
+s = fg:reset bg:surface1
+t = fg:subtext0 bg:reset
+u = fg:subtext0 bg:surface1
+v = fg:surface1 bg:reset
+w = fg:teal bg:reset
+x = fg:text bg:reset
+y = fg:text bg:surface1
+z = fg:yellow bg:panel_bg

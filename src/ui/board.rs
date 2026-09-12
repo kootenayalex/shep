@@ -1,10 +1,14 @@
-//! Session board overlay: two full-screen lane boards one key apart.
+//! The session board: a full-screen sibling of the desktop, three views one
+//! key apart.
 //!
-//! The docket board answers "what is owed" — inbox, due, slated, recurring,
-//! done — one card per docket item, drawn from the rows sampled into
+//! The overseer view (`super::overseer`) is what the board opens on. The
+//! docket board answers "what is owed" — inbox, due, slated, recurring, done
+//! — one card per docket item, drawn from the rows sampled into
 //! `AppState::docket_sample`. The agent board answers "what are all my agents
 //! doing right now": one lane per group, one card per agent pane. On narrow
-//! terminals either collapses to a single stacked list, lane by lane.
+//! terminals either lane board collapses to a single stacked list, lane by
+//! lane. Every view shares the overseer's header row; the chrome's titlebar
+//! and hint bar frame them all.
 //!
 //! Everything here is pure TUI presentation: the model, geometry, selection
 //! traversal, and enter-focus resolution are computed from `&AppState` so they
@@ -27,7 +31,6 @@ use super::status::{agent_icon_for, docket_appearance, state_label, DocketUrgenc
 use super::text::{
     contract_home, display_width, fit_strip, spans_width, truncate_end, truncate_start,
 };
-use super::widgets::render_panel_shell;
 use crate::api::schema::{DocketKind, DocketRepeat, DocketStatus};
 use crate::app::state::{AppState, BoardView, DocketSample, Palette};
 use crate::detect::AgentState;
@@ -554,50 +557,27 @@ pub(crate) fn is_narrow(app: &AppState) -> bool {
     is_narrow_with_lanes(app, board_model(app).lanes.len())
 }
 
+/// The board's surface, whole. There is no panel border any more: the board
+/// is a screen of its own, framed by the chrome's titlebar and hint bar.
 fn inner_area(area: Rect) -> Option<Rect> {
-    if area.width < 2 || area.height < 2 {
+    if area.width == 0 || area.height == 0 {
         return None;
     }
-    Some(Rect::new(
-        area.x + 1,
-        area.y + 1,
-        area.width - 2,
-        area.height - 2,
-    ))
+    Some(area)
 }
 
-/// Rows the dashboard strip occupies below the title: session pulse, then
-/// host/system vitals.
-const DASHBOARD_ROWS: u16 = 2;
-
-/// The card region inside the panel, reserving the title row, the dashboard
-/// strip, and the footer row. On a short terminal the dashboard yields first —
-/// the cards are the point of the screen.
+/// The rows a lane board's cards get: everything under the header row.
 fn board_body(inner: Rect) -> Rect {
-    if inner.height <= 2 {
-        return inner;
-    }
-    let reserved = 2 + dashboard_rows(inner);
-    if inner.height <= reserved {
-        return Rect::new(
-            inner.x,
-            inner.y + 1,
-            inner.width,
-            inner.height.saturating_sub(2),
-        );
-    }
     Rect::new(
         inner.x,
-        inner.y + 1 + dashboard_rows(inner),
+        inner.y + inner.height.min(1),
         inner.width,
-        inner.height.saturating_sub(reserved),
+        inner.height.saturating_sub(1),
     )
 }
 
-/// How many dashboard rows fit. Below this the strip is dropped entirely
-/// rather than half-rendered.
-/// Body rect for a detail screen: everything between the title row and the
-/// footer row, indented one column so text does not sit on the panel border.
+/// Body rect for a detail screen: under the header row and a blank one,
+/// indented one column so text does not sit on the screen's edge.
 fn detail_body(inner: Rect) -> Rect {
     if inner.height <= 2 || inner.width <= 2 {
         return Rect::new(inner.x, inner.y, 0, 0);
@@ -606,16 +586,8 @@ fn detail_body(inner: Rect) -> Rect {
         inner.x + 1,
         inner.y + 2,
         inner.width.saturating_sub(2),
-        inner.height.saturating_sub(3),
+        inner.height.saturating_sub(2),
     )
-}
-
-fn dashboard_rows(inner: Rect) -> u16 {
-    if inner.height >= 12 {
-        DASHBOARD_ROWS
-    } else {
-        0
-    }
 }
 
 /// Divide the body evenly between the lanes, giving the leftmost lanes the
@@ -757,7 +729,7 @@ pub(crate) fn pane_at(app: &AppState, col: u16, row: u16) -> Option<PaneId> {
 // Render
 // ---------------------------------------------------------------------------
 
-fn card_age(app: &AppState, card: &BoardCard) -> Option<String> {
+pub(super) fn card_age(app: &AppState, card: &BoardCard) -> Option<String> {
     let terminal_id = app.workspaces.get(card.ws_idx)?.terminal_id(card.pane_id)?;
     let at = app.terminals.get(terminal_id)?.last_agent_state_change_at?;
     Some(format_event_age(
@@ -814,184 +786,30 @@ pub(crate) fn board_summary(app: &AppState, model: &BoardModel) -> BoardSummary 
     }
 }
 
-/// `1234567890` -> `1.1G`. Bytes on a status strip are only ever read as a
-/// magnitude.
-fn human_bytes(bytes: u64) -> String {
-    const UNITS: [(u64, &str); 3] = [(1024 * 1024 * 1024, "G"), (1024 * 1024, "M"), (1024, "K")];
-    for (scale, suffix) in UNITS {
-        if bytes >= scale {
-            return format!("{:.1}{suffix}", bytes as f64 / scale as f64);
-        }
-    }
-    format!("{bytes}B")
-}
-
-/// Two-row dashboard: the session pulse, then the host it runs on.
-fn render_dashboard(
-    app: &AppState,
-    frame: &mut Frame,
-    area: Rect,
-    summary: &BoardSummary,
-    docket: &DocketBoardModel,
-) {
-    let p = &app.palette;
-    let dim = Style::default().fg(p.overlay0);
-    let value = Style::default().fg(p.text);
-    let sep = Span::styled(glyphs::SEP_WIDE, Style::default().fg(p.surface0));
-    let width = area.width as usize;
-
-    // Row 1 — agents and session shape, most worth knowing first.
-    let mut lead = vec![
-        Span::styled(" agents ", dim),
-        Span::styled(summary.agents().to_string(), value),
-    ];
-    if summary.attention > 0 {
-        // The one number on this strip that is a call to action, so it rides
-        // with the head count instead of being a fact that can fall off.
-        lead.push(Span::styled(
-            format!("  {} need you", summary.attention),
-            Style::default().fg(p.red).add_modifier(Modifier::BOLD),
-        ));
-    }
-    let mut facts = vec![lead];
-    for (label, count, state, seen) in [
-        ("blocked", summary.blocked, AgentState::Blocked, true),
-        ("done", summary.done, AgentState::Idle, false),
-        ("working", summary.working, AgentState::Working, true),
-        ("idle", summary.idle, AgentState::Idle, true),
-    ] {
-        facts.push(vec![
-            Span::styled(
-                format!("{label} "),
-                Style::default().fg(super::status::state_label_color(state, seen, p)),
-            ),
-            Span::styled(count.to_string(), value),
-        ]);
-    }
-    if summary.queued_input > 0 {
-        facts.push(vec![Span::styled(
-            format!("{}{} queued", glyphs::QUEUED, summary.queued_input),
-            Style::default().fg(p.teal),
-        )]);
-    }
-    // The docket, once it has been read: what is due is a call to action of
-    // its own, so it warms up when the number is not zero. On the docket
-    // board it is the fact worth keeping when the strip runs out of room, so
-    // it rides right behind the head count there; on the agent lanes it
-    // follows the agent states.
-    if app.docket_sample.sampled {
-        let due = docket.due_count();
-        let due_style = if due > 0 {
-            Style::default().fg(p.peach)
-        } else {
-            value
-        };
-        let fact = vec![
-            Span::styled("docket ", dim),
-            Span::styled(due.to_string(), due_style),
-            Span::styled(" due ", dim),
-            Span::styled(glyphs::SEP, Style::default().fg(p.surface1)),
-            Span::styled(format!(" {}", docket.inbox_count()), value),
-            Span::styled(" inbox", dim),
-        ];
-        if app.board.view == BoardView::Docket {
-            facts.insert(1, fact);
-        } else {
-            facts.push(fact);
-        }
-    }
-    // Session shape last: it describes the furniture, not the work.
-    facts.push(vec![Span::styled(
-        format!(
-            "{} ws {s} {} tabs {s} {} panes",
-            summary.workspaces,
-            summary.tabs,
-            summary.panes,
-            s = glyphs::SEP
-        ),
-        dim,
-    )]);
-    frame.render_widget(
-        Paragraph::new(Line::from(fit_strip(facts, &sep, width))),
-        Rect::new(area.x, area.y, area.width, 1),
-    );
-
-    if area.height < 2 {
-        return;
-    }
-
-    // Row 2 — the host. Unsampled or unreadable values print as an em dash
-    // rather than a confident zero.
-    let vitals = app.dashboard_sample.vitals;
-    let mut rows = vec![vec![
-        Span::styled(" shep ", dim),
-        Span::styled(env!("CARGO_PKG_VERSION"), value),
-    ]];
-    let mut load = vec![Span::styled("load ", dim)];
-    match (vitals.load_percent, vitals.cores) {
-        (Some(percent), Some(cores)) => {
-            let color = match percent {
-                100..=u16::MAX => p.red,
-                70..=99 => p.yellow,
-                _ => p.text,
-            };
-            load.push(Span::styled(
-                format!("{percent}%"),
-                Style::default().fg(color),
-            ));
-            load.push(Span::styled(format!(" of {cores} cores"), dim));
-        }
-        _ => load.push(Span::styled(glyphs::DASH, dim)),
-    }
-    rows.push(load);
-    let mut mem = vec![Span::styled("mem ", dim)];
-    match vitals.memory_percent {
-        Some(percent) => {
-            let color = match percent {
-                90..=u8::MAX => p.red,
-                75..=89 => p.yellow,
-                _ => p.text,
-            };
-            mem.push(Span::styled(
-                format!("{percent}%"),
-                Style::default().fg(color),
-            ));
-            if let (Some(used), Some(total)) = (vitals.memory_used_bytes, vitals.memory_total_bytes)
-            {
-                mem.push(Span::styled(
-                    format!(" {} of {}", human_bytes(used), human_bytes(total)),
-                    dim,
-                ));
-            }
-        }
-        None => mem.push(Span::styled(glyphs::DASH, dim)),
-    }
-    rows.push(mem);
-    frame.render_widget(
-        Paragraph::new(Line::from(fit_strip(rows, &sep, width))),
-        Rect::new(area.x, area.y + 1, area.width, 1),
-    );
-}
-
-pub(super) fn render_board_overlay(
+/// Draw the board over `area` — the whole screen between the titlebar and
+/// the hint bar. The first row is the overseer's header on every view; the
+/// hint bar carries each view's keys and the docket notice.
+pub(super) fn render_board_screen(
     app: &AppState,
     terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
     frame: &mut Frame,
+    area: Rect,
 ) {
-    let area = board_area(app);
-    let Some(inner) = render_panel_shell(frame, area, app.palette.accent, app.palette.panel_bg)
-    else {
+    let Some(inner) = inner_area(area) else {
         return;
     };
-
-    render_title(app, frame, Rect::new(inner.x, inner.y, inner.width, 1));
+    if app.board.view == BoardView::Overseer {
+        super::overseer::render_overseer(app, frame, inner);
+        return;
+    }
+    frame.render_widget(ratatui::widgets::Clear, inner);
+    super::overseer::render_overseer_header(
+        app,
+        frame,
+        Rect::new(inner.x, inner.y, inner.width, inner.height.min(1)),
+    );
 
     let model = board_model(app);
-    let footer_y = inner.y + inner.height.saturating_sub(1);
-    render_footer(app, frame, Rect::new(inner.x, footer_y, inner.width, 1));
-
-    // A detail screen replaces the dashboard and lanes entirely; it keeps
-    // only the panel shell, title, and footer so the board stays recognisable.
     let docket = docket_board_model(&app.docket_sample);
     match app.board.view {
         BoardView::Agent => {
@@ -1004,23 +822,10 @@ pub(super) fn render_board_overlay(
             render_docket_detail(app, frame, &docket, body);
             return;
         }
-        BoardView::Columns | BoardView::Docket => {}
+        BoardView::Overseer | BoardView::Columns | BoardView::Docket => {}
     }
 
     let body = board_body(inner);
-
-    let rows = dashboard_rows(inner);
-    if rows > 0 {
-        let summary = board_summary(app, &model);
-        render_dashboard(
-            app,
-            frame,
-            Rect::new(inner.x, inner.y + 1, inner.width, rows),
-            &summary,
-            &docket,
-        );
-    }
-
     if body.height == 0 || body.width == 0 {
         return;
     }
@@ -1041,92 +846,6 @@ pub(super) fn render_board_overlay(
     } else {
         render_wide(app, frame, &model, body);
     }
-}
-
-fn render_title(app: &AppState, frame: &mut Frame, area: Rect) {
-    let p = &app.palette;
-    let title = Style::default().fg(p.accent).add_modifier(Modifier::BOLD);
-    let dim = Style::default().fg(p.overlay0);
-    // On a detail screen the title doubles as the breadcrumb back to the board.
-    let line = match app.board.view {
-        BoardView::Docket => Line::from(vec![
-            Span::styled(" docket ", title),
-            Span::styled(format!("{} what needs doing", glyphs::SEP), dim),
-        ]),
-        BoardView::DocketItem => Line::from(vec![
-            Span::styled(" docket ", dim),
-            Span::styled("/ ", dim),
-            Span::styled("item", title),
-        ]),
-        BoardView::Columns => Line::from(vec![
-            Span::styled(" session board ", title),
-            Span::styled(format!("{} what are my agents doing", glyphs::SEP), dim),
-        ]),
-        BoardView::Agent => Line::from(vec![
-            Span::styled(" session board ", dim),
-            Span::styled("/ ", dim),
-            Span::styled("agent", title),
-        ]),
-    };
-    frame.render_widget(Paragraph::new(line), area);
-}
-
-fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
-    let p = &app.palette;
-    let key = Style::default().fg(p.accent).add_modifier(Modifier::BOLD);
-    let dim = Style::default().fg(p.overlay0);
-    // Each screen advertises only the keys that do something on it, and every
-    // screen says what esc does — from a detail screen that is "back", not
-    // "close", so the board is always one step away.
-    let hints: &[(&str, &str)] = match app.board.view {
-        // The docket's verbs are its keys; the arrows are left unsaid here
-        // because at 80 columns the row has room for the verbs or the
-        // arrows, and the verbs are the ones a person cannot guess.
-        BoardView::Docket => &[
-            ("i", " inspect  "),
-            ("n", " new  "),
-            ("p", " slate  "),
-            ("r", " recur  "),
-            ("d", " done  "),
-            ("x", " discard  "),
-            ("a", " agents  "),
-            ("esc", " close"),
-        ],
-        BoardView::DocketItem => &[
-            ("p", " slate  "),
-            ("r", " recur  "),
-            ("d", " done  "),
-            ("x", " discard  "),
-            ("esc", " back to docket"),
-        ],
-        BoardView::Columns => &[
-            ("enter", " focus  "),
-            ("i", " inspect  "),
-            (glyphs::KEYS_ARROWS, " move  "),
-            ("<>", " move group  "),
-            ("a", " docket  "),
-            ("esc/q", " close"),
-        ],
-        BoardView::Agent => &[("enter", " attach  "), ("esc/q", " back to board")],
-    };
-    let mut spans = vec![Span::raw(" ")];
-    for (k, label) in hints {
-        spans.push(Span::styled(*k, key));
-        spans.push(Span::styled(*label, dim));
-    }
-    // A refused docket verb says why, in the store's words, where the eye
-    // already is. It rides the footer's right edge and is gone on the next key.
-    if let Some(notice) = app.board.docket_notice.as_deref() {
-        let used: usize = spans.iter().map(|s| display_width(&s.content)).sum();
-        let room = (area.width as usize).saturating_sub(used + 2);
-        let text = truncate_end(&format!("! {notice}"), room);
-        let pad = (area.width as usize)
-            .saturating_sub(used)
-            .saturating_sub(display_width(&text) + 1);
-        spans.push(Span::raw(" ".repeat(pad)));
-        spans.push(Span::styled(text, Style::default().fg(p.peach)));
-    }
-    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 /// A lane heading: the group's name and how many agents are in it.
@@ -1809,7 +1528,7 @@ impl DocketCard {
         self.status == DocketStatus::Open && matches!(self.due, DueLabel::Overdue(_))
     }
 
-    fn urgency(&self) -> DocketUrgency {
+    pub(super) fn urgency(&self) -> DocketUrgency {
         if self.status == DocketStatus::Open {
             self.due.urgency()
         } else {
@@ -1856,6 +1575,14 @@ fn source_tags(source: Option<&serde_json::Value>) -> Option<(String, String)> {
                 None => (base.to_string(), full),
             },
         );
+    }
+    if source.get("kind").and_then(serde_json::Value::as_str) == Some("situation") {
+        // The overseer's own capture: it says what it was looking at.
+        let full = match source.get("ref").and_then(serde_json::Value::as_str) {
+            Some(reference) => format!("overseer{}{reference}", glyphs::SEP_SPACED),
+            None => "overseer".to_string(),
+        };
+        return Some((full.clone(), full));
     }
     if let Some(pane) = source.get("pane") {
         let short = format!("pane {}", json_text(pane));
@@ -1957,16 +1684,6 @@ impl DocketBoardModel {
             .iter()
             .map(|(_, cards)| cards.iter().map(|card| card.id).collect())
             .collect()
-    }
-
-    /// Open items due today or earlier, and inbox items: the two numbers the
-    /// dashboard strip reports.
-    pub(crate) fn due_count(&self) -> usize {
-        self.lane(DocketLane::Due).len()
-    }
-
-    pub(crate) fn inbox_count(&self) -> usize {
-        self.lane(DocketLane::Inbox).len()
     }
 }
 
@@ -2784,7 +2501,7 @@ mod tests {
 
         let mut term = Terminal::new(TestBackend::new(110, 26)).expect("test terminal");
         let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+        term.draw(|frame| render_board_screen(&state, &runtimes, frame, board_area(&state)))
             .expect("render");
         let buffer = term.backend().buffer();
         for y in 0..26 {
@@ -2830,7 +2547,7 @@ mod tests {
         }
         let mut term = Terminal::new(TestBackend::new(150, 34)).expect("test terminal");
         let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+        term.draw(|frame| render_board_screen(&state, &runtimes, frame, board_area(&state)))
             .expect("render");
         let buffer = term.backend().buffer();
         for y in 0..34 {
@@ -2854,41 +2571,6 @@ mod tests {
         assert_eq!(summary.workspaces, 2);
         assert_eq!(summary.panes, 3, "two panes in ws0, one in ws1");
         assert_eq!(summary.queued_input, 2);
-    }
-
-    #[test]
-    fn dashboard_strip_renders_the_pulse_and_the_host() {
-        use ratatui::{backend::TestBackend, Terminal};
-        let (state, _) = board_state();
-        let summary = board_summary(&state, &board_model(&state));
-        let mut term = Terminal::new(TestBackend::new(120, 2)).expect("test terminal");
-        let docket = docket_board_model(&state.docket_sample);
-        term.draw(|frame| {
-            render_dashboard(&state, frame, Rect::new(0, 0, 120, 2), &summary, &docket)
-        })
-        .expect("dashboard should render");
-        let buffer = term.backend().buffer();
-        let row = |y: u16| -> String { (0..120).map(|x| buffer[(x, y)].symbol()).collect() };
-
-        let pulse = row(0);
-        assert!(pulse.contains("agents 3"), "{pulse:?}");
-        assert!(pulse.contains("2 need you"), "{pulse:?}");
-        assert!(pulse.contains("2 ws"), "{pulse:?}");
-        // Unsampled host facts must read as em dashes, never as 0%.
-        let host = row(1);
-        assert!(host.contains(env!("CARGO_PKG_VERSION")), "{host:?}");
-        assert!(host.contains('\u{2014}'), "unsampled vitals: {host:?}");
-        assert!(!host.contains("0%"), "must not invent a reading: {host:?}");
-    }
-
-    #[test]
-    fn dashboard_yields_its_rows_before_the_cards_do() {
-        // A short terminal drops the strip entirely rather than squeezing the
-        // cards out of existence.
-        assert_eq!(dashboard_rows(Rect::new(0, 0, 80, 10)), 0);
-        assert!(dashboard_rows(Rect::new(0, 0, 80, 30)) > 0);
-        let short = board_body(Rect::new(0, 0, 80, 10));
-        assert_eq!(short.height, 8, "title + footer only");
     }
 
     #[test]
@@ -2924,47 +2606,6 @@ mod tests {
             last.contains('\u{2588}'),
             "gauge should draw a bar: {last:?}"
         );
-    }
-
-    /// The facts that do not fit come off whole.
-    ///
-    /// Clipping the `Paragraph` instead left `·  3` on an 80-column board — the
-    /// head of "3 ws · 3 tabs · 5 panes", which reads as a count of something
-    /// that is never named.
-    #[test]
-    fn the_dashboard_drops_whole_facts_rather_than_clipping_one() {
-        use ratatui::{backend::TestBackend, Terminal};
-        let (state, _) = board_state();
-        let model = board_model(&state);
-        let summary = board_summary(&state, &model);
-        let docket = docket_board_model(&state.docket_sample);
-        for width in 20u16..=140 {
-            let mut terminal = Terminal::new(TestBackend::new(width, 2)).expect("test terminal");
-            terminal
-                .draw(|frame| {
-                    render_dashboard(&state, frame, Rect::new(0, 0, width, 2), &summary, &docket)
-                })
-                .expect("dashboard should render");
-            let buffer = terminal.backend().buffer();
-            for y in 0..2 {
-                let row: String = (0..width).map(|x| buffer[(x, y)].symbol()).collect();
-                let row = row.trim_end();
-                assert!(
-                    !row.ends_with(glyphs::SEP),
-                    "width {width} row {y} ends on a separator: {row:?}"
-                );
-                // Every fact ends in a word or a digit — never a bare fragment
-                // of a longer phrase.
-                if let Some(last) = row.split_whitespace().next_back() {
-                    assert!(
-                        last.chars().next_back().is_some_and(|c| c.is_alphanumeric()
-                            || c == '%'
-                            || c == glyphs::DASH.chars().next().unwrap_or('-')),
-                        "width {width} row {y} ends mid-fact: {row:?}"
-                    );
-                }
-            }
-        }
     }
 
     /// Four lanes need four times the room, so the board stacks well before
@@ -3257,8 +2898,8 @@ mod tests {
         // Done is newest-updated first; discarded is not on the board.
         assert_eq!(lane_ids(&model, DocketLane::Done), vec![8, 9]);
         assert!(model.locate(10).is_none());
-        assert_eq!(model.due_count(), 2);
-        assert_eq!(model.inbox_count(), 3);
+        assert_eq!(model.lane(DocketLane::Due).len(), 2);
+        assert_eq!(model.lane(DocketLane::Inbox).len(), 3);
     }
 
     #[test]
@@ -3412,6 +3053,26 @@ mod tests {
     }
 
     #[test]
+    fn source_tags_names_the_overseer() {
+        let situation = serde_json::json!({"kind": "situation", "ref": "pane p5"});
+        let (short, full) = source_tags(Some(&situation)).expect("a situation source");
+        assert_eq!(short, "overseer · pane p5");
+        assert_eq!(full, short);
+
+        let bare = serde_json::json!({"kind": "situation"});
+        assert_eq!(
+            source_tags(Some(&bare)).map(|(short, _)| short).as_deref(),
+            Some("overseer")
+        );
+
+        let pane = serde_json::json!({"pane": "p5"});
+        assert_eq!(
+            source_tags(Some(&pane)).map(|(short, _)| short).as_deref(),
+            Some("pane p5")
+        );
+    }
+
+    #[test]
     fn docket_card_reads_id_kind_due_source_and_notes() {
         use ratatui::{backend::TestBackend, Terminal};
         let mut state = docket_state();
@@ -3420,15 +3081,18 @@ mod tests {
         state.board.docket_selected = Some(3);
         let mut term = Terminal::new(TestBackend::new(150, 40)).expect("test terminal");
         let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+        term.draw(|frame| render_board_screen(&state, &runtimes, frame, board_area(&state)))
             .expect("render");
         let buffer = term.backend().buffer();
         let screen: Vec<String> = (0..40)
             .map(|y| (0..150).map(|x| buffer[(x, y)].symbol()).collect())
             .collect();
         let text = screen.join("\n");
-        assert!(text.contains("docket 2 due"), "strip fact: {text}");
-        assert!(text.contains("3 inbox"), "strip fact: {text}");
+        // The overseer's header leads every view.
+        assert!(
+            text.contains("open the overseer's session"),
+            "header: {text}"
+        );
         // The overdue card: `!` in the gutter, the days late on row two, the
         // notes on row three — and the lane heading carries the count.
         let row = screen
@@ -3476,7 +3140,7 @@ mod tests {
         state.view.sidebar_rect = Rect::new(0, 0, 150, 40);
         let mut term = Terminal::new(TestBackend::new(150, 40)).expect("test terminal");
         let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+        term.draw(|frame| render_board_screen(&state, &runtimes, frame, board_area(&state)))
             .expect("render");
         let buffer = term.backend().buffer();
         // The card's gutter mark is bold peach; the lane heading's count is
@@ -3560,7 +3224,7 @@ mod tests {
         state.board.docket_selected = Some(4);
         let mut term = Terminal::new(TestBackend::new(100, 30)).expect("test terminal");
         let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+        term.draw(|frame| render_board_screen(&state, &runtimes, frame, board_area(&state)))
             .expect("render");
         let buffer = term.backend().buffer();
         let text: String = (0..30)
@@ -3580,29 +3244,9 @@ mod tests {
             "repeat       1w",
             "source       ~/vault/agents/vikunja-docket/dockets/shiftmayt.mjs:1",
             "notes",
-            "p slate",
-            "esc back to docket",
         ] {
             assert!(text.contains(needle), "missing {needle:?} in:\n{text}");
         }
-    }
-
-    #[test]
-    fn a_docket_notice_rides_the_footer() {
-        use ratatui::{backend::TestBackend, Terminal};
-        let mut state = docket_state();
-        state.view.terminal_area = Rect::new(0, 0, 150, 40);
-        state.view.sidebar_rect = Rect::new(0, 0, 150, 40);
-        state.board.docket_notice =
-            Some("docket item 1 is inbox, only open items can be completed".into());
-        let mut term = Terminal::new(TestBackend::new(150, 40)).expect("test terminal");
-        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
-            .expect("render");
-        let buffer = term.backend().buffer();
-        let footer: String = (1..149).map(|x| buffer[(x, 38)].symbol()).collect();
-        assert!(footer.contains("! docket item 1 is inbox"), "{footer:?}");
-        assert!(footer.trim_end().ends_with("completed"), "{footer:?}");
     }
 
     #[test]
@@ -3615,7 +3259,7 @@ mod tests {
         state.board.docket_selected = Some(3);
         let mut term = Terminal::new(TestBackend::new(150, 34)).expect("test terminal");
         let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
-        term.draw(|frame| render_board_overlay(&state, &runtimes, frame))
+        term.draw(|frame| render_board_screen(&state, &runtimes, frame, board_area(&state)))
             .expect("render");
         let buffer = term.backend().buffer();
         for y in 0..34 {

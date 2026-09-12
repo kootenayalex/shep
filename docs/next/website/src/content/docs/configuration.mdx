@@ -340,20 +340,24 @@ The sidebar is one tree: every space, with its agents nested under it. `agent_pa
 
 ### Session board as the leading screen
 
-The session board is the full-screen agent overview: `blocked`, `done`, `working`, and `idle` columns in descending attention order. Two options make it the screen you start and return to.
+The session board is the full-screen overview: the overseer's read of the room with everything it is reading from. Two options make it the screen you start and return to.
 
 ```toml
 [ui]
 open_on_board = true
-board_view = "docket"
+board_view = "overseer"
 escape_returns_to_board = true
 ```
 
-`open_on_board` starts a session on the board instead of dropping straight into a pane, so a session with several agents opens on the overview. Enter focuses the selected pane. The board and the desktop are two sides of one screen: `keys.switch_view` (`ctrl+alt+b` by default) flips between them from anywhere, and `keys.board` is an optional second binding that only opens it.
+`open_on_board` starts a session on the board instead of dropping straight into a pane, so a session with several agents opens on the overview. The board and the desktop are two sides of one screen: `keys.switch_view` (`ctrl+alt+b` by default) flips between them from anywhere, and `keys.board` is an optional second binding that only opens it. The board replaces the desktop while it is up — no sidebar, no panes — under the same titlebar and hint bar.
 
-The board is two lane boards one key apart, and `board_view` picks which one it opens on. `docket` (the default) is the personal docket — inbox, due, slated, recurring, done — one card per item, with the verbs on keys: `n` captures a new item into the inbox, `p` and `r` promote the selected inbox item as slated or weekly-recurring, `d` completes it (a recurring item rolls its date forward), `x` discards it, and `i` opens the item in full. `agents` is the agent lanes, one per group. `a` flips between the two, and the dashboard strip on either counts what the docket has due and waiting.
+The board is three views one key apart, and `board_view` picks which one it opens on: `overseer` (the default), `agents`, or `docket`. `a` cycles overseer → agents → docket.
 
-Each lane board has a detail screen. `i` opens the selected agent: its state, status, activity, working directory, and context gauge, plus a live window onto what the pane is showing — everything the card has to truncate, without attaching to it. On the docket it opens the item: every field and the notes whole. Esc steps back to the lanes before it closes the board.
+`overseer` is one screen. A header row reads the last tick, the brain's age and runtime, the shep version, load and memory, with `▸ open the overseer's session` pinned right (on a narrow terminal facts drop from the right: runtime, then brain, then load and memory, then the tick — the button never drops). Down the left: `needs you` (blocked agents with their visible prompt, done agents whose result you have not looked at), `agents` (one row each: name, group, branch, state age and context gauge), `docket` (the due lane in full, then the newest inbox items) and `health`. Down the right: `✦ read of the room`, the overseer's narrative; `proposals`, the inbox items it captured, which you keep or drop; and `chat`, a placeholder for the session that lands later. Below 120 columns the right column stacks under the left. `j`/`k` (or the arrows) walk every row in that order, Enter focuses the selected agent's pane or opens the docket item, `a` keeps a proposal as slated and `x` drops it, `?` opens the key help over the board and returns to it, and Esc or `q` goes back to the desktop. Opening the board refreshes the overseer: when its situation is missing or older than a minute, the plugin's `tick` action runs once.
+
+`agents` is the agent lanes — `blocked`, `done`, `working`, and `idle` columns in descending attention order, one per group. `hjkl` move, `<` and `>` move the selected agent between groups, Enter focuses it, `i` inspects it. `docket` is the personal docket — inbox, due, slated, recurring, done — one card per item, with the verbs on keys: `n` captures a new item into the inbox, `p` and `r` promote the selected inbox item as slated or weekly-recurring, `d` completes it (a recurring item rolls its date forward), `x` discards it, and `i` opens the item in full. Both keep the overseer's header row at the top.
+
+Each lane view has a detail screen. `i` opens the selected agent: its state, status, activity, working directory, and context gauge, plus a live window onto what the pane is showing — everything the card has to truncate, without attaching to it. On the docket it opens the item: every field and the notes whole. Esc steps back to the lanes before it closes the board.
 
 `escape_returns_to_board` makes Esc the way back out. In a pane running an agent Herdr recognizes, a bare Esc returns to the board and `shift+esc` sends the interrupt to the agent instead. Panes with no detected agent — shells, editors, pagers — always receive Esc unchanged, so this never breaks the app inside a pane.
 

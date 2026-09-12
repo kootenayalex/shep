@@ -264,6 +264,30 @@ impl App {
                 }
                 return true;
             }
+            if view == BoardView::Overseer {
+                use crate::ui::overseer;
+                match mouse.kind {
+                    MouseEventKind::Moved => {
+                        if let Some(row) = overseer::row_at(&self.state, mouse.column, mouse.row) {
+                            self.state.board.overseer_selected = Some(row);
+                        }
+                    }
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        if overseer::session_button_at(&self.state, mouse.column, mouse.row) {
+                            self.open_overseer_session();
+                        } else if overseer::chat_input_at(&self.state, mouse.column, mouse.row) {
+                            // The chat lands in the next phase.
+                        } else if let Some(row) =
+                            overseer::row_at(&self.state, mouse.column, mouse.row)
+                        {
+                            self.state.board.overseer_selected = Some(row);
+                            self.overseer_enter();
+                        }
+                    }
+                    _ => {}
+                }
+                return true;
+            }
             if view == BoardView::Docket {
                 // A docket card is selected by a click and opened by a key;
                 // there is no pane behind it to fall into.

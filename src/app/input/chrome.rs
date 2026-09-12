@@ -39,11 +39,11 @@ impl App {
         }
         if let MouseEventKind::Down(MouseButton::Left) = mouse.kind {
             if on_strip {
-                self.state.open_board();
+                self.open_board_live();
             } else {
                 match titlebar_pill_at(&self.state, mouse.column, mouse.row) {
                     Some(PillHalf::Board) if self.state.mode != Mode::Board => {
-                        self.state.open_board();
+                        self.open_board_live();
                     }
                     Some(PillHalf::Desktop) if self.state.mode == Mode::Board => {
                         super::modal::leave_modal(&mut self.state);

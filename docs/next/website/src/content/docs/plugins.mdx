@@ -321,10 +321,12 @@ shep plugin pane open --plugin overseer --entrypoint board
 
 Its two event hooks (`pane.agent_status_changed`, `pane.exited`) run one tick:
 `shep doctor --json`, `session.overview`, `shep docket list --json` become
-`situation.md` in the plugin's state dir and a `BOARD.md` of at most 40 lines
-— blocked agents first, every agent with its state age, health fails and
-warns, docket due and inbox. With nothing configured that deterministic board
-is all it does. Name a brain and it thinks too:
+`situation.md` in the plugin's state dir and a `BOARD.md` of at most 10 lines
+— a header and a short read of the room in prose: who is blocked and waiting
+on you first, then what the docket owes, then health. The overseer board in
+the TUI (`ctrl+alt+b`) draws the agent table, the docket and the health strip
+around that narrative. With nothing configured that deterministic board is all
+it does. Name a brain and it thinks too:
 
 ```toml
 [plugins.overseer]

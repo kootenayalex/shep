@@ -224,6 +224,39 @@ impl App {
         .map_err(|(_, message)| message)
     }
 
+    /// Run one of a plugin's actions with nothing behind it but shep itself
+    /// — the board asking the overseer for a fresh tick. The command log
+    /// entry comes back so the caller can watch for it finishing.
+    pub(crate) fn invoke_plugin_action_quietly(
+        &mut self,
+        plugin_id: Option<&str>,
+        action_id: &str,
+        source: &str,
+    ) -> Result<crate::api::schema::PluginCommandLogInfo, String> {
+        let (plugin, action) = self
+            .find_plugin_action(plugin_id, action_id)
+            .map_err(|(_, message)| message)?;
+        if !plugin.enabled {
+            return Err(format!("plugin {} is disabled", plugin.plugin_id));
+        }
+        ensure_platform_supported(
+            effective_platforms(&action.platforms, &plugin.platforms),
+            &action.qualified_id(),
+        )
+        .map_err(|(_, message)| message)?;
+        let mut context = self.current_plugin_context(source);
+        context.invocation_source = Some(source.to_string());
+        self.start_plugin_command(
+            &plugin,
+            Some(action.action_id),
+            None,
+            action.command,
+            &context,
+            None,
+        )
+        .map_err(|(_, message)| message)
+    }
+
     pub(crate) fn invoke_plugin_link_handler_for_url(
         &mut self,
         url: &str,

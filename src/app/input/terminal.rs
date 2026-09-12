@@ -118,7 +118,7 @@ impl App {
                     ?pane_id,
                     "returning to session board instead of forwarding esc to agent pane"
                 );
-                self.state.open_board();
+                self.open_board_live();
                 return None;
             }
         }

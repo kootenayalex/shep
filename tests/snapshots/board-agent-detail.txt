@@ -1,106 +1,109 @@
-# board-agent-detail 120x40 · 17 styles
+# board-agent-detail 120x40 · 20 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                                                  ✦ overseer                  ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ session board / agent                                                                                                │
-│                                                                                                                      │
-│ ◉ claude · workmayt                                                                                                  │
-│ workmayt · fix/stripe-webhook · p1 · last activity 2m                                                                │
-│                                                                                                                      │
-│ state        blocked · ⇥2 queued                                                                                     │
-│ activity     may I run the stripe integration tests?                                                                 │
-│ working dir  ~/vault/dev/workmayt                                                                                    │
-│ context      ████▍   72%                                                                                             │
-│                                                                                                                      │
-│ live screen                                                                                                          │
-│   (no live screen for this pane)                                                                                     │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│ enter attach  esc/q back to board                                                                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ctrl+alt+b desktop  ? keys
+ tick 07:08  ·  shep 0.7.3  ·  load 38 % of 12  ·  mem 64 %                               ▸ open the overseer's session
+
+ ◉ claude · workmayt
+ workmayt · fix/stripe-webhook · p1 · last activity 2m
+
+ state        blocked · ⇥2 queued
+ activity     may I run the stripe integration tests?
+ working dir  ~/vault/dev/workmayt
+ context      ████▍   72%
+
+ live screen
+   (no live screen for this pane)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ctrl+alt+b desktop  enter attach  esc back
 
 --- styles ---
-lbbbblllllllllllllllllllllllllllllllllllllllllllllllllleeeeeeeeeellllllllllllllllllkkkllqqqllccclldddllnnnnnnnnniiiiiiil
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-afffffffffffffffffbbbbblllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-aljlppppppppppppppppplllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alffffffffffffffffffffffffffffffffffffffffffffffffffffflllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alfffffffffffffjjjjjjjjjjjjjjjjjjjllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alfffffffffffffhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alfffffffffffffoooooooooooooooooooolllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alfffffffffffffgggggmfffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alffffffffffflllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alffffffffffffffffffffffffffffffffllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-alllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-albbbbbfffffffffbbbbbfffffffffffffflllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllla
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-lbbbbbbbbbbffffffffffbffffflllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
+laaaallllllllllllllllllllllllllllllllllllllllllllllllllddddddddddlllllllllllllllllljjjlltttllbbbllccclloooooooooiiiiiiil
+.nnnnnqqqqqpppppffffffffffpppppffffffffffffffffffffffffffff..............................sssssssssssssssssssssssssssssss
+
+.k.rrrrrrrrrrrrrrrrr
+.fffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+.fffffffffffffkkkkkkkkkkkkkkkkkkk
+.fffffffffffffhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+.fffffffffffffqqqqqqqqqqqqqqqqqqqq
+.fffffffffffffgggggmfffff
+
+.fffffffffff
+.ffffffffffffffffffffffffffffffff
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+laaaaaaaaaaeeeeeeeeeeaaaaaeeeeeeeeeaaaeeeeelllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
 
 --- legend ---
 . = (unstyled)
-a = fg:accent bg:panel_bg
-b = fg:accent bg:panel_bg bold
-c = fg:blue bg:panel_bg
-d = fg:green bg:panel_bg
-e = fg:mauve bg:panel_bg bold
-f = fg:overlay0 bg:panel_bg
+a = fg:accent bg:panel_bg bold
+b = fg:blue bg:panel_bg
+c = fg:green bg:panel_bg
+d = fg:mauve bg:panel_bg bold
+e = fg:overlay0 bg:panel_bg
+f = fg:overlay0 bg:reset
 g = fg:overlay0 bg:surface1
-h = fg:overlay1 bg:panel_bg italic
+h = fg:overlay1 bg:reset italic
 i = fg:panel_bg bg:accent bold
-j = fg:red bg:panel_bg
-k = fg:red bg:panel_bg bold
+j = fg:red bg:panel_bg bold
+k = fg:red bg:reset
 l = fg:reset bg:panel_bg
 m = fg:reset bg:surface1
-n = fg:subtext0 bg:surface1
-o = fg:text bg:panel_bg
-p = fg:text bg:panel_bg bold
-q = fg:yellow bg:panel_bg
+n = fg:subtext0 bg:reset
+o = fg:subtext0 bg:surface1
+p = fg:surface1 bg:reset
+q = fg:text bg:reset
+r = fg:text bg:reset bold
+s = fg:text bg:surface1
+t = fg:yellow bg:panel_bg

@@ -12,9 +12,12 @@ shep plugin action invoke tick --plugin overseer
 Every `pane.agent_status_changed` and `pane.exited` event runs one tick:
 `shep doctor --json`, `session.overview` over the socket, `shep docket list
 --json`, written to `<plugin state dir>/situation.{md,json}`, then a
-`BOARD.md` of at most 40 lines — agents with their state ages, blocked agents
-first, health fails and warns, docket due/overdue and inbox. That is what you
-get with nothing configured, and it is already useful.
+`BOARD.md` of at most 10 lines: a header (`OVERSEER · <at> · <source>`) and a
+short read of the room in prose — who is blocked and waiting on you first,
+then what the docket owes, then health. The TUI's overseer board (`ctrl+alt+b`)
+draws the agent table, the docket and the health strip itself, so the board
+carries the narrative rather than the lists. That is what you get with
+nothing configured, and it is already useful.
 
 ## A brain, optionally
 
@@ -27,7 +30,8 @@ runtime = "claude"          # any runtime `shep runtime list` marks headless
 or `SHEP_OVERSEER_RUNTIME=claude` in the server's environment. With a brain,
 at most once every ten minutes the tick hands the situation to
 `shep runtime ask <runtime>` together with the hard rules below and asks for
-exactly two things: a board (≤ 40 lines) and a JSON list of proposed inbox
+exactly two things: a board (≤ 10 lines of prose, no headings, no tables,
+no per-agent list) and a JSON list of proposed inbox
 items (`title`, `source`, `notes`). The board replaces the deterministic one;
 each proposal whose `source` is not already in the docket becomes
 `shep docket add … --kind captured` — inbox only, no date, no repeat, at most

@@ -225,6 +225,7 @@ fn load_plugin_registry(no_session: bool) -> crate::app::state::InstalledPluginR
 
 fn board_view_from_config(view: crate::config::BoardViewConfig) -> state::BoardView {
     match view {
+        crate::config::BoardViewConfig::Overseer => state::BoardView::Overseer,
         crate::config::BoardViewConfig::Docket => state::BoardView::Docket,
         crate::config::BoardViewConfig::Agents => state::BoardView::Columns,
     }

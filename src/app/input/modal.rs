@@ -375,6 +375,7 @@ pub(super) fn open_new_docket_item(state: &mut AppState) {
     state.rename_pane_target = None;
     state.name_input = String::new();
     state.name_input_replace_on_type = false;
+    state.board.suspended = state.mode == Mode::Board;
     state.mode = Mode::NewDocketItem;
 }
 
@@ -535,6 +536,13 @@ pub(super) fn open_new_tab_dialog(state: &mut AppState) {
 }
 
 pub(super) fn leave_modal(state: &mut AppState) {
+    // A modal the board opened hands back to the board, which stayed drawn
+    // underneath it; the board's own leave runs with `suspended` clear.
+    if state.board.suspended {
+        state.board.suspended = false;
+        state.mode = Mode::Board;
+        return;
+    }
     if state.active.is_some() {
         state.mode = Mode::Terminal;
     } else {
@@ -1634,19 +1642,14 @@ impl App {
 }
 
 fn cancel_rename_modal(state: &mut AppState) {
-    // The docket prompt was opened from the board, so it hands back to the
-    // board rather than to whatever pane is behind it.
-    let back_to_board = state.mode == Mode::NewDocketItem;
     state.creating_new_tab = false;
     state.requested_new_tab_name = None;
     state.rename_pane_target = None;
     state.name_input.clear();
     state.name_input_replace_on_type = false;
-    if back_to_board {
-        state.mode = Mode::Board;
-    } else {
-        leave_modal(state);
-    }
+    // A prompt the board opened (`n`) hands back to the board through
+    // `leave_modal`'s `suspended` check, not to the pane behind it.
+    leave_modal(state);
 }
 
 impl AppState {

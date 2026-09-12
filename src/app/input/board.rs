@@ -20,24 +20,42 @@ use crate::app::{
 };
 use crate::docket::{self, DocketError};
 use crate::ui::board::{self, BoardDir};
+use crate::ui::overseer;
 
 use super::modal::{leave_modal, open_new_docket_item};
 
+/// How old the overseer's situation may be before opening the board asks
+/// the plugin for a fresh tick.
+const STALE_SITUATION_SECS: u64 = 60;
+
 impl AppState {
     /// Open the session board, seeding the agent selection. Always opens on
-    /// the configured lane board — the detail screens are somewhere you go,
-    /// not somewhere you come back to. The docket selection is seeded lazily
-    /// by the board itself, so opening never reads the store.
+    /// the configured view — the detail screens are somewhere you go, not
+    /// somewhere you come back to. The docket selection is seeded lazily by
+    /// the board itself, so opening never reads the store.
     pub(crate) fn open_board(&mut self) {
         self.board.selected = board::initial_selection(self);
+        self.board.overseer_selected = overseer::overseer_model(self).effective_selection(None);
         self.board.view = self.board_default_view.lanes();
         self.board.docket_notice = None;
+        self.board.suspended = false;
         self.mode = Mode::Board;
     }
 
     /// Switch board screens.
     pub(crate) fn set_board_view(&mut self, view: BoardView) {
         self.board.view = view;
+    }
+
+    /// `a` on a lane board: the next view round. Overseer, agents, docket.
+    pub(crate) fn cycle_board_view(&mut self) {
+        let next = match self.board.view.lanes() {
+            BoardView::Overseer => BoardView::Columns,
+            BoardView::Columns => BoardView::Docket,
+            BoardView::Docket => BoardView::Overseer,
+            BoardView::Agent | BoardView::DocketItem => BoardView::Overseer,
+        };
+        self.set_board_view(next);
     }
 
     /// Move the docket selection in `dir`, from the card the board is
@@ -114,10 +132,19 @@ impl AppState {
     /// `p`: promote the selected inbox item as slated, undated. A date can
     /// follow from the CLI; the board's job is the decision.
     pub(crate) fn docket_promote_slated(&mut self) {
-        let Some(id) = self.docket_selected_id() else {
-            return;
-        };
+        if let Some(id) = self.docket_selected_id() {
+            self.docket_promote_slated_id(id);
+        }
+    }
+
+    /// Promote one inbox item as slated, by id — the overseer's `keep`.
+    pub(crate) fn docket_promote_slated_id(&mut self, id: i64) {
         self.docket_apply(|conn| docket::promote(conn, id, DocketKind::Slated, None, None));
+    }
+
+    /// Discard one live item, by id — the overseer's `drop`.
+    pub(crate) fn docket_discard_id(&mut self, id: i64) {
+        self.docket_apply(|conn| docket::discard(conn, id));
     }
 
     /// `r`: promote the selected inbox item as recurring, weekly by default.
@@ -146,10 +173,9 @@ impl AppState {
 
     /// `x`: discard the selected live item.
     pub(crate) fn docket_discard_selected(&mut self) {
-        let Some(id) = self.docket_selected_id() else {
-            return;
-        };
-        self.docket_apply(|conn| docket::discard(conn, id));
+        if let Some(id) = self.docket_selected_id() {
+            self.docket_discard_id(id);
+        }
     }
 
     /// Move the board selection in `dir`. `narrow` picks the stacked traversal
@@ -167,10 +193,35 @@ impl AppState {
 }
 
 impl App {
+    /// Open the board from a live app: the pure open, a fresh look at the
+    /// overseer's files, and — when its situation is missing or older than
+    /// a minute — one `tick` of the overseer plugin, so the board is not a
+    /// stale read of the room. No plugin, nothing happens. A tick already
+    /// in flight is not stacked on.
+    pub(crate) fn open_board_live(&mut self) {
+        self.state.open_board();
+        self.state
+            .refresh_overseer_if_stale(std::time::Instant::now());
+        if self.state.board.tick_in_flight.is_some()
+            || !self
+                .state
+                .overseer
+                .sample
+                .situation_older_than(STALE_SITUATION_SECS)
+        {
+            return;
+        }
+        match self.invoke_plugin_action_quietly(Some("overseer"), "tick", "board") {
+            Ok(log) => self.state.board.tick_in_flight = Some(log.log_id),
+            Err(err) => tracing::debug!(error = %err, "overseer tick not started"),
+        }
+    }
+
     pub(crate) fn handle_board_key(&mut self, key: KeyEvent) {
         // A notice answers the last verb; the next key is a new question.
         self.state.board.docket_notice = None;
         match self.state.board.view {
+            BoardView::Overseer => self.handle_board_overseer_key(key),
             BoardView::Docket => self.handle_board_docket_key(key),
             BoardView::DocketItem => self.handle_board_docket_item_key(key),
             BoardView::Columns => self.handle_board_columns_key(key),
@@ -200,7 +251,7 @@ impl App {
             KeyCode::Enter | KeyCode::Char('i') if self.state.docket_selected_id().is_some() => {
                 self.state.set_board_view(BoardView::DocketItem)
             }
-            KeyCode::Char('a') => self.state.set_board_view(BoardView::Columns),
+            KeyCode::Char('a') => self.state.cycle_board_view(),
             KeyCode::Char('n') => open_new_docket_item(&mut self.state),
             _ => self.handle_docket_verb(key),
         }
@@ -258,7 +309,7 @@ impl App {
             KeyCode::Char('i') if self.state.board.selected.is_some() => {
                 self.state.set_board_view(BoardView::Agent)
             }
-            KeyCode::Char('a') => self.state.set_board_view(BoardView::Docket),
+            KeyCode::Char('a') => self.state.cycle_board_view(),
             _ => {}
         }
     }
@@ -292,9 +343,16 @@ impl App {
     }
 
     fn board_focus_selected(&mut self) {
-        if let Some((ws_idx, pane_id)) = self.state.board_enter_target() {
-            self.focus_pane_internal_via_api(ws_idx, pane_id);
+        match self.state.board_enter_target() {
+            Some((ws_idx, pane_id)) => self.board_focus_pane(ws_idx, pane_id),
+            None => leave_modal(&mut self.state),
         }
+    }
+
+    /// Leave the board for a pane: focus goes through the API so it stays a
+    /// shared runtime fact, then the board hands back to the desktop.
+    pub(crate) fn board_focus_pane(&mut self, ws_idx: usize, pane_id: crate::layout::PaneId) {
+        self.focus_pane_internal_via_api(ws_idx, pane_id);
         leave_modal(&mut self.state);
     }
 }
@@ -367,14 +425,28 @@ mod tests {
     fn open_board_always_lands_on_the_configured_lanes() {
         use crate::app::state::BoardView;
         let (mut state, _root, _second) = board_app();
-        // The docket by default, and never a detail screen.
+        // The overseer by default, and never a detail screen.
         state.board.view = BoardView::Agent;
         state.open_board();
-        assert_eq!(state.board.view, BoardView::Docket);
+        assert_eq!(state.board.view, BoardView::Overseer);
         state.board_default_view = BoardView::Columns;
         state.board.view = BoardView::DocketItem;
         state.open_board();
         assert_eq!(state.board.view, BoardView::Columns);
+        state.board_default_view = BoardView::Docket;
+        state.open_board();
+        assert_eq!(state.board.view, BoardView::Docket);
+    }
+
+    #[test]
+    fn open_board_seeds_the_overseer_selection_on_the_first_needs_you_row() {
+        let (mut state, _root, second) = board_app();
+        state.open_board();
+        assert_eq!(
+            state.board.overseer_selected,
+            Some(crate::ui::overseer::OverseerRow::NeedsYou(second)),
+            "the blocked agent leads"
+        );
     }
 
     #[test]
@@ -429,6 +501,7 @@ mod tests {
             .expect("recurring item");
         }
         state.refresh_docket();
+        state.board_default_view = BoardView::Docket;
         state.open_board();
         (state, path)
     }
@@ -603,7 +676,9 @@ mod tests {
         assert_eq!(app.state.mode, Mode::Board);
         assert_eq!(app.state.board.view, BoardView::Docket);
 
-        // `a` flips to the agent lanes and back.
+        // `a` goes round: docket, overseer, agents, docket.
+        app.handle_board_key(key(KeyCode::Char('a')));
+        assert_eq!(app.state.board.view, BoardView::Overseer);
         app.handle_board_key(key(KeyCode::Char('a')));
         assert_eq!(app.state.board.view, BoardView::Columns);
         app.handle_board_key(key(KeyCode::Char('a')));

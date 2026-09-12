@@ -529,6 +529,37 @@ const WIDE: (u16, u16) = (200, 55);
 const MID: (u16, u16) = (120, 40);
 const SMALL: (u16, u16) = (80, 24);
 
+/// The overseer view — what the board opens on — with a proposal selected,
+/// a brain three minutes old, a named runtime, and the proposals fixture.
+fn overseer_at(name: &str, size: (u16, u16)) {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    state.board.view = BoardView::Overseer;
+    state.board.overseer_selected = Some(crate::ui::overseer::OverseerRow::Proposal(12));
+    state.overseer.sample.brain_mtime =
+        Some(std::time::SystemTime::now() - Duration::from_secs(190));
+    state.plugins_config.insert(
+        "overseer".into(),
+        toml::from_str("runtime = \"claude\"").expect("a toml table"),
+    );
+    assert_screen(&mut state, name, size.0, size.1);
+}
+
+#[test]
+fn snapshot_overseer_wide() {
+    overseer_at("overseer-wide", (160, 45));
+}
+
+#[test]
+fn snapshot_overseer_mid() {
+    overseer_at("overseer-mid", MID);
+}
+
+#[test]
+fn snapshot_overseer_small() {
+    overseer_at("overseer-small", SMALL);
+}
+
 fn board_at(name: &str, size: (u16, u16)) {
     let mut state = fixture::session();
     state.mode = Mode::Board;

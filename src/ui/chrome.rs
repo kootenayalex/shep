@@ -17,7 +17,7 @@ use ratatui::{
 
 use super::glyphs;
 use super::text::{display_width, spans_width, truncate_end};
-use crate::app::state::{Mode, Palette};
+use crate::app::state::Palette;
 use crate::app::AppState;
 use crate::config::ActionKeybinds;
 use crate::detect::AgentState;
@@ -330,7 +330,7 @@ fn center_line(
     terminal_runtimes: Option<&TerminalRuntimeRegistry>,
 ) -> Option<Line<'static>> {
     let p = &app.palette;
-    if app.mode == Mode::Board {
+    if app.board_underlay() {
         return Some(Line::from(Span::styled(
             format!("{} overseer", glyphs::OVERSEER),
             Style::default().fg(p.mauve).add_modifier(Modifier::BOLD),
@@ -374,7 +374,7 @@ pub(crate) fn titlebar_layout(
         update_ready: app.update_available.is_some(),
         tally: agent_tally(app),
         proposals: crate::app::overseer::proposals(&app.docket_sample).len(),
-        lit: if app.mode == Mode::Board {
+        lit: if app.board_underlay() {
             PillHalf::Board
         } else {
             PillHalf::Desktop
@@ -583,13 +583,53 @@ pub(super) fn render_hint_bar(app: &AppState, frame: &mut Frame, area: Rect) {
 
     let switch = app.keybinds.switch_view.label();
     let mut hints: Vec<(String, &'static str)> = Vec::new();
-    if app.mode == Mode::Board {
+    if app.board_underlay() {
+        use crate::app::state::BoardView;
         if let Some(chord) = switch {
             hints.push((chord, "desktop"));
         }
-        if let Some(rhs) = prefix_rhs(&app.keybinds.help) {
-            hints.push((rhs, "keys"));
-        }
+        // Each view advertises only the keys that do something on it; the
+        // detail screens say what esc does — back, not close — so the board
+        // is always one step away.
+        let view_hints: &[(&str, &'static str)] = match app.board.view {
+            BoardView::Overseer => &[
+                ("enter", "focus"),
+                ("jk", "move"),
+                ("a", "keep"),
+                ("x", "drop"),
+                ("tab", "chat"),
+                ("?", "keys"),
+            ],
+            BoardView::Columns => &[
+                ("enter", "focus"),
+                ("i", "inspect"),
+                ("hjkl", "move"),
+                ("<>", "move group"),
+                ("a", "docket"),
+            ],
+            BoardView::Docket => &[
+                ("i", "inspect"),
+                ("n", "new"),
+                ("p", "slate"),
+                ("r", "recur"),
+                ("d", "done"),
+                ("x", "discard"),
+                ("a", "overseer"),
+            ],
+            BoardView::Agent => &[("enter", "attach"), ("esc", "back")],
+            BoardView::DocketItem => &[
+                ("p", "slate"),
+                ("r", "recur"),
+                ("d", "done"),
+                ("x", "discard"),
+                ("esc", "back"),
+            ],
+        };
+        hints.extend(
+            view_hints
+                .iter()
+                .map(|(chord, label)| (chord.to_string(), *label)),
+        );
     } else {
         let prefix = crate::config::format_key_combo((app.prefix_code, app.prefix_mods));
         hints.push((prefix, "prefix"));
@@ -620,12 +660,27 @@ pub(super) fn render_hint_bar(app: &AppState, frame: &mut Frame, area: Rect) {
         }
     }
 
+    // A refused docket verb says why, in the store's words, on the bar's
+    // right edge; it is gone on the next key. The hints yield to it from
+    // the right.
+    let notice = app
+        .board
+        .docket_notice
+        .as_deref()
+        .filter(|_| app.board_underlay())
+        .map(|notice| format!("! {notice}"));
+    let notice_width = notice
+        .as_ref()
+        .map(|text| display_width(text) + 2)
+        .unwrap_or(0);
+    let hint_width = usize::from(area.width).saturating_sub(notice_width);
+
     let mut spans: Vec<Span<'static>> = vec![Span::raw(" ")];
     let mut used: usize = 1;
     for (i, (chord, label)) in hints.into_iter().enumerate() {
         let sep = if i > 0 { 2 } else { 0 };
         let entry_w = sep + chord.chars().count() + 1 + label.chars().count();
-        if used + entry_w > usize::from(area.width) {
+        if used + entry_w > hint_width {
             break;
         }
         if i > 0 {
@@ -635,12 +690,22 @@ pub(super) fn render_hint_bar(app: &AppState, frame: &mut Frame, area: Rect) {
         spans.push(Span::styled(format!(" {label}"), dim));
         used += entry_w;
     }
+    if let Some(notice) = notice {
+        let room = usize::from(area.width).saturating_sub(used + 2);
+        let text = truncate_end(&notice, room);
+        let pad = usize::from(area.width)
+            .saturating_sub(used)
+            .saturating_sub(display_width(&text) + 1);
+        spans.push(Span::raw(" ".repeat(pad)));
+        spans.push(Span::styled(text, Style::default().fg(p.peach)));
+    }
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::state::Mode;
 
     fn fixture() -> AppState {
         let mut state = super::super::snapshot::fixture::session();
@@ -907,6 +972,86 @@ mod tests {
         app.mode = Mode::Board;
         let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);
         let bottom = row(&buffer);
-        assert!(bottom.contains("ctrl+alt+b desktop  ? keys"), "{bottom:?}");
+        assert!(
+            bottom.contains(
+                "ctrl+alt+b desktop  enter focus  jk move  a keep  x drop  tab chat  ? keys"
+            ),
+            "{bottom:?}"
+        );
+        app.board.view = crate::app::state::BoardView::Docket;
+        let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);
+        let bottom = row(&buffer);
+        assert!(
+            bottom.contains(
+                "ctrl+alt+b desktop  i inspect  n new  p slate  r recur  d done  x discard"
+            ),
+            "{bottom:?}"
+        );
+        app.board.view = crate::app::state::BoardView::Agent;
+        let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);
+        let bottom = row(&buffer);
+        assert!(bottom.contains("enter attach  esc back"), "{bottom:?}");
+    }
+
+    /// A refused docket verb rides the hint bar's right edge, in peach, and
+    /// the hints yield to it from the right.
+    #[test]
+    fn a_docket_notice_rides_the_hint_bar() {
+        let mut app = fixture();
+        app.hint_bar = true;
+        app.mode = Mode::Board;
+        app.board.view = crate::app::state::BoardView::Docket;
+        app.board.docket_notice =
+            Some("docket item 1 is inbox, only open items can be completed".into());
+        let area = Rect::new(0, 0, 150, 40);
+        let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);
+        let bottom: String = (0..150).map(|x| buffer[(x, 39)].symbol()).collect();
+        assert!(bottom.contains("! docket item 1 is inbox"), "{bottom:?}");
+        assert!(bottom.trim_end().ends_with("completed"), "{bottom:?}");
+        let cell = buffer[(149 - 1, 39)].style();
+        assert_eq!(cell.fg, Some(app.palette.peach));
+        // Narrow: the hints give way before the notice is lost.
+        let area = Rect::new(0, 0, 90, 24);
+        let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);
+        let bottom: String = (0..90).map(|x| buffer[(x, 23)].symbol()).collect();
+        assert!(bottom.contains("! docket item 1"), "{bottom:?}");
+        assert!(!bottom.contains("a overseer"), "{bottom:?}");
+    }
+
+    /// The board is a screen, not an overlay: nothing of the desktop shows
+    /// under it — and a modal it opened keeps it that way.
+    #[test]
+    fn the_board_replaces_the_desktop_and_stays_under_its_modals() {
+        let mut app = fixture();
+        app.mode = Mode::Board;
+        let area = Rect::new(0, 0, 120, 40);
+        let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);
+        let text: String = (0..40)
+            .map(|y| {
+                (0..120)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect();
+        assert!(
+            !text.contains("+ new group"),
+            "sidebar drawn under the board:\n{text}"
+        );
+        assert!(text.contains("needs you"), "{text}");
+        app.board.suspended = true;
+        app.mode = Mode::KeybindHelp;
+        let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);
+        let text: String = (0..40)
+            .map(|y| {
+                (0..120)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect();
+        assert!(!text.contains("+ new group"), "{text}");
+        assert!(text.contains("open the overseer's session"), "{text}");
+        assert!(text.contains("keybind"), "help drawn over it: {text}");
     }
 }

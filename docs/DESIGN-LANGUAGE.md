@@ -219,6 +219,20 @@ surface1 behind subtext. Focus tier, because the pill is a selection between
 two views and not a state. The unlit `board` half carries ` N` in teal (the
 queued tier: proposals waiting for you) when the overseer has captured any.
 
+**The board is a screen, not a panel.** It takes the desktop's place under
+the same titlebar and hint bar — no border, no title, no footer of its own —
+because a sibling of the desktop is not something drawn over it. Its regions
+are headings in bold text with a count beside them in overlay0 (`needs you 2`,
+`agents 5`, `docket  due 2 !1  ·  inbox 5`, `health`), and the overseer's own
+regions carry its mark: `✦ read of the room  ·  hh:mm` in mauve, then
+`proposals`, whose heading is teal — the queued tier, because a proposal is
+waiting for you and nothing has happened yet — and `chat`. Above 120 columns
+the left column is 74 wide with a surface1 rule beside it; below, the right
+column stacks under the left. Each region is a prefix of its rows: when the
+height runs out a region shows its first N entries and the rest are simply
+not there, never an ellipsis row. The selected row is `▌` in accent on
+surface0 across the full width, the same selection every other list draws.
+
 **The overseer strip is one row and no buttons.** `✦ overseer · <first
 sentence> · hh:mm` on surface0, the mark in mauve, the time pinned to the right
 edge in overlay0. Narrowing drops the word `overseer` before it elides the

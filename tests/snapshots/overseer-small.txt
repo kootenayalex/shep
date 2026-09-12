@@ -1,0 +1,85 @@
+# overseer-small 80x24 · 28 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                              ✦ overseer   ◉ 1  ⠹ 2  ● 1   desktop  board
+ tick 07:08  ·  shep 0.7.3                        ▸ open the overseer's session
+ needs you 2
+ ◉ claude · workmayt                                             blocked 2m  p1
+   may I run the stripe integration tests?                    enter → answer it
+
+ agents 5
+ ◉ claude    workmayt    fix/stripe-webhook   blocked 2m            ████▍   72%
+ ⠹ opencode  workmayt    fix/stripe-webhook   working 20s           ██▌     41%
+
+ docket  due 2 !1  ·  inbox 5
+ ! #3 sign the four incorporation forms                              overdue 3d
+
+ health
+ ✓ server  ✓ bridge  ✓ hooks  ⚠ disk 9.8 G free  ⚠ err-log written 23h ago
+
+ ✦ read of the room  ·  07:08
+  workmayt's claude has been blocked 2m on a permission prompt. emberline is
+  done and unseen; two proposals on the board.
+
+ proposals 2  · inbox only, you dispose
+ ○ #13 emberline's push is unseen — look                         a keep  x drop
+   from  pane p5
+ ctrl+alt+b desktop  enter focus  jk move  a keep  x drop  tab chat  ? keys
+
+--- styles ---
+raaaarrrrrrrrrrrrrrrrrrrrrrrrrrrrrreeeeeeeeeerrrooorrAAArrbbbrruuuuuuuuulllllllr
+.tttttxxxxxvvvvviiiiiiiiii.......................zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
+.yyyyyyyyyxx
+.p.yyyyyyyyyyyyyyyyy.............................................ppppppppppiiii
+...ttttttttttttttttttttttttttttttttttttttt....................kkkkkkkkkkkkkkkkk
+
+.yyyyyyxx
+.p.xxxxxxxxxttttttttttttfffffffffffffffffffffppppppppppppppp........jjjjjsiiiii
+.B.xxxxxxxxxttttttttttttfffffffffffffffffffffBBBBBBBBBBBBBBB........jjjsssiiiii
+
+.yyyyyykkkkkkxmmmkkkkkkkkkkkx
+.n.iiixxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..............................mmmmmmmmmm
+
+.yyyyyy
+.cttttttt..cttttttt..ctttttt..mmmmmmmmmmmmmmmmm..mmmmmmmmmmmmmmmmmmmmmmmmm
+
+.ggggggggggggggggggiiiiiiiiii
+tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
+tttttttttttttttttttttttttttttttttttttttttttttt
+
+.wwwwwwwwwxxkkkkkkkkkkkkkkkkkkkkkkkkkkk
+.k.iiiixxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.........................diiiiiiiqiiiii
+iiiiiiiiiiiiiiii
+raaaaaaaaaahhhhhhhhhhaaaaahhhhhhhhaahhhhhhhahhhhhhhahhhhhhhaaahhhhhhhahhhhhrrrrr
+
+--- legend ---
+. = (unstyled)
+A = fg:yellow bg:panel_bg
+B = fg:yellow bg:reset
+a = fg:accent bg:panel_bg bold
+b = fg:blue bg:panel_bg
+c = fg:green bg:reset
+d = fg:green bg:reset bold
+e = fg:mauve bg:panel_bg bold
+f = fg:mauve bg:reset
+g = fg:mauve bg:reset bold
+h = fg:overlay0 bg:panel_bg
+i = fg:overlay0 bg:reset
+j = fg:overlay0 bg:surface1
+k = fg:overlay1 bg:reset
+l = fg:panel_bg bg:accent bold
+m = fg:peach bg:reset
+n = fg:peach bg:reset bold
+o = fg:red bg:panel_bg bold
+p = fg:red bg:reset
+q = fg:red bg:reset bold
+r = fg:reset bg:panel_bg
+s = fg:reset bg:surface1
+t = fg:subtext0 bg:reset
+u = fg:subtext0 bg:surface1
+v = fg:surface1 bg:reset
+w = fg:teal bg:reset bold
+x = fg:text bg:reset
+y = fg:text bg:reset bold
+z = fg:text bg:surface1
