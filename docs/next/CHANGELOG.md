@@ -20,6 +20,18 @@
   mutating `docket.*` methods now repaint an attached desktop, so keeping or
   dropping a proposal from a phone moves the board at once. The bridge relays
   all three overseer methods. No protocol bump: this is additive.
+- The bridge answers two more methods locally: `push.send {title, message,
+  kind?, state?, agent?, workspace?, pane_id?}` pages every registered device
+  over the same delivery path as `shep bridge notify-push` and reports
+  `{delivered, skipped, errors}`, and `memory.search {query, limit?}` returns
+  `{hits: [{ts, session_id, kind, snippet}]}` out of the FTS5 session-history
+  sidecar (default 20 hits, capped at 100; a machine with no sidecar yet
+  answers with no hits rather than an error). Both are bridge-local, so
+  neither is an API method and the protocol version is unchanged. The four
+  local dispatchers behind `pane.*`, `push.*` and `memory.*` are now one
+  `handle_local_method`, with `BRIDGE_LOCAL_METHODS` naming everything the
+  bridge answers itself — `shep mcp` will back its local tools onto exactly
+  that, rather than keeping a second list that drifts.
 
 - The overseer board's chat and its session pane are one claude
   conversation. When the overseer's runtime can name conversations, the

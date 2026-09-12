@@ -15,10 +15,11 @@
 //! guessing at a format we have not seen would produce plausible nonsense; an
 //! explicit `unsupported agent` is a better answer.
 
-use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Map, Value};
+
+use super::api_call;
 
 /// Turns returned when the caller does not say.
 const DEFAULT_LIMIT: usize = 120;
@@ -332,30 +333,6 @@ fn read_tail(path: &Path, max: u64) -> String {
 // ---------------------------------------------------------------------------
 // Talking to the server
 // ---------------------------------------------------------------------------
-
-fn api_call(api_socket: &Path, method: &str, params: Value) -> Result<Value, String> {
-    let request = json!({"id": "bridge:transcript", "method": method, "params": params});
-    let mut stream = crate::ipc::connect_local_stream(api_socket).map_err(|err| err.to_string())?;
-    stream
-        .write_all(format!("{request}\n").as_bytes())
-        .map_err(|err| err.to_string())?;
-    stream.flush().map_err(|err| err.to_string())?;
-    let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    reader.read_line(&mut line).map_err(|err| err.to_string())?;
-    let value: Value = serde_json::from_str(line.trim()).map_err(|err| err.to_string())?;
-    if let Some(error) = value.get("error") {
-        let message = error
-            .get("message")
-            .and_then(Value::as_str)
-            .unwrap_or("api error");
-        return Err(message.to_string());
-    }
-    value
-        .get("result")
-        .cloned()
-        .ok_or_else(|| "api response had no result".to_string())
-}
 
 /// The pane's row in `session.snapshot`.
 ///

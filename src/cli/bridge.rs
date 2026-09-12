@@ -22,10 +22,16 @@
 //! reach it from the phone; never bind a public interface.
 //!
 //! Only the methods in [`BRIDGE_ALLOWED_METHODS`] are relayed to the API; the
-//! bridge-local `pane.stream` / `pane.transcript` / `pane.todos` / `push.*` /
-//! `memory.*` handlers run ahead of that check. Everything else is answered
-//! with a JSON error so a paired phone can never reach `server.stop`, the
-//! config, or the pty of an agent it has no UI for.
+//! bridge-local handlers named in [`BRIDGE_LOCAL_METHODS`] (`pane.stream` /
+//! `pane.transcript` / `pane.todos` / `push.*` / `memory.*`) run ahead of that
+//! check. Everything else is answered with a JSON error so a paired phone can
+//! never reach `server.stop`, the config, or the pty of an agent it has no UI
+//! for.
+//!
+//! The one-shot half of that local set is [`handle_local_method`], which is
+//! deliberately independent of the WebSocket plumbing: `shep mcp` backs its
+//! local tools onto the same dispatcher, so there is one list of what the
+//! bridge answers itself rather than two that drift.
 
 pub(crate) mod pair;
 mod stream;
@@ -91,6 +97,101 @@ const BRIDGE_ALLOWED_METHODS: &[&str] = &[
     "workspace.ship",
     "worktree.remove",
 ];
+
+/// Methods the bridge answers itself rather than relaying to the JSON API.
+///
+/// Sorted and unique, one per line, for the same reason
+/// [`BRIDGE_ALLOWED_METHODS`] is: `scripts/test_bridge_allowlist.py` parses
+/// this block and checks it against every `"x.y" =>` arm and `const METHOD`
+/// under `src/cli/bridge*`, and
+/// `tests::bridge_local_methods_const_matches_the_dispatcher` checks it
+/// against [`handle_local_method`] at runtime. These are deliberately *not*
+/// API methods: they read and write files on this machine, so they need no
+/// `Method` variant and no protocol bump.
+///
+/// `pane.stream` is listed here but is not answered by
+/// [`handle_local_method`]: it is long-lived and duplex, so
+/// [`stream::try_open`] takes it with the channel's frame sink instead.
+pub(crate) const BRIDGE_LOCAL_METHODS: &[&str] = &[
+    "memory.add",
+    "memory.remove",
+    "memory.replace",
+    "memory.search",
+    "memory.show",
+    "pane.stream",
+    "pane.todos",
+    "pane.transcript",
+    "push.list",
+    "push.register",
+    "push.send",
+    "push.set_kinds",
+    "push.test",
+];
+
+/// Answer one bridge-local method, or say it is not one.
+///
+/// `Some(Ok)` / `Some(Err)` when a local module owns `method`; `None` when the
+/// caller should relay it to the JSON API instead. `params` is the request's
+/// `params` value — `Value::Null` for a request that carried none.
+///
+/// Shared with `shep mcp`, which backs its local tools onto this rather than
+/// dialing a bridge of its own.
+pub(crate) fn handle_local_method(
+    method: &str,
+    params: &serde_json::Value,
+    api_socket: &std::path::Path,
+) -> Option<Result<serde_json::Value, String>> {
+    // The modules below were written against `Option<&Value>`, where `None`
+    // means "the request carried no params at all"; a null `params` is that.
+    let params = (!params.is_null()).then_some(params);
+    push::handle_local_method(method, params)
+        .or_else(|| memory_local::handle_local_method(method, params))
+        .or_else(|| transcript::handle_local_method(method, params, api_socket))
+        .or_else(|| todo::handle_local_method(method, params, api_socket))
+}
+
+/// Request ids for [`api_call`]. Only ever echoed back by the API, but making
+/// them distinct keeps a log of two concurrent bridge calls readable.
+static NEXT_API_REQUEST_ID: AtomicUsize = AtomicUsize::new(1);
+
+/// Ask the JSON API one question and read the answer.
+///
+/// The API takes ONE request per connection, so this opens a connection per
+/// call, writes the request line, reads the first response line, and drops the
+/// connection. Used by the bridge-local handlers that need a fact only the
+/// server has (which session a pane is running, what a pane's screen says).
+pub(crate) fn api_call(
+    api_socket: &std::path::Path,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let id = format!(
+        "bridge:{}",
+        NEXT_API_REQUEST_ID.fetch_add(1, Ordering::Relaxed)
+    );
+    let request = serde_json::json!({"id": id, "method": method, "params": params});
+    let mut stream = crate::ipc::connect_local_stream(api_socket).map_err(|err| err.to_string())?;
+    stream
+        .write_all(format!("{request}\n").as_bytes())
+        .map_err(|err| err.to_string())?;
+    stream.flush().map_err(|err| err.to_string())?;
+    let mut reader = BufReader::new(stream);
+    let mut line = String::new();
+    reader.read_line(&mut line).map_err(|err| err.to_string())?;
+    let value: serde_json::Value =
+        serde_json::from_str(line.trim()).map_err(|err| err.to_string())?;
+    if let Some(error) = value.get("error") {
+        let message = error
+            .get("message")
+            .and_then(|message| message.as_str())
+            .unwrap_or("api error");
+        return Err(message.to_string());
+    }
+    value
+        .get("result")
+        .cloned()
+        .ok_or_else(|| "api response had no result".to_string())
+}
 
 /// Upper bound on simultaneous WebSocket clients. One phone holds one
 /// connection; the cap exists so a scanner cannot pin a thread per socket.
@@ -458,10 +559,11 @@ fn handle_client_frame(
             }
             return;
         }
-        let local = push::handle_local_method(method, params)
-            .or_else(|| memory_local::handle_local_method(method, params))
-            .or_else(|| transcript::handle_local_method(method, params, api_socket))
-            .or_else(|| todo::handle_local_method(method, params, api_socket));
+        let local = handle_local_method(
+            method,
+            params.unwrap_or(&serde_json::Value::Null),
+            api_socket,
+        );
         if let Some(outcome) = local {
             let line = match outcome {
                 Ok(result) => serde_json::json!({"result": result}),
@@ -590,9 +692,16 @@ fn rejection_response(status: StatusCode, body: &str) -> ErrorResponse {
     response
 }
 
-/// Whether an API method may be relayed for a companion client.
-fn bridge_allows_method(method: &str) -> bool {
+/// Whether a paired companion may call `method` at all — either relayed to the
+/// API ([`BRIDGE_ALLOWED_METHODS`]) or answered here
+/// ([`BRIDGE_LOCAL_METHODS`]).
+///
+/// The relay path reaches this only after the local handlers have declined, so
+/// the union is what "allowed over the bridge" means; `shep mcp` asks the same
+/// question of the same two lists.
+pub(crate) fn bridge_allows_method(method: &str) -> bool {
     BRIDGE_ALLOWED_METHODS.binary_search(&method).is_ok()
+        || BRIDGE_LOCAL_METHODS.binary_search(&method).is_ok()
 }
 
 /// Header-only bearer check. The token is compared in constant time so the
@@ -1047,6 +1156,14 @@ mod push {
             // which is how a broken setup went unnoticed for weeks. This reports
             // per-device what actually happened, synchronously, to whoever asked.
             "push.test" => Some(Ok(test_send(&endpoints_path()))),
+            // Page the phone with something the caller composed, rather than
+            // with an agent-state transition out of `SHEP_NOTIFY_*`. Same
+            // delivery path as `shep bridge notify-push`; only the payload's
+            // provenance differs. `shep mcp` exposes this as `push_page`.
+            "push.send" => Some(
+                payload_from_params(params)
+                    .map(|payload| deliver_at(&endpoints_path(), &payload).to_json()),
+            ),
             _ => None,
         }
     }
@@ -1108,26 +1225,40 @@ mod push {
         )
     }
 
-    /// `shep bridge notify-push` — the `[notifications] exec` target. Reads the
-    /// transition context from `SHEP_NOTIFY_*` and POSTs it to each registered
-    /// endpoint. Best-effort and non-fatal: a dead endpoint must not wedge the
-    /// exec-bridge, so failures are logged and the exit code stays 0.
-    pub(super) fn notify_push(_args: &[String]) -> std::io::Result<i32> {
-        let path = endpoints_path();
-        let endpoints = load(&path);
-        if endpoints.is_empty() {
-            eprintln!("shep bridge notify-push: no registered devices; nothing to do");
-            return Ok(0);
+    /// What one [`deliver_at`] call did.
+    ///
+    /// `skipped` counts devices that are registered but not subscribed to this
+    /// notification's kind — a mute, not a failure. `registered` is the size of
+    /// the device list and never leaves the process: it is what tells the CLI
+    /// "nothing to do" apart from "nothing wanted it".
+    pub(super) struct Report {
+        pub(super) registered: usize,
+        pub(super) delivered: usize,
+        pub(super) skipped: usize,
+        pub(super) errors: Vec<String>,
+    }
+
+    impl Report {
+        fn to_json(&self) -> serde_json::Value {
+            serde_json::json!({
+                "delivered": self.delivered,
+                "skipped": self.skipped,
+                "errors": self.errors,
+            })
         }
-        let kind = std::env::var("SHEP_NOTIFY_KIND").unwrap_or_default();
+    }
+
+    /// The payload `shep bridge notify-push` sends: the agent-state transition
+    /// the exec-bridge put in the environment.
+    fn payload_from_env() -> Payload {
         let pane_id = std::env::var("SHEP_NOTIFY_PANE_ID").unwrap_or_default();
-        let payload = Payload {
+        Payload {
             // One notification per pane on the device: a newer event for the
             // same pane replaces the older one instead of stacking beside it.
             tag: pane_id.clone(),
             // Absent from a server older than clears; treat as a show.
             op: std::env::var("SHEP_NOTIFY_OP").unwrap_or_else(|_| "show".to_string()),
-            kind: kind.clone(),
+            kind: std::env::var("SHEP_NOTIFY_KIND").unwrap_or_default(),
             state: std::env::var("SHEP_NOTIFY_STATE").unwrap_or_default(),
             agent: std::env::var("SHEP_NOTIFY_AGENT").unwrap_or_default(),
             workspace: std::env::var("SHEP_NOTIFY_WORKSPACE").unwrap_or_default(),
@@ -1137,8 +1268,66 @@ mod push {
                 &std::env::var("SHEP_NOTIFY_MESSAGE").unwrap_or_default(),
                 400,
             ),
-        };
+        }
+    }
 
+    /// The payload `push.send` sends: whatever the caller composed.
+    ///
+    /// `title` and `message` are the notification, so both are required; an
+    /// empty `kind` means "every device wants this" (see [`Endpoint::wants`]),
+    /// which is the right default for a page someone asked for explicitly.
+    fn payload_from_params(params: Option<&serde_json::Value>) -> Result<Payload, String> {
+        let params = params.ok_or("missing params")?;
+        let field = |key: &str| -> String {
+            params
+                .get(key)
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .trim()
+                .to_string()
+        };
+        let title = field("title");
+        if title.is_empty() {
+            return Err("missing title".to_string());
+        }
+        let message = field("message");
+        if message.is_empty() {
+            return Err("missing message".to_string());
+        }
+        let pane_id = field("pane_id");
+        Ok(Payload {
+            tag: pane_id.clone(),
+            op: "show".to_string(),
+            kind: field("kind"),
+            state: field("state"),
+            // The phone labels the notification with this; "shep" is who is
+            // talking when the caller does not say.
+            agent: match field("agent") {
+                agent if agent.is_empty() => "shep".to_string(),
+                agent => agent,
+            },
+            workspace: field("workspace"),
+            pane_id,
+            title,
+            message: truncate(&message, 400),
+        })
+    }
+
+    /// POST `payload` to every device in `path` that wants its kind.
+    ///
+    /// Best-effort by construction: a dead endpoint is an entry in
+    /// [`Report::errors`], never a failure of the call. A token FCM says is
+    /// gone will never work again — the app was uninstalled or reinstalled — so
+    /// it is dropped here rather than paying a failed request on every future
+    /// notification.
+    fn deliver_at(path: &std::path::Path, payload: &Payload) -> Report {
+        let endpoints = load(path);
+        let mut report = Report {
+            registered: endpoints.len(),
+            delivered: 0,
+            skipped: 0,
+            errors: Vec::new(),
+        };
         // Co-location shortcut for UnifiedPush only: when shep and the broker
         // run on the same host the resolver often can't resolve the broker's
         // MagicDNS name, and the tailnet round-trip is pointless anyway.
@@ -1148,51 +1337,64 @@ mod push {
         // silently stops arriving.
         let base_override = std::env::var("SHEP_NTFY_PUBLISH_BASE").ok();
         let mut stale: Vec<String> = Vec::new();
-        let mut delivered = 0usize;
         for endpoint in &endpoints {
-            if !endpoint.wants(&kind) {
+            if !endpoint.wants(&payload.kind) {
+                report.skipped += 1;
                 continue;
             }
             match &endpoint.transport {
                 Transport::UnifiedPush { url } => {
                     let target = resolve_publish_url(url, base_override.as_deref());
                     match post(&target, &payload.to_json()) {
-                        Ok(_) => delivered += 1,
-                        Err(err) => {
-                            eprintln!("shep bridge notify-push: {target} failed: {err}")
-                        }
+                        Ok(_) => report.delivered += 1,
+                        Err(err) => report.errors.push(format!("{target} failed: {err}")),
                     }
                 }
-                Transport::Fcm { token } => match fcm::send(token, &payload) {
-                    Ok(fcm::Delivery::Sent) => delivered += 1,
+                Transport::Fcm { token } => match fcm::send(token, payload) {
+                    Ok(fcm::Delivery::Sent) => report.delivered += 1,
                     Ok(fcm::Delivery::Unregistered) => {
-                        eprintln!(
-                            "shep bridge notify-push: dropping unregistered device {}",
-                            endpoint.label
-                        );
+                        report
+                            .errors
+                            .push(format!("dropping unregistered device {}", endpoint.label));
                         stale.push(token.clone());
                     }
-                    Err(err) => {
-                        eprintln!("shep bridge notify-push: fcm send failed: {err}")
-                    }
+                    Err(err) => report.errors.push(format!("fcm send failed: {err}")),
                 },
             }
         }
-
-        // A token that FCM says is gone will never work again — the app was
-        // uninstalled or reinstalled — so drop it rather than paying a failed
-        // request on every future notification.
         if !stale.is_empty() {
             let kept: Vec<Endpoint> = endpoints
                 .into_iter()
                 .filter(|e| !stale.iter().any(|token| token == e.transport.key()))
                 .collect();
-            if let Err(err) = store(&path, &kept) {
-                eprintln!("shep bridge notify-push: could not prune stale devices: {err}");
+            if let Err(err) = store(path, &kept) {
+                report
+                    .errors
+                    .push(format!("could not prune stale devices: {err}"));
             }
         }
-        if delivered == 0 {
-            eprintln!("shep bridge notify-push: nothing delivered for kind {kind:?}");
+        report
+    }
+
+    /// `shep bridge notify-push` — the `[notifications] exec` target. Reads the
+    /// transition context from `SHEP_NOTIFY_*` and POSTs it to each registered
+    /// endpoint. Best-effort and non-fatal: a dead endpoint must not wedge the
+    /// exec-bridge, so failures are logged and the exit code stays 0.
+    pub(super) fn notify_push(_args: &[String]) -> std::io::Result<i32> {
+        let payload = payload_from_env();
+        let report = deliver_at(&endpoints_path(), &payload);
+        if report.registered == 0 {
+            eprintln!("shep bridge notify-push: no registered devices; nothing to do");
+            return Ok(0);
+        }
+        for error in &report.errors {
+            eprintln!("shep bridge notify-push: {error}");
+        }
+        if report.delivered == 0 {
+            eprintln!(
+                "shep bridge notify-push: nothing delivered for kind {:?}",
+                payload.kind
+            );
         }
         Ok(0)
     }
@@ -1200,6 +1402,7 @@ mod push {
     /// What one notification says. Flat and all-strings because FCM's `data`
     /// block only carries strings, and the UnifiedPush body is the same shape so
     /// the app has one parser rather than two.
+    #[derive(Debug)]
     pub(super) struct Payload {
         /// What the device keys its notification on (the pane id): a later
         /// event with the same tag bumps the earlier one, and a `clear`
@@ -1941,6 +2144,114 @@ mod push {
         }
 
         #[test]
+        fn push_send_needs_a_title_and_a_message() {
+            assert_eq!(payload_from_params(None).unwrap_err(), "missing params");
+            assert_eq!(
+                payload_from_params(Some(&serde_json::json!({}))).unwrap_err(),
+                "missing title"
+            );
+            assert_eq!(
+                payload_from_params(Some(&serde_json::json!({"title": "  "}))).unwrap_err(),
+                "missing title"
+            );
+            assert_eq!(
+                payload_from_params(Some(&serde_json::json!({"title": "hi"}))).unwrap_err(),
+                "missing message"
+            );
+        }
+
+        #[test]
+        fn push_send_payload_defaults_agent_and_tags_by_pane() {
+            let payload = payload_from_params(Some(&serde_json::json!({
+                "title": "review ready",
+                "message": "twinkly-pike wants a look",
+                "kind": "review",
+                "state": "idle",
+                "workspace": "twinkly-pike",
+                "pane_id": "p7",
+            })))
+            .unwrap();
+            assert_eq!(payload.title, "review ready");
+            assert_eq!(payload.kind, "review");
+            assert_eq!(payload.state, "idle");
+            assert_eq!(payload.workspace, "twinkly-pike");
+            // The device keys the notification on the pane, like notify-push.
+            assert_eq!(payload.tag, "p7");
+            assert_eq!(payload.pane_id, "p7");
+            assert_eq!(payload.op, "show");
+            // Nobody said who is talking, so shep is.
+            assert_eq!(payload.agent, "shep");
+            // An unset kind reaches every device (`Endpoint::wants`).
+            let unspecified =
+                payload_from_params(Some(&serde_json::json!({"title": "t", "message": "m"})))
+                    .unwrap();
+            assert!(unspecified.kind.is_empty());
+            assert_eq!(unspecified.agent, "shep");
+
+            let long = "x".repeat(600);
+            let capped =
+                payload_from_params(Some(&serde_json::json!({"title": "t", "message": long})))
+                    .unwrap();
+            assert_eq!(capped.message.chars().count(), 401);
+        }
+
+        /// No device list is not a failure: there is simply nobody to page.
+        #[test]
+        fn delivering_with_no_registered_devices_reports_nothing() {
+            let path = std::env::temp_dir().join(format!(
+                "shep-bridge-no-endpoints-{}.json",
+                std::process::id()
+            ));
+            std::fs::remove_file(&path).ok();
+            let payload =
+                payload_from_params(Some(&serde_json::json!({"title": "t", "message": "m"})))
+                    .unwrap();
+            let report = deliver_at(&path, &payload);
+            assert_eq!(report.registered, 0);
+            assert_eq!(report.delivered, 0);
+            assert_eq!(report.skipped, 0);
+            assert!(report.errors.is_empty());
+            assert_eq!(
+                report.to_json(),
+                serde_json::json!({"delivered": 0, "skipped": 0, "errors": []})
+            );
+        }
+
+        /// A device that did not subscribe to this kind is skipped, not failed
+        /// — and skipping costs no request, so no endpoint is ever dialed here.
+        #[test]
+        fn delivering_a_muted_kind_skips_without_sending() {
+            let path = std::env::temp_dir().join(format!(
+                "shep-bridge-muted-endpoints-{}.json",
+                std::process::id()
+            ));
+            std::fs::remove_file(&path).ok();
+            store(
+                &path,
+                &[Endpoint {
+                    transport: Transport::UnifiedPush {
+                        url: "http://127.0.0.1:1/UPnope".to_string(),
+                    },
+                    label: "phone".to_string(),
+                    kinds: Some(vec!["blocked".to_string()]),
+                }],
+            )
+            .unwrap();
+            let payload = payload_from_params(Some(&serde_json::json!({
+                "title": "t",
+                "message": "m",
+                "kind": "review",
+            })))
+            .unwrap();
+            let report = deliver_at(&path, &payload);
+            assert_eq!(report.registered, 1);
+            assert_eq!(report.skipped, 1);
+            assert_eq!(report.delivered, 0);
+            assert!(report.errors.is_empty());
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
         fn truncate_caps_length() {
             assert_eq!(truncate("abc", 5), "abc");
             assert_eq!(truncate(&"x".repeat(10), 3), "xxx…");
@@ -1971,17 +2282,30 @@ mod push {
     }
 }
 
-/// Bridge-local shared-memory methods (`memory.show`/`add`/`replace`/`remove`).
+/// Bridge-local shared-memory methods
+/// (`memory.show`/`add`/`replace`/`remove`/`search`).
 ///
 /// Mirrors `shep memory`: operations on the plain-markdown memory files
 /// (`~/.config/shep/memory/USER.md` and `<repo>/.shep/memory/MEMORY.md`). The
 /// optional `repo` param selects the per-repo file; absent it targets the user
-/// profile. Search (`shep memory search`) is over a separate FTS history db and
-/// is intentionally not exposed here yet.
+/// profile.
+///
+/// `memory.search` is over a different store — the FTS5 session-history
+/// sidecar, not the memory files — which is why it was left out of this module
+/// at first. It is here now because a reader needs it: `shep mcp` exposes a
+/// `memory_search` tool, and an agent asking "what did we decide about X" wants
+/// the history, not a substring scan of two markdown files. Read-only, so it
+/// widens nothing the phone could already write.
 mod memory_local {
     use crate::memory::{self, MemoryDoc, MemoryKind};
     use serde_json::{json, Value};
     use std::path::{Path, PathBuf};
+
+    /// History hits returned when the caller does not say, and the most it can
+    /// ask for. A phone renders a screenful; a tool pays for every one in
+    /// context.
+    const DEFAULT_SEARCH_LIMIT: u64 = 20;
+    const MAX_SEARCH_LIMIT: u64 = 100;
 
     pub(super) fn handle_local_method(
         method: &str,
@@ -1992,6 +2316,7 @@ mod memory_local {
             "memory.add" => Some(add(params)),
             "memory.replace" => Some(replace(params)),
             "memory.remove" => Some(remove(params)),
+            "memory.search" => Some(search(params)),
             _ => None,
         }
     }
@@ -2097,15 +2422,102 @@ mod memory_local {
         Ok(show_json(kind, &doc))
     }
 
+    /// Clamp the caller's `limit` into [1, [`MAX_SEARCH_LIMIT`]].
+    fn search_limit(params: Option<&Value>) -> usize {
+        params
+            .and_then(|params| params.get("limit"))
+            .and_then(Value::as_u64)
+            .unwrap_or(DEFAULT_SEARCH_LIMIT)
+            .clamp(1, MAX_SEARCH_LIMIT) as usize
+    }
+
+    fn search(params: Option<&Value>) -> Result<Value, String> {
+        let query = params
+            .and_then(|params| params.get("query"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|query| !query.is_empty())
+            .ok_or("missing query")?;
+        search_at(
+            &memory::history::history_db_path(),
+            query,
+            search_limit(params),
+        )
+    }
+
+    /// No database means nothing has been ingested yet (`shep memory init`
+    /// wires the hooks that create it), which is an empty result rather than an
+    /// error: a caller asking what was said should be told "nothing", not
+    /// handed a plumbing complaint.
+    fn search_at(db_path: &Path, query: &str, limit: usize) -> Result<Value, String> {
+        if !db_path.exists() {
+            return Ok(json!({"hits": []}));
+        }
+        let conn = memory::history::open_db(db_path).map_err(|err| err.to_string())?;
+        let hits = memory::history::search(&conn, query, limit).map_err(|err| err.to_string())?;
+        let hits: Vec<Value> = hits
+            .into_iter()
+            .map(|hit| {
+                json!({
+                    "ts": hit.ts,
+                    "session_id": hit.session_id,
+                    "kind": hit.kind,
+                    "snippet": hit.snippet,
+                })
+            })
+            .collect();
+        Ok(json!({"hits": hits}))
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
 
         #[test]
         fn only_owns_memory_methods() {
-            assert!(handle_local_method("memory.search", None).is_none());
+            assert!(handle_local_method("memory.init", None).is_none());
             assert!(handle_local_method("session.snapshot", None).is_none());
             assert!(handle_local_method("memory.show", None).is_some());
+            assert!(handle_local_method("memory.search", None).is_some());
+        }
+
+        #[test]
+        fn search_needs_a_query_and_caps_the_limit() {
+            assert_eq!(search(None).unwrap_err(), "missing query");
+            assert_eq!(
+                search(Some(&json!({"query": "   "}))).unwrap_err(),
+                "missing query"
+            );
+            assert_eq!(search_limit(None), DEFAULT_SEARCH_LIMIT as usize);
+            assert_eq!(
+                search_limit(Some(&json!({}))),
+                DEFAULT_SEARCH_LIMIT as usize
+            );
+            assert_eq!(search_limit(Some(&json!({"limit": 5}))), 5);
+            assert_eq!(search_limit(Some(&json!({"limit": 0}))), 1);
+            assert_eq!(
+                search_limit(Some(&json!({"limit": 10_000}))),
+                MAX_SEARCH_LIMIT as usize
+            );
+            // A non-number is the default, not an error.
+            assert_eq!(
+                search_limit(Some(&json!({"limit": "many"}))),
+                DEFAULT_SEARCH_LIMIT as usize
+            );
+        }
+
+        /// The sidecar only exists once `shep memory init` has wired the hooks,
+        /// so "no database" is the normal state on a fresh machine.
+        #[test]
+        fn search_without_a_database_is_empty_not_an_error() {
+            let db = std::env::temp_dir().join(format!(
+                "shep-bridge-no-history-{}-{}.db",
+                std::process::id(),
+                "search"
+            ));
+            std::fs::remove_file(&db).ok();
+            let result = search_at(&db, "anything", 20).unwrap();
+            assert_eq!(result, json!({"hits": []}));
         }
 
         #[test]
@@ -2223,6 +2635,78 @@ mod tests {
         assert!(!bridge_allows_method("config.reload"));
         assert!(!bridge_allows_method("pane.read"));
         assert!(!bridge_allows_method(""));
+    }
+
+    /// The list and the dispatcher are two statements of the same fact, and
+    /// `shep mcp` trusts the list to say what it may call. A name in one and
+    /// not the other is a tool that 404s (or a local method no tool can find),
+    /// so check them against each other rather than by eye.
+    #[test]
+    fn bridge_local_methods_const_matches_the_dispatcher() {
+        let mut sorted = BRIDGE_LOCAL_METHODS.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(
+            sorted, BRIDGE_LOCAL_METHODS,
+            "keep the bridge-local list sorted and unique"
+        );
+        // Never both: the relay gate would then hide a local handler behind a
+        // proxied method (`scripts/test_bridge_allowlist.py` says so too).
+        for method in BRIDGE_LOCAL_METHODS {
+            assert!(
+                BRIDGE_ALLOWED_METHODS.binary_search(method).is_err(),
+                "{method} is both relayed and local"
+            );
+        }
+
+        let socket = PathBuf::from("/nonexistent/shep-bridge-local.sock");
+        let empty = serde_json::json!({});
+        for method in BRIDGE_LOCAL_METHODS {
+            // `pane.stream` is duplex and long-lived: `stream::try_open` owns
+            // it, with the channel's frame sink. `push.test` deliberately sends
+            // a real notification to every registered device, which is not
+            // something a unit test may do.
+            if matches!(*method, "pane.stream" | "push.test") {
+                continue;
+            }
+            assert!(
+                handle_local_method(method, &empty, &socket).is_some(),
+                "{method} is listed as bridge-local but the dispatcher declines it"
+            );
+        }
+        assert!(
+            BRIDGE_LOCAL_METHODS.contains(&stream::METHOD),
+            "pane.stream is bridge-local and must be listed"
+        );
+        assert!(
+            handle_local_method(stream::METHOD, &empty, &socket).is_none(),
+            "pane.stream is opened by stream::try_open, not answered once here"
+        );
+        // Anything not on the list proxies.
+        assert!(handle_local_method("session.snapshot", &empty, &socket).is_none());
+        assert!(handle_local_method("push.nope", &empty, &socket).is_none());
+        assert!(handle_local_method("", &empty, &socket).is_none());
+        // A request that carried no params at all reads as "no params", not as
+        // an empty object.
+        assert!(matches!(
+            handle_local_method("push.send", &serde_json::Value::Null, &socket),
+            Some(Err(message)) if message == "missing params"
+        ));
+    }
+
+    #[test]
+    fn bridge_allows_both_the_relayed_and_the_local_methods() {
+        for method in BRIDGE_ALLOWED_METHODS {
+            assert!(bridge_allows_method(method), "{method} is allowlisted");
+        }
+        for method in BRIDGE_LOCAL_METHODS {
+            assert!(bridge_allows_method(method), "{method} is bridge-local");
+        }
+        assert!(bridge_allows_method("memory.search"));
+        assert!(bridge_allows_method("push.send"));
+        // Still neither: `shep memory init` rewrites the harness's hooks.
+        assert!(!bridge_allows_method("memory.init"));
+        assert!(!bridge_allows_method("server.stop"));
     }
 
     fn drain(rx: &mpsc::Receiver<String>) -> Vec<serde_json::Value> {

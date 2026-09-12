@@ -9,6 +9,11 @@ then checks every dotted `"a.b"` string literal in the companion's Kotlin
 sources against them. A phone verb that reaches the relay without being
 allowlisted would fail at runtime with "method not allowed over the bridge";
 this catches it at `just check` instead.
+
+It also holds `BRIDGE_LOCAL_METHODS` to the handlers it claims to list. That
+const is what non-bridge callers (`shep mcp`) read to know what the bridge
+answers itself, so a handler missing from it is a tool nobody can reach and a
+name in it with no handler is a tool that errors at call time.
 """
 
 from __future__ import annotations
@@ -27,14 +32,21 @@ ANDROID_SRC = ROOT / "android" / "app" / "src" / "main" / "java"
 DOTTED = re.compile(r'"([a-z_]+\.[a-z_]+)"')
 
 
-def allowlist() -> list[str]:
+def method_const(name: str) -> list[str]:
+    """The dotted names in one `&[&str]` const in bridge.rs, in source order."""
     text = BRIDGE.read_text(encoding="utf-8")
-    match = re.search(
-        r"const BRIDGE_ALLOWED_METHODS: &\[&str\] = &\[(.*?)\];", text, re.S
-    )
+    match = re.search(rf"const {name}: &\[&str\] = &\[(.*?)\];", text, re.S)
     if match is None:
-        raise AssertionError("BRIDGE_ALLOWED_METHODS block not found in bridge.rs")
+        raise AssertionError(f"{name} block not found in bridge.rs")
     return DOTTED.findall(match.group(1))
+
+
+def allowlist() -> list[str]:
+    return method_const("BRIDGE_ALLOWED_METHODS")
+
+
+def bridge_local_const() -> list[str]:
+    return method_const("BRIDGE_LOCAL_METHODS")
 
 
 def bridge_local_methods() -> set[str]:
@@ -90,8 +102,30 @@ class BridgeAllowlistTest(unittest.TestCase):
         unknown = sorted(set(allowlist()) - methods)
         self.assertEqual(unknown, [], f"allowlisted names that are not API methods: {unknown}")
 
+    def test_local_const_is_sorted_and_lists_every_handler(self) -> None:
+        declared = bridge_local_const()
+        self.assertTrue(declared, "BRIDGE_LOCAL_METHODS parsed empty")
+        self.assertEqual(
+            declared,
+            sorted(set(declared)),
+            "keep BRIDGE_LOCAL_METHODS sorted and unique",
+        )
+        handled = bridge_local_methods()
+        self.assertEqual(
+            sorted(handled - set(declared)),
+            [],
+            "bridge-local handlers missing from BRIDGE_LOCAL_METHODS",
+        )
+        self.assertEqual(
+            sorted(set(declared) - handled),
+            [],
+            "BRIDGE_LOCAL_METHODS names with no bridge-local handler",
+        )
+
     def test_allowlist_never_overlaps_bridge_locals(self) -> None:
-        overlap = sorted(set(allowlist()) & bridge_local_methods())
+        overlap = sorted(
+            set(allowlist()) & (bridge_local_methods() | set(bridge_local_const()))
+        )
         self.assertEqual(
             overlap, [], f"bridge-local methods must not also be relayed: {overlap}"
         )
