@@ -1589,6 +1589,45 @@ mod tests {
         );
     }
 
+    /// The chord that flips desktop and board, in both encodings a host can
+    /// send it: the kitty protocol's `CSI 98;7u`, and the legacy `ESC 0x02`
+    /// that mosh and Terminal.app produce.
+    #[test]
+    fn ctrl_alt_b_parses_from_kitty_and_legacy_encodings() {
+        for bytes in [b"\x1b[98;7u".as_slice(), b"\x1b\x02".as_slice()] {
+            let (event, consumed) = extract_one_event(bytes).unwrap();
+            assert_eq!(consumed, bytes.len(), "{bytes:?}");
+            assert_raw_key(
+                event,
+                KeyCode::Char('b'),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            );
+        }
+    }
+
+    /// The legacy form arrives one byte at a time over a slow link. The ESC
+    /// is held, the control byte completes it, and nothing was flushed as a
+    /// lone Esc in between.
+    #[test]
+    fn escape_followed_by_control_byte_before_flush_becomes_ctrl_alt_key() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let mut buffer = Vec::new();
+
+        drain_chunk(&mut buffer, &tx, b"\x1b");
+        assert_eq!(buffer, b"\x1b");
+        assert!(collect_events(&mut rx).is_empty());
+
+        drain_chunk(&mut buffer, &tx, b"\x02");
+        assert!(buffer.is_empty());
+        let events = collect_events(&mut rx);
+        assert_eq!(events.len(), 1);
+        assert_raw_key(
+            events.into_iter().next().unwrap(),
+            KeyCode::Char('b'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+        );
+    }
+
     #[test]
     fn chunked_kitty_sequence_waits_for_completion() {
         let (tx, mut rx) = mpsc::channel(8);

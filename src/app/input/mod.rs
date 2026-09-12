@@ -55,7 +55,8 @@ pub(crate) use self::{
 };
 use self::{
     modal::{
-        modal_action_from_key, ModalAction, ONBOARDING_WELCOME_ACTIONS, RELEASE_NOTES_ACTIONS,
+        leave_modal, modal_action_from_key, ModalAction, ONBOARDING_WELCOME_ACTIONS,
+        RELEASE_NOTES_ACTIONS,
     },
     mouse::MouseAction,
     settings::SettingsAction,
@@ -113,7 +114,16 @@ impl App {
                 Mode::Navigator => {
                     handle_navigator_key(&mut self.state, &self.terminal_runtimes, key_event)
                 }
-                Mode::Board => self.handle_board_key(key_event),
+                Mode::Board => {
+                    // The board never reaches `action_for_key`, so the one
+                    // chord that flips back to the desktop is checked here.
+                    if self.state.keybinds.switch_view.matches_direct_key(key) {
+                        self.state.board.docket_notice = None;
+                        leave_modal(&mut self.state);
+                    } else {
+                        self.handle_board_key(key_event);
+                    }
+                }
                 Mode::PairPhone => handle_pair_phone_key(&mut self.state, key_event),
                 Mode::Terminal => unreachable!(),
             },
@@ -712,6 +722,36 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel().1,
             crate::api::EventHub::default(),
         )
+    }
+
+    /// One chord, both directions: from a pane it opens the board, and from
+    /// the board — which never consults the navigate table — it comes back.
+    #[tokio::test]
+    async fn switch_view_chord_flips_between_desktop_and_board() {
+        let mut app = test_app();
+        app.state.workspaces = vec![crate::workspace::Workspace::test_new("test")];
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.mode = Mode::Terminal;
+        let chord = TerminalKey::new(
+            KeyCode::Char('b'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+        );
+        assert!(app.state.keybinds.switch_view.matches_direct_key(chord));
+
+        app.handle_key(chord).await;
+        assert_eq!(app.state.mode, Mode::Board);
+
+        app.state.board.docket_notice = Some("promoted".into());
+        app.handle_key(chord).await;
+        assert_eq!(app.state.mode, Mode::Terminal);
+        assert_eq!(app.state.board.docket_notice, None);
+
+        // Any other key on the board still reaches the board's own handler.
+        app.handle_key(chord).await;
+        app.handle_key(TerminalKey::new(KeyCode::Esc, KeyModifiers::NONE))
+            .await;
+        assert_eq!(app.state.mode, Mode::Terminal);
     }
 
     #[tokio::test]

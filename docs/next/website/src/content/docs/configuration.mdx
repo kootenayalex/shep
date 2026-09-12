@@ -182,7 +182,10 @@ close_pane = "prefix+x"
 zoom = "prefix+z"
 resize_mode = "prefix+r"
 toggle_sidebar = "prefix+b"
+switch_view = "ctrl+alt+b"
 ```
+
+`switch_view` is the one direct chord in the default keymap: it flips between the desktop and the session board from either side, including from inside a pane running an agent, and `ctrl+alt` is the modifier family terminals leave alone (see [going prefix-free](/docs/keyboard/#going-prefix-free)). Over mosh and in terminals without a modern keyboard protocol it arrives as `ESC` followed by `ctrl+b`, which shep reads as the same chord.
 
 Optional actions are unset by default. Bind them with `prefix+` for prefix-mode behavior, or with an explicit modified chord when you intentionally want a direct shortcut:
 
@@ -317,7 +320,7 @@ prompt_new_tab_name = true
 pane_borders = true
 pane_gaps = true
 show_agent_labels_on_pane_borders = false
-hide_tab_bar_when_single_tab = false
+hide_tab_bar_when_single_tab = true
 agent_panel_sort = "spaces"
 accent = "cyan"
 ```
@@ -343,7 +346,7 @@ board_view = "docket"
 escape_returns_to_board = true
 ```
 
-`open_on_board` starts a session on the board instead of dropping straight into a pane, so a session with several agents opens on the overview. Enter focuses the selected pane.
+`open_on_board` starts a session on the board instead of dropping straight into a pane, so a session with several agents opens on the overview. Enter focuses the selected pane. The board and the desktop are two sides of one screen: `keys.switch_view` (`ctrl+alt+b` by default) flips between them from anywhere, and `keys.board` is an optional second binding that only opens it.
 
 The board is two lane boards one key apart, and `board_view` picks which one it opens on. `docket` (the default) is the personal docket — inbox, due, slated, recurring, done — one card per item, with the verbs on keys: `n` captures a new item into the inbox, `p` and `r` promote the selected inbox item as slated or weekly-recurring, `d` completes it (a recurring item rolls its date forward), `x` discards it, and `i` opens the item in full. `agents` is the agent lanes, one per group. `a` flips between the two, and the dashboard strip on either counts what the docket has due and waiting.
 
@@ -367,7 +370,7 @@ Set `pane_borders = false` to remove split pane borders. Set `pane_gaps = false`
 
 Set `show_agent_labels_on_pane_borders = true` if you want detected agent labels in split pane borders when no manual pane label is set.
 
-Set `hide_tab_bar_when_single_tab = true` to hide the tab row when the active workspace has exactly one tab. New tabs can still be created with the configured keybinding. When a second tab appears, Herdr restores the tab row and resizes panes to make room for it.
+`hide_tab_bar_when_single_tab` hides the tab row when the active workspace has exactly one tab, and is on by default: a group with one agent has no tab to choose. New tabs can still be created with the configured keybinding. When a second tab appears, Herdr restores the tab row and resizes panes to make room for it. Set it to `false` to keep the row on every group.
 
 ## Notifications
 

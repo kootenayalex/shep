@@ -3,8 +3,8 @@
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- g╭──────────────────────────────────────────────────────────────────────────╮
-  │keybinds                                                        esc close │─╮
+ g╭──────────────────────────────────────────────────────────────────────────╮─╮
+  │keybinds                                                        esc close │ │
  ◉│ available commands and configured shortcuts                              │ │
   │                                                                          │ │
   │ global                                                                  ▐│ │
@@ -29,8 +29,8 @@
 
 --- styles ---
 nccccnnnnnnnnnnnnnnnnnnnnnnnnnnnnnttttttttgggqnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkn
-hhaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaann
-ooassssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmjjjjjjjjjjjauu
+hhaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauu
+ooassssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmjjjjjjjjjjjaou
 plaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiaou
 ppammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaou
 ppabbbbbbbmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmiaou

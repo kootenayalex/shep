@@ -170,6 +170,24 @@
 
 ### Changed
 
+- One chord flips between the desktop and the session board: `ctrl+alt+b`
+  (`keys.switch_view`), from a pane, from prefix mode, and from the board
+  itself; the board never reached the keymap before, so it could only be
+  left with Esc. The keybind help lists it as `desktop ⇄ board`, and the
+  `session board` row borrows the chord when `keys.board` is unset instead
+  of reading `unset`. The chord also parses from the legacy encoding mosh
+  and Terminal.app send — `ESC` before the control byte — which used to come
+  out as alt plus an unnameable control character; every `ESC ctrl+letter`
+  pair now reads as ctrl+alt+letter.
+
+- `ui.hide_tab_bar_when_single_tab` defaults to `true`: a group with one
+  agent no longer spends a row on a tab strip with one tab in it.
+
+- The context gauge on board cards and the agent detail screen warms to
+  peach at 80% and stays dim below, instead of yellow from 60 and red from
+  85. Yellow is a working agent and red is a blocked one; a meter is neither
+  (`docs/DESIGN-LANGUAGE.md`).
+
 - The board opens on the docket. The session board is now two lane boards
   one key apart: the docket — inbox, due, slated, recurring, done — and the
   agent lanes it used to be. `[ui] board_view = "docket" | "agents"` picks

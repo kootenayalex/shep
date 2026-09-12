@@ -20,10 +20,13 @@ use ratatui::{
     Frame,
 };
 
+use super::gauge::context_gauge_spans;
 use super::glyphs;
 use super::sidebar::{agent_panel_entries, format_event_age};
 use super::status::{agent_icon_for, docket_appearance, state_label, DocketUrgency};
-use super::text::{display_width, truncate_end, truncate_start};
+use super::text::{
+    contract_home, display_width, fit_strip, spans_width, truncate_end, truncate_start,
+};
 use super::widgets::render_panel_shell;
 use crate::api::schema::{DocketKind, DocketRepeat, DocketStatus};
 use crate::app::state::{AppState, BoardView, DocketSample, Palette};
@@ -177,98 +180,6 @@ impl BoardModel {
     fn lane_of(&self, pane_id: Option<PaneId>) -> Option<usize> {
         self.locate(pane_id?).map(|(lane, _)| lane)
     }
-}
-
-/// `/Users/alex/vault/dev/shep` -> `~/vault/dev/shep`. Board cards are narrow
-/// and the home prefix is the same on every one of them.
-fn contract_home(path: &std::path::Path) -> String {
-    let display = path.display().to_string();
-    let Some(home) = std::env::var_os("HOME") else {
-        return display;
-    };
-    let home = home.to_string_lossy();
-    if home.is_empty() {
-        return display;
-    }
-    match display.strip_prefix(home.as_ref()) {
-        Some("") => "~".to_string(),
-        Some(rest) if rest.starts_with('/') => format!("~{rest}"),
-        _ => display,
-    }
-}
-
-/// A tiny inline gauge for the context window: `███▍░░ 62%`.
-///
-/// Rendered as a bar because the number alone doesn't read at a glance — the
-/// thing worth seeing across eight cards is *which agent is nearly full*.
-///
-/// Drawn in eighths. Six whole cells give seven states for a hundred and one
-/// percentages, so 60% and 74% were the same picture; eighths give the same
-/// six columns forty-nine, which is the difference between a gauge that
-/// reports and one that rounds.
-///
-/// The number is right-aligned in its own three columns. The gauge is pinned to
-/// the card's right edge, so an unpadded `100%` would drag the bar one column
-/// left of every other card's — a shifted bar in a column of bars reads as a
-/// different measurement.
-/// The bar is drawn cell by cell rather than as one string, and the boundary
-/// cell carries the fill as foreground over the track as background. As plain
-/// text the partial cell showed the panel through it and the bar read as
-/// broken — a gap between the fill and the track — which every cell-exact
-/// snapshot passed, because every cell was right. It took looking at pixels.
-const GAUGE_WIDTH: usize = 6;
-
-fn context_gauge_spans<'a>(percent: u8, p: &Palette) -> Vec<Span<'a>> {
-    let percent = percent.min(100);
-    // Near-full context is the thing worth noticing, so it warms up. Both the
-    // card and the detail screen come through here: they used to each carry
-    // this ladder and disagreed about the cold end.
-    let color = match percent {
-        85..=u8::MAX => p.red,
-        60..=84 => p.yellow,
-        _ => p.overlay0,
-    };
-    // Any nonzero reading lights something, so "barely used" still outranks
-    // "unknown" — which is a different claim and draws nothing.
-    let smallest = 1.0 / (GAUGE_WIDTH * 8) as f32;
-    let fraction = (f32::from(percent) / 100.0).max(if percent > 0 { smallest } else { 0.0 });
-    let (full, remainder, empty) = glyphs::bar_parts(fraction, GAUGE_WIDTH);
-    // The whole bar sits on `surface1` — a recessed channel — and the fill is
-    // drawn into it. The boundary cell's unfilled part is that same channel,
-    // so the fill's edge is a hard line inside one cell rather than a hole.
-    let track = Style::default().bg(p.surface1);
-    let mut spans = Vec::new();
-    if full > 0 {
-        spans.push(Span::styled(
-            glyphs::EIGHTHS[8].repeat(full),
-            track.fg(color),
-        ));
-    }
-    if remainder > 0 {
-        spans.push(Span::styled(
-            glyphs::EIGHTHS[remainder].to_string(),
-            track.fg(color),
-        ));
-    }
-    if empty > 0 {
-        // EIGHTHS[0] is a space: nothing but the channel.
-        spans.push(Span::styled(glyphs::EIGHTHS[0].repeat(empty), track));
-    }
-    spans.push(Span::styled(
-        format!(" {percent:>3}%"),
-        Style::default().fg(color),
-    ));
-    spans
-}
-
-/// The gauge's text, for measuring it and for tests.
-fn spans_text(spans: &[Span<'_>]) -> String {
-    spans.iter().map(|s| s.content.as_ref()).collect()
-}
-
-#[cfg(test)]
-fn context_gauge(percent: u8) -> String {
-    spans_text(&context_gauge_spans(percent, &Palette::shep()))
 }
 
 /// Human-readable "where is this agent" tag.
@@ -916,38 +827,6 @@ fn human_bytes(bytes: u64) -> String {
 }
 
 /// Two-row dashboard: the session pulse, then the host it runs on.
-/// Assemble a strip of facts into one line, dropping whole facts that will not
-/// fit.
-///
-/// A `Paragraph` clipped at the terminal's edge leaves debris. On an 80-column
-/// board this strip ended `·  3` — the head of "3 ws · 3 tabs · 5 panes",
-/// reading as a count of something unnamed — and at 120 it ended on a dangling
-/// separator promising a fact that was not there.
-///
-/// Facts are given in the order a glance wants them, and this stops at the
-/// first one that does not fit rather than skipping ahead to a shorter one:
-/// a strip that is a prefix of a known order can be read, and a gap-toothed
-/// subset of it cannot.
-fn fit_strip<'a>(facts: Vec<Vec<Span<'a>>>, sep: &Span<'a>, width: usize) -> Vec<Span<'a>> {
-    let span_width =
-        |spans: &[Span<'a>]| -> usize { spans.iter().map(|s| display_width(&s.content)).sum() };
-    let sep_width = display_width(&sep.content);
-    let mut out: Vec<Span<'a>> = Vec::new();
-    let mut used = 0usize;
-    for fact in facts {
-        let lead = if out.is_empty() { 0 } else { sep_width };
-        if used + lead + span_width(&fact) > width {
-            break;
-        }
-        used += lead + span_width(&fact);
-        if lead > 0 {
-            out.push(sep.clone());
-        }
-        out.extend(fact);
-    }
-    out
-}
-
 fn render_dashboard(
     app: &AppState,
     frame: &mut Frame,
@@ -1519,7 +1398,7 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         .context_percent
         .map(|percent| context_gauge_spans(percent, p))
         .unwrap_or_default();
-    let gauge_width = display_width(&spans_text(&gauge));
+    let gauge_width = spans_width(&gauge);
     let strip_budget = content
         .saturating_sub(CARD_INDENT)
         .saturating_sub(if gauge_width == 0 { 0 } else { gauge_width + 1 });
@@ -1558,7 +1437,7 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         facts.insert(0, vec![Span::styled(truncate_start(cwd, cwd_budget), dim)]);
     }
     let strip = fit_strip(facts, &Span::styled(glyphs::SEP_SPACED, dim), strip_budget);
-    used = CARD_INDENT + display_width(&spans_text(&strip));
+    used = CARD_INDENT + spans_width(&strip);
     let mut line5 = vec![Span::raw(indent)];
     line5.extend(strip);
     if gauge_width > 0 {
@@ -3047,45 +2926,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn context_gauge_fills_proportionally_and_clamps() {
-        // Empty draws only the channel, which is bare background.
-        assert!(context_gauge(0).starts_with("      "));
-        assert_eq!(context_gauge(100), "██████ 100%");
-        // Any nonzero percentage lights something, so a barely used context is
-        // still visibly distinct from an unknown one — an eighth now, rather
-        // than a whole cell, because a whole cell overstated 1% by sixteen.
-        assert!(!context_gauge(1).starts_with("  "));
-        // Only a full context fills the bar: a nearly-full agent must stay
-        // visually distinguishable from a finished one.
-        assert_ne!(context_gauge(88), context_gauge(100));
-    }
-
-    /// What eighths buy: six whole cells give seven states across a hundred
-    /// and one percentages, so 60% and 74% used to be the same picture.
-    #[test]
-    fn the_context_gauge_resolves_within_a_cell() {
-        assert_ne!(context_gauge(60), context_gauge(74));
-        let distinct: std::collections::HashSet<String> = (0..=100)
-            .map(|percent| {
-                let g = context_gauge(percent);
-                g.split(' ').next().unwrap_or_default().to_string()
-            })
-            .collect();
-        // Forty-eight eighths plus empty.
-        assert_eq!(distinct.len(), 49);
-    }
-
-    /// Every gauge is the same width, so a lane of them is a column of bars
-    /// with a column of numbers beside it rather than a staircase.
-    #[test]
-    fn every_gauge_measures_the_same() {
-        let widths: std::collections::HashSet<usize> = (0..=100)
-            .map(|p| display_width(&context_gauge(p)))
-            .collect();
-        assert_eq!(widths.len(), 1, "gauge widths: {widths:?}");
-    }
-
     /// The facts that do not fit come off whole.
     ///
     /// Clipping the `Paragraph` instead left `·  3` on an 80-column board — the
@@ -3182,7 +3022,14 @@ mod tests {
             (1, card_age(&state, card).unwrap_or_default()),
             (
                 4,
-                card.context_percent.map(context_gauge).unwrap_or_default(),
+                card.context_percent
+                    .map(|percent| {
+                        context_gauge_spans(percent, &state.palette)
+                            .iter()
+                            .map(|s| s.content.as_ref())
+                            .collect::<String>()
+                    })
+                    .unwrap_or_default(),
             ),
         ];
         for (y, fact) in trailing {

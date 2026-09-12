@@ -309,6 +309,7 @@ pub struct Keybinds {
     pub next_agent: ActionKeybinds,
     pub next_blocked: ActionKeybinds,
     pub board: ActionKeybinds,
+    pub switch_view: ActionKeybinds,
     pub focus_agent: Vec<IndexedKeybind>,
     pub new_tab: ActionKeybinds,
     pub rename_tab: ActionKeybinds,
@@ -475,6 +476,7 @@ impl Config {
             next_agent: empty_action!(),
             next_blocked: empty_action!(),
             board: empty_action!(),
+            switch_view: empty_action!(),
             focus_agent: Vec::new(),
             new_tab: empty_action!(),
             rename_tab: empty_action!(),
@@ -605,6 +607,7 @@ impl Config {
             apply_action!(keybinds.next_agent, next_agent, source);
             apply_action!(keybinds.next_blocked, next_blocked, source);
             apply_action!(keybinds.board, board, source);
+            apply_action!(keybinds.switch_view, switch_view, source);
             apply_indexed!(
                 keybinds.focus_agent,
                 focus_agent,

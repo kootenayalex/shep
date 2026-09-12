@@ -122,6 +122,35 @@ pub(super) const TICK: &str = "✓";
 /// costs nothing.
 pub(super) const QUEUED: &str = "⇥";
 
+/// The overseer — the one voice in the UI that is not an agent's. Mauve,
+/// wherever it is drawn. Not `◆`: that is the needs-review badge, and one
+/// glyph carries one meaning.
+// Pinned ahead of the overseer board that draws it; unused until then.
+#[allow(dead_code)]
+pub(super) const OVERSEER: &str = "✦";
+
+/// The global menu, as a click target beside the sidebar toggle.
+///
+/// East-Asian-Ambiguous, like [QUEUED]: two columns on a CJK-configured
+/// terminal. Kept because nothing else reads as "menu" in one cell, and it
+/// sits at the end of a header row where a second column costs nothing.
+// Pinned ahead of the overseer board that draws it; unused until then.
+#[allow(dead_code)]
+pub(super) const MENU: &str = "≡";
+
+/// A health finding that needs a look. A warning, not a stop — peach ink.
+// Pinned ahead of the overseer board that draws it; unused until then.
+#[allow(dead_code)]
+pub(super) const WARNING: &str = "⚠";
+
+/// Fold the sidebar away; bring it back. The collapsed mark is the only
+/// evidence a sidebar exists, so it is also where the attention badge lights.
+pub(super) const SIDEBAR_COLLAPSE: &str = "«";
+pub(super) const SIDEBAR_EXPAND: &str = "»";
+
+/// Two views, one chord: `desktop ⇄ board`.
+pub(super) const SWITCH: &str = "⇄";
+
 // ── Meters ──────────────────────────────────────────────────────────────────
 
 /// Block eighths, empty through full.
@@ -180,6 +209,12 @@ mod tests {
             EN_DASH,
             TICK,
             QUEUED,
+            OVERSEER,
+            MENU,
+            WARNING,
+            SIDEBAR_COLLAPSE,
+            SIDEBAR_EXPAND,
+            SWITCH,
         ];
         for glyph in single {
             assert_eq!(display_width(glyph), 1, "{glyph:?} is not one column");
@@ -266,6 +301,12 @@ mod tests {
             EN_DASH,
             TICK,
             QUEUED,
+            OVERSEER,
+            MENU,
+            WARNING,
+            SIDEBAR_COLLAPSE,
+            SIDEBAR_EXPAND,
+            SWITCH,
             SEP,
             // The state vocabulary, from `status.rs`.
             "◉",

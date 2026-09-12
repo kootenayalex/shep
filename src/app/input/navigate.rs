@@ -410,6 +410,7 @@ impl App {
                 self.state.open_navigator_from(&self.terminal_runtimes)
             }
             NavigateAction::OpenBoard => self.state.open_board(),
+            NavigateAction::SwitchView => switch_view(&mut self.state),
         }
 
         finish_action_context(&mut self.state, context, previous_mode);
@@ -1321,6 +1322,7 @@ pub(crate) enum NavigateAction {
     Detach,
     OpenNavigator,
     OpenBoard,
+    SwitchView,
 }
 
 fn copy_mode_survives_prefix_action(action: NavigateAction) -> bool {
@@ -1454,6 +1456,7 @@ fn action_for_key(
         (&kb.detach, NavigateAction::Detach),
         (&kb.goto, NavigateAction::OpenNavigator),
         (&kb.board, NavigateAction::OpenBoard),
+        (&kb.switch_view, NavigateAction::SwitchView),
     ] {
         if action_matches(bindings, key, dispatch) {
             return Some(action);
@@ -1710,6 +1713,7 @@ pub(super) fn execute_navigate_action_in_context(
         }
         NavigateAction::OpenNavigator => state.open_navigator_from(terminal_runtimes),
         NavigateAction::OpenBoard => state.open_board(),
+        NavigateAction::SwitchView => switch_view(state),
     }
 
     finish_action_context(state, context, previous_mode);
@@ -1743,6 +1747,18 @@ fn workspace_can_start_worktree_action(
             .and_then(crate::workspace::git_space_metadata)
     });
     !git_space.is_some_and(|space| space.is_linked_worktree)
+}
+
+/// The desktop and the board are two sides of one screen, and one chord
+/// flips between them. From the board it is the board's own leave; from
+/// anywhere else — a pane, prefix mode, the navigate overlay — it opens the
+/// board the way the `board` action does.
+pub(super) fn switch_view(state: &mut AppState) {
+    if state.mode == Mode::Board {
+        super::modal::leave_modal(state);
+    } else {
+        state.open_board();
+    }
 }
 
 fn leave_navigate_mode(state: &mut AppState) {

@@ -8,6 +8,7 @@ use ratatui::{
 pub(crate) mod board;
 mod chrome;
 mod dialogs;
+mod gauge;
 mod glyphs;
 mod keybind_help;
 mod menus;
@@ -1630,5 +1631,38 @@ switch_workspace = "ctrl+1..9"
 
         assert_eq!(switch_tab_key, "prefix+1..9 / alt+1..9");
         assert_eq!(switch_workspace_key, "ctrl+1..9");
+    }
+
+    /// The board row never reads `unset`: without a binding of its own it
+    /// borrows the switch chord, which is the door that always exists.
+    #[test]
+    fn keybind_help_board_row_borrows_the_switch_chord_when_unset() {
+        let rows = |toml: &str| {
+            let config: crate::config::Config = toml::from_str(toml).expect("config parses");
+            let mut app = crate::app::state::AppState::test_new();
+            app.keybinds = config.keybinds();
+            keybind_help_groups(&app)
+                .into_iter()
+                .find(|(name, _)| *name == "groups / tabs")
+                .expect("workspace tab group")
+                .1
+        };
+        let key_for = |rows: &[(String, std::borrow::Cow<'static, str>)], label: &str| {
+            rows.iter()
+                .find(|(_, l)| l.as_ref() == label)
+                .map(|(key, _)| key.clone())
+                .unwrap_or_else(|| panic!("{label} help entry"))
+        };
+
+        let default_rows = rows("");
+        assert_eq!(key_for(&default_rows, "session board"), "ctrl+alt+b");
+        assert_eq!(
+            key_for(&default_rows, "desktop \u{21c4} board"),
+            "ctrl+alt+b"
+        );
+
+        let bound = rows("[keys]\nboard = \"prefix+space\"\nswitch_view = \"ctrl+alt+o\"\n");
+        assert_eq!(key_for(&bound, "session board"), "prefix+space");
+        assert_eq!(key_for(&bound, "desktop \u{21c4} board"), "ctrl+alt+o");
     }
 }

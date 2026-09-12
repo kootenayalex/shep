@@ -152,6 +152,7 @@ Badges sit beside a name and answer a different question from state.
 | git ahead | `↑N` | green | commits to push |
 | git behind | `↓N` | peach | commits to pull |
 | memory pressure | `mem NN%` | peach | at or over 80% of the cap |
+| context window | `███▍░░ NN%` | peach at or over 80%, overlay0 below | how full the agent's context is |
 | plan mode | `plan` | mauve | the agent is planning, not editing |
 | bypassing permissions | `bypass` | peach | the agent is not asking before acting |
 | churn | `+N/-N` | green / red | lines the session has added and removed |
@@ -165,6 +166,16 @@ detection evidence.
 
 `✓` means approved and nothing else. It used to be idle's glyph too, which is why
 idle is now `○`.
+
+The context gauge is a meter, not a state, so it takes the warning tier and
+nothing hotter: it used to go yellow at 60 and red at 85, which spent the
+working and stop tiers on a number. One gauge, drawn by `src/ui/gauge.rs`,
+wherever a context percentage appears.
+
+The overseer's mark is `✦`, mauve, wherever the overseer speaks. Not `◆`: that
+is the needs-review badge, and one glyph carries one meaning. `≡` is the global
+menu, `⚠` a health finding (peach: a warning), and `«`/`»` fold the sidebar
+away and back — all pinned in `src/ui/glyphs.rs`.
 
 The worktree badge is the one entry that reads differently on the two surfaces,
 and deliberately: the phone puts it in a card header beside an id, where a

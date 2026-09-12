@@ -1967,6 +1967,9 @@ mod tests {
         app.state.active = Some(0);
         app.state.selected = 0;
         app.state.mode = Mode::Terminal;
+        // The point is the tab-bar row offset, so keep the row on this
+        // single-tab group (it ships hidden).
+        app.state.hide_tab_bar_when_single_tab = false;
         crate::ui::compute_view(&mut app.state, Rect::new(0, 0, 106, 20));
         let info = app.state.view.pane_infos[0].clone();
         assert!(info.inner_rect.x > 0, "sidebar offset should be present");
@@ -2007,6 +2010,9 @@ mod tests {
         app.state.active = Some(0);
         app.state.selected = 0;
         app.state.mode = Mode::Terminal;
+        // The point is the tab-bar row offset, so keep the row on this
+        // single-tab group (it ships hidden).
+        app.state.hide_tab_bar_when_single_tab = false;
         crate::ui::compute_view(&mut app.state, Rect::new(0, 0, 106, 20));
         let info = app.state.view.pane_infos[0].clone();
         assert!(info.inner_rect.x > 0, "sidebar offset should be present");
@@ -3547,6 +3553,9 @@ mod tests {
         app.state.selected = 0;
         app.state.mode = Mode::Terminal;
         app.state.prompt_new_tab_name = false;
+        // The `+` button lives on the tab row, which a single-tab group
+        // hides by default.
+        app.state.hide_tab_bar_when_single_tab = false;
 
         crate::ui::compute_view(&mut app.state, Rect::new(0, 0, 120, 40));
         let new_tab_area = app.state.view.new_tab_hit_area;

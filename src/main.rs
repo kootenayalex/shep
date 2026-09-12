@@ -190,6 +190,7 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 # next_agent = ""         # optional, unset by default
 # next_blocked = ""       # optional, unset by default; jumps to next blocked pane (e.g. "prefix+b" if you rebind toggle_sidebar)
 # board = ""              # optional, unset by default; opens the session board overlay (e.g. "prefix+space"); also in the global menu
+# switch_view = "ctrl+alt+b" # flips between the desktop and the session board, from either side and from inside a pane
 # focus_agent = ""        # optional indexed binding, e.g. "prefix+alt+1..9"
 # remote_image_paste = "ctrl+v" # only active in shep --remote; empty disables raw-key image paste
 # new_tab = "prefix+c"
@@ -304,7 +305,7 @@ const DEFAULT_CONFIG: &str = r##"# shep configuration
 
 # Hide the tab row when a workspace has exactly one tab.
 # New tabs can still be created with the configured keybinding.
-# hide_tab_bar_when_single_tab = false
+# hide_tab_bar_when_single_tab = true
 
 # Show the full-width titlebar at the top of the desktop layout
 # (brand, active workspace · tab, update/blocked attention slot).

@@ -1,10 +1,10 @@
-# pair-phone-small 80x24 · 33 styles
+# pair-phone-small 80x24 · 31 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- groups          grouped │ 1       +
-                         │╭──────────────────────────┬─────────────────────────╮
+ groups          grouped │╭──────────────────────────┬─────────────────────────╮
+                         ││                          │                         │
  ◉ workmayt ◆ ⇥2         ││                          │                         │
     ↑2 ↓1 20s mem 87%    ││                          │                         │
    ◉ claude  blocked 72% ││                          │                         │
@@ -28,40 +28,38 @@
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
-tcccctttttttttttttttttttttttttttttDDDDDDDDjjjwttttttttttttttttttttttqqqqqqqqqqqt
-kkkkkkkuuuuuuuuuukkkkkkkuzoooooooonnnttttttttttttttttttttttttttttttttttttttttttt
-uuuuuuuuuuuuuuuuuuuuuuuuuzddddddddddddddddddddddddddddFFFFFFFFFFFFFFFFFFFFFFFFFF
-vrvEEEEEEEEvhvAAvvvvvvvvvzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-vvvvggvppvmmmvpppppppvvvvzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-vvvrvEEEEEEvvrrrrrrrvmmmvzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-vvvGvyyyyyyyyvvvvGGGGGGGvzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuuuuuuuuuuzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-ueuxxxxxxxxxuuuuaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauuuuuuuuuuuuuuuF
-uuullllllulluuuuabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbssssssauuuuuuuuuuuuuuuF
-uuueuxxxxxxuuuuuaiiiiiiiiiiBBBBBBBBBBBBBBBsssssssssssssssssssssauuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuaiiiiiiiiiiCCCCCCCCCsssssssssssssssssssssssssssauuuuuuuuuuuuuuuF
-uFuxxxxuuuuuuuuuaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiisssssssssauuuuuuuuuuuuuuuF
-uuulllllllllllluassssssssssssssssssssssssssssssssssssssssssssssauuuuuuuuuuuuuuuF
-uuufuxxxxxxuuuuuaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiisssssssssauuuuuuuuuuuuuuuF
-uuuFuxxxxxuuuFFFaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuuuuuuuuuuzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuuuuuuuuuuzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuuuuuuuuuuzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuuuuuuuuuuzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuuuuuuuuuuzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-uuuuuuuuuuuuuuuuuuuuuuuuuzduuuuuuuuuuuuuuuuuuuuuuuuuuduuuuuuuuuuuuuuuuuuuuuuuuuF
-lllluuuuuuuuuuuuuuullllulzddddddddddddddddddddddddddddFFFFFFFFFFFFFFFFFFFFFFFFFF
-tccccccjjjjjjjjjcjjjjjjjjjcjjjjjjcjjjjjjjcjjjjjjjttttttttttttttttttttttttttttttt
+rccccrrrrrrrrrrrrrrrrrrrrrrrrrrrrrBBBBBBBBjjjurrrrrrrrrrrrrrrrrrrrrrooooooooooor
+kkkkkkksssssssssskkkkkkksxddddddddddddddddddddddddddddDDDDDDDDDDDDDDDDDDDDDDDDDD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+tptCCCCCCCCthtyytttttttttxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+ttttggtnntmmmtnnnnnnnttttxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+tttptCCCCCCttppppppptmmmtxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+tttEtwwwwwwwwttttEEEEEEEtxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+sesvvvvvvvvvssssaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaasssssssssssssssD
+sssllllllsllssssabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbqqqqqqasssssssssssssssD
+sssesvvvvvvsssssaiiiiiiiiiizzzzzzzzzzzzzzzqqqqqqqqqqqqqqqqqqqqqasssssssssssssssD
+ssssssssssssssssaiiiiiiiiiiAAAAAAAAAqqqqqqqqqqqqqqqqqqqqqqqqqqqasssssssssssssssD
+sDsvvvvsssssssssaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiqqqqqqqqqasssssssssssssssD
+sssllllllllllllsaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqasssssssssssssssD
+sssfsvvvvvvsssssaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiqqqqqqqqqasssssssssssssssD
+sssDsvvvvvsssDDDaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaasssssssssssssssD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+sssssssssssssssssssssssssxdssssssssssssssssssssssssssdsssssssssssssssssssssssssD
+llllsssssssssssssssllllslxddddddddddddddddddddddddddddDDDDDDDDDDDDDDDDDDDDDDDDDD
+rccccccjjjjjjjjjcjjjjjjjjjcjjjjjjcjjjjjjjcjjjjjjjrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
 
 --- legend ---
 . = (unstyled)
-A = fg:teal bg:surface_dim dim
-B = fg:text bg:panel_bg
-C = fg:text bg:panel_bg bold
-D = fg:text bg:panel_bg bold+dim
-E = fg:text bg:surface_dim bold+dim
-F = fg:yellow bg:reset dim
-G = fg:yellow bg:surface_dim dim
+A = fg:text bg:panel_bg bold
+B = fg:text bg:panel_bg bold+dim
+C = fg:text bg:surface_dim bold+dim
+D = fg:yellow bg:reset dim
+E = fg:yellow bg:surface_dim dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:panel_bg bold+dim
@@ -75,16 +73,16 @@ j = fg:overlay0 bg:panel_bg dim
 k = fg:overlay0 bg:reset bold+dim
 l = fg:overlay0 bg:reset dim
 m = fg:overlay0 bg:surface_dim dim
-n = fg:overlay1 bg:panel_bg dim
-o = fg:panel_bg bg:accent dim
-p = fg:peach bg:surface_dim dim
-q = fg:red bg:panel_bg bold+dim
-r = fg:red bg:surface_dim dim
-s = fg:reset bg:panel_bg
-t = fg:reset bg:panel_bg dim
-u = fg:reset bg:reset dim
-v = fg:reset bg:surface_dim dim
-w = fg:subtext0 bg:panel_bg dim
-x = fg:subtext0 bg:reset dim
-y = fg:subtext0 bg:surface_dim dim
-z = fg:surface_dim bg:reset dim
+n = fg:peach bg:surface_dim dim
+o = fg:red bg:panel_bg bold+dim
+p = fg:red bg:surface_dim dim
+q = fg:reset bg:panel_bg
+r = fg:reset bg:panel_bg dim
+s = fg:reset bg:reset dim
+t = fg:reset bg:surface_dim dim
+u = fg:subtext0 bg:panel_bg dim
+v = fg:subtext0 bg:reset dim
+w = fg:subtext0 bg:surface_dim dim
+x = fg:surface_dim bg:reset dim
+y = fg:teal bg:surface_dim dim
+z = fg:text bg:panel_bg

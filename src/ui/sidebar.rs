@@ -1307,7 +1307,11 @@ fn render_sidebar_toggle(
     if toggle_area == Rect::default() {
         return;
     }
-    let icon = if collapsed { "»" } else { "«" };
+    let icon = if collapsed {
+        glyphs::SIDEBAR_EXPAND
+    } else {
+        glyphs::SIDEBAR_COLLAPSE
+    };
     let icon_style = if collapsed && app.global_menu_attention_badge_visible() {
         Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
     } else {

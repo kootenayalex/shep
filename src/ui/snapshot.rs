@@ -376,6 +376,10 @@ mod fixture {
         // is not the screen anyone uses.
         state.titlebar = true;
         state.hint_bar = true;
+        // Also shipped on: a group with one agent has no tab row to spend a
+        // line on, so the desktop snapshots show the pane starting under the
+        // titlebar.
+        state.hide_tab_bar_when_single_tab = true;
         // The shipped default. `test_new` still starts on catppuccin, which is
         // not what anyone runs — and worse for a snapshot, catppuccin maps
         // `accent` and `blue` to the same RGB, so the two roles are

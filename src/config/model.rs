@@ -405,6 +405,9 @@ pub struct KeysConfig {
     /// default (suggested binding: `prefix+space`); also reachable from the
     /// global menu.
     pub board: BindingConfig,
+    /// Flip between the desktop and the session board — the same chord from
+    /// either side, and from inside a pane. Default: "ctrl+alt+b".
+    pub switch_view: BindingConfig,
     /// Focus an agent by index 1-9. Unset by default.
     pub focus_agent: BindingConfig,
     /// Local-client shortcut that sends a clipboard image to a remote Shep session. Default: "ctrl+v".
@@ -533,6 +536,8 @@ pub(crate) struct KeysConfigOverlay {
     #[serde(skip_serializing_if = "Option::is_none")]
     board: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    switch_view: Option<BindingConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     focus_agent: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     remote_image_paste: Option<String>,
@@ -643,6 +648,7 @@ impl<'de> Deserialize<'de> for KeysConfig {
         apply_field!(next_agent);
         apply_field!(next_blocked);
         apply_field!(board);
+        apply_field!(switch_view);
         apply_field!(focus_agent);
         apply_field!(remote_image_paste);
         apply_field!(new_tab);
@@ -745,6 +751,7 @@ impl KeysConfig {
         copy_effective_action_field!(next_agent, keybinds.next_agent);
         copy_effective_action_field!(next_blocked, keybinds.next_blocked);
         copy_effective_action_field!(board, keybinds.board);
+        copy_effective_action_field!(switch_view, keybinds.switch_view);
         copy_effective_indexed_field!(focus_agent, keybinds.focus_agent);
         copy_user_field!(remote_image_paste);
         copy_effective_action_field!(new_tab, keybinds.new_tab);
@@ -1275,6 +1282,7 @@ impl Default for KeysConfig {
             next_agent: BindingConfig::empty(),
             next_blocked: BindingConfig::empty(),
             board: BindingConfig::empty(),
+            switch_view: BindingConfig::one("ctrl+alt+b"),
             focus_agent: BindingConfig::empty(),
             remote_image_paste: "ctrl+v".into(),
             new_tab: BindingConfig::one("prefix+c"),
@@ -1340,7 +1348,7 @@ impl Default for UiConfig {
             pane_gaps: true,
             show_agent_labels_on_pane_borders: true,
             state_border_rings: true,
-            hide_tab_bar_when_single_tab: false,
+            hide_tab_bar_when_single_tab: true,
             titlebar: true,
             hint_bar: true,
             open_on_board: true,
@@ -1558,7 +1566,7 @@ agent_panel_scope = "current"
         assert!(default_config.ui.pane_gaps);
         assert!(default_config.ui.show_agent_labels_on_pane_borders);
         assert!(default_config.ui.state_border_rings);
-        assert!(!default_config.ui.hide_tab_bar_when_single_tab);
+        assert!(default_config.ui.hide_tab_bar_when_single_tab);
 
         let toml = r#"
 [ui]
@@ -1566,14 +1574,14 @@ pane_borders = false
 pane_gaps = true
 show_agent_labels_on_pane_borders = false
 state_border_rings = false
-hide_tab_bar_when_single_tab = true
+hide_tab_bar_when_single_tab = false
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         assert!(!config.ui.pane_borders);
         assert!(config.ui.pane_gaps);
         assert!(!config.ui.show_agent_labels_on_pane_borders);
         assert!(!config.ui.state_border_rings);
-        assert!(config.ui.hide_tab_bar_when_single_tab);
+        assert!(!config.ui.hide_tab_bar_when_single_tab);
     }
 
     #[test]

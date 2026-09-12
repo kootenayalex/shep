@@ -74,6 +74,16 @@ fn parse_legacy_key_sequence(data: &str) -> Option<TerminalKey> {
             let rest = data.strip_prefix('\x1b')?;
             if rest.chars().count() == 1 {
                 let ch = rest.chars().next()?;
+                // ESC before a control byte is how a legacy terminal (mosh,
+                // xterm without modifyOtherKeys) says alt+ctrl+letter:
+                // `ESC 0x02` is ctrl+alt+b, not alt+U+0002. Enter, Tab and
+                // Backspace keep their own legacy alt forms; a lone ESC never
+                // reaches here.
+                if matches!(ch as u32, 1..=26) && !matches!(ch, '\r' | '\t' | '\n' | '\x08') {
+                    let mut key = parse_legacy_ctrl_char(ch)?;
+                    key.modifiers |= KeyModifiers::ALT;
+                    return Some(key);
+                }
                 let mut modifiers = KeyModifiers::ALT;
                 if ch.is_ascii_uppercase() {
                     modifiers |= KeyModifiers::SHIFT;
@@ -533,6 +543,44 @@ mod tests {
             None,
         );
         assert_eq!(encode_terminal_key(key, KeyboardProtocol::Legacy), b"\x1bA");
+    }
+
+    /// `ESC 0x02` is how mosh and every modifyOtherKeys-less terminal says
+    /// ctrl+alt+b: the alt prefix over the control byte. It used to come out
+    /// as alt+U+0002, which no binding could name.
+    #[test]
+    fn parse_legacy_escape_before_control_byte_is_ctrl_alt_letter() {
+        let key = parse_terminal_key_sequence("\x1b\x02").expect("ctrl+alt+b should parse");
+        assert_terminal_key_eq(
+            key,
+            KeyCode::Char('b'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+            crossterm::event::KeyEventKind::Press,
+            None,
+        );
+        assert_eq!(
+            encode_terminal_key(key, KeyboardProtocol::Legacy),
+            b"\x1b\x02"
+        );
+        // The whole ctrl range, not just the one chord shep binds.
+        for (byte, letter) in (1u8..=26).zip('a'..='z') {
+            if matches!(byte, 8 | 9 | 10 | 13) {
+                continue;
+            }
+            let seq = format!("\x1b{}", byte as char);
+            let key = parse_terminal_key_sequence(&seq).expect("ctrl+alt letter");
+            assert_eq!(key.code, KeyCode::Char(letter), "{byte:#x}");
+            assert_eq!(key.modifiers, KeyModifiers::CONTROL | KeyModifiers::ALT);
+        }
+        // The keys that own a legacy alt form of their own keep it.
+        assert_eq!(
+            parse_terminal_key_sequence("\x1b\x7f").map(|k| k.code),
+            Some(KeyCode::Backspace)
+        );
+        assert_eq!(
+            parse_terminal_key_sequence("\x1b").map(|k| (k.code, k.modifiers)),
+            Some((KeyCode::Esc, KeyModifiers::empty()))
+        );
     }
 
     #[test]

@@ -3,8 +3,8 @@
 
 --- screen ---
  shep                             workmayt · 1                      ◉ 1 blocked
- g╭──────────────────────────────────────────────────────────────────────────╮
-  │ settings                                                                 │─╮
+ g╭──────────────────────────────────────────────────────────────────────────╮─╮
+  │ settings                                                                 │ │
  ◉│ theme   sound   toasts   pane labels   integrations   experiments        │ │
   │──────────────────────────────────────────────────────────────────────────│ │
   │                                                                          │ │
@@ -29,8 +29,8 @@
 
 --- styles ---
 nbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnnuuuuuuuufffrnnnnnnnnnnnnnnnnnnnnnnkkkkkkkkkkkn
-ggaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaann
-ooatttttttttmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaww
+ggaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaww
+ooatttttttttmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaow
 plaijjjjjiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiaow
 ppassssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssaow
 ppammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmaow

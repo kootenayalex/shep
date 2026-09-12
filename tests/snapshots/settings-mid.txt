@@ -1,10 +1,10 @@
-# settings-mid 120x40 · 38 styles
+# settings-mid 120x40 · 36 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                                                 workmayt · 1                                          ◉ 1 blocked
- groups          grouped │ 1       +
-                         │╭──────────────────────────────────────────────┬─────────────────────────────────────────────╮
+ groups          grouped │╭──────────────────────────────────────────────┬─────────────────────────────────────────────╮
+                         ││                                              │                                             │
  ◉ workmayt ◆ ⇥2         ││                                              │                                             │
     ↑2 ↓1 20s mem 87%    ││                                              │                                             │
    ◉ claude  blocked 72% ││                                              │                                             │
@@ -44,61 +44,59 @@
  ctrl+b prefix  w groups  c tab  ? keys  q detach
 
 --- styles ---
-wbbbbwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwHHHHHHHHjjjAwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwtttttttttttw
-kkkkkkkxxxxxxxxxxkkkkkkkxEqqqqqqqqooowwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
-xxxxxxxxxxxxxxxxxxxxxxxxxEccccccccccccccccccccccccccccccccccccccccccccccccKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
-yuyJJJJJJJJyhyFFyyyyyyyyyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-yyyyggyssymmmysssssssyyyyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-yyyuyJJJJJJyyuuuuuuuymmmyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-yyyLyCCCCCCCCyyyyLLLLLLLyEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xdxBBBBBBBBBxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxllllllxllxxxxxxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxxxxxxxK
-xxxdxBBBBBBxxxxxddddxlaGGGGGGGGGvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxanpppppnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnaxxxxxxxxxxxxxxxxxxxxxK
-xKxBBBBxxxxxxxxxxxxxxxaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaxxxxxxxxxxxxxxxxxxxxxK
-xxxllllllllllllxrrxllxavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xxxfxBBBBBBxxxxxffffxlaIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIaxxxxxxxxxxxxxxxxxxxxxK
-xxxKxBBBBBxxxKKKKKKKxlazzzzzzzzzzzzzeezzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxaiiinnnnnnnnniiinnnnnnnnvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvvvvvvpppppppppvvIIIIIIIIIIIvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-xxxxxxxxxxxxxxxxxxxxxxxxxEcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxK
-llllxxxxxxxxxxxxxxxllllxlEccccccccccccccccccccccccccccccccccccccccccccccccKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK
-wbbbbbbjjjjjjjjjbjjjjjjjjjbjjjjjjbjjjjjjjbjjjjjjjwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+ubbbbuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuFFFFFFFFjjjyuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuurrrrrrrrrrru
+kkkkkkkvvvvvvvvvvkkkkkkkvCccccccccccccccccccccccccccccccccccccccccccccccccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+wswHHHHHHHHwhwDDwwwwwwwwwCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+wwwwggwqqwmmmwqqqqqqqwwwwCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+wwwswHHHHHHwwssssssswmmmwCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+wwwJwAAAAAAAAwwwwJJJJJJJwCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vdvzzzzzzzzzvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvllllllvllvvvvvvvvvvaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavvvvvvvvvvvvvvvvvvvvvI
+vvvdvzzzzzzvvvvvddddvlaEEEEEEEEEtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvanooooonnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnavvvvvvvvvvvvvvvvvvvvvI
+vIvzzzzvvvvvvvvvvvvvvvaBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBavvvvvvvvvvvvvvvvvvvvvI
+vvvllllllllllllvppvllvattttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvI
+vvvfvzzzzzzvvvvvffffvlaGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGavvvvvvvvvvvvvvvvvvvvvI
+vvvIvzzzzzvvvIIIIIIIvlaxxxxxxxxxxxxxeexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvattttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaiiinnnnnnnnniiinnnnnnnntttttttttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvattttttttttttttttttttttttttooooooooottGGGGGGGGGGGttttttttttttttttttttttttttavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+vvvvvvvvvvvvvvvvvvvvvvvvvCcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvcvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvI
+llllvvvvvvvvvvvvvvvllllvlCccccccccccccccccccccccccccccccccccccccccccccccccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+ubbbbbbjjjjjjjjjbjjjjjjjjjbjjjjjjbjjjjjjjbjjjjjjjuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
 
 --- legend ---
 . = (unstyled)
-A = fg:subtext0 bg:panel_bg dim
-B = fg:subtext0 bg:reset dim
-C = fg:subtext0 bg:surface_dim dim
-D = fg:surface0 bg:panel_bg
-E = fg:surface_dim bg:reset dim
-F = fg:teal bg:surface_dim dim
-G = fg:text bg:panel_bg bold
-H = fg:text bg:panel_bg bold+dim
-I = fg:text bg:surface0 bold
-J = fg:text bg:surface_dim bold+dim
-K = fg:yellow bg:reset dim
-L = fg:yellow bg:surface_dim dim
+A = fg:subtext0 bg:surface_dim dim
+B = fg:surface0 bg:panel_bg
+C = fg:surface_dim bg:reset dim
+D = fg:teal bg:surface_dim dim
+E = fg:text bg:panel_bg bold
+F = fg:text bg:panel_bg bold+dim
+G = fg:text bg:surface0 bold
+H = fg:text bg:surface_dim bold+dim
+I = fg:yellow bg:reset dim
+J = fg:yellow bg:surface_dim dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold+dim
 c = fg:accent bg:reset dim
@@ -113,15 +111,15 @@ k = fg:overlay0 bg:reset bold+dim
 l = fg:overlay0 bg:reset dim
 m = fg:overlay0 bg:surface_dim dim
 n = fg:overlay1 bg:panel_bg
-o = fg:overlay1 bg:panel_bg dim
-p = fg:panel_bg bg:accent bold
-q = fg:panel_bg bg:accent dim
-r = fg:peach bg:reset dim
-s = fg:peach bg:surface_dim dim
-t = fg:red bg:panel_bg bold+dim
-u = fg:red bg:surface_dim dim
-v = fg:reset bg:panel_bg
-w = fg:reset bg:panel_bg dim
-x = fg:reset bg:reset dim
-y = fg:reset bg:surface_dim dim
-z = fg:subtext0 bg:panel_bg
+o = fg:panel_bg bg:accent bold
+p = fg:peach bg:reset dim
+q = fg:peach bg:surface_dim dim
+r = fg:red bg:panel_bg bold+dim
+s = fg:red bg:surface_dim dim
+t = fg:reset bg:panel_bg
+u = fg:reset bg:panel_bg dim
+v = fg:reset bg:reset dim
+w = fg:reset bg:surface_dim dim
+x = fg:subtext0 bg:panel_bg
+y = fg:subtext0 bg:panel_bg dim
+z = fg:subtext0 bg:reset dim

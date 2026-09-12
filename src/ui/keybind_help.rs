@@ -128,7 +128,19 @@ pub(super) fn keybind_help_groups(app: &AppState) -> Vec<HelpGroup> {
         help_entry(keybind_label(&kb.previous_agent), "previous agent"),
         help_entry(keybind_label(&kb.next_agent), "next agent"),
         help_entry(keybind_label(&kb.next_blocked), "next blocked pane"),
-        help_entry(keybind_label(&kb.board), "session board"),
+        // The board has two doors: its own optional binding and the chord
+        // that flips between the two views. Unset, it borrows the chord's
+        // label rather than reading `unset` beside a screen it can reach.
+        help_entry(
+            kb.board
+                .label()
+                .unwrap_or_else(|| keybind_label(&kb.switch_view)),
+            "session board",
+        ),
+        (
+            keybind_label(&kb.switch_view),
+            Cow::Owned(format!("desktop {} board", glyphs::SWITCH)),
+        ),
         help_entry(indexed_label(&kb.focus_agent), "focus agent 1-9"),
         help_entry(keybind_label(&kb.new_tab), "new tab"),
         help_entry(keybind_label(&kb.rename_tab), "rename tab"),
