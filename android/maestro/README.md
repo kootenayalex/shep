@@ -43,6 +43,9 @@ maestro --device <tablet-serial> test maestro/05-tablet-two-pane.yaml
 maestro --device <serial> test maestro/06-groups.yaml
 maestro --device <serial> test maestro/07-pane-output-modes.yaml
 maestro --device <serial> test maestro/08-live-input.yaml     # …14
+
+# Docket tab (adds one inbox item — throwaway server only):
+maestro --device <serial> test maestro/15-docket.yaml
 ```
 
 Flows 08–13 type into a plain shell agent named `shell` (`-e AGENT=` to

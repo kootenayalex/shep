@@ -1,0 +1,29 @@
+# The docket tab: the desktop board's lanes and verbs on the phone.
+# Needs a paired app (run 01 first). Text anchors only (no ids) per
+# device-testing conventions.
+#
+# Adds one item so it can see the list render; run it against a throwaway
+# server, not the one that owns your docket — `+ add` writes to docket.db.
+appId: dev.shep.companion
+env:
+  TITLE: "maestro docket probe"
+---
+- launchApp
+- tapOn: "docket"
+- assertVisible: "\\+ add"
+
+# Empty or not, the screen says so; the add sheet is the same either way.
+- tapOn: "\\+ add"
+- assertVisible: "add to docket"
+- tapOn: "title"
+- inputText: "${TITLE}"
+- pressKey: back
+- tapOn: "add"
+
+# A captured item lands in the inbox lane, id first.
+- assertVisible: "inbox"
+- assertVisible: "${TITLE}"
+- assertVisible: "#[0-9]+"
+# The kind/date row is separate text nodes; an undated item shows the dash.
+- assertVisible: "captured"
+- assertVisible: "—"
