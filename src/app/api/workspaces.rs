@@ -269,6 +269,7 @@ impl App {
             .workspaces
             .iter()
             .enumerate()
+            .filter(|(_, ws)| !ws.is_system())
             .map(|(idx, _)| self.workspace_info(idx))
             .collect()
     }
@@ -597,5 +598,32 @@ mod tests {
             },
         );
         assert!(response.contains("not_a_worktree"), "{response}");
+    }
+
+    #[test]
+    fn workspace_list_api_omits_system() {
+        let mut app = app_with_one_workspace();
+        app.state = crate::app::state::AppState::test_with_system_workspace();
+        let system_id = app.public_workspace_id(crate::app::state::AppState::TEST_SYSTEM_WS);
+        let response = app.handle_workspace_list("list".into());
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        let crate::api::schema::ResponseResult::WorkspaceList { workspaces } = success.result
+        else {
+            panic!("expected workspace list");
+        };
+        let ids: Vec<&str> = workspaces
+            .iter()
+            .map(|ws| ws.workspace_id.as_str())
+            .collect();
+        assert_eq!(ids.len(), 2);
+        assert!(!ids.contains(&system_id.as_str()));
+        // `workspace.get` by id still answers: identity is untouched.
+        let response = app.handle_workspace_get(
+            "get".into(),
+            WorkspaceTarget {
+                workspace_id: system_id,
+            },
+        );
+        let _: SuccessResponse = serde_json::from_str(&response).unwrap();
     }
 }

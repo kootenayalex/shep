@@ -499,7 +499,7 @@ pub(super) fn open_group_picker(state: &mut AppState, ws_idx: usize, tab_idx: us
         .workspaces
         .iter()
         .enumerate()
-        .filter(|(idx, _)| *idx != ws_idx)
+        .filter(|(idx, ws)| *idx != ws_idx && !ws.is_system())
         .map(|(_, ws)| GroupPickerItem {
             label: ws.display_name(),
             action: GroupPickerAction::Existing(ws.id.clone()),
@@ -2436,5 +2436,23 @@ mod tests {
         assert_eq!(app.state.mode, Mode::ConfirmClose);
         assert_eq!(app.state.workspaces.len(), 2);
         assert!(app.state.context_menu.is_none());
+    }
+
+    #[test]
+    fn group_picker_omits_system() {
+        use crate::app::state::GroupPickerAction;
+        let mut state = AppState::test_with_system_workspace();
+        let system_id = state.workspaces[AppState::TEST_SYSTEM_WS].id.clone();
+        open_group_picker(&mut state, 0, 0);
+        let picker = state.group_picker.as_ref().expect("picker");
+        let labels: Vec<String> = picker.items.iter().map(|item| item.label.clone()).collect();
+        assert!(
+            !picker.items.iter().any(|item| matches!(
+                &item.action,
+                GroupPickerAction::Existing(id) if *id == system_id
+            )),
+            "{labels:?}"
+        );
+        assert_eq!(labels, vec!["beta".to_string(), "New group".to_string()]);
     }
 }

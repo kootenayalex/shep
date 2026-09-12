@@ -229,7 +229,7 @@ impl AppState {
         })
     }
 
-    pub(super) fn collapsed_workspace_at_row(&self, row: u16) -> Option<usize> {
+    pub(crate) fn collapsed_workspace_at_row(&self, row: u16) -> Option<usize> {
         if !self.sidebar_collapsed {
             return None;
         }
@@ -239,8 +239,15 @@ impl AppState {
             return None;
         }
 
-        let idx = (row - ws_area.y) as usize;
-        (idx < self.workspaces.len()).then_some(idx)
+        // Rows are the user workspaces in order; a system workspace draws
+        // no row, so the nth row is the nth non-system workspace.
+        let row_idx = (row - ws_area.y) as usize;
+        self.workspaces
+            .iter()
+            .enumerate()
+            .filter(|(_, ws)| !ws.is_system())
+            .nth(row_idx)
+            .map(|(idx, _)| idx)
     }
 
     pub(super) fn collapsed_agent_detail_target_at(

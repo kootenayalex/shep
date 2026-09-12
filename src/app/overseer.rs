@@ -23,9 +23,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
 
-use super::state::{AppState, DocketSample};
+use super::state::{AppState, DocketSample, Mode};
 use super::App;
 use crate::events::AppEvent;
+use crate::workspace::SystemRole;
 
 /// How stale the sample may get before the dir is stat'ed again. The
 /// dashboard's interval: the overseer ticks on agent events, not per frame.
@@ -637,7 +638,129 @@ impl App {
             .store(true, std::sync::atomic::Ordering::Release);
         self.render_notify.notify_one();
     }
+
+    /// The system workspace holding the overseer's session, if one is open.
+    /// Its pane's exit removes the workspace, so an index here is a live
+    /// session.
+    pub(crate) fn overseer_session_workspace(&self) -> Option<usize> {
+        self.state
+            .workspaces
+            .iter()
+            .position(|ws| ws.system == Some(SystemRole::OverseerSession))
+    }
+
+    /// The board header's one button: show the overseer's session pane.
+    ///
+    /// An open session is focused; otherwise one is started from the
+    /// overseer plugin's `session` pane in a workspace flagged as the
+    /// system's own, which no list will ever show. Without the plugin the
+    /// board says so where the docket notice goes and nothing is created.
+    pub(crate) fn open_overseer_session(&mut self) {
+        if let Some(idx) = self.overseer_session_workspace() {
+            self.show_overseer_session(idx);
+            return;
+        }
+        let Some((plugin, pane)) = self.overseer_session_pane() else {
+            self.state.board.docket_notice = Some(SESSION_NEEDS_PLUGIN.to_string());
+            return;
+        };
+        let context = self.current_plugin_context("overseer-session");
+        let extra_env = match self.plugin_pane_launch_env(
+            &plugin,
+            &pane.id,
+            std::collections::HashMap::new(),
+            &context,
+        ) {
+            Ok(env) => env,
+            Err((code, message)) => {
+                tracing::warn!(code, message, "overseer session env failed");
+                self.state.board.docket_notice = Some(format!("overseer session: {message}"));
+                return;
+            }
+        };
+        let (rows, cols) = self.state.estimate_pane_size();
+        let created = crate::workspace::Workspace::new_argv_command_with_extra_env(
+            PathBuf::from(&plugin.plugin_root),
+            rows.max(4),
+            cols.max(10),
+            &pane.command,
+            self.state.pane_scrollback_limit_bytes,
+            self.state.host_terminal_theme,
+            self.event_tx.clone(),
+            self.render_notify.clone(),
+            self.render_dirty.clone(),
+            extra_env,
+        );
+        let (mut ws, mut terminal, runtime) = match created {
+            Ok(created) => created,
+            Err(err) => {
+                tracing::warn!(error = %err, "overseer session failed to start");
+                self.state.board.docket_notice = Some(format!("overseer session: {err}"));
+                return;
+            }
+        };
+        ws.system = Some(SystemRole::OverseerSession);
+        ws.custom_name = Some(SESSION_GROUP_NAME.to_string());
+        terminal.set_manual_label(pane.title.clone());
+        let pane_id = ws.tabs[0].root_pane;
+        let terminal_id = terminal.id.clone();
+        self.terminal_runtimes.insert(terminal_id.clone(), runtime);
+        self.state.terminals.insert(terminal_id, terminal);
+        self.state.workspaces.push(ws);
+        let idx = self.state.workspaces.len() - 1;
+        self.state.remove_alias_shadowed_by_new_pane(pane_id);
+        self.state.plugin_panes.insert(
+            pane_id,
+            crate::app::state::PluginPaneRecord {
+                plugin_id: plugin.plugin_id.clone(),
+                entrypoint: pane.id.clone(),
+            },
+        );
+        crate::logging::workspace_created(&self.state.workspaces[idx].id, pane_id.raw());
+        // Clients re-read their lists on these, and the lists omit it; the
+        // events keep the plugin hooks and the pane's own lifecycle honest.
+        self.emit_workspace_open_events(idx);
+        self.show_overseer_session(idx);
+        self.schedule_session_save();
+    }
+
+    /// The installed, enabled overseer plugin and its `session` pane.
+    fn overseer_session_pane(
+        &self,
+    ) -> Option<(
+        crate::api::schema::InstalledPluginInfo,
+        crate::api::schema::PluginManifestPane,
+    )> {
+        let plugin = self.state.installed_plugins.get(OVERSEER_PLUGIN_ID)?;
+        if !plugin.enabled {
+            return None;
+        }
+        let pane = plugin
+            .panes
+            .iter()
+            .find(|pane| pane.id == SESSION_PANE_ID)?
+            .clone();
+        Some((plugin.clone(), pane))
+    }
+
+    /// Put the session's workspace on the desktop, whatever screen or
+    /// board-opened modal was up.
+    fn show_overseer_session(&mut self, idx: usize) {
+        self.state.switch_workspace(idx);
+        self.state.board.suspended = false;
+        self.state.mode = Mode::Terminal;
+    }
 }
+
+/// The plugin the session comes from, and its pane entrypoint.
+pub(crate) const OVERSEER_PLUGIN_ID: &str = "overseer";
+pub(crate) const SESSION_PANE_ID: &str = "session";
+/// The system workspace's name, as the titlebar and a degraded (unflagged)
+/// fallback would show it.
+pub(crate) const SESSION_GROUP_NAME: &str = "overseer";
+/// What the board says when the button has nothing to open.
+pub(crate) const SESSION_NEEDS_PLUGIN: &str =
+    "link the overseer plugin: shep plugin link plugins/overseer";
 
 /// One inbox item the overseer proposed, as the board lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]

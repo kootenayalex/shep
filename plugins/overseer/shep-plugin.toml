@@ -30,3 +30,14 @@ title = "Overseer"
 description = "The overseer's board, refreshed every few seconds"
 placement = "tab"
 command = ["sh", "./overseer-board"]
+
+# The overseer's own session: an interactive agent (claude by default, or
+# `[plugins.overseer] session_argv`) in the plugin's state dir, opened only
+# from the board's `▸ open the overseer's session` button. shep keeps it in a
+# system workspace that no list shows.
+[[panes]]
+id = "session"
+title = "overseer session"
+description = "The overseer's interactive session, with its state dir in the environment"
+placement = "tab"
+command = ["./overseer-session"]

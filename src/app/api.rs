@@ -639,6 +639,9 @@ impl App {
             let Some(ws) = self.state.workspaces.get(update.ws_idx) else {
                 continue;
             };
+            if ws.is_system() {
+                continue;
+            }
             let Some(pane) = ws
                 .tabs
                 .iter()

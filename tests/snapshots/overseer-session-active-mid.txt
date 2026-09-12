@@ -1,0 +1,116 @@
+# overseer-session-active-mid 120x40 · 27 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                                             ✦ overseer › session           ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board 2
+ ✦ overseer · workmayt's claude has been blocked 2m on a permission prompt.                                       07:08
+ groups       grouped ≡ «│
+                         │
+ ◉ workmayt ◆ ⇥2         │
+   fix/stripe-web… ↑2 ↓1 │
+   ◉ claude      blocked │
+   ⠹ opencode    working │
+                         │
+ ● emberline             │
+   master                │
+   ● claude         done │
+                         │
+ ⠹ shep                  │
+   feat/design-pass ↓4   │
+   ○ claude         idle │
+   ⠹ codex       working │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+ + new group             │
+ ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
+
+--- styles ---
+qaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqffffffffffiiisssssssqqqqqqqqqqqoooqqzzzqqbbbqqdddqqmmmmmmmmmuuuuuuxxuq
+rhhhhhhhhhhlllyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrllllll
+kkkkkkk.......kkkkkkk.j.jv
+.........................v
+.p.tttttttt.g.ww.........v
+...jjjjjjjjjjjjjjj.ee.nn.v
+...p.tttttt......ppppppp.v
+...A.tttttttt....AAAAAAA.v
+.........................v
+.c.ttttttttt.............v
+...jjjjjj................v
+...c.tttttt.........cccc.v
+.........................v
+.A.tttt..................v
+...jjjjjjjjjjjjjjjj.nn...v
+...e.tttttt.........eeee.v
+...A.ttttt.......AAAAAAA.v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+.........................v
+jjjjjjjjjjjj.............v
+qaaaaaaiiiiiiiiiaaaaaaaaaaiiiiiiiiaiiiiiiiaiiiiiiiqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
+
+--- legend ---
+. = (unstyled)
+A = fg:yellow bg:reset
+a = fg:accent bg:panel_bg bold
+b = fg:blue bg:panel_bg
+c = fg:blue bg:reset
+d = fg:green bg:panel_bg
+e = fg:green bg:reset
+f = fg:mauve bg:panel_bg bold
+g = fg:mauve bg:reset
+h = fg:mauve bg:surface0 bold
+i = fg:overlay0 bg:panel_bg
+j = fg:overlay0 bg:reset
+k = fg:overlay0 bg:reset bold
+l = fg:overlay0 bg:surface0
+m = fg:panel_bg bg:accent bold
+n = fg:peach bg:reset
+o = fg:red bg:panel_bg bold
+p = fg:red bg:reset
+q = fg:reset bg:panel_bg
+r = fg:reset bg:surface0
+s = fg:subtext0 bg:panel_bg
+t = fg:subtext0 bg:reset
+u = fg:subtext0 bg:surface1
+v = fg:surface_dim bg:reset
+w = fg:teal bg:reset
+x = fg:teal bg:surface1
+y = fg:text bg:surface0
+z = fg:yellow bg:panel_bg

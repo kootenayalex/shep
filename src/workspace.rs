@@ -147,10 +147,25 @@ pub(crate) fn reserve_workspace_ids(workspaces: &[Workspace]) {
     }
 }
 
+/// What a system workspace is for. A system workspace is shep's own — the
+/// overseer's session pane — and is never listed with the user's groups:
+/// every enumerator that feeds a user-facing list (sidebar, board,
+/// navigator, group picker, `session.overview`, `workspace.list`, workspace
+/// cycling, notifications) skips it. Identity, focus and persistence treat
+/// it like any other workspace; only the lists differ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemRole {
+    /// The overseer's interactive session, opened from the board's button.
+    OverseerSession,
+}
+
 /// A named workspace containing tabs.
 pub struct Workspace {
     /// Stable public workspace identity, independent of display order.
     pub id: String,
+    /// `Some` for a workspace shep opened for itself; see [`SystemRole`].
+    pub system: Option<SystemRole>,
     /// User-provided override. If set, auto-derived identity stops updating.
     pub custom_name: Option<String>,
     /// Fallback workspace identity source for tests, old snapshots, or missing runtimes.
@@ -221,6 +236,7 @@ impl Workspace {
         public_pane_numbers.insert(root_pane, 1);
         Self {
             id,
+            system: None,
             custom_name: label,
             identity_cwd: identity_cwd.clone(),
             cached_git_branch: git_branch(&identity_cwd),
@@ -404,6 +420,7 @@ impl Workspace {
         Ok((
             Self {
                 id,
+                system: None,
                 custom_name: None,
                 identity_cwd: initial_cwd.clone(),
                 cached_git_branch: git_branch(&initial_cwd),
@@ -1094,6 +1111,12 @@ impl Workspace {
         self.public_tab_number(tab_idx)
     }
 
+    /// Whether this is one of shep's own workspaces (see [`SystemRole`]).
+    /// The predicate every user-facing enumerator applies.
+    pub fn is_system(&self) -> bool {
+        self.system.is_some()
+    }
+
     pub fn set_custom_name(&mut self, name: String) {
         self.custom_name = Some(name);
     }
@@ -1278,6 +1301,7 @@ impl Workspace {
         public_pane_numbers.insert(tab.root_pane, 1);
         Self {
             id: generate_workspace_id(),
+            system: None,
             custom_name: Some(name.to_string()),
             identity_cwd: identity_cwd.clone(),
             cached_git_branch: git_branch(&identity_cwd),
@@ -1293,6 +1317,14 @@ impl Workspace {
             active_tab: 0,
             test_runtimes: HashMap::new(),
         }
+    }
+
+    /// A system workspace as the board's button would open it: one tab, one
+    /// pane, named `overseer`, carrying the overseer-session role.
+    pub(crate) fn test_new_system(role: SystemRole) -> Self {
+        let mut ws = Self::test_new("overseer");
+        ws.system = Some(role);
+        ws
     }
 
     pub(crate) fn insert_test_runtime(&mut self, pane_id: PaneId, runtime: TerminalRuntime) {
@@ -1367,12 +1399,38 @@ impl Workspace {
         ws
     }
 
+    /// The overseer's session as it looks after a life of pane churn: one
+    /// tab whose raw pane ids and public numbers have drifted apart, so a
+    /// list that filters on the role still has to carry real indices.
+    pub(crate) fn test_adversarial_system_identity_state() -> Self {
+        let mut ws = Self::test_new_system(SystemRole::OverseerSession);
+        let removed_pane = ws.test_split(Direction::Horizontal);
+        assert!(!ws.close_pane(removed_pane));
+        let _unused_raw_id = PaneId::alloc();
+        let later_pane = ws.test_split(Direction::Vertical);
+        assert_ne!(
+            later_pane.raw() as usize,
+            ws.public_pane_number(later_pane).unwrap(),
+            "adversarial system pane must distinguish raw pane id from public pane number"
+        );
+        assert!(ws.is_system());
+        ws
+    }
+
     pub(crate) fn assert_invariants_for_test(&self) {
         assert!(
             !self.tabs.is_empty(),
             "workspace {} must contain at least one tab",
             self.id
         );
+        if self.is_system() {
+            assert_eq!(
+                self.tabs.len(),
+                1,
+                "system workspace {} must hold exactly one tab",
+                self.id
+            );
+        }
         assert!(
             self.active_tab < self.tabs.len(),
             "workspace {} active_tab {} out of bounds for {} tabs",
@@ -1596,6 +1654,35 @@ mod tests {
         let fourth_root = ws.tabs[fourth_tab].root_pane;
         assert_eq!(ws.public_tab_number_for_pane(fourth_root), Some(4));
         ws.assert_invariants_for_test();
+    }
+
+    #[test]
+    fn adversarial_system_identity_state_satisfies_workspace_invariants_after_mutation() {
+        let mut ws = Workspace::test_adversarial_system_identity_state();
+        ws.assert_invariants_for_test();
+        assert_eq!(ws.system, Some(SystemRole::OverseerSession));
+
+        let new_pane = ws.test_split(Direction::Horizontal);
+        ws.assert_invariants_for_test();
+        assert!(!ws.close_pane(new_pane));
+        ws.assert_invariants_for_test();
+        // The role survives every pane mutation; only a tab count of two
+        // would break the invariant, and a system workspace never grows one.
+        assert!(ws.is_system());
+    }
+
+    #[test]
+    #[should_panic(expected = "must hold exactly one tab")]
+    fn a_system_workspace_with_two_tabs_fails_the_invariants() {
+        let mut ws = Workspace::test_adversarial_system_identity_state();
+        ws.test_add_tab(None);
+        ws.assert_invariants_for_test();
+    }
+
+    #[test]
+    fn every_constructor_starts_as_a_user_workspace() {
+        assert!(!Workspace::test_new("plain").is_system());
+        assert!(!Workspace::test_adversarial_identity_state().is_system());
     }
 
     #[test]

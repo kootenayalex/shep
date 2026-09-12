@@ -173,6 +173,7 @@ fn agent_panel_entries_with_runtimes(
         .workspaces
         .iter()
         .enumerate()
+        .filter(|(_, ws)| !ws.is_system())
         .flat_map(|(ws_idx, ws)| {
             let multi_tab = ws.tabs.len() > 1;
             let workspace_label = ws.display_name_from(&app.terminals, terminal_runtimes);
@@ -347,6 +348,9 @@ pub(crate) fn workspace_list_entries_expanded(app: &AppState) -> Vec<WorkspaceLi
 fn workspace_list_entries_inner(app: &AppState, force_expanded: bool) -> Vec<WorkspaceListEntry> {
     let mut members_by_key = std::collections::HashMap::<String, Vec<usize>>::new();
     for (ws_idx, ws) in app.workspaces.iter().enumerate() {
+        if ws.is_system() {
+            continue;
+        }
         if let Some(space) = ws.worktree_space() {
             members_by_key
                 .entry(space.key.clone())
@@ -383,6 +387,11 @@ fn workspace_list_entries_inner(app: &AppState, force_expanded: bool) -> Vec<Wor
     let mut emitted_groups = std::collections::HashSet::<String>::new();
     let mut entries = Vec::new();
     for (ws_idx, ws) in app.workspaces.iter().enumerate() {
+        // A system workspace (the overseer's session) is never a group in
+        // the tree; `ws_idx` stays a real index into `app.workspaces`.
+        if ws.is_system() {
+            continue;
+        }
         let Some(space) = ws
             .worktree_space()
             .filter(|space| grouped_keys.contains(&space.key))
@@ -756,8 +765,14 @@ pub(super) fn render_sidebar_collapsed(app: &AppState, frame: &mut Frame, area: 
         return;
     }
 
-    for (visible_idx, ws) in app.workspaces.iter().enumerate() {
-        let y = ws_area.y + visible_idx as u16;
+    for (row, (visible_idx, ws)) in app
+        .workspaces
+        .iter()
+        .enumerate()
+        .filter(|(_, ws)| !ws.is_system())
+        .enumerate()
+    {
+        let y = ws_area.y + row as u16;
         if y >= ws_area.y + ws_area.height {
             break;
         }
@@ -2419,5 +2434,86 @@ mod tests {
                 },
             ]
         );
+    }
+
+    // --- system workspaces -------------------------------------------------
+    // Characterized first (every workspace listed, the blocked system group
+    // sorted first), then the predicate landed and these flipped.
+
+    #[test]
+    fn sidebar_rows_skip_system_workspaces() {
+        let app = AppState::test_with_system_workspace();
+        let system = AppState::TEST_SYSTEM_WS;
+        let listed: Vec<usize> = workspace_list_entries(&app)
+            .into_iter()
+            .map(|WorkspaceListEntry::Workspace { ws_idx, .. }| ws_idx)
+            .collect();
+        // The system pane is blocked, which used to sort its group first;
+        // now it is simply not a group.
+        assert_eq!(listed, vec![0, 1]);
+        let expanded: Vec<usize> = workspace_list_entries_expanded(&app)
+            .into_iter()
+            .map(|WorkspaceListEntry::Workspace { ws_idx, .. }| ws_idx)
+            .collect();
+        assert_eq!(expanded, vec![0, 1]);
+        assert!(!sidebar_rows(&app).iter().any(|row| match row {
+            SidebarRow::Group { ws_idx, .. } | SidebarRow::Agent { ws_idx, .. } => {
+                *ws_idx == system
+            }
+        }));
+        assert!(!agent_panel_entries(&app)
+            .iter()
+            .any(|entry| entry.ws_idx == system));
+        // The two user groups keep their real indices.
+        assert_eq!(
+            agent_panel_entries(&app)
+                .iter()
+                .map(|entry| entry.ws_idx)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+    }
+
+    /// `active` may point at the system workspace while its pane is on
+    /// screen; the tree then highlights nothing and hit-tests no row for it.
+    #[test]
+    fn sidebar_copes_with_an_unlisted_active_workspace() {
+        let mut app = AppState::test_with_system_workspace();
+        app.switch_workspace(AppState::TEST_SYSTEM_WS);
+        assert_eq!(app.active, Some(AppState::TEST_SYSTEM_WS));
+        assert_eq!(app.selected, AppState::TEST_SYSTEM_WS);
+        let area = Rect::new(0, 0, 30, 20);
+        let cards = compute_workspace_card_areas(&app, area);
+        assert!(cards
+            .iter()
+            .all(|card| card.ws_idx != AppState::TEST_SYSTEM_WS));
+        // Rendering with an unlisted active/selected workspace neither
+        // panics nor paints a selection on a user group.
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(30, 20)).expect("terminal");
+        let runtimes = TerminalRuntimeRegistry::new();
+        terminal
+            .draw(|frame| {
+                render_sidebar(&app, &runtimes, frame, area);
+            })
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        let selected_bg = app.palette.surface0;
+        let active_bg = app.palette.surface_dim;
+        let painted = cards.iter().filter(|card| card.is_group()).any(|card| {
+            let cell = &buffer[(card.rect.x + 1, card.rect.y)];
+            cell.style().bg == Some(selected_bg) || cell.style().bg == Some(active_bg)
+        });
+        assert!(
+            !painted,
+            "no user group is highlighted for the system workspace"
+        );
+        // The collapsed strip maps rows to user workspaces only.
+        app.sidebar_collapsed = true;
+        app.view.sidebar_rect = Rect::new(0, 0, 4, 20);
+        let (ws_area, _, _) = collapsed_sidebar_sections(app.view.sidebar_rect);
+        assert_eq!(app.collapsed_workspace_at_row(ws_area.y), Some(0));
+        assert_eq!(app.collapsed_workspace_at_row(ws_area.y + 1), Some(1));
+        assert_eq!(app.collapsed_workspace_at_row(ws_area.y + 2), None);
     }
 }

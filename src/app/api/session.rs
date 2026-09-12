@@ -31,6 +31,9 @@ impl App {
         let mut tabs = Vec::new();
         let mut layouts = Vec::new();
         for (ws_idx, ws) in self.state.workspaces.iter().enumerate() {
+            if ws.is_system() {
+                continue;
+            }
             workspaces.push(self.workspace_info(ws_idx));
             for tab_idx in 0..ws.tabs.len() {
                 if let Some(tab) = self.tab_info(ws_idx, tab_idx) {
@@ -293,5 +296,48 @@ mod tests {
             snapshot.focused_pane_id.as_deref(),
             Some(snapshot.panes[0].pane_id.as_str())
         );
+    }
+
+    #[test]
+    fn session_overview_omits_system_workspaces() {
+        let mut app = app_with_two_tabs();
+        app.state = crate::app::state::AppState::test_with_system_workspace();
+        let system = crate::app::state::AppState::TEST_SYSTEM_WS;
+        let system_id = app.public_workspace_id(system);
+        let snapshot = app.session_snapshot();
+        assert_eq!(snapshot.workspaces.len(), 2);
+        assert!(!snapshot
+            .workspaces
+            .iter()
+            .any(|ws| ws.workspace_id == system_id));
+        assert!(!snapshot
+            .tabs
+            .iter()
+            .any(|tab| tab.workspace_id == system_id));
+        assert!(!snapshot
+            .panes
+            .iter()
+            .any(|pane| pane.workspace_id == system_id));
+        assert!(!snapshot
+            .agents
+            .iter()
+            .any(|agent| agent.workspace_id == system_id));
+        assert!(!snapshot
+            .layouts
+            .iter()
+            .any(|layout| layout.workspace_id == system_id));
+        let overview = app.session_overview();
+        assert_eq!(overview.totals.workspaces, 2);
+        // The all-tabs listing omits it too; by id, the tab still answers.
+        let response = app.handle_tab_list(
+            "tabs".into(),
+            crate::api::schema::TabListParams { workspace_id: None },
+        );
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        let ResponseResult::TabList { tabs } = success.result else {
+            panic!("expected tab list");
+        };
+        assert!(!tabs.iter().any(|tab| tab.workspace_id == system_id));
+        assert_eq!(tabs.len(), 2);
     }
 }

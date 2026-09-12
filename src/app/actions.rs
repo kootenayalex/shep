@@ -359,7 +359,7 @@ impl AppState {
         self.navigator.scroll = 0;
         self.navigator.expanded_workspaces.clear();
 
-        for ws in &self.workspaces {
+        for ws in self.workspaces.iter().filter(|ws| !ws.is_system()) {
             self.navigator.expanded_workspaces.insert(ws.id.clone());
         }
 
@@ -384,6 +384,9 @@ impl AppState {
         let query_kind = navigator_query_kind(&query, self.navigator.state_filter);
         let mut rows = Vec::new();
         for (ws_idx, ws) in self.workspaces.iter().enumerate() {
+            if ws.is_system() {
+                continue;
+            }
             let workspace_label = ws.display_name_from(&self.terminals, terminal_runtimes);
             let activity = workspace_activity_summary(ws, &self.terminals);
             let workspace_search_text = format!("{workspace_label} {activity}").to_lowercase();
@@ -1357,6 +1360,7 @@ impl AppState {
         self.workspaces
             .iter()
             .enumerate()
+            .filter(|(_, ws)| !ws.is_system())
             .flat_map(|(ws_idx, ws)| {
                 ws.pane_details(&self.terminals)
                     .into_iter()
@@ -2934,6 +2938,11 @@ impl AppState {
     ) -> Option<AgentNotificationDelivery> {
         self.pending_agent_notifications.remove(&pane_id);
         if change.manual {
+            return None;
+        }
+        // The overseer's own session never toasts, sounds or pushes: it is
+        // shep's pane, not an agent waiting on the user.
+        if self.workspaces.get(ws_idx).is_some_and(|ws| ws.is_system()) {
             return None;
         }
 
@@ -5620,5 +5629,100 @@ mod tests {
         assert!(!deferred);
         assert_eq!(state.workspaces.len(), 1);
         assert_eq!(state.workspaces[0].display_name(), "notes");
+    }
+
+    // --- system workspaces -------------------------------------------------
+
+    #[test]
+    fn navigator_rows_omit_system() {
+        let mut state = AppState::test_with_system_workspace();
+        state.open_navigator();
+        let system_id = state.workspaces[AppState::TEST_SYSTEM_WS].id.clone();
+        let rows = state.navigator_rows();
+        assert!(!rows.is_empty());
+        assert!(!rows.iter().any(|row| match row.target {
+            NavigatorTarget::Workspace { ws_idx }
+            | NavigatorTarget::Tab { ws_idx, .. }
+            | NavigatorTarget::Pane { ws_idx, .. } => ws_idx == AppState::TEST_SYSTEM_WS,
+        }));
+        assert!(!state.navigator.expanded_workspaces.contains(&system_id));
+    }
+
+    #[test]
+    fn next_workspace_skips_system() {
+        let mut state = AppState::test_with_system_workspace();
+        assert_eq!(state.visible_workspace_order(), vec![0, 1]);
+        state.next_workspace();
+        assert_eq!(state.active, Some(1));
+        state.next_workspace();
+        assert_eq!(state.active, Some(0));
+        state.previous_workspace();
+        assert_eq!(state.active, Some(1));
+        // From the system workspace itself, cycling lands on a user group.
+        state.switch_workspace(AppState::TEST_SYSTEM_WS);
+        state.next_workspace();
+        assert_eq!(state.active, Some(1));
+        state.switch_workspace(AppState::TEST_SYSTEM_WS);
+        state.previous_workspace();
+        assert_eq!(state.active, Some(1));
+    }
+
+    #[test]
+    fn next_blocked_skips_system() {
+        let mut state = AppState::test_with_system_workspace();
+        let user_pane = state.workspaces[1].tabs[0].root_pane;
+        set_pane_agent_state_direct(&mut state, 1, 0, user_pane, AgentState::Blocked);
+        assert_eq!(state.blocked_panes(), vec![(1, user_pane)]);
+        assert!(state.jump_to_next_blocked());
+        assert_eq!(state.active, Some(1));
+        assert!(state.jump_to_next_blocked());
+        assert_eq!(
+            state.active,
+            Some(1),
+            "wraps onto itself, never the system pane"
+        );
+    }
+
+    #[test]
+    fn no_notification_for_system_agents() {
+        let mut state = AppState::test_with_system_workspace();
+        state.toast_config.delivery = crate::config::ToastDelivery::Shep;
+        state.toast_config.delay_seconds = 0;
+        let system_pane = state.workspaces[AppState::TEST_SYSTEM_WS].tabs[0].root_pane;
+        // Start it working so a blocked transition is a real change.
+        set_pane_agent_state_direct(
+            &mut state,
+            AppState::TEST_SYSTEM_WS,
+            0,
+            system_pane,
+            AgentState::Working,
+        );
+        state.handle_app_event(AppEvent::StateChanged {
+            pane_id: system_pane,
+            agent: Some(Agent::Claude),
+            state: AgentState::Blocked,
+            visible_blocker: false,
+            visible_working: false,
+            process_exited: false,
+            observed_at: std::time::Instant::now(),
+        });
+        assert!(
+            state.toast.is_none(),
+            "the overseer's own agent never toasts"
+        );
+        assert!(state.pending_agent_notifications.is_empty());
+        // The same transition on a user group still does.
+        let user_pane = state.workspaces[1].tabs[0].root_pane;
+        set_pane_agent_state_direct(&mut state, 1, 0, user_pane, AgentState::Working);
+        state.handle_app_event(AppEvent::StateChanged {
+            pane_id: user_pane,
+            agent: Some(Agent::Claude),
+            state: AgentState::Blocked,
+            visible_blocker: false,
+            visible_working: false,
+            process_exited: false,
+            observed_at: std::time::Instant::now(),
+        });
+        assert!(state.toast.is_some());
     }
 }

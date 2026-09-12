@@ -52,6 +52,7 @@ fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
     let count = app
         .workspaces
         .iter()
+        .filter(|workspace| !workspace.is_system())
         .flat_map(|workspace| workspace.tabs.iter())
         .map(|tab| tab.panes.len())
         .sum::<usize>();

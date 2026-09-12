@@ -2569,12 +2569,63 @@ impl AppState {
 
     pub fn test_with_adversarial_identity_state() -> Self {
         let mut state = Self::test_new();
-        state.workspaces = vec![crate::workspace::Workspace::test_adversarial_identity_state()];
+        // A system workspace rides along, last: every user-facing list must
+        // skip it without disturbing the indices of the workspaces before it.
+        state.workspaces = vec![
+            crate::workspace::Workspace::test_adversarial_identity_state(),
+            crate::workspace::Workspace::test_adversarial_system_identity_state(),
+        ];
         state.active = Some(0);
         state.selected = 0;
         state.ensure_test_terminals();
         state
     }
+
+    /// Two user groups and, last, the overseer's session as a system
+    /// workspace whose pane runs a blocked claude: the shape every list
+    /// filter is tested against. Indices: `alpha` 0, `beta` 1, system 2.
+    pub fn test_with_system_workspace() -> Self {
+        use crate::detect::{Agent, AgentState};
+        let mut state = Self::test_new();
+        let system = crate::workspace::Workspace::test_new_system(
+            crate::workspace::SystemRole::OverseerSession,
+        );
+        let system_pane = system.tabs[0].root_pane;
+        let system_terminal = system.tabs[0].panes[&system_pane]
+            .attached_terminal_id
+            .clone();
+        state.workspaces = vec![
+            crate::workspace::Workspace::test_new("alpha"),
+            crate::workspace::Workspace::test_new("beta"),
+            system,
+        ];
+        state.active = Some(0);
+        state.selected = 0;
+        state.mode = Mode::Terminal;
+        state.ensure_test_terminals();
+        // Each user group runs an idle claude, so the agent-level lists have
+        // rows to keep while the system one goes.
+        for ws_idx in 0..Self::TEST_SYSTEM_WS {
+            let pane = state.workspaces[ws_idx].tabs[0].root_pane;
+            let terminal_id = state.workspaces[ws_idx].tabs[0].panes[&pane]
+                .attached_terminal_id
+                .clone();
+            let terminal = state.terminals.get_mut(&terminal_id).expect("terminal");
+            terminal.detected_agent = Some(Agent::Claude);
+            terminal.state = AgentState::Idle;
+        }
+        let terminal = state
+            .terminals
+            .get_mut(&system_terminal)
+            .expect("system terminal");
+        terminal.set_manual_label("overseer session".to_string());
+        terminal.detected_agent = Some(Agent::Claude);
+        terminal.state = AgentState::Blocked;
+        state
+    }
+
+    /// The index of the system workspace in [`Self::test_with_system_workspace`].
+    pub(crate) const TEST_SYSTEM_WS: usize = 2;
 
     pub fn assert_invariants_for_test(&self) {
         if self.workspaces.is_empty() {

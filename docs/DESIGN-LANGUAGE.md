@@ -233,6 +233,13 @@ height runs out a region shows its first N entries and the rest are simply
 not there, never an ellipsis row. The selected row is `▌` in accent on
 surface0 across the full width, the same selection every other list draws.
 
+**The overseer's session is a workspace with no row.** While it is active
+the titlebar centre reads `✦ overseer › session` — the mark and name in mauve
+where a group's name would be in text — and the sidebar highlights nothing,
+because the session is not a group: a system workspace is skipped by every
+list (sidebar, board, navigator, picker, `session.overview`) and reached only
+through the board's button.
+
 **The overseer strip is one row and no buttons.** `✦ overseer · <first
 sentence> · hh:mm` on surface0, the mark in mauve, the time pinned to the right
 edge in overlay0. Narrowing drops the word `overseer` before it elides the

@@ -331,6 +331,8 @@ it does. Name a brain and it thinks too:
 ```toml
 [plugins.overseer]
 runtime = "claude"     # any runtime `shep runtime list` marks headless
+session_argv = ["claude"]                  # what the board's session button runs
+session_cwd = "~/vault/agents/shep-overseer"  # where; default: the plugin's state dir
 ```
 
 At most once every ten minutes the tick hands the situation to
@@ -341,6 +343,13 @@ most five per tick. The plugin never sends keys or text to a pane, never
 touches the server process, never nudges, and never promotes or dates a docket
 item; `tests/plugin_overseer.rs` greps its script for the forbidden verbs. See
 `plugins/overseer/README.md`.
+
+The board's `▸ open the overseer's session` button runs the plugin's
+`session` pane: `session_argv` (default `["claude"]`; the server's
+`SHEP_OVERSEER_SESSION_ARGV` overrides it) in `session_cwd` when that
+directory exists, else the plugin's state dir, with `SHEP_OVERSEER_STATE_DIR`,
+`SHEP_OVERSEER_SITUATION`, `SHEP_OVERSEER_BOARD` and `SHEP_OVERSEER_CHAT`
+exported. shep keeps that session in a system workspace no list shows.
 
 ## Marketplace
 

@@ -2092,4 +2092,14 @@ mod tests {
             println!("{row}");
         }
     }
+
+    #[test]
+    fn overseer_model_skips_system_workspaces() {
+        let app = AppState::test_with_system_workspace();
+        let system = AppState::TEST_SYSTEM_WS;
+        let model = overseer_model(&app);
+        assert!(!model.agents.iter().any(|row| row.ws_idx == system));
+        assert!(!model.needs_you.iter().any(|row| row.ws_idx == system));
+        assert_eq!(model.agents.len(), 2);
+    }
 }

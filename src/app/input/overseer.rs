@@ -13,7 +13,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{
-    state::{AppState, BoardView, Mode},
+    state::{AppState, BoardView},
     App,
 };
 use crate::ui::board::BoardDir;
@@ -132,6 +132,9 @@ impl App {
     pub(crate) fn overseer_enter(&mut self) {
         let model = overseer_model(&self.state);
         let Some(row) = model.effective_selection(self.state.board.overseer_selected) else {
+            // Nothing to select: the header's button is the only thing
+            // enter can mean.
+            self.open_overseer_session();
             return;
         };
         match row {
@@ -146,16 +149,6 @@ impl App {
             }
             OverseerRow::Proposal(id) => self.state.overseer_keep_proposal(id),
         }
-    }
-
-    /// The header's one button. The session pane itself lands in a later
-    /// phase; until then the button says so where the docket notice goes.
-    pub(crate) fn open_overseer_session(&mut self) {
-        if self.state.mode != Mode::Board {
-            return;
-        }
-        self.state.board.docket_notice =
-            Some("the overseer's session lands in the next phase".to_string());
     }
 }
 
@@ -716,5 +709,227 @@ mod tests {
         assert!(!app.state.overseer.chat_focused);
         assert_eq!(app.state.mode, Mode::Board);
         cleanup(&path);
+    }
+
+    // --- the session button ------------------------------------------------
+
+    /// An installed, enabled overseer plugin whose `session` pane runs
+    /// `command`. Returns the plugin root to remove afterwards.
+    fn install_fake_overseer(app: &mut App, command: &[&str]) -> std::path::PathBuf {
+        let plugin_root = crate::app::overseer::test_state_dir();
+        std::fs::create_dir_all(&plugin_root).expect("plugin root");
+        let manifest_path = plugin_root.join("shep-plugin.toml");
+        std::fs::write(&manifest_path, "id = 'overseer'\n").expect("manifest");
+        app.state.installed_plugins.insert(
+            "overseer".into(),
+            crate::api::schema::InstalledPluginInfo {
+                plugin_id: "overseer".into(),
+                name: "Overseer".into(),
+                version: "0.1.0".into(),
+                min_shep_version: "0.7.3".into(),
+                description: None,
+                manifest_path: manifest_path.display().to_string(),
+                plugin_root: plugin_root.display().to_string(),
+                enabled: true,
+                platforms: None,
+                build: Vec::new(),
+                actions: Vec::new(),
+                events: Vec::new(),
+                panes: vec![crate::api::schema::PluginManifestPane {
+                    id: "session".into(),
+                    title: "overseer session".into(),
+                    description: None,
+                    platforms: None,
+                    placement: crate::api::schema::PluginPanePlacement::Tab,
+                    command: command.iter().map(|s| s.to_string()).collect(),
+                }],
+                link_handlers: Vec::new(),
+                source: crate::api::schema::PluginSourceInfo::default(),
+                warnings: Vec::new(),
+            },
+        );
+        plugin_root
+    }
+
+    fn system_workspaces(app: &App) -> Vec<usize> {
+        app.state
+            .workspaces
+            .iter()
+            .enumerate()
+            .filter(|(_, ws)| ws.is_system())
+            .map(|(idx, _)| idx)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn open_overseer_session_without_the_plugin_says_so() {
+        let (mut app, path, _) = overseer_app();
+        assert_eq!(app.state.mode, Mode::Board);
+        let before = app.state.workspaces.len();
+        app.open_overseer_session();
+        assert_eq!(app.state.mode, Mode::Board, "stays on the board");
+        assert_eq!(app.state.workspaces.len(), before);
+        assert_eq!(
+            app.state.board.docket_notice.as_deref(),
+            Some(crate::app::overseer::SESSION_NEEDS_PLUGIN)
+        );
+        assert!(app.overseer_session_workspace().is_none());
+        // A disabled plugin is as good as none.
+        let root = install_fake_overseer(&mut app, &["true"]);
+        app.state
+            .installed_plugins
+            .get_mut("overseer")
+            .expect("plugin")
+            .enabled = false;
+        app.state.board.docket_notice = None;
+        app.open_overseer_session();
+        assert_eq!(
+            app.state.board.docket_notice.as_deref(),
+            Some(crate::app::overseer::SESSION_NEEDS_PLUGIN)
+        );
+        assert_eq!(app.state.workspaces.len(), before);
+        let _ = std::fs::remove_dir_all(&root);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn enter_with_nothing_selected_is_the_session_button() {
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            true,
+            None,
+            tokio::sync::mpsc::unbounded_channel().1,
+            crate::api::EventHub::default(),
+        );
+        // No agents, no docket: the overseer view has no rows at all.
+        app.state = AppState::test_new();
+        app.state.open_board();
+        assert_eq!(app.state.overseer_selection(), None);
+        app.handle_board_overseer_key(key(KeyCode::Enter));
+        assert_eq!(
+            app.state.board.docket_notice.as_deref(),
+            Some(crate::app::overseer::SESSION_NEEDS_PLUGIN)
+        );
+    }
+
+    #[tokio::test]
+    async fn open_overseer_session_creates_one_from_the_plugin() {
+        let (mut app, path, _) = overseer_app();
+        let event_hub = crate::api::EventHub::default();
+        app.event_hub = event_hub.clone();
+        let root = install_fake_overseer(&mut app, &["sh", "-c", "sleep 30"]);
+        let user_groups = app.state.workspaces.len();
+        let listed_before = crate::ui::workspace_list_entries(&app.state);
+
+        app.open_overseer_session();
+
+        let system = system_workspaces(&app);
+        assert_eq!(system.len(), 1, "exactly one system workspace");
+        let idx = system[0];
+        assert_eq!(app.state.active, Some(idx));
+        assert_eq!(app.state.mode, Mode::Terminal);
+        assert!(app.state.board.docket_notice.is_none());
+        assert_eq!(app.overseer_session_workspace(), Some(idx));
+        let ws = &app.state.workspaces[idx];
+        assert_eq!(
+            ws.system,
+            Some(crate::workspace::SystemRole::OverseerSession)
+        );
+        assert_eq!(ws.custom_name.as_deref(), Some("overseer"));
+        assert_eq!(ws.tabs.len(), 1);
+        ws.assert_invariants_for_test();
+        app.state.assert_invariants_for_test();
+        let pane = ws.tabs[0].root_pane;
+        let terminal = app
+            .state
+            .terminals
+            .get(ws.terminal_id(pane).expect("terminal id"))
+            .expect("terminal");
+        assert_eq!(terminal.manual_label.as_deref(), Some("overseer session"));
+        assert!(app.terminal_runtimes.get(&terminal.id).is_some());
+        assert_eq!(
+            app.state
+                .plugin_panes
+                .get(&pane)
+                .map(|r| r.entrypoint.as_str()),
+            Some("session")
+        );
+        // Not a group: the sidebar and every other list read as before.
+        assert_eq!(app.state.workspaces.len(), user_groups + 1);
+        assert_eq!(crate::ui::workspace_list_entries(&app.state), listed_before);
+        assert!(!crate::ui::board::board_model(&app.state)
+            .lanes
+            .iter()
+            .any(|lane| lane.ws_idx == idx));
+        let events = event_hub.events_after(0);
+        assert!(events
+            .iter()
+            .any(|(_, e)| e.event == crate::api::schema::EventKind::WorkspaceCreated));
+        assert!(events
+            .iter()
+            .any(|(_, e)| e.event == crate::api::schema::EventKind::PaneCreated));
+
+        // The button a second time focuses the same one, from the board.
+        app.state.switch_workspace(0);
+        app.state.open_board();
+        app.open_overseer_session();
+        assert_eq!(system_workspaces(&app), vec![idx]);
+        assert_eq!(app.state.active, Some(idx));
+        assert_eq!(app.state.mode, Mode::Terminal);
+
+        crate::app::api::test_support::shutdown_test_runtimes(&mut app);
+        let _ = std::fs::remove_dir_all(&root);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn open_overseer_session_focuses_an_existing_one() {
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            true,
+            None,
+            tokio::sync::mpsc::unbounded_channel().1,
+            crate::api::EventHub::default(),
+        );
+        app.state = AppState::test_with_system_workspace();
+        let system = AppState::TEST_SYSTEM_WS;
+        app.state.open_board();
+        app.state.board.suspended = true;
+        let before = app.state.workspaces.len();
+        app.open_overseer_session();
+        assert_eq!(app.state.workspaces.len(), before, "nothing new is spawned");
+        assert_eq!(app.state.active, Some(system));
+        assert_eq!(app.state.mode, Mode::Terminal);
+        assert!(!app.state.board.suspended);
+        assert!(app.state.board.docket_notice.is_none());
+    }
+
+    #[tokio::test]
+    async fn session_pane_exit_returns_active_to_a_user_group() {
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            true,
+            None,
+            tokio::sync::mpsc::unbounded_channel().1,
+            crate::api::EventHub::default(),
+        );
+        app.state = AppState::test_with_system_workspace();
+        let system = AppState::TEST_SYSTEM_WS;
+        app.state.switch_workspace(system);
+        app.state.mode = Mode::Terminal;
+        let listed_before = crate::ui::workspace_list_entries(&app.state);
+        let rows_before = crate::ui::sidebar_rows(&app.state);
+        let pane = app.state.workspaces[system].tabs[0].root_pane;
+
+        app.handle_internal_event(crate::events::AppEvent::PaneDied { pane_id: pane });
+
+        assert!(system_workspaces(&app).is_empty());
+        assert!(app.overseer_session_workspace().is_none());
+        let active = app.state.active.expect("a user group is active");
+        assert!(!app.state.workspaces[active].is_system());
+        assert_eq!(app.state.mode, Mode::Terminal);
+        assert_eq!(crate::ui::workspace_list_entries(&app.state), listed_before);
+        assert_eq!(crate::ui::sidebar_rows(&app.state), rows_before);
+        app.state.assert_invariants_for_test();
     }
 }

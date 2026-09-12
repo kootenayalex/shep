@@ -25,6 +25,8 @@ nothing configured, and it is already useful.
 # config.toml
 [plugins.overseer]
 runtime = "claude"          # any runtime `shep runtime list` marks headless
+session_argv = ["claude"]   # the board's session button runs this (default)
+session_cwd = "~/vault/agents/shep-overseer"   # in here; default: the state dir
 ```
 
 or `SHEP_OVERSEER_RUNTIME=claude` in the server's environment. With a brain,
@@ -51,6 +53,19 @@ state dir, one `{"at", "role", "text"}` line per turn (`role` is `you` or
 obeys the same rules as the narrative — an answer is words on the board, never
 keys into a pane.
 
+## The session
+
+The board's `▸ open the overseer's session` button opens the `session` pane:
+`overseer-session` execs `session_argv` — or `SHEP_OVERSEER_SESSION_ARGV`
+(shell words) from the server's environment, or `claude` — in `session_cwd`
+(`~` expands; must exist) or the plugin's state dir, with
+`SHEP_OVERSEER_STATE_DIR`, `SHEP_OVERSEER_SITUATION` (`situation.md`),
+`SHEP_OVERSEER_BOARD` (`BOARD.md`) and `SHEP_OVERSEER_CHAT` (`chat.jsonl`)
+exported, so the agent can read what the tick wrote and what the chat said.
+shep keeps the pane in a system workspace that no list ever shows; the
+titlebar reads `✦ overseer › session` while it is up. The launcher makes no
+shep calls, so the forbidden-verb test covers it too.
+
 ## What it never does
 
 - Never answers for an agent: no keys, no text, nothing to any pane's input.
@@ -65,9 +80,11 @@ rules hold by construction, not by discipline.
 ## Files
 
 - `shep-plugin.toml` — manifest: two event hooks, the `tick` action, the
-  `board` pane.
+  `board` and `session` panes.
 - `overseer-tick` — the tick (Python 3, stdlib only).
 - `overseer-board` — the pane: redraws `BOARD.md` every five seconds.
+- `overseer-session` — the session launcher (Python 3, stdlib only): execs
+  the configured agent with the state files in its environment.
 - state, under `SHEP_PLUGIN_STATE_DIR`: `situation.md`, `situation.json`,
   `BOARD.md`, `BOARD.md.source`, `last-brain`, `journal.log`, and the board's
   `chat.jsonl` (written by the TUI, read by anyone).

@@ -194,7 +194,7 @@ impl App {
         )
     }
 
-    fn plugin_pane_launch_env(
+    pub(crate) fn plugin_pane_launch_env(
         &self,
         plugin: &InstalledPluginInfo,
         entrypoint: &str,

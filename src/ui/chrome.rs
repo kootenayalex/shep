@@ -336,16 +336,32 @@ fn center_line(
             Style::default().fg(p.mauve).add_modifier(Modifier::BOLD),
         )));
     }
+    let sep = Span::styled(
+        format!(" {} ", glyphs::LEADS_TO),
+        Style::default().fg(p.overlay0),
+    );
+    if app
+        .active
+        .and_then(|idx| app.workspaces.get(idx))
+        .is_some_and(|ws| ws.is_system())
+    {
+        // The overseer's own session: its mark and name, not a group's.
+        return Some(Line::from(vec![
+            Span::styled(
+                format!("{} overseer", glyphs::OVERSEER),
+                Style::default().fg(p.mauve).add_modifier(Modifier::BOLD),
+            ),
+            sep,
+            Span::styled("session", Style::default().fg(p.subtext0)),
+        ]));
+    }
     let (group, agent) = active_group_and_agent(app, terminal_runtimes)?;
     Some(Line::from(vec![
         Span::styled(
             group,
             Style::default().fg(p.text).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            format!(" {} ", glyphs::LEADS_TO),
-            Style::default().fg(p.overlay0),
-        ),
+        sep,
         Span::styled(agent, Style::default().fg(p.subtext0)),
     ]))
 }
@@ -886,6 +902,32 @@ mod tests {
         assert_eq!(text(&layout.center.expect("centre").line), "✦ overseer");
         // The lit board half does not count what it is already showing.
         assert!(text(&right.line).ends_with(" desktop  board  "));
+    }
+
+    #[test]
+    fn titlebar_reads_overseer_session_when_active() {
+        let mut app = AppState::test_with_system_workspace();
+        app.titlebar = true;
+        app.switch_workspace(AppState::TEST_SYSTEM_WS);
+        app.mode = Mode::Terminal;
+        let area = Rect::new(0, 0, 200, 1);
+        let layout = titlebar_layout(&app, None, area);
+        let center = layout.center.expect("centre");
+        assert_eq!(text(&center.line), "✦ overseer › session");
+        assert_eq!(center.line.spans[0].style.fg, Some(app.palette.mauve));
+        // Still the desktop: its half of the pill is lit.
+        let right = layout.right.expect("right slot");
+        let desktop = right
+            .line
+            .spans
+            .iter()
+            .find(|s| s.content.contains("desktop"))
+            .expect("pill half");
+        assert_eq!(desktop.style.bg, Some(app.palette.accent));
+        // Back on a user group the centre is that group again.
+        app.switch_workspace(0);
+        let layout = titlebar_layout(&app, None, area);
+        assert_eq!(text(&layout.center.expect("centre").line), "alpha › claude");
     }
 
     #[test]

@@ -4,6 +4,25 @@
 
 ### Added
 
+- The overseer board's `▸ open the overseer's session` button (a click, or
+  Enter with nothing selected) opens a real interactive session for the
+  overseer: the plugin's `session` pane — `claude` by default, or
+  `[plugins.overseer] session_argv` — in the plugin's state dir (or
+  `session_cwd`), with `SHEP_OVERSEER_STATE_DIR`, `SHEP_OVERSEER_SITUATION`,
+  `SHEP_OVERSEER_BOARD` and `SHEP_OVERSEER_CHAT` in its environment. The
+  session lives in a *system workspace*: it is never listed with the
+  session's groups — not in the sidebar, the board on any view, the
+  navigator, the group picker, `session.overview`, `workspace.list`, the
+  all-tabs `tab.list`, next/previous-group cycling or jump-to-blocked — and
+  its agent raises no toast, sound or push. While it is the active
+  workspace the titlebar reads `✦ overseer › session`, the sidebar
+  highlights no group, and the pill or `ctrl+alt+b` returns to the board;
+  pressing the button again focuses the open session. When its pane exits
+  the workspace goes with it and a user group becomes active. A live
+  handoff keeps the session; a cold restore drops it (nothing could resume
+  it). Without the linked plugin the button says
+  `link the overseer plugin: shep plugin link plugins/overseer`.
+
 - The Android companion has a `docket` tab, between memory and shep: the
   desktop board's five lanes — inbox, due, slated, recurring, done — as
   collapsible sections over `docket.list`, each card the design language's

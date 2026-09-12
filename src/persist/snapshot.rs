@@ -55,6 +55,11 @@ pub struct TabHistorySnapshot {
 pub struct WorkspaceSnapshot {
     #[serde(default)]
     pub id: Option<String>,
+    /// Set for shep's own workspaces (the overseer's session). Absent from
+    /// older snapshots and from every user workspace, so no version bump —
+    /// the same shape as `manual_state`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system: Option<crate::workspace::SystemRole>,
     #[serde(default)]
     pub custom_name: Option<String>,
     pub identity_cwd: PathBuf,
@@ -238,6 +243,7 @@ impl From<LegacyWorkspaceSnapshot> for WorkspaceSnapshot {
 
         Self {
             id: None,
+            system: None,
             custom_name: snap.custom_name,
             identity_cwd,
             worktree_space: None,
@@ -372,6 +378,7 @@ fn capture_workspace(
 ) -> WorkspaceSnapshot {
     WorkspaceSnapshot {
         id: Some(ws.id.clone()),
+        system: ws.system,
         custom_name: ws.custom_name.clone(),
         identity_cwd: ws
             .resolved_identity_cwd_from(terminals, terminal_runtimes)
@@ -737,6 +744,7 @@ mod tests {
         let snap = SessionSnapshot {
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("wproj".to_string()),
+                system: None,
                 custom_name: Some("pi-mono".to_string()),
                 identity_cwd: PathBuf::from("/home/can/Projects/shep"),
                 worktree_space: None,
@@ -1310,6 +1318,7 @@ mod tests {
             version: SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("test-ws".to_string()),
+                system: None,
                 custom_name: Some("fallback test".to_string()),
                 identity_cwd: PathBuf::from("/tmp"),
                 worktree_space: None,
@@ -1346,5 +1355,49 @@ mod tests {
             restored.workspaces[0].tabs[0].panes[&0].cwd,
             PathBuf::from("/tmp/this-directory-does-not-exist-for-shep-test")
         );
+    }
+
+    #[test]
+    fn snapshot_persists_the_system_role() {
+        let state = AppState::test_with_system_workspace();
+        let snap = capture(
+            &state.workspaces,
+            &state.terminals,
+            &TerminalRuntimeRegistry::new(),
+            state.active,
+            state.selected,
+            30,
+            Default::default(),
+            &Default::default(),
+        );
+        assert_eq!(
+            snap.version, SNAPSHOT_VERSION,
+            "no version bump for the flag"
+        );
+        assert_eq!(snap.workspaces[0].system, None);
+        assert_eq!(
+            snap.workspaces[AppState::TEST_SYSTEM_WS].system,
+            Some(crate::workspace::SystemRole::OverseerSession)
+        );
+        let json = serde_json::to_string(&snap).unwrap();
+        // A user workspace carries no `system` key at all; the overseer's
+        // session says which role it holds.
+        assert_eq!(json.matches("\"system\"").count(), 1);
+        assert!(json.contains("\"system\":\"overseer_session\""));
+        let back: SessionSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            back.workspaces[AppState::TEST_SYSTEM_WS].system,
+            Some(crate::workspace::SystemRole::OverseerSession)
+        );
+        assert_eq!(back.workspaces[1].system, None);
+        // Every checked-in fixture predates the flag and still parses as
+        // user workspaces.
+        for name in ["current-shep", "current-shep-dev", "legacy-pre-tabs-v2"] {
+            let snap = parse_snapshot(session_fixture(name)).expect(name);
+            assert!(
+                snap.workspaces.iter().all(|ws| ws.system.is_none()),
+                "{name}"
+            );
+        }
     }
 }

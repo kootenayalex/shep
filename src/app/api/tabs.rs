@@ -21,6 +21,9 @@ impl App {
         } else {
             let mut tabs = Vec::new();
             for (ws_idx, ws) in self.state.workspaces.iter().enumerate() {
+                if ws.is_system() {
+                    continue;
+                }
                 for tab_idx in 0..ws.tabs.len() {
                     if let Some(tab) = self.tab_info(ws_idx, tab_idx) {
                         tabs.push(tab);

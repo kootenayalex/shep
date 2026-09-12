@@ -345,6 +345,9 @@ pub(crate) mod fixture {
     ///
     /// Deliberately deterministic: the spinner tick is pinned, host vitals are
     /// literals rather than a live read, and every age sits mid-bucket.
+    /// Index of the overseer's session workspace in [`session`].
+    pub(crate) const SESSION_WS: usize = 3;
+
     pub(crate) fn session() -> AppState {
         let mut billing = Workspace::test_new("workmayt");
         let billing_root = billing.tabs[0].root_pane;
@@ -365,11 +368,29 @@ pub(crate) mod fixture {
         let tools_root = tools.tabs[0].root_pane;
         let tools_second = tools.test_split(Direction::Vertical);
 
+        // The overseer's session, as the board's button opens it: a system
+        // workspace with a labelled pane and no detected agent. It rides in
+        // every fixture so that every existing snapshot proves the lists
+        // never show it.
+        let session = Workspace::test_new_system(crate::workspace::SystemRole::OverseerSession);
+        let session_pane = session.tabs[0].root_pane;
+
         let mut state = AppState::test_new();
-        state.workspaces = vec![billing, site, tools];
+        state.workspaces = vec![billing, site, tools, session];
         state.ensure_test_terminals();
         state.active = Some(0);
         state.selected = 0;
+        {
+            let terminal_id = state.workspaces[3].tabs[0].panes[&session_pane]
+                .attached_terminal_id
+                .clone();
+            let terminal = state
+                .terminals
+                .get_mut(&terminal_id)
+                .expect("fixture terminal should exist");
+            terminal.set_manual_label("overseer session".to_string());
+            terminal.cwd = PathBuf::from("~/.local/state/shep/plugins/overseer");
+        }
 
         // Chrome ships on; `test_new` keeps it off so older minimal-baseline
         // tests stay small, but a screen snapshot with no titlebar or hint bar
@@ -671,6 +692,18 @@ fn snapshot_desktop_wide() {
     let mut state = fixture::session();
     state.mode = Mode::Terminal;
     assert_screen(&mut state, "desktop-wide", WIDE.0, WIDE.1);
+}
+
+/// The desktop while the overseer's session is the active workspace: the
+/// titlebar reads `✦ overseer › session`, the pane grid shows its pane, and
+/// the sidebar lists the same three groups with none of them selected.
+#[test]
+fn snapshot_overseer_session_active_mid() {
+    let mut state = fixture::session();
+    state.mode = Mode::Terminal;
+    state.switch_workspace(fixture::SESSION_WS);
+    assert!(state.workspaces[fixture::SESSION_WS].is_system());
+    assert_screen(&mut state, "overseer-session-active-mid", MID.0, MID.1);
 }
 
 #[test]

@@ -232,6 +232,7 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             .workspaces
             .iter()
             .enumerate()
+            .filter(|(_, ws)| !ws.is_system())
             .map(|(ws_idx, ws)| BoardLane {
                 ws_idx,
                 title: ws.display_name(),
@@ -774,11 +775,17 @@ pub(crate) fn board_summary(app: &AppState, model: &BoardModel) -> BoardSummary 
         // without anyone looking: both are waiting on the user, and together
         // they are the only number on this strip worth reacting to.
         attention: counts[0] + counts[1],
-        workspaces: app.workspaces.len(),
-        tabs: app.workspaces.iter().map(|ws| ws.tabs.len()).sum(),
+        workspaces: app.workspaces.iter().filter(|ws| !ws.is_system()).count(),
+        tabs: app
+            .workspaces
+            .iter()
+            .filter(|ws| !ws.is_system())
+            .map(|ws| ws.tabs.len())
+            .sum(),
         panes: app
             .workspaces
             .iter()
+            .filter(|ws| !ws.is_system())
             .flat_map(|ws| ws.tabs.iter())
             .map(|tab| tab.panes.len())
             .sum(),
@@ -3266,5 +3273,27 @@ mod tests {
             let row: String = (0..150).map(|x| buffer[(x, y)].symbol()).collect();
             println!("{}", row.trim_end());
         }
+    }
+
+    #[test]
+    fn board_model_skips_system_workspaces() {
+        let app = AppState::test_with_system_workspace();
+        let system = AppState::TEST_SYSTEM_WS;
+        let model = board_model(&app);
+        assert!(!model.lanes.iter().any(|lane| lane.ws_idx == system));
+        assert!(!model.flattened().iter().any(|card| card.ws_idx == system));
+        assert_eq!(
+            model
+                .lanes
+                .iter()
+                .map(|lane| lane.ws_idx)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        let summary = board_summary(&app, &model);
+        assert_eq!(summary.workspaces, 2);
+        assert_eq!(summary.tabs, 2);
+        assert_eq!(summary.panes, 2);
+        assert_eq!(summary.blocked, 0);
     }
 }

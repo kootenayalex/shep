@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""The overseer's interactive session.
+
+Exec an agent with the overseer's files in its environment, so the same
+charter that drives the tick can be talked to. What runs, in order:
+`SHEP_OVERSEER_SESSION_ARGV` (shell words), `session_argv` from the plugin's
+`[plugins.overseer]` table, else `claude`. Where: `session_cwd` from that
+table (`~` expands) when it exists, else the plugin's state dir.
+
+Exported for whatever runs: `SHEP_OVERSEER_STATE_DIR`,
+`SHEP_OVERSEER_SITUATION` (situation.md), `SHEP_OVERSEER_BOARD` (BOARD.md)
+and `SHEP_OVERSEER_CHAT` (chat.jsonl). This script makes no shep calls and
+never returns: it becomes the agent.
+"""
+
+import json
+import os
+import shlex
+import sys
+
+
+def fail(reason: str) -> "NoReturn":
+    print(f"overseer-session: {reason}", file=sys.stderr)
+    sys.exit(1)
+
+
+def main() -> None:
+    try:
+        config = json.loads(os.environ.get("SHEP_PLUGIN_CONFIG_JSON") or "{}")
+    except json.JSONDecodeError as err:
+        fail(f"SHEP_PLUGIN_CONFIG_JSON is not JSON: {err}")
+    if not isinstance(config, dict):
+        config = {}
+
+    override = os.environ.get("SHEP_OVERSEER_SESSION_ARGV")
+    if override:
+        argv = shlex.split(override)
+    else:
+        configured = config.get("session_argv")
+        if isinstance(configured, list) and configured and all(
+            isinstance(word, str) for word in configured
+        ):
+            argv = list(configured)
+        else:
+            argv = ["claude"]
+
+    state_dir = os.environ.get("SHEP_PLUGIN_STATE_DIR") or os.getcwd()
+    cwd = state_dir
+    configured_cwd = config.get("session_cwd")
+    if isinstance(configured_cwd, str) and configured_cwd:
+        candidate = os.path.expanduser(configured_cwd)
+        if os.path.isdir(candidate):
+            cwd = candidate
+
+    os.environ["SHEP_OVERSEER_STATE_DIR"] = state_dir
+    os.environ["SHEP_OVERSEER_SITUATION"] = os.path.join(state_dir, "situation.md")
+    os.environ["SHEP_OVERSEER_BOARD"] = os.path.join(state_dir, "BOARD.md")
+    os.environ["SHEP_OVERSEER_CHAT"] = os.path.join(state_dir, "chat.jsonl")
+
+    try:
+        os.chdir(cwd)
+    except OSError as err:
+        fail(f"cannot enter {cwd}: {err}")
+    try:
+        os.execvp(argv[0], argv)
+    except OSError as err:
+        fail(f"cannot run {shlex.join(argv)}: {err}")
+
+
+if __name__ == "__main__":
+    main()

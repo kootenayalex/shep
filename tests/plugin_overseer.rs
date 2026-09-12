@@ -46,7 +46,12 @@ fn overseer_script_never_uses_a_forbidden_verb() {
         r"send-keys|send-text|send-input|server stop|live-handoff|pkill|agent send|kickstart|launchctl",
     )
     .unwrap();
-    for file in ["overseer-tick", "overseer-board", "shep-plugin.toml"] {
+    for file in [
+        "overseer-tick",
+        "overseer-board",
+        "overseer-session",
+        "shep-plugin.toml",
+    ] {
         let text = fs::read_to_string(Path::new(PLUGIN_DIR).join(file)).unwrap();
         assert!(
             !forbidden.is_match(&text),
@@ -80,7 +85,13 @@ fn overseer_manifest_declares_the_hooks_action_and_pane() {
         1
     );
     assert_eq!(manifest["panes"][0]["id"].as_str(), Some("board"));
-    for script in ["overseer-tick", "overseer-board"] {
+    assert_eq!(manifest["panes"][1]["id"].as_str(), Some("session"));
+    assert_eq!(manifest["panes"][1]["placement"].as_str(), Some("tab"));
+    assert_eq!(
+        manifest["panes"][1]["command"][0].as_str(),
+        Some("./overseer-session")
+    );
+    for script in ["overseer-tick", "overseer-board", "overseer-session"] {
         use std::os::unix::fs::PermissionsExt;
         let mode = fs::metadata(Path::new(PLUGIN_DIR).join(script))
             .unwrap()
@@ -88,6 +99,79 @@ fn overseer_manifest_declares_the_hooks_action_and_pane() {
             .mode();
         assert!(mode & 0o111 != 0, "{script} is not executable");
     }
+}
+
+/// The session launcher execs what it is told, in the directory it is told,
+/// with the overseer's files in the environment; it never calls shep.
+#[test]
+fn overseer_session_execs_the_configured_agent_in_the_configured_dir() {
+    let dir = unique_test_dir();
+    let state_dir = dir.join("state");
+    let cwd = dir.join("cwd");
+    fs::create_dir_all(&state_dir).unwrap();
+    fs::create_dir_all(&cwd).unwrap();
+    let run = |env: &[(&str, String)]| {
+        let mut cmd = std::process::Command::new(Path::new(PLUGIN_DIR).join("overseer-session"));
+        cmd.env_remove("SHEP_OVERSEER_SESSION_ARGV")
+            .env("SHEP_PLUGIN_STATE_DIR", &state_dir);
+        for (key, value) in env {
+            cmd.env(key, value);
+        }
+        cmd.output().unwrap()
+    };
+
+    // Config: argv and cwd from `[plugins.overseer]`.
+    let config = serde_json::json!({
+        "session_argv": ["sh", "-c", "pwd; echo $SHEP_OVERSEER_SITUATION; echo $SHEP_OVERSEER_BOARD; echo $SHEP_OVERSEER_CHAT; echo $SHEP_OVERSEER_STATE_DIR"],
+        "session_cwd": cwd.display().to_string(),
+    });
+    let out = run(&[("SHEP_PLUGIN_CONFIG_JSON", config.to_string())]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lines: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(str::to_string)
+        .collect();
+    assert_eq!(
+        lines,
+        vec![
+            fs::canonicalize(&cwd).unwrap().display().to_string(),
+            state_dir.join("situation.md").display().to_string(),
+            state_dir.join("BOARD.md").display().to_string(),
+            state_dir.join("chat.jsonl").display().to_string(),
+            state_dir.display().to_string(),
+        ]
+    );
+
+    // The env override wins over config, and a missing cwd falls back to
+    // the state dir.
+    let config = serde_json::json!({
+        "session_argv": ["false"],
+        "session_cwd": dir.join("missing").display().to_string(),
+    });
+    let out = run(&[
+        ("SHEP_PLUGIN_CONFIG_JSON", config.to_string()),
+        ("SHEP_OVERSEER_SESSION_ARGV", "sh -c pwd".to_string()),
+    ]);
+    assert!(out.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        fs::canonicalize(&state_dir).unwrap().display().to_string()
+    );
+
+    // An agent that cannot start is one line on stderr and exit 1.
+    let out = run(&[(
+        "SHEP_OVERSEER_SESSION_ARGV",
+        "definitely-not-an-agent-xyz".to_string(),
+    )]);
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(stderr.lines().count(), 1, "{stderr}");
+    assert!(stderr.starts_with("overseer-session: cannot run"));
+    let _ = fs::remove_dir_all(&dir);
 }
 
 // --- server harness --------------------------------------------------------

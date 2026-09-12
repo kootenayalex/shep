@@ -379,6 +379,19 @@ fn restore_workspace(
         .max(snap.next_public_tab_number);
     let mut failed_imports = 0;
 
+    // A system workspace (the overseer's session) only comes back across a
+    // live handoff, where its pane runtime is imported as-is. On a cold
+    // restore nothing can resume that session, so it is dropped rather than
+    // brought back as a stray shell that the lists would then hide.
+    if snap.system.is_some() && !snapshot_has_imported_pane(snap, imported_panes) {
+        tracing::info!(
+            workspace = %workspace_id,
+            role = ?snap.system,
+            "dropping system workspace on cold restore"
+        );
+        return (None, failed_imports);
+    }
+
     for (idx, tab_snap) in snap.tabs.iter().enumerate() {
         let tab_number = snap.public_tab_numbers.get(idx).copied().unwrap_or(idx + 1);
         let (restored_tab, tab_failed_imports) = restore_tab(
@@ -433,6 +446,7 @@ fn restore_workspace(
     (
         Some(Workspace {
             id: workspace_id,
+            system: snap.system,
             custom_name: snap.custom_name.clone(),
             identity_cwd: snap.identity_cwd.clone(),
             cached_git_branch: crate::workspace::git_branch(&snap.identity_cwd),
@@ -452,6 +466,19 @@ fn restore_workspace(
         .map(|workspace| (workspace, terminals, terminal_runtimes)),
         failed_imports,
     )
+}
+
+/// Whether any pane of this workspace snapshot has a runtime waiting to be
+/// imported — true only during a live handoff.
+fn snapshot_has_imported_pane(
+    snap: &WorkspaceSnapshot,
+    imported_panes: &HashMap<u32, crate::handoff_runtime::ImportedHandoffRuntime>,
+) -> bool {
+    snap.tabs.iter().any(|tab| {
+        let mut ids = Vec::new();
+        collect_layout_snapshot_pane_ids(&tab.layout, &mut ids);
+        ids.iter().any(|id| imported_panes.contains_key(id))
+    })
 }
 
 fn restored_worktree_space_membership(
@@ -1232,6 +1259,7 @@ mod tests {
             version: super::super::snapshot::SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("workspace".into()),
+                system: None,
                 custom_name: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
@@ -1311,6 +1339,7 @@ mod tests {
             version: super::super::snapshot::SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("w1".into()),
+                system: None,
                 custom_name: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
@@ -1424,6 +1453,7 @@ mod tests {
             version: super::super::snapshot::SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("w1".into()),
+                system: None,
                 custom_name: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
@@ -1508,6 +1538,7 @@ mod tests {
         let cwd = std::env::current_dir().unwrap();
         let snapshot = WorkspaceSnapshot {
             id: Some("w1".into()),
+            system: None,
             custom_name: None,
             identity_cwd: cwd,
             worktree_space: None,
@@ -1550,6 +1581,7 @@ mod tests {
             version: super::super::snapshot::SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("workspace".into()),
+                system: None,
                 custom_name: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
@@ -1615,6 +1647,7 @@ mod tests {
             version: super::super::snapshot::SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("workspace".into()),
+                system: None,
                 custom_name: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
@@ -1823,6 +1856,7 @@ mod tests {
             version: super::super::snapshot::SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("workspace".into()),
+                system: None,
                 custom_name: None,
                 identity_cwd: cwd,
                 worktree_space: None,
@@ -1847,5 +1881,174 @@ mod tests {
             public_pane_id_aliases: Default::default(),
         };
         (snapshot, history)
+    }
+
+    /// A two-workspace snapshot: a user group and the overseer's session.
+    fn snapshot_with_a_system_workspace() -> SessionSnapshot {
+        let cwd = std::env::current_dir().unwrap();
+        let workspace =
+            |id: &str, system: Option<crate::workspace::SystemRole>, pane: u32| WorkspaceSnapshot {
+                id: Some(id.into()),
+                system,
+                custom_name: system.map(|_| "overseer".to_string()),
+                identity_cwd: cwd.clone(),
+                worktree_space: None,
+                public_pane_numbers: HashMap::from([(pane, 1)]),
+                next_public_pane_number: 2,
+                public_tab_numbers: vec![1],
+                next_public_tab_number: 2,
+                tabs: vec![TabSnapshot {
+                    custom_name: None,
+                    layout: LayoutSnapshot::Pane(pane),
+                    panes: HashMap::from([(
+                        pane,
+                        super::super::snapshot::PaneSnapshot {
+                            cwd: cwd.clone(),
+                            label: system.map(|_| "overseer session".to_string()),
+                            agent_name: None,
+                            agent_session: None,
+                            launch_argv: None,
+                            manual_state: None,
+                            state_age_seconds: None,
+                        },
+                    )]),
+                    zoomed: false,
+                    focused: Some(pane),
+                    root_pane: Some(pane),
+                }],
+                active_tab: 0,
+            };
+        SessionSnapshot {
+            version: super::super::snapshot::SNAPSHOT_VERSION,
+            workspaces: vec![
+                workspace("wuser", None, 0),
+                workspace(
+                    "wsys",
+                    Some(crate::workspace::SystemRole::OverseerSession),
+                    1,
+                ),
+            ],
+            active: Some(1),
+            selected: 1,
+            sidebar_width: None,
+            collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn cold_restore_drops_a_system_workspace() {
+        let snapshot = snapshot_with_a_system_workspace();
+        let (events, _event_rx) = mpsc::channel(4);
+        let (workspaces, terminals, runtimes) = restore(
+            &snapshot,
+            None,
+            24,
+            80,
+            0,
+            test_restore_shell(),
+            crate::config::ShellModeConfig::NonLogin,
+            false,
+            events,
+            Arc::new(Notify::new()),
+            Arc::new(AtomicBool::new(false)),
+        );
+        assert_eq!(
+            workspaces.len(),
+            1,
+            "nothing can resume the overseer's session"
+        );
+        assert_eq!(workspaces[0].id, "wuser");
+        assert!(!workspaces[0].is_system());
+        assert_eq!(terminals.len(), 1);
+        assert_eq!(runtimes.len(), 1);
+        for ws in &workspaces {
+            ws.assert_invariants_for_test();
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn handoff_keeps_a_system_workspace() {
+        use portable_pty::{native_pty_system, PtySize};
+
+        let snapshot = snapshot_with_a_system_workspace();
+        // Both panes arrive with a live pty, the way a handoff delivers them.
+        let mut imports = HashMap::new();
+        let mut keep_alive = Vec::new();
+        for raw in [0u32, 1u32] {
+            let pair = native_pty_system()
+                .openpty(PtySize {
+                    rows: 24,
+                    cols: 80,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .expect("pty");
+            // A real child holds the slave open: the runtime signals
+            // `child_pid` when it shuts down (so it must not be this test
+            // process), and the reader only returns once the slave closes.
+            let mut command = portable_pty::CommandBuilder::new("sleep");
+            command.arg("300");
+            let child = pair.slave.spawn_command(command).expect("child");
+            drop(pair.slave);
+            let child_pid = child.process_id().expect("child pid");
+            let master_fd = pair.master.as_raw_fd().expect("master fd");
+            // The import takes ownership of its fd.
+            let owned = unsafe { libc::dup(master_fd) };
+            assert!(owned >= 0);
+            imports.insert(
+                raw,
+                crate::handoff_runtime::ImportedHandoffRuntime {
+                    master_fd: owned,
+                    state: crate::handoff_runtime::HandoffRuntimeState {
+                        pane_id: raw,
+                        child_pid,
+                        rows: 24,
+                        cols: 80,
+                        cell_width_px: 0,
+                        cell_height_px: 0,
+                        keyboard_protocol_flags: 0,
+                        keyboard_protocol_ansi: None,
+                        input_state: None,
+                        initial_history_ansi: None,
+                    },
+                },
+            );
+            keep_alive.push((pair.master, child));
+        }
+        let (events, _event_rx) = mpsc::channel(4);
+        let (workspaces, terminals, mut runtimes) = restore_handoff(
+            &snapshot,
+            0,
+            test_restore_shell(),
+            crate::config::ShellModeConfig::NonLogin,
+            &mut imports,
+            events,
+            Arc::new(Notify::new()),
+            Arc::new(AtomicBool::new(false)),
+        )
+        .expect("handoff restore");
+        assert!(imports.is_empty());
+        assert_eq!(workspaces.len(), 2);
+        assert_eq!(workspaces[1].id, "wsys");
+        assert_eq!(
+            workspaces[1].system,
+            Some(crate::workspace::SystemRole::OverseerSession)
+        );
+        assert_eq!(workspaces[1].custom_name.as_deref(), Some("overseer"));
+        assert!(!workspaces[0].is_system());
+        assert_eq!(terminals.len(), 2);
+        for ws in &workspaces {
+            ws.assert_invariants_for_test();
+        }
+        for (_, runtime) in runtimes.drain() {
+            runtime.shutdown();
+        }
+        for (master, mut child) in keep_alive {
+            let _ = child.kill();
+            let _ = child.wait();
+            drop(master);
+        }
     }
 }
