@@ -813,6 +813,11 @@ impl App {
             crate::persist::handoff_public_pane_id_aliases(snapshot, &pane_id_aliases, &workspaces);
 
         app.no_session = false;
+        // `Self::new(config, true, ..)` above skips the plugin registry the way
+        // an ephemeral `--no-session` run does, but a handoff is the same
+        // persistent session under a new binary: every `shep plugin link` lives
+        // in `plugins.json` and its event hooks must keep firing.
+        app.state.installed_plugins = load_plugin_registry(false);
         let now = Instant::now();
         if background_update_check_enabled(app.no_session, app.update_version_check_enabled) {
             app.next_auto_update_check = app
@@ -4931,5 +4936,58 @@ last_pane = "prefix+tab"
             &input[events[1].start..events[1].start + events[1].len],
             b"a"
         );
+    }
+
+    /// A live handoff builds the app with `no_session = true` (the snapshot is
+    /// handed over explicitly), and that flag also skips `plugins.json` — so
+    /// every `shep plugin link` used to vanish at the first handoff and its
+    /// event hooks went quiet. The handoff constructor must load the registry.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_handoff_keeps_the_linked_plugins() {
+        let root = unique_temp_path("handoff-plugins");
+        let plugin_root = root.join("plugin");
+        std::fs::create_dir_all(&plugin_root).unwrap();
+        std::fs::write(
+            plugin_root.join("shep-plugin.toml"),
+            "id = \"kept\"\nname = \"Kept\"\nversion = \"0.1.0\"\nmin_shep_version = \"0.7.3\"\nplatforms = [\"linux\", \"macos\"]\n",
+        )
+        .unwrap();
+        let plugin =
+            crate::app::api::plugins::load_plugin_manifest(&plugin_root.to_string_lossy(), true)
+                .expect("manifest loads");
+        // `plugins.json` lives in the config dir; point it at scratch. nextest
+        // runs one process per test, so the env var is ours.
+        std::env::set_var("XDG_CONFIG_HOME", &root);
+        let registry = crate::config::config_dir().join("plugins.json");
+        crate::persist::plugin_registry::save_to_path(&registry, &[plugin]).unwrap();
+
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let snapshot = crate::persist::SessionSnapshot {
+            version: 3,
+            workspaces: Vec::new(),
+            active: None,
+            selected: 0,
+            sidebar_width: None,
+            collapsed_space_keys: Default::default(),
+            public_pane_id_aliases: Default::default(),
+        };
+        let mut imports = std::collections::HashMap::new();
+        let app = App::new_from_handoff(
+            &Config::default(),
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+            &snapshot,
+            &mut imports,
+        )
+        .expect("handoff app");
+        assert!(
+            app.state.installed_plugins.contains_key("kept"),
+            "a handoff must reload plugins.json: {:?}",
+            app.state.installed_plugins.keys().collect::<Vec<_>>()
+        );
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

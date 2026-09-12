@@ -320,6 +320,8 @@
 
 ### Fixed
 
+- A live handoff keeps every linked plugin. The handoff constructor built the app the way an ephemeral `--no-session` run does and so skipped `plugins.json`; the links were on disk all along, but their event hooks went quiet after the first handoff.
+
 - An agent in a pane that was moved to another group keeps reporting to shep
   after a live handoff. A moved pane's shell keeps the `SHEP_PANE_ID` it was
   born with, so every hook in it — Claude's session reports above all — names
