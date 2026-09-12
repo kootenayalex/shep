@@ -342,6 +342,17 @@ pub struct RuntimeOverrideConfig {
     pub headless_argv: Vec<String>,
     /// How the prompt reaches `headless_argv`: `stdin` (default) or `arg`.
     pub headless_prompt: Option<crate::detect::manifest::HeadlessPrompt>,
+    /// Per-field: how the headless recipe names a new conversation
+    /// (`["--session-id", "{session_id}"]`). Set on its own it lands on the
+    /// manifest's `[headless]`; with `headless_argv` it completes the
+    /// override, which otherwise cannot share a session.
+    pub headless_session_new_args: Option<Vec<String>>,
+    /// Per-field: how the headless recipe resumes that conversation.
+    pub headless_session_resume_args: Option<Vec<String>>,
+    /// Per-field: the interactive launch's `session_new_args`.
+    pub session_new_args: Option<Vec<String>>,
+    /// Per-field: the interactive launch's `session_resume_args`.
+    pub session_resume_args: Option<Vec<String>>,
 }
 
 #[derive(Debug)]

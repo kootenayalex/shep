@@ -210,7 +210,7 @@ fn print_runtime_help() {
     eprintln!("  ask <name> <prompt|-> [--timeout SECS] [--cwd PATH]");
     eprintln!("                                      one-shot question through the runtime's [headless] recipe (default timeout {DEFAULT_ASK_TIMEOUT_SECS}s)");
     eprintln!();
-    eprintln!("a [runtimes.<name>] table in config.toml (argv, env, headless_argv, headless_prompt) overrides the manifest.");
+    eprintln!("a [runtimes.<name>] table in config.toml (argv, env, headless_argv, headless_prompt, and the per-field session_new_args, session_resume_args, headless_session_new_args, headless_session_resume_args) overrides the manifest.");
 }
 
 #[cfg(test)]

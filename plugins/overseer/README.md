@@ -25,8 +25,8 @@ nothing configured, and it is already useful.
 # config.toml
 [plugins.overseer]
 runtime = "claude"          # any runtime `shep runtime list` marks headless
-session_argv = ["claude"]   # the board's session button runs this (default)
-session_cwd = "~/vault/agents/shep-overseer"   # in here; default: the state dir
+session_argv = ["claude", "--resume", "{session_id}"]   # optional; see below
+session_cwd = "~/vault/agents/shep-overseer"   # both faces run here; default: the state dir
 ```
 
 or `SHEP_OVERSEER_RUNTIME=claude` in the server's environment. With a brain,
@@ -46,19 +46,52 @@ The prompt goes on stdin, so the runtime never sees it on argv. Point
 would rather not send a session summary anywhere.
 
 The same runtime answers the board's `chat` (`tab` on the overseer board):
-the TUI hands it the hard rules below, `situation.md`, the last twelve turns
-and the question, and shows the answer. The thread is `chat.jsonl` in the
-state dir, one `{"at", "role", "text"}` line per turn (`role` is `you` or
-`overseer`), appended by the TUI; the plugin does not write it. The chat
-obeys the same rules as the narrative — an answer is words on the board, never
-keys into a pane.
+the TUI hands it the hard rules below, `situation.md` and the question, and
+shows the answer. The thread is `chat.jsonl` in the state dir, one
+`{"at", "role", "text"}` line per turn (`role` is `you` or `overseer`),
+appended by the TUI; the plugin does not write it. The chat obeys the same
+rules as the narrative — an answer is words on the board, never keys into a
+pane.
+
+## One session, two faces
+
+The board's chat and the session pane are the same claude conversation.
+The first question (or the first opening of the pane) mints a v4 uuid into
+`session-id` in the state dir; every headless question runs
+`claude -p … --session-id <id>` until something has begun the conversation
+and `--resume <id>` after (`session-started` is the marker, written by the
+first answer that succeeds or by opening the pane), and the pane runs
+`claude --resume <id>` (or `--session-id <id>` when nothing has). Whatever
+you said in the pane, the chat knows; whatever the chat answered, the pane
+remembers. Because claude keys conversations by working directory, both
+faces run in one place: `session_cwd` when it exists, else the state dir
+(shep hands the pane `SHEP_OVERSEER_SESSION_CWD`). The chat's prompt
+carries no replay of earlier turns — the session is the memory — and
+re-sends the situation each time as current. A resume the runtime refuses
+(its transcript gone) drops the marker and starts the same id over, once.
+
+This holds for any runtime whose headless recipe declares
+`session_new_args` and `session_resume_args` (`claude` does; see the
+manifest's `[headless]`). A runtime without them gets today's stateless
+chat instead: a fresh process per question with the last twelve turns
+replayed in the prompt, and an unrelated session pane. A
+`[runtimes.<name>] headless_argv` override shares nothing unless it also
+sets `headless_session_new_args` / `headless_session_resume_args`.
+
+Ticks are stateless either way: `shep runtime ask` never touches the
+session. If the pane is open while you send a chat line, both append to the
+same transcript; do not type in both at the same instant.
 
 ## The session
 
 The board's `▸ open the overseer's session` button opens the `session` pane:
 `overseer-session` execs `session_argv` — or `SHEP_OVERSEER_SESSION_ARGV`
-(shell words) from the server's environment, or `claude` — in `session_cwd`
-(`~` expands; must exist) or the plugin's state dir, with
+(shell words) from the server's environment, with `{session_id}` in any
+word replaced by the shared id — or, by default, `claude --resume <id>` /
+`claude --session-id <id>` (plain `claude` when shep passed no id). It runs
+in `SHEP_OVERSEER_SESSION_CWD` when shep set it (the resolution above),
+else `session_cwd` (`~` expands; must exist) or the plugin's state dir,
+with `SHEP_OVERSEER_SESSION_ID`, `SHEP_OVERSEER_SESSION_RESUME` (`1`/`0`),
 `SHEP_OVERSEER_STATE_DIR`, `SHEP_OVERSEER_SITUATION` (`situation.md`),
 `SHEP_OVERSEER_BOARD` (`BOARD.md`) and `SHEP_OVERSEER_CHAT` (`chat.jsonl`)
 exported, so the agent can read what the tick wrote and what the chat said.
@@ -86,8 +119,9 @@ rules hold by construction, not by discipline.
 - `overseer-session` — the session launcher (Python 3, stdlib only): execs
   the configured agent with the state files in its environment.
 - state, under `SHEP_PLUGIN_STATE_DIR`: `situation.md`, `situation.json`,
-  `BOARD.md`, `BOARD.md.source`, `last-brain`, `journal.log`, and the board's
-  `chat.jsonl` (written by the TUI, read by anyone).
+  `BOARD.md`, `BOARD.md.source`, `last-brain`, `journal.log`, the board's
+  `chat.jsonl` (written by the TUI, read by anyone), and the shared
+  session's `session-id` and `session-started` (written by the TUI).
 
 Alex's vault skill `/shep-overseer` is the richer, claude-only variant of the
 same charter (paging, nudging, memory-file capture); this plugin is the part

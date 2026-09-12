@@ -4,6 +4,32 @@
 
 ### Added
 
+- The overseer board's chat and its session pane are one claude
+  conversation. When the overseer's runtime can name conversations, the
+  first chat line (or the first opening of the pane) mints a v4 uuid into
+  `session-id` in the plugin's state dir; every headless question then runs
+  with `--session-id <id>` until something has begun the conversation and
+  `--resume <id>` after (`session-started` marks it: the first successful
+  answer, or the pane being opened), and the pane is launched with
+  `SHEP_OVERSEER_SESSION_ID`, `SHEP_OVERSEER_SESSION_RESUME` and
+  `SHEP_OVERSEER_SESSION_CWD` so `overseer-session` runs
+  `claude --resume <id>` / `claude --session-id <id>` by default (a
+  configured `session_argv` or `SHEP_OVERSEER_SESSION_ARGV` has
+  `{session_id}` substituted instead). Both faces run in one directory —
+  `[plugins.overseer] session_cwd` when it exists, else the state dir —
+  since claude keys transcripts by cwd. The chat's prompt no longer replays
+  earlier turns for such a runtime (the session is the memory) and marks
+  the re-sent situation as current; a resume the runtime refuses is retried
+  once as new under the same id. Runtime manifests describe this
+  generically: `[headless]` and `[launch]` take optional
+  `session_new_args` / `session_resume_args` with a `{session_id}`
+  placeholder (the bundled `claude` manifest sets both), and
+  `[runtimes.<name>]` gains the per-field `headless_session_new_args`,
+  `headless_session_resume_args`, `session_new_args` and
+  `session_resume_args`. A runtime without them keeps the stateless chat
+  (a fresh process per question, the last twelve turns replayed). Ticks
+  are unchanged and stateless.
+
 - The overseer board's `▸ open the overseer's session` button (a click, or
   Enter with nothing selected) opens a real interactive session for the
   overseer: the plugin's `session` pane — `claude` by default, or

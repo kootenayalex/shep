@@ -12,11 +12,15 @@ bin = "claude"
 fallback_bins = ["openclaude"]
 version_args = ["--version"]
 argv = ["claude"]
+session_new_args = ["--session-id", "{session_id}"]
+session_resume_args = ["--resume", "{session_id}"]
 
 [headless]
 argv = ["claude", "-p", "--output-format", "text"]
 prompt = "stdin"
 output = "text"
+session_new_args = ["--session-id", "{session_id}"]
+session_resume_args = ["--resume", "{session_id}"]
 
 [[rules]]
 id = "osc_title_working"

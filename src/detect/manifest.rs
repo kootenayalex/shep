@@ -189,6 +189,17 @@ pub struct LaunchSpec {
     /// Environment the runtime needs (a caller's `env` wins on conflict).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
+    /// Arguments that start a *named* conversation, spliced after `argv`
+    /// with `{session_id}` replaced (claude: `["--session-id",
+    /// "{session_id}"]`). With `session_resume_args` this is what lets a
+    /// headless question and an interactive pane share one conversation;
+    /// absent, the runtime cannot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_new_args: Option<Vec<String>>,
+    /// Arguments that resume that conversation (claude: `["--resume",
+    /// "{session_id}"]`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_resume_args: Option<Vec<String>>,
 }
 
 /// `[headless]`: one-shot question to the CLI. The prompt goes on stdin by
@@ -203,6 +214,21 @@ pub struct HeadlessSpec {
     pub prompt: HeadlessPrompt,
     #[serde(default)]
     pub output: HeadlessOutput,
+    /// As on [`LaunchSpec`]: how to name the conversation a question starts,
+    /// so the next question (or an interactive pane) can resume it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_new_args: Option<Vec<String>>,
+    /// As on [`LaunchSpec`]: how to resume it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_resume_args: Option<Vec<String>>,
+}
+
+impl HeadlessSpec {
+    /// Whether questions can share one conversation: both session recipes
+    /// are declared. One without the other is treated as neither.
+    pub fn shares_session(&self) -> bool {
+        self.session_new_args.is_some() && self.session_resume_args.is_some()
+    }
 }
 
 #[derive(

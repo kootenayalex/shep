@@ -113,6 +113,9 @@ fn overseer_session_execs_the_configured_agent_in_the_configured_dir() {
     let run = |env: &[(&str, String)]| {
         let mut cmd = std::process::Command::new(Path::new(PLUGIN_DIR).join("overseer-session"));
         cmd.env_remove("SHEP_OVERSEER_SESSION_ARGV")
+            .env_remove("SHEP_OVERSEER_SESSION_ID")
+            .env_remove("SHEP_OVERSEER_SESSION_RESUME")
+            .env_remove("SHEP_OVERSEER_SESSION_CWD")
             .env("SHEP_PLUGIN_STATE_DIR", &state_dir);
         for (key, value) in env {
             cmd.env(key, value);
@@ -171,6 +174,129 @@ fn overseer_session_execs_the_configured_agent_in_the_configured_dir() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(stderr.lines().count(), 1, "{stderr}");
     assert!(stderr.starts_with("overseer-session: cannot run"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// One session, two faces: with shep's session env the launcher runs the
+/// board's conversation — `claude --session-id <id>` the first time,
+/// `claude --resume <id>` after — substitutes `{session_id}` into a
+/// configured argv, and runs where shep says.
+#[test]
+fn overseer_session_shares_the_boards_conversation() {
+    let dir = unique_test_dir();
+    let state_dir = dir.join("state");
+    let shep_cwd = dir.join("shep-cwd");
+    let config_cwd = dir.join("config-cwd");
+    let bin = dir.join("bin");
+    for d in [&state_dir, &shep_cwd, &config_cwd, &bin] {
+        fs::create_dir_all(d).unwrap();
+    }
+    // A `claude` on PATH that prints its argv and cwd, so the default can
+    // be seen without the real thing.
+    let fake = bin.join("claude");
+    fs::write(
+        &fake,
+        "#!/bin/sh\npwd\nfor arg in \"$@\"; do echo \"$arg\"; done\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let path_var = format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let run = |env: &[(&str, String)]| {
+        let mut cmd = std::process::Command::new(Path::new(PLUGIN_DIR).join("overseer-session"));
+        cmd.env_remove("SHEP_OVERSEER_SESSION_ARGV")
+            .env_remove("SHEP_OVERSEER_SESSION_ID")
+            .env_remove("SHEP_OVERSEER_SESSION_RESUME")
+            .env_remove("SHEP_OVERSEER_SESSION_CWD")
+            .env_remove("SHEP_PLUGIN_CONFIG_JSON")
+            .env("PATH", &path_var)
+            .env("SHEP_PLUGIN_STATE_DIR", &state_dir);
+        for (key, value) in env {
+            cmd.env(key, value);
+        }
+        let out = cmd.output().unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .map(str::to_string)
+            .collect::<Vec<String>>()
+    };
+    let canon = |p: &Path| fs::canonicalize(p).unwrap().display().to_string();
+    let id = "0f5a1c2e-7b1d-4e3a-9c8b-0123456789ab".to_string();
+
+    // No id at all: plain `claude`, in the state dir.
+    assert_eq!(run(&[]), vec![canon(&state_dir)]);
+
+    // A new conversation, where shep says.
+    let out = run(&[
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_RESUME", "0".to_string()),
+        ("SHEP_OVERSEER_SESSION_CWD", shep_cwd.display().to_string()),
+    ]);
+    assert_eq!(
+        out,
+        vec![canon(&shep_cwd), "--session-id".to_string(), id.clone()]
+    );
+
+    // A begun one is resumed.
+    let out = run(&[
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_RESUME", "1".to_string()),
+        ("SHEP_OVERSEER_SESSION_CWD", shep_cwd.display().to_string()),
+    ]);
+    assert_eq!(
+        out,
+        vec![canon(&shep_cwd), "--resume".to_string(), id.clone()]
+    );
+
+    // shep's cwd wins over the config's; without it the config's holds.
+    let config = serde_json::json!({
+        "session_argv": ["claude", "--model", "opus", "--resume={session_id}"],
+        "session_cwd": config_cwd.display().to_string(),
+    });
+    let out = run(&[
+        ("SHEP_PLUGIN_CONFIG_JSON", config.to_string()),
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_RESUME", "1".to_string()),
+        ("SHEP_OVERSEER_SESSION_CWD", shep_cwd.display().to_string()),
+    ]);
+    assert_eq!(
+        out,
+        vec![
+            canon(&shep_cwd),
+            "--model".to_string(),
+            "opus".to_string(),
+            format!("--resume={id}"),
+        ],
+        "a configured argv substitutes the id and is not second-guessed"
+    );
+    let out = run(&[
+        ("SHEP_PLUGIN_CONFIG_JSON", config.to_string()),
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+    ]);
+    assert_eq!(out[0], canon(&config_cwd));
+
+    // The env argv substitutes too, and wins over the config.
+    let out = run(&[
+        ("SHEP_PLUGIN_CONFIG_JSON", config.to_string()),
+        (
+            "SHEP_OVERSEER_SESSION_ARGV",
+            "claude -r {session_id}".to_string(),
+        ),
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_CWD", shep_cwd.display().to_string()),
+    ]);
+    assert_eq!(out, vec![canon(&shep_cwd), "-r".to_string(), id]);
     let _ = fs::remove_dir_all(&dir);
 }
 

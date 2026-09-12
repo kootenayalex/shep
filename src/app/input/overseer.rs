@@ -489,6 +489,43 @@ mod tests {
         dir
     }
 
+    /// [`fake_brain`] whose recipe also names conversations
+    /// (`--session-id {session_id}` / `--resume {session_id}`), so the chat
+    /// shares one with the session pane. The script sees them as `$@` and
+    /// is expected to record them in `argv.log` in the dir.
+    fn fake_brain_with_session(app: &mut App, script: &str) -> std::path::PathBuf {
+        let dir = fake_brain(app, script);
+        let over = app
+            .state
+            .runtimes_config
+            .get_mut("fake-brain")
+            .expect("the fake brain");
+        over.headless_session_new_args = Some(vec!["--session-id".into(), "{session_id}".into()]);
+        over.headless_session_resume_args = Some(vec!["--resume".into(), "{session_id}".into()]);
+        dir
+    }
+
+    /// The lines of `argv.log`: what each headless run was called with.
+    fn argv_log(dir: &std::path::Path) -> Vec<String> {
+        std::fs::read_to_string(dir.join("argv.log"))
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// A script body that logs `$@` and the cwd to `argv.log`, then reads
+    /// the prompt and answers `text` — unless `$1` is `--resume`, when
+    /// `on_resume` runs instead (an empty string: answer as usual).
+    fn recording_script(text: &str, on_resume: &str) -> String {
+        format!(
+            "printf '%s' \"$PWD\" >> \"$(dirname \"$0\")/argv.log\"; printf ' %s' \"$@\" >> \"$(dirname \"$0\")/argv.log\"; echo >> \"$(dirname \"$0\")/argv.log\"; \
+             prompt=$(cat); case \"$prompt\" in *'Hard rules'*) ;; *) echo 'no rules' >&2; exit 9;; esac; \
+             case \"$prompt\" in *'The conversation so far'*) echo 'replayed' >&2; exit 8;; esac; \
+             if [ \"$1\" = --resume ]; then :; {on_resume} fi; echo '{text}'"
+        )
+    }
+
     async fn pump_chat(app: &mut App) {
         let event = tokio::time::timeout(std::time::Duration::from_secs(20), app.event_rx.recv())
             .await
@@ -557,6 +594,92 @@ mod tests {
         assert!(!app.state.overseer.chat_pending);
         assert_eq!(chat_lines(&dir).len(), 2);
         let _ = std::fs::remove_dir_all(&dir);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn first_chat_creates_then_resumes() {
+        let (mut app, path, _) = overseer_app();
+        let dir = fake_brain_with_session(&mut app, &recording_script("fine.", ""));
+        std::fs::write(dir.join("situation.md"), "all quiet.\n").expect("situation");
+        assert!(!dir.join("session-id").exists());
+
+        app.send_overseer_chat("first?".into());
+        pump_chat(&mut app).await;
+        let (id, started) = app.state.overseer.overseer_session();
+        assert!(started, "a successful answer begins the session");
+        assert_eq!(
+            app.state.overseer.chat.last().map(|t| t.text.as_str()),
+            Some("fine.")
+        );
+
+        app.send_overseer_chat("second?".into());
+        pump_chat(&mut app).await;
+        assert_eq!(app.state.overseer.overseer_session(), (id.clone(), true));
+        let cwd = std::fs::canonicalize(&dir)
+            .expect("dir")
+            .display()
+            .to_string();
+        assert_eq!(
+            argv_log(&dir),
+            vec![
+                format!("{cwd} --session-id {id}"),
+                format!("{cwd} --resume {id}"),
+            ],
+            "new first, resumed after, both in the session's cwd"
+        );
+        assert_eq!(
+            chat_lines(&dir).len(),
+            4,
+            "the board still draws every turn"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn a_failed_resume_retries_once_as_new() {
+        let (mut app, path, _) = overseer_app();
+        let dir = fake_brain_with_session(
+            &mut app,
+            &recording_script("started over.", "echo 'No conversation found' >&2; exit 1;"),
+        );
+        // Something began the session (the pane, say) but the runtime has
+        // lost it: the resume fails, the same id starts over, once.
+        app.state.overseer.mark_session_started();
+        let (id, _) = app.state.overseer.overseer_session();
+        app.send_overseer_chat("still there?".into());
+        pump_chat(&mut app).await;
+        assert_eq!(
+            app.state.overseer.chat.last().map(|t| t.text.as_str()),
+            Some("started over.")
+        );
+        let log = argv_log(&dir);
+        assert_eq!(log.len(), 2, "{log:?}");
+        assert!(log[0].ends_with(&format!(" --resume {id}")), "{log:?}");
+        assert!(log[1].ends_with(&format!(" --session-id {id}")), "{log:?}");
+        assert_eq!(app.state.overseer.overseer_session(), (id.clone(), true));
+
+        // When starting over fails too, the marker stays cleared and the
+        // last failure is the row; a new one is not retried again.
+        let dir2 = fake_brain_with_session(
+            &mut app,
+            "printf ' %s' \"$@\" >> \"$(dirname \"$0\")/argv.log\"; echo >> \"$(dirname \"$0\")/argv.log\"; cat >/dev/null; echo \"gone $1\" >&2; exit 2",
+        );
+        app.state.overseer.mark_session_started();
+        app.send_overseer_chat("anyone?".into());
+        pump_chat(&mut app).await;
+        assert_eq!(
+            app.state.overseer.chat.last().map(|t| t.text.as_str()),
+            Some("the overseer did not answer: fake-brain exited 2: gone --session-id")
+        );
+        assert_eq!(argv_log(&dir2).len(), 2);
+        assert!(
+            !app.state.overseer.overseer_session().1,
+            "nothing has begun it"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&dir2);
         cleanup(&path);
     }
 
@@ -879,6 +1002,55 @@ mod tests {
 
         crate::app::api::test_support::shutdown_test_runtimes(&mut app);
         let _ = std::fs::remove_dir_all(&root);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn session_pane_env_carries_id_resume_and_cwd() {
+        let (mut app, path, _) = overseer_app();
+        let state_dir = crate::app::overseer::test_state_dir();
+        app.state.overseer.state_dir = state_dir.clone();
+        let cwd = crate::app::overseer::test_state_dir();
+        std::fs::create_dir_all(&cwd).expect("cwd");
+        app.state.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str(&format!("session_cwd = \"{}\"", cwd.display())).expect("table"),
+        );
+        let out = state_dir.join("pane-env");
+        let script = format!(
+            "printf '%s\\n%s\\n%s\\n' \"$SHEP_OVERSEER_SESSION_ID\" \"$SHEP_OVERSEER_SESSION_RESUME\" \"$SHEP_OVERSEER_SESSION_CWD\" > '{}'; sleep 30",
+            out.display()
+        );
+        let root = install_fake_overseer(&mut app, &["sh", "-c", &script]);
+        assert!(!state_dir.join("session-id").exists());
+
+        app.open_overseer_session();
+        assert!(app.overseer_session_workspace().is_some());
+        let (id, started) = app.state.overseer.overseer_session();
+        assert!(started, "opening the pane begins the session");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let text = loop {
+            if let Ok(text) = std::fs::read_to_string(&out) {
+                if text.lines().count() == 3 {
+                    break text;
+                }
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the pane never wrote its env"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        };
+        assert_eq!(
+            text.lines().collect::<Vec<_>>(),
+            vec![id.as_str(), "0", &cwd.display().to_string()],
+            "a fresh id, not yet begun when the pane was launched, in the configured cwd"
+        );
+
+        crate::app::api::test_support::shutdown_test_runtimes(&mut app);
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&state_dir);
+        let _ = std::fs::remove_dir_all(&cwd);
         cleanup(&path);
     }
 

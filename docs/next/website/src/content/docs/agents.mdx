@@ -91,13 +91,20 @@ version_args = ["--version"]        # how the binary prints its version
 argv = ["claude"]                   # what agent.start runs; defaults to [bin]
 env = {}                            # environment the runtime needs
 
+session_new_args = ["--session-id", "{session_id}"]   # optional: name a conversation
+session_resume_args = ["--resume", "{session_id}"]    # optional: pick it up again
+
 [headless]
 argv = ["claude", "-p", "--output-format", "text"]
 prompt = "stdin"                    # or "arg": appended as the last argument
 output = "text"                     # or "stream-json"
+session_new_args = ["--session-id", "{session_id}"]
+session_resume_args = ["--resume", "{session_id}"]
 ```
 
 `[launch]` is what `agent.start { runtime = "claude" }` and `shep agent start <name> --runtime claude` run. When `bin` is not on `PATH` the first `fallback_bins` entry that is takes its place in `argv[0]`; when none is, the error `runtime_not_launchable` names every binary tried. `[headless]` is the one-shot question command behind `shep runtime ask`: the prompt goes on stdin by default so a long prompt never hits an argv limit. The bundled manifests carry both sections for `claude`, `opencode`, `codex`, `gemini` and `copilot`; `shep runtime list` shows which runtimes this machine can actually launch.
+
+`session_new_args` and `session_resume_args` are optional on both and say how the runtime names a conversation: the caller's id replaces `{session_id}` in every word and the result is spliced after `argv` (before a prompt that travels as an argument). A recipe with both can share one conversation between a headless question and an interactive pane — the overseer board's chat and session do — and one without them cannot; one without the other counts as neither. `shep runtime ask` never uses them.
 
 A `[runtimes.<name>]` table in `config.toml` overrides either recipe without editing a manifest (see [Configuration](/docs/configuration/#runtimes)). A local detection override that omits the sections does not make a runtime unlaunchable: the bundled recipe still applies.
 

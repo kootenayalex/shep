@@ -37,6 +37,11 @@ pub struct ResolvedLaunch {
     /// Absolute path of `argv[0]` as found on `PATH`.
     pub bin_resolved: PathBuf,
     pub source: RecipeSource,
+    /// The recipe's `session_new_args`, when it names conversations; see
+    /// [`session_args`] for the splice.
+    pub session_new_args: Option<Vec<String>>,
+    /// The recipe's `session_resume_args`.
+    pub session_resume_args: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,7 +128,8 @@ pub fn resolve_launch(
                 tried: vec![program.clone()],
             });
         };
-        let env = override_for(name, overrides)
+        let over = override_for(name, overrides);
+        let env = over
             .map(|over| over.env.clone().into_iter().collect())
             .unwrap_or_default();
         return Ok(ResolvedLaunch {
@@ -131,6 +137,8 @@ pub fn resolve_launch(
             env,
             bin_resolved,
             source: RecipeSource::Config,
+            session_new_args: over.and_then(|over| over.session_new_args.clone()),
+            session_resume_args: over.and_then(|over| over.session_resume_args.clone()),
         });
     }
     let Some(agent) = agent else {
@@ -138,12 +146,22 @@ pub fn resolve_launch(
             name: name.to_string(),
         });
     };
-    let Some(spec) = crate::detect::manifest::launch_spec(agent) else {
+    let Some(mut spec) = crate::detect::manifest::launch_spec(agent) else {
         return Err(RuntimeResolveError::NotLaunchable {
             name: name.to_string(),
             tried: Vec::new(),
         });
     };
+    // Per-field: the session recipes override on their own, the argv does
+    // not have to come along.
+    if let Some(over) = override_for(name, overrides) {
+        if over.session_new_args.is_some() {
+            spec.session_new_args = over.session_new_args.clone();
+        }
+        if over.session_resume_args.is_some() {
+            spec.session_resume_args = over.session_resume_args.clone();
+        }
+    }
     resolve_launch_spec(name, &spec, find_on_path)
 }
 
@@ -172,6 +190,8 @@ pub fn resolve_launch_spec(
                 env: spec.env.clone().into_iter().collect(),
                 bin_resolved,
                 source: RecipeSource::Manifest,
+                session_new_args: spec.session_new_args.clone(),
+                session_resume_args: spec.session_resume_args.clone(),
             });
         }
         tried.push(candidate.to_string());
@@ -183,19 +203,24 @@ pub fn resolve_launch_spec(
 }
 
 /// Resolve the one-shot question recipe for `name`: the config override when
-/// it sets `headless_argv`, else the manifest's `[headless]`.
+/// it sets `headless_argv`, else the manifest's `[headless]`. The override's
+/// `headless_session_new_args` / `headless_session_resume_args` are
+/// per-field: on their own they land on the manifest's recipe, and with
+/// `headless_argv` they are the only way the override can share a session.
 pub fn resolve_headless(
     name: &str,
     overrides: &BTreeMap<String, RuntimeOverrideConfig>,
 ) -> Result<(HeadlessSpec, RecipeSource), RuntimeResolveError> {
     let name = name.trim();
-    if let Some(over) = override_for(name, overrides).filter(|over| !over.headless_argv.is_empty())
-    {
+    let over = override_for(name, overrides);
+    if let Some(over) = over.filter(|over| !over.headless_argv.is_empty()) {
         return Ok((
             HeadlessSpec {
                 argv: over.headless_argv.clone(),
                 prompt: over.headless_prompt.unwrap_or_default(),
                 output: Default::default(),
+                session_new_args: over.headless_session_new_args.clone(),
+                session_resume_args: over.headless_session_resume_args.clone(),
             },
             RecipeSource::Config,
         ));
@@ -205,12 +230,55 @@ pub fn resolve_headless(
             name: name.to_string(),
         });
     };
-    crate::detect::manifest::headless_spec(agent)
-        .map(|spec| (spec, RecipeSource::Manifest))
-        .ok_or_else(|| RuntimeResolveError::NotLaunchable {
+    let Some(mut spec) = crate::detect::manifest::headless_spec(agent) else {
+        return Err(RuntimeResolveError::NotLaunchable {
             name: name.to_string(),
             tried: Vec::new(),
-        })
+        });
+    };
+    if let Some(over) = over {
+        if over.headless_session_new_args.is_some() {
+            spec.session_new_args = over.headless_session_new_args.clone();
+        }
+        if over.headless_session_resume_args.is_some() {
+            spec.session_resume_args = over.headless_session_resume_args.clone();
+        }
+    }
+    Ok((spec, RecipeSource::Manifest))
+}
+
+/// The conversation a headless question belongs to: `id` is substituted
+/// for `{session_id}` in the recipe's `session_new_args` (first question)
+/// or `session_resume_args` (every later one).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeadlessSession {
+    pub id: String,
+    pub resume: bool,
+}
+
+/// The placeholder a session recipe carries where the id goes.
+pub const SESSION_ID_PLACEHOLDER: &str = "{session_id}";
+
+/// The session arguments for `session` under `spec`: the resume or new
+/// recipe with `{session_id}` replaced verbatim in every word. `None` when
+/// the recipe does not name conversations, so the argv goes out unchanged.
+pub fn session_args(spec: &HeadlessSpec, session: &HeadlessSession) -> Option<Vec<String>> {
+    if !spec.shares_session() {
+        return None;
+    }
+    let recipe = if session.resume {
+        spec.session_resume_args.as_deref()
+    } else {
+        spec.session_new_args.as_deref()
+    }?;
+    Some(substitute_session_id(recipe, &session.id))
+}
+
+/// `{session_id}` -> `id` in every word.
+pub fn substitute_session_id(args: &[String], id: &str) -> Vec<String> {
+    args.iter()
+        .map(|word| word.replace(SESSION_ID_PLACEHOLDER, id))
+        .collect()
 }
 
 /// Every runtime shep can name — the detection manifests plus any
@@ -308,19 +376,39 @@ pub fn run_headless(
     timeout: Duration,
     cwd: Option<&Path>,
 ) -> std::io::Result<HeadlessOutcome> {
-    run_headless_with(spec, prompt, timeout, cwd, false).map(|capture| capture.outcome)
+    run_headless_with(spec, prompt, timeout, cwd, None, false).map(|capture| capture.outcome)
 }
 
 /// [`run_headless`] with the child's stdout and stderr captured instead of
-/// inherited, each capped at [`HEADLESS_CAPTURE_MAX_BYTES`]. The board's
-/// chat uses this: the answer is the stdout.
+/// inherited, each capped at [`HEADLESS_CAPTURE_MAX_BYTES`], and, with a
+/// `session`, the recipe's session arguments spliced after the argv (see
+/// [`session_args`]). The board's chat uses this: the answer is the stdout.
 pub fn run_headless_captured(
     spec: &HeadlessSpec,
     prompt: &str,
     timeout: Duration,
     cwd: Option<&Path>,
+    session: Option<&HeadlessSession>,
 ) -> std::io::Result<HeadlessCapture> {
-    run_headless_with(spec, prompt, timeout, cwd, true)
+    run_headless_with(spec, prompt, timeout, cwd, session, true)
+}
+
+/// The argv a run uses: the recipe's, then the session arguments when
+/// there is a session and a recipe for it, then the prompt when it travels
+/// as an argument.
+pub fn headless_argv(
+    spec: &HeadlessSpec,
+    prompt: &str,
+    session: Option<&HeadlessSession>,
+) -> Vec<String> {
+    let mut argv = spec.argv.clone();
+    if let Some(args) = session.and_then(|session| session_args(spec, session)) {
+        argv.extend(args);
+    }
+    if spec.prompt == HeadlessPrompt::Arg {
+        argv.push(prompt.to_string());
+    }
+    argv
 }
 
 /// The one launch-and-wait loop behind both entry points. With `capture`
@@ -332,12 +420,10 @@ fn run_headless_with(
     prompt: &str,
     timeout: Duration,
     cwd: Option<&Path>,
+    session: Option<&HeadlessSession>,
     capture: bool,
 ) -> std::io::Result<HeadlessCapture> {
-    let mut argv = spec.argv.clone();
-    if spec.prompt == HeadlessPrompt::Arg {
-        argv.push(prompt.to_string());
-    }
+    let argv = headless_argv(spec, prompt, session);
     let Some(program) = argv.first() else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -448,6 +534,18 @@ mod tests {
             version_args: vec!["--version".into()],
             argv: argv.iter().map(|s| s.to_string()).collect(),
             env: BTreeMap::new(),
+            session_new_args: None,
+            session_resume_args: None,
+        }
+    }
+
+    fn headless(argv: &[&str], prompt: HeadlessPrompt) -> HeadlessSpec {
+        HeadlessSpec {
+            argv: argv.iter().map(|s| s.to_string()).collect(),
+            prompt,
+            output: Default::default(),
+            session_new_args: None,
+            session_resume_args: None,
         }
     }
 
@@ -533,6 +631,10 @@ mod tests {
         assert_eq!(resolved.source, RecipeSource::Config);
         assert_eq!(resolved.argv[0], "my-claude");
         assert_eq!(resolved.env, vec![("FOO".to_string(), "bar".to_string())]);
+        assert_eq!(
+            resolved.session_new_args, None,
+            "an override without them shares nothing"
+        );
 
         let err = resolve_launch("claude", &overrides, &path_with(&["claude"])).unwrap_err();
         assert_eq!(
@@ -594,6 +696,183 @@ mod tests {
     }
 
     #[test]
+    fn session_args_are_per_field_overrides_and_absent_means_no_sharing() {
+        // A `headless_argv` override on its own cannot share a session.
+        let mut overrides = BTreeMap::new();
+        overrides.insert(
+            "local-llm".to_string(),
+            RuntimeOverrideConfig {
+                headless_argv: vec!["llm".into(), "ask".into()],
+                ..Default::default()
+            },
+        );
+        let (spec, _) = resolve_headless("local-llm", &overrides).unwrap();
+        assert!(!spec.shares_session());
+        assert_eq!(
+            headless_argv(
+                &spec,
+                "q",
+                Some(&HeadlessSession {
+                    id: "X".into(),
+                    resume: true
+                })
+            ),
+            vec!["llm", "ask"]
+        );
+
+        // With the session fields it can.
+        overrides.insert(
+            "local-llm".to_string(),
+            RuntimeOverrideConfig {
+                headless_argv: vec!["llm".into(), "ask".into()],
+                headless_session_new_args: Some(vec!["--new".into(), "{session_id}".into()]),
+                headless_session_resume_args: Some(vec!["--continue={session_id}".into()]),
+                ..Default::default()
+            },
+        );
+        let (spec, _) = resolve_headless("local-llm", &overrides).unwrap();
+        assert!(spec.shares_session());
+        assert_eq!(
+            headless_argv(
+                &spec,
+                "q",
+                Some(&HeadlessSession {
+                    id: "X".into(),
+                    resume: false
+                })
+            ),
+            vec!["llm", "ask", "--new", "X"]
+        );
+        assert_eq!(
+            headless_argv(
+                &spec,
+                "q",
+                Some(&HeadlessSession {
+                    id: "X".into(),
+                    resume: true
+                })
+            ),
+            vec!["llm", "ask", "--continue=X"]
+        );
+
+        // The bundled claude manifest shares; the session fields alone
+        // override it without replacing its argv.
+        let (claude, source) = resolve_headless("claude", &BTreeMap::new()).unwrap();
+        assert_eq!(source, RecipeSource::Manifest);
+        assert!(claude.shares_session());
+        assert_eq!(
+            headless_argv(
+                &claude,
+                "q",
+                Some(&HeadlessSession {
+                    id: "u-1".into(),
+                    resume: false
+                })
+            ),
+            vec![
+                "claude",
+                "-p",
+                "--output-format",
+                "text",
+                "--session-id",
+                "u-1"
+            ]
+        );
+        assert_eq!(
+            headless_argv(
+                &claude,
+                "q",
+                Some(&HeadlessSession {
+                    id: "u-1".into(),
+                    resume: true
+                })
+            ),
+            vec!["claude", "-p", "--output-format", "text", "--resume", "u-1"]
+        );
+        assert_eq!(
+            headless_argv(&claude, "q", None),
+            vec!["claude", "-p", "--output-format", "text"],
+            "no session, no splice"
+        );
+        let mut overrides = BTreeMap::new();
+        overrides.insert(
+            "claude".to_string(),
+            RuntimeOverrideConfig {
+                headless_session_resume_args: Some(vec!["-r".into(), "{session_id}".into()]),
+                ..Default::default()
+            },
+        );
+        let (claude, source) = resolve_headless("claude", &overrides).unwrap();
+        assert_eq!(source, RecipeSource::Manifest);
+        assert_eq!(claude.argv, vec!["claude", "-p", "--output-format", "text"]);
+        assert_eq!(
+            session_args(
+                &claude,
+                &HeadlessSession {
+                    id: "u-1".into(),
+                    resume: true
+                }
+            ),
+            Some(vec!["-r".into(), "u-1".into()])
+        );
+
+        // The launch recipe carries the same two.
+        let launch = resolve_launch("claude", &BTreeMap::new(), &path_with(&["claude"])).unwrap();
+        assert_eq!(
+            launch.session_resume_args,
+            Some(vec!["--resume".into(), "{session_id}".into()])
+        );
+        assert_eq!(
+            substitute_session_id(launch.session_new_args.as_deref().unwrap_or(&[]), "u-2"),
+            vec!["--session-id", "u-2"]
+        );
+        // A prompt that travels as an argument stays last.
+        let mut arg = headless(&["ask"], HeadlessPrompt::Arg);
+        arg.session_new_args = Some(vec!["--sid".into(), "{session_id}".into()]);
+        arg.session_resume_args = Some(vec!["--rid".into(), "{session_id}".into()]);
+        assert_eq!(
+            headless_argv(
+                &arg,
+                "hello",
+                Some(&HeadlessSession {
+                    id: "S".into(),
+                    resume: false
+                })
+            ),
+            vec!["ask", "--sid", "S", "hello"]
+        );
+    }
+
+    #[test]
+    fn run_headless_captured_splices_the_session_args() {
+        let mut spec = headless(
+            &["sh", "-c", "printf '%s\\n' \"$@\"", "argv0"],
+            HeadlessPrompt::Arg,
+        );
+        spec.session_new_args = Some(vec!["--session-id".into(), "{session_id}".into()]);
+        spec.session_resume_args = Some(vec!["--resume".into(), "{session_id}".into()]);
+        let session = HeadlessSession {
+            id: "abc".into(),
+            resume: false,
+        };
+        let capture =
+            run_headless_captured(&spec, "q", Duration::from_secs(10), None, Some(&session))
+                .unwrap();
+        assert_eq!(capture.stdout, "--session-id\nabc\nq\n");
+        let session = HeadlessSession {
+            id: "abc".into(),
+            resume: true,
+        };
+        let capture =
+            run_headless_captured(&spec, "q", Duration::from_secs(10), None, Some(&session))
+                .unwrap();
+        assert_eq!(capture.stdout, "--resume\nabc\nq\n");
+        let capture =
+            run_headless_captured(&spec, "q", Duration::from_secs(10), None, None).unwrap();
+        assert_eq!(capture.stdout, "q\n");
+    }
+
+    #[test]
     fn find_on_path_only_accepts_executable_regular_files() {
         let dir = std::env::temp_dir().join(format!("shep-runtimes-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -620,20 +899,12 @@ mod tests {
 
     #[test]
     fn run_headless_delivers_the_prompt_on_stdin_and_times_out() {
-        let spec = HeadlessSpec {
-            argv: vec!["sh".into(), "-c".into(), "cat >/dev/null".into()],
-            prompt: HeadlessPrompt::Stdin,
-            output: Default::default(),
-        };
+        let spec = headless(&["sh", "-c", "cat >/dev/null"], HeadlessPrompt::Stdin);
         let outcome = run_headless(&spec, "hello", Duration::from_secs(10), None).unwrap();
         assert_eq!(outcome.exit_code, Some(0));
         assert!(!outcome.timed_out);
 
-        let slow = HeadlessSpec {
-            argv: vec!["sh".into(), "-c".into(), "sleep 30".into()],
-            prompt: HeadlessPrompt::Arg,
-            output: Default::default(),
-        };
+        let slow = headless(&["sh", "-c", "sleep 30"], HeadlessPrompt::Arg);
         let outcome = run_headless(&slow, "x", Duration::from_millis(200), None).unwrap();
         assert!(outcome.timed_out);
         assert_eq!(outcome.exit_code, None);
@@ -641,27 +912,24 @@ mod tests {
 
     #[test]
     fn run_headless_captured_returns_stdout_and_times_out() {
-        let echo = HeadlessSpec {
-            argv: vec![
-                "sh".into(),
-                "-c".into(),
-                "read -r line; printf 'answer: %s\\n' \"$line\"; echo warn >&2".into(),
+        let echo = headless(
+            &[
+                "sh",
+                "-c",
+                "read -r line; printf 'answer: %s\\n' \"$line\"; echo warn >&2",
             ],
-            prompt: HeadlessPrompt::Stdin,
-            output: Default::default(),
-        };
-        let capture = run_headless_captured(&echo, "hello", Duration::from_secs(10), None).unwrap();
+            HeadlessPrompt::Stdin,
+        );
+        let capture =
+            run_headless_captured(&echo, "hello", Duration::from_secs(10), None, None).unwrap();
         assert_eq!(capture.outcome.exit_code, Some(0));
         assert!(!capture.outcome.timed_out);
         assert_eq!(capture.stdout, "answer: hello\n");
         assert_eq!(capture.stderr, "warn\n");
 
-        let slow = HeadlessSpec {
-            argv: vec!["sh".into(), "-c".into(), "echo early; sleep 30".into()],
-            prompt: HeadlessPrompt::Arg,
-            output: Default::default(),
-        };
-        let capture = run_headless_captured(&slow, "x", Duration::from_millis(200), None).unwrap();
+        let slow = headless(&["sh", "-c", "echo early; sleep 30"], HeadlessPrompt::Arg);
+        let capture =
+            run_headless_captured(&slow, "x", Duration::from_millis(200), None, None).unwrap();
         assert!(capture.outcome.timed_out);
         assert_eq!(capture.outcome.exit_code, None);
         assert_eq!(
@@ -669,12 +937,9 @@ mod tests {
             "what arrived before the kill is kept"
         );
 
-        let failing = HeadlessSpec {
-            argv: vec!["sh".into(), "-c".into(), "echo nope >&2; exit 3".into()],
-            prompt: HeadlessPrompt::Arg,
-            output: Default::default(),
-        };
-        let capture = run_headless_captured(&failing, "x", Duration::from_secs(10), None).unwrap();
+        let failing = headless(&["sh", "-c", "echo nope >&2; exit 3"], HeadlessPrompt::Arg);
+        let capture =
+            run_headless_captured(&failing, "x", Duration::from_secs(10), None, None).unwrap();
         assert_eq!(capture.outcome.exit_code, Some(3));
         assert_eq!(capture.stderr, "nope\n");
     }

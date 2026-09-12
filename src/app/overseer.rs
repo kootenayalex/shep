@@ -11,12 +11,21 @@
 //!
 //! The board's chat with the overseer's headless runtime lives here too: a
 //! `chat.jsonl` in the same dir (one [`ChatTurn`] per line, mirrored under
-//! the same mtime guard), the prompt that carries the plugin's hard rules
-//! and the last few turns, and the send path that spawns the runtime on a
-//! thread and reports back through [`AppEvent::OverseerChatFinished`].
+//! the same mtime guard), the prompt that carries the plugin's hard rules,
+//! and the send path that spawns the runtime on a thread and reports back
+//! through [`AppEvent::OverseerChatFinished`].
+//!
+//! One session, two faces: when the runtime's headless recipe can name a
+//! conversation (`session_new_args` / `session_resume_args`), the chat and
+//! the board's interactive session pane are the same conversation — the id
+//! lives in `session-id`, `session-started` says whether anything has begun
+//! it yet, and the prompt carries no turn replay because the session is the
+//! memory. A runtime without those recipes gets the last few turns replayed
+//! instead. Ticks are stateless either way.
 //!
 //! Nothing on the read side creates the dir or any file. A missing dir is
-//! simply an overseer that has not spoken yet; only a sent question writes.
+//! simply an overseer that has not spoken yet; only a sent question or an
+//! opened session writes.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
@@ -41,6 +50,13 @@ const CHAT_FILE: &str = "chat.jsonl";
 const BOARD_FILE: &str = "BOARD.md";
 const BOARD_SOURCE_FILE: &str = "BOARD.md.source";
 const BRAIN_STAMP_FILE: &str = "last-brain";
+/// The shared conversation's id (a v4 uuid), created on the first chat or
+/// the first session open and never changed.
+const SESSION_ID_FILE: &str = "session-id";
+/// Present once something has begun the conversation under that id — a
+/// headless answer that succeeded, or the interactive pane being opened —
+/// so the next face resumes instead of starting anew.
+const SESSION_STARTED_FILE: &str = "session-started";
 
 /// `shep doctor`'s verdict on one check, as the plugin copied it into
 /// `situation.json`. The lowercase wire spelling matches `shep doctor --json`.
@@ -339,6 +355,21 @@ Hard rules you must respect in what you write:
 /// What the chat asks of the runtime, after the rules.
 const CHAT_TASK: &str = "You are the overseer of this shep session; answer in at most 6 short lines, plain prose, no markdown headings.";
 
+/// What the chat adds when the runtime resumes one conversation: the
+/// situation is re-sent every time and supersedes what earlier turns said.
+const CHAT_TASK_SHARED: &str =
+    "The situation below is current and replaces any earlier one in this conversation.";
+
+/// Where a question's memory of the thread comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ChatMemory<'a> {
+    /// The runtime forgets between calls: the last
+    /// [`CHAT_CONTEXT_TURNS`] of these ride along in the prompt.
+    Replay(&'a [ChatTurn]),
+    /// The runtime resumes one conversation: nothing is replayed.
+    Session,
+}
+
 fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -391,12 +422,22 @@ pub(crate) fn append_chat(dir: &Path, turn: &ChatTurn) -> std::io::Result<()> {
 }
 
 /// The prompt for one question: the rules, the task, the situation the tick
-/// last wrote, the last [`CHAT_CONTEXT_TURNS`] turns, and the question.
-pub(crate) fn build_chat_prompt(situation_md: &str, turns: &[ChatTurn], question: &str) -> String {
+/// last wrote, the memory (the last [`CHAT_CONTEXT_TURNS`] turns when the
+/// runtime needs them replayed; nothing when it resumes a session), and
+/// the question.
+pub(crate) fn build_chat_prompt(
+    situation_md: &str,
+    memory: ChatMemory<'_>,
+    question: &str,
+) -> String {
     let mut prompt = String::new();
     prompt.push_str(OVERSEER_HARD_RULES);
     prompt.push_str("\n\n");
     prompt.push_str(CHAT_TASK);
+    if memory == ChatMemory::Session {
+        prompt.push(' ');
+        prompt.push_str(CHAT_TASK_SHARED);
+    }
     prompt.push_str("\n\nThe situation, as last sensed:\n");
     let situation = situation_md.trim();
     prompt.push_str(if situation.is_empty() {
@@ -405,15 +446,17 @@ pub(crate) fn build_chat_prompt(situation_md: &str, turns: &[ChatTurn], question
         situation
     });
     prompt.push('\n');
-    let start = turns.len().saturating_sub(CHAT_CONTEXT_TURNS);
-    if start < turns.len() {
-        prompt.push_str("\nThe conversation so far:\n");
-        for turn in &turns[start..] {
-            let who = match turn.role {
-                ChatRole::You => "you",
-                ChatRole::Overseer => "overseer",
-            };
-            prompt.push_str(&format!("{who}: {}\n", turn.text.trim()));
+    if let ChatMemory::Replay(turns) = memory {
+        let start = turns.len().saturating_sub(CHAT_CONTEXT_TURNS);
+        if start < turns.len() {
+            prompt.push_str("\nThe conversation so far:\n");
+            for turn in &turns[start..] {
+                let who = match turn.role {
+                    ChatRole::You => "you",
+                    ChatRole::Overseer => "overseer",
+                };
+                prompt.push_str(&format!("{who}: {}\n", turn.text.trim()));
+            }
         }
     }
     prompt.push_str(&format!("\nyou: {}\noverseer:", question.trim()));
@@ -435,6 +478,74 @@ pub(crate) fn overseer_runtime_name(app: &AppState) -> Option<String> {
                 .map(|name| name.trim().to_string())
                 .filter(|name| !name.is_empty())
         })
+}
+
+/// Where the shared session runs: `[plugins.overseer] session_cwd` (`~`
+/// expands) when that directory exists, else the overseer's state dir. The
+/// one resolution both faces use — claude keys its transcripts by cwd, so
+/// the headless question and the interactive pane must agree — handed to
+/// the session pane as `SHEP_OVERSEER_SESSION_CWD`.
+pub(crate) fn overseer_session_cwd(app: &AppState) -> PathBuf {
+    app.plugins_config
+        .get("overseer")
+        .and_then(|table| table.get("session_cwd"))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(crate::worktree::expand_tilde_path)
+        .filter(|path| path.is_dir())
+        .unwrap_or_else(|| app.overseer.state_dir.clone())
+}
+
+/// The env the session pane gets so it runs the same conversation the chat
+/// does: the id, whether to resume it, and where.
+pub(crate) fn overseer_session_env(app: &AppState) -> Vec<(String, String)> {
+    let (id, started) = app.overseer.overseer_session();
+    vec![
+        ("SHEP_OVERSEER_SESSION_ID".to_string(), id),
+        (
+            "SHEP_OVERSEER_SESSION_RESUME".to_string(),
+            if started { "1" } else { "0" }.to_string(),
+        ),
+        (
+            "SHEP_OVERSEER_SESSION_CWD".to_string(),
+            overseer_session_cwd(app).display().to_string(),
+        ),
+    ]
+}
+
+/// A fresh v4 uuid, formatted the way `claude --session-id` insists on
+/// (`8-4-4-4-12` lowercase hex with the version and variant bits set).
+/// Sixteen bytes from `/dev/urandom`, the way the bridge mints its tokens;
+/// when that is unreadable, a hash of the clock, the pid and a counter.
+fn new_session_id() -> String {
+    use std::io::Read;
+    let mut bytes = [0u8; 16];
+    let random = std::fs::File::open("/dev/urandom")
+        .and_then(|mut file| file.read_exact(&mut bytes))
+        .is_ok();
+    if !random {
+        use sha2::Digest;
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let seq = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let digest = sha2::Sha256::digest(format!("{nanos}-{}-{seq}", std::process::id()));
+        bytes.copy_from_slice(&digest[..16]);
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    )
 }
 
 /// The sample plus where it comes from, and the chat beside it. The dir is a
@@ -515,6 +626,39 @@ impl OverseerState {
         }
     }
 
+    /// The shared conversation: its id and whether anything has begun it.
+    /// The id is minted and written on the first call (creating the dir);
+    /// every later call reads the same one back. Called from input paths
+    /// only — never from render, which must not touch the dir.
+    pub(crate) fn overseer_session(&self) -> (String, bool) {
+        let path = self.state_dir.join(SESSION_ID_FILE);
+        let existing = std::fs::read_to_string(&path)
+            .ok()
+            .map(|text| text.trim().to_string())
+            .filter(|id| !id.is_empty());
+        let id = match existing {
+            Some(id) => id,
+            None => {
+                let id = new_session_id();
+                let written = std::fs::create_dir_all(&self.state_dir)
+                    .and_then(|_| std::fs::write(&path, format!("{id}\n")));
+                match written {
+                    Ok(()) => tracing::info!(id = %id, "overseer session id created"),
+                    Err(err) => {
+                        tracing::warn!(error = %err, path = %path.display(), "overseer session id not written")
+                    }
+                }
+                id
+            }
+        };
+        (id, self.state_dir.join(SESSION_STARTED_FILE).exists())
+    }
+
+    /// Record that the conversation under the current id has begun.
+    pub(crate) fn mark_session_started(&self) {
+        mark_session_started_in(&self.state_dir);
+    }
+
     /// The chat's fixture: a question, an answer, and a follow-up.
     #[cfg(test)]
     pub(crate) fn test_chat_fixture(now: u64) -> Vec<ChatTurn> {
@@ -537,6 +681,61 @@ impl OverseerState {
                 text: "is the disk warning urgent?".into(),
             },
         ]
+    }
+}
+
+fn mark_session_started_in(dir: &Path) {
+    let path = dir.join(SESSION_STARTED_FILE);
+    if let Err(err) = std::fs::create_dir_all(dir).and_then(|_| std::fs::write(&path, "")) {
+        tracing::warn!(error = %err, path = %path.display(), "overseer session marker not written");
+    }
+}
+
+fn clear_session_started_in(dir: &Path) {
+    let path = dir.join(SESSION_STARTED_FILE);
+    match std::fs::remove_file(&path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => {
+            tracing::warn!(error = %err, path = %path.display(), "overseer session marker not cleared")
+        }
+    }
+}
+
+/// One headless run, judged: the answer text, or why there is none.
+fn judge_capture(
+    name: &str,
+    run: std::io::Result<crate::runtimes::HeadlessCapture>,
+) -> Result<String, String> {
+    match run {
+        Ok(capture) if capture.outcome.timed_out => Err(format!(
+            "{name} did not answer within {}s",
+            CHAT_TIMEOUT.as_secs()
+        )),
+        Ok(capture) if capture.outcome.exit_code != Some(0) => {
+            let tail = capture
+                .stderr
+                .lines()
+                .rev()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            Err(match capture.outcome.exit_code {
+                Some(code) if tail.is_empty() => format!("{name} exited {code}"),
+                Some(code) => format!("{name} exited {code}: {tail}"),
+                None => format!("{name} was killed"),
+            })
+        }
+        Ok(capture) => {
+            let text = capture.stdout.trim().to_string();
+            if text.is_empty() {
+                Err(format!("{name} said nothing"))
+            } else {
+                Ok(text)
+            }
+        }
+        Err(err) => Err(format!("{name} could not start: {err}")),
     }
 }
 
@@ -571,47 +770,66 @@ impl App {
         let state_dir = self.state.overseer.state_dir.clone();
         let situation =
             std::fs::read_to_string(state_dir.join(SITUATION_MD_FILE)).unwrap_or_default();
-        // The question is already the last turn; the prompt names it once.
-        let turns = &self.state.overseer.chat;
-        let earlier = &turns[..turns.len().saturating_sub(1)];
-        let prompt = build_chat_prompt(&situation, earlier, &question);
+        // A runtime that can name conversations shares one with the session
+        // pane: the session is the memory, and the question runs where the
+        // pane would. Any other runtime gets the last turns replayed and
+        // runs in the state dir.
+        let (session, cwd, prompt) = if spec.shares_session() {
+            let (id, started) = self.state.overseer.overseer_session();
+            (
+                Some(crate::runtimes::HeadlessSession {
+                    id,
+                    resume: started,
+                }),
+                overseer_session_cwd(&self.state),
+                build_chat_prompt(&situation, ChatMemory::Session, &question),
+            )
+        } else {
+            // The question is already the last turn; the prompt names it once.
+            let turns = &self.state.overseer.chat;
+            let earlier = &turns[..turns.len().saturating_sub(1)];
+            (
+                None,
+                state_dir.clone(),
+                build_chat_prompt(&situation, ChatMemory::Replay(earlier), &question),
+            )
+        };
         let event_tx = self.event_tx.clone();
         std::thread::spawn(move || {
-            let answer = match crate::runtimes::run_headless_captured(
-                &spec,
-                &prompt,
-                CHAT_TIMEOUT,
-                Some(&state_dir),
-            ) {
-                Ok(capture) if capture.outcome.timed_out => Err(format!(
-                    "{name} did not answer within {}s",
-                    CHAT_TIMEOUT.as_secs()
-                )),
-                Ok(capture) if capture.outcome.exit_code != Some(0) => {
-                    let tail = capture
-                        .stderr
-                        .lines()
-                        .rev()
-                        .find(|line| !line.trim().is_empty())
-                        .unwrap_or("")
-                        .trim()
-                        .to_string();
-                    Err(match capture.outcome.exit_code {
-                        Some(code) if tail.is_empty() => format!("{name} exited {code}"),
-                        Some(code) => format!("{name} exited {code}: {tail}"),
-                        None => format!("{name} was killed"),
-                    })
-                }
-                Ok(capture) => {
-                    let text = capture.stdout.trim().to_string();
-                    if text.is_empty() {
-                        Err(format!("{name} said nothing"))
-                    } else {
-                        Ok(text)
-                    }
-                }
-                Err(err) => Err(format!("{name} could not start: {err}")),
+            let run = |session: Option<&crate::runtimes::HeadlessSession>| {
+                judge_capture(
+                    &name,
+                    crate::runtimes::run_headless_captured(
+                        &spec,
+                        &prompt,
+                        CHAT_TIMEOUT,
+                        Some(&cwd),
+                        session,
+                    ),
+                )
             };
+            let mut answer = run(session.as_ref());
+            if let Some(session) = session {
+                // A resume that fails is taken as a conversation the runtime
+                // no longer has (its transcript gone, its cwd moved): the
+                // marker is dropped and the same id starts over, once.
+                if answer.is_err() && session.resume {
+                    tracing::warn!(
+                        runtime = %name,
+                        id = %session.id,
+                        error = answer.as_ref().err().map(String::as_str).unwrap_or(""),
+                        "overseer chat resume failed; starting the session anew"
+                    );
+                    clear_session_started_in(&state_dir);
+                    answer = run(Some(&crate::runtimes::HeadlessSession {
+                        id: session.id.clone(),
+                        resume: false,
+                    }));
+                }
+                if answer.is_ok() {
+                    mark_session_started_in(&state_dir);
+                }
+            }
             let _ = event_tx.blocking_send(AppEvent::OverseerChatFinished { answer });
         });
     }
@@ -665,12 +883,12 @@ impl App {
             return;
         };
         let context = self.current_plugin_context("overseer-session");
-        let extra_env = match self.plugin_pane_launch_env(
-            &plugin,
-            &pane.id,
-            std::collections::HashMap::new(),
-            &context,
-        ) {
+        // The pane runs the same conversation the chat does; opening it is
+        // what begins that conversation when nothing has yet.
+        let session_env: std::collections::HashMap<String, String> =
+            overseer_session_env(&self.state).into_iter().collect();
+        let extra_env = match self.plugin_pane_launch_env(&plugin, &pane.id, session_env, &context)
+        {
             Ok(env) => env,
             Err((code, message)) => {
                 tracing::warn!(code, message, "overseer session env failed");
@@ -699,6 +917,7 @@ impl App {
                 return;
             }
         };
+        self.state.overseer.mark_session_started();
         ws.system = Some(SystemRole::OverseerSession);
         ws.custom_name = Some(SESSION_GROUP_NAME.to_string());
         terminal.set_manual_label(pane.title.clone());
@@ -1098,7 +1317,11 @@ mod tests {
                 text: format!("turn {i}"),
             })
             .collect();
-        let prompt = build_chat_prompt("# situation\nclaude is blocked.", &turns, "and now?");
+        let prompt = build_chat_prompt(
+            "# situation\nclaude is blocked.",
+            ChatMemory::Replay(&turns),
+            "and now?",
+        );
         assert!(prompt.starts_with(OVERSEER_HARD_RULES), "rules lead");
         let rules_end = prompt
             .find("You are the overseer of this shep session")
@@ -1117,10 +1340,148 @@ mod tests {
 
         // No situation and no turns: the prompt says so rather than going
         // blank, and carries no conversation header.
-        let bare = build_chat_prompt("", &[], "hello?");
+        let bare = build_chat_prompt("", ChatMemory::Replay(&[]), "hello?");
         assert!(bare.contains("has not sensed the session yet"));
         assert!(!bare.contains("The conversation so far"));
         assert!(bare.ends_with("you: hello?\noverseer:"));
+        assert!(!bare.contains(CHAT_TASK_SHARED));
+    }
+
+    #[test]
+    fn chat_prompt_has_no_turn_replay_when_the_session_is_shared() {
+        let turns = OverseerState::test_chat_fixture(1_700_000_000);
+        let replayed =
+            build_chat_prompt("claude is blocked.", ChatMemory::Replay(&turns), "and now?");
+        assert!(replayed.contains("The conversation so far"));
+        assert!(replayed.contains("you: what should I do first?"));
+
+        let shared = build_chat_prompt("claude is blocked.", ChatMemory::Session, "and now?");
+        assert!(shared.starts_with(OVERSEER_HARD_RULES));
+        assert!(shared.contains("at most 6 short lines"));
+        assert!(
+            shared.contains(CHAT_TASK_SHARED),
+            "the situation is declared current"
+        );
+        assert!(shared.contains("claude is blocked."));
+        assert!(
+            !shared.contains("The conversation so far"),
+            "the session is the memory"
+        );
+        for turn in &turns {
+            assert!(
+                !shared.contains(turn.text.as_str()),
+                "{:?} was replayed",
+                turn.text
+            );
+        }
+        assert!(shared.ends_with("you: and now?\noverseer:"));
+    }
+
+    #[test]
+    fn session_id_is_created_once_and_reused() {
+        let dir = test_state_dir();
+        let state = OverseerState::new(dir.clone());
+        assert!(!dir.exists());
+        let (id, started) = state.overseer_session();
+        assert!(!started, "nothing has begun it");
+        assert!(dir.join("session-id").exists(), "the first ask writes it");
+        assert_eq!(id.len(), 36);
+        assert!(id
+            .bytes()
+            .all(|b| b == b'-' || b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
+        assert_eq!(
+            id.split('-').map(str::len).collect::<Vec<_>>(),
+            vec![8, 4, 4, 4, 12]
+        );
+        assert_eq!(&id[14..15], "4", "a v4 uuid");
+        assert!(matches!(&id[19..20], "8" | "9" | "a" | "b"), "{id}");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("session-id"))
+                .expect("file")
+                .trim(),
+            id
+        );
+
+        let again = OverseerState::new(dir.clone());
+        assert_eq!(
+            again.overseer_session(),
+            (id.clone(), false),
+            "read back, not minted"
+        );
+        assert_ne!(new_session_id(), new_session_id(), "ids are random");
+
+        again.mark_session_started();
+        assert_eq!(again.overseer_session(), (id.clone(), true));
+        clear_session_started_in(&dir);
+        assert_eq!(again.overseer_session(), (id, false));
+        clear_session_started_in(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn session_cwd_resolution_prefers_config_then_state_dir() {
+        let mut app = AppState::test_new();
+        let dir = test_state_dir();
+        app.overseer.state_dir = dir.clone();
+        assert_eq!(overseer_session_cwd(&app), dir, "nothing configured");
+
+        let configured = test_state_dir();
+        app.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str(&format!("session_cwd = \"{}\"", configured.display())).expect("table"),
+        );
+        assert_eq!(
+            overseer_session_cwd(&app),
+            dir,
+            "a configured dir that does not exist is passed over"
+        );
+        std::fs::create_dir_all(&configured).expect("cwd");
+        assert_eq!(overseer_session_cwd(&app), configured);
+
+        // `~` expands.
+        let home = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .filter(|home| home.is_dir());
+        if let Some(home) = home {
+            app.plugins_config.insert(
+                "overseer".into(),
+                toml::from_str("session_cwd = \"~\"").expect("table"),
+            );
+            assert_eq!(overseer_session_cwd(&app), home);
+        }
+        app.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str("session_cwd = \"  \"").expect("table"),
+        );
+        assert_eq!(overseer_session_cwd(&app), dir, "blank is unset");
+
+        // The env the pane gets is the same resolution, plus the id and
+        // whether to resume.
+        app.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str(&format!("session_cwd = \"{}\"", configured.display())).expect("table"),
+        );
+        let env = overseer_session_env(&app);
+        let (id, _) = app.overseer.overseer_session();
+        assert_eq!(
+            env,
+            vec![
+                ("SHEP_OVERSEER_SESSION_ID".to_string(), id.clone()),
+                ("SHEP_OVERSEER_SESSION_RESUME".to_string(), "0".to_string()),
+                (
+                    "SHEP_OVERSEER_SESSION_CWD".to_string(),
+                    configured.display().to_string()
+                ),
+            ]
+        );
+        app.overseer.mark_session_started();
+        assert_eq!(overseer_session_env(&app)[1].1, "1");
+        assert!(
+            !dir.join("chat.jsonl").exists(),
+            "asking for the session writes no chat"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&configured);
     }
 
     /// The rules are the plugin's words. Rule 4 in the script carries a

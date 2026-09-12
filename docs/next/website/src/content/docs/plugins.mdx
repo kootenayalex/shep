@@ -331,8 +331,8 @@ it does. Name a brain and it thinks too:
 ```toml
 [plugins.overseer]
 runtime = "claude"     # any runtime `shep runtime list` marks headless
-session_argv = ["claude"]                  # what the board's session button runs
-session_cwd = "~/vault/agents/shep-overseer"  # where; default: the plugin's state dir
+session_argv = ["claude", "--resume", "{session_id}"]  # optional; the default resumes the board's conversation
+session_cwd = "~/vault/agents/shep-overseer"  # where the chat and the pane run; default: the plugin's state dir
 ```
 
 At most once every ten minutes the tick hands the situation to
@@ -345,9 +345,15 @@ item; `tests/plugin_overseer.rs` greps its script for the forbidden verbs. See
 `plugins/overseer/README.md`.
 
 The board's `▸ open the overseer's session` button runs the plugin's
-`session` pane: `session_argv` (default `["claude"]`; the server's
-`SHEP_OVERSEER_SESSION_ARGV` overrides it) in `session_cwd` when that
-directory exists, else the plugin's state dir, with `SHEP_OVERSEER_STATE_DIR`,
+`session` pane, and that pane is the board's chat in another face: shep
+hands it `SHEP_OVERSEER_SESSION_ID` (the shared conversation's id, minted
+into `session-id` in the state dir by the first chat line or the first
+open), `SHEP_OVERSEER_SESSION_RESUME` (`1` once something has begun it) and
+`SHEP_OVERSEER_SESSION_CWD` (`session_cwd` when that directory exists, else
+the plugin's state dir — the chat runs there too). `overseer-session` runs
+`session_argv` (or the server's `SHEP_OVERSEER_SESSION_ARGV`) with
+`{session_id}` substituted, else `claude --resume <id>` /
+`claude --session-id <id>`, with `SHEP_OVERSEER_STATE_DIR`,
 `SHEP_OVERSEER_SITUATION`, `SHEP_OVERSEER_BOARD` and `SHEP_OVERSEER_CHAT`
 exported. shep keeps that session in a system workspace no list shows.
 

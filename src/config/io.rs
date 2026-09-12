@@ -731,6 +731,8 @@ env = { CLAUDE_CONFIG_DIR = "/tmp/cc" }
 [runtimes.local-llm]
 headless_argv = ["llm", "ask"]
 headless_prompt = "arg"
+headless_session_new_args = ["--new", "{session_id}"]
+headless_session_resume_args = ["--continue", "{session_id}"]
 "#,
         )
         .unwrap();
@@ -746,6 +748,15 @@ headless_prompt = "arg"
             local.headless_prompt,
             Some(crate::detect::manifest::HeadlessPrompt::Arg)
         );
+        assert_eq!(
+            local.headless_session_new_args.as_deref(),
+            Some(&["--new".to_string(), "{session_id}".to_string()][..])
+        );
+        assert_eq!(
+            local.headless_session_resume_args.as_deref(),
+            Some(&["--continue".to_string(), "{session_id}".to_string()][..])
+        );
+        assert_eq!(claude.session_new_args, None);
 
         // A typo in the table is a section diagnostic, not a silent reset.
         let loaded = load_live_config_from_str(
