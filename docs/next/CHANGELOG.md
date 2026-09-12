@@ -213,6 +213,11 @@
   `bridge-pair-code` window `shep bridge pair` does, tells you when the phone
   has claimed it, and closing the screen cancels the code.
 
+- Each agent in a `session.overview` response carries `git_ahead` and
+  `git_behind`, the commits its workspace's branch is ahead of and behind its
+  upstream, so a client can draw "↑N not pushed" without a round-trip per
+  workspace. Both are absent when the workspace has no upstream.
+
 ### Changed
 
 - The overseer board's `chat` is a thread with the overseer's headless

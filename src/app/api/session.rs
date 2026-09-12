@@ -116,6 +116,8 @@ impl App {
                 pane_number: ws.public_pane_number(card.pane_id).map(|n| n as u64),
                 workspace_label: card.workspace_label.clone(),
                 branch: card.branch.clone(),
+                git_ahead: ws.cached_git_ahead_behind.map(|(ahead, _)| ahead as u64),
+                git_behind: ws.cached_git_ahead_behind.map(|(_, behind)| behind as u64),
                 name: Some(card.agent_label.clone()),
                 display_name: card.display_name.clone(),
                 display_agent: card.model.clone(),
@@ -203,6 +205,20 @@ mod tests {
 
         let mut app = app_with_two_tabs();
         app.state.workspaces[0].tabs[0].set_custom_name("review".into());
+        // One workspace tracks an upstream, one does not.
+        app.state.workspaces[0].cached_git_ahead_behind = Some((2, 1));
+        app.state.workspaces.push(Workspace::test_new("detached"));
+        app.state.ensure_test_terminals();
+        let detached_pane = app.state.workspaces[1].tabs[0].root_pane;
+        let detached_terminal = app.state.workspaces[1]
+            .terminal_id(detached_pane)
+            .expect("terminal")
+            .clone();
+        app.state
+            .terminals
+            .get_mut(&detached_terminal)
+            .expect("terminal")
+            .detected_agent = Some(Agent::Claude);
         let pane = app.state.workspaces[0].tabs[0].root_pane;
         let terminal_id = app.state.workspaces[0]
             .terminal_id(pane)
@@ -229,8 +245,8 @@ mod tests {
             panic!("expected session overview response");
         };
 
-        assert_eq!(overview.totals.workspaces, 1);
-        assert_eq!(overview.totals.tabs, 2);
+        assert_eq!(overview.totals.workspaces, 2);
+        assert_eq!(overview.totals.tabs, 3);
         assert_eq!(overview.totals.blocked, 1);
         // A blocked agent is by definition waiting on the user.
         assert_eq!(overview.totals.attention, 1);
@@ -257,6 +273,16 @@ mod tests {
         assert_eq!(blocked.context_percent, Some(62));
         assert!(!blocked.pane_id.is_empty());
         assert!(!blocked.workspace_id.is_empty());
+        // Ahead/behind ride along from the workspace's cached git status.
+        assert_eq!(blocked.git_ahead, Some(2));
+        assert_eq!(blocked.git_behind, Some(1));
+        let upstreamless = overview
+            .agents
+            .iter()
+            .find(|agent| agent.workspace_id != blocked.workspace_id)
+            .expect("the workspace without an upstream");
+        assert_eq!(upstreamless.git_ahead, None);
+        assert_eq!(upstreamless.git_behind, None);
 
         // Host facts are sampled by the handler itself, with no TUI tick.
         assert_eq!(overview.host.version, crate::build_info::version());

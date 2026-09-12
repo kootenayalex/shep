@@ -9682,6 +9682,24 @@
             "focused": {
               "type": "boolean"
             },
+            "git_ahead": {
+              "description": "Commits on this workspace's branch that its upstream does not have.\nAbsent when the workspace has no upstream.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "git_behind": {
+              "description": "Commits on the upstream that this workspace's branch does not have.\nAbsent when the workspace has no upstream.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "manual_state": {
               "anyOf": [
                 {

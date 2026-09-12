@@ -40,6 +40,14 @@ pub struct SessionOverviewAgent {
     pub workspace_label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
+    /// Commits on this workspace's branch that its upstream does not have.
+    /// Absent when the workspace has no upstream.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_ahead: Option<u64>,
+    /// Commits on the upstream that this workspace's branch does not have.
+    /// Absent when the workspace has no upstream.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_behind: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// The name to show for this agent: shep's own label plus only as much
