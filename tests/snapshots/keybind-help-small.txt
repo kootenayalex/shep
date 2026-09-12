@@ -4,7 +4,7 @@
 --- screen ---
  shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
  ✦╭──────────────────────────────────────────────────────────────────────────╮8
- g│keybinds                                                        esc close │─╮
+ g│keybinds                                                        esc close │ ╮
   │ available commands and configured shortcuts                              │ │
  ◉│                                                                          │ │
   │ global                                                                  ▐│ │
@@ -24,7 +24,7 @@
   │ 1..9                         switch group                               ▕│ │
   │                                                                          │ │
   │ scroll jk/↑↓ or wheel ↑↓  ·  jump pgup / pgdn  ·  close esc / enter      │ │
- n╰──────────────────────────────────────────────────────────────────────────╯─╯
+ +╰──────────────────────────────────────────────────────────────────────────╯─╯
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---

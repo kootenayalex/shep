@@ -380,6 +380,9 @@ pub(crate) mod fixture {
         // line on, so the desktop snapshots show the pane starting under the
         // titlebar.
         state.hide_tab_bar_when_single_tab = true;
+        // Shipped on too (`[ui] show_agent_labels_on_pane_borders`): the pane
+        // title is where the branch, the directory and the context gauge live.
+        state.show_agent_labels_on_pane_borders = true;
         // The shipped default. `test_new` still starts on catppuccin, which is
         // not what anyone runs — and worse for a snapshot, catppuccin maps
         // `accent` and `blue` to the same RGB, so the two roles are

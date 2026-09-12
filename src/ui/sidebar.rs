@@ -11,13 +11,48 @@ use super::scrollbar::{render_scrollbar, should_show_scrollbar};
 use super::status::{
     agent_icon, agent_icon_for, manual_state_appearance, state_label, state_label_color,
 };
-use super::text::{display_width, display_width_u16, truncate_end};
+use super::text::{display_width, display_width_u16, fit_strip, truncate_end};
 use crate::app::state::{AgentPanelSort, Palette};
 use crate::app::{AppState, Mode};
 use crate::detect::AgentState;
 use crate::terminal::TerminalRuntimeRegistry;
 
 const WORKSPACE_SECTION_HEADER_ROWS: u16 = 2;
+
+/// At or under this many content columns the tree draws its narrow form:
+/// one row per group and no state word on an agent row.
+const NARROW_SIDEBAR_WIDTH: u16 = 20;
+
+/// The header row carries the sort toggle only from this many content
+/// columns — a 26-column sidebar, the auto width of the snapshot fixture.
+/// Under it ` groups` and `grouped ≡ «` would sit on top of each other.
+const SORT_TOGGLE_MIN_WIDTH: u16 = 25;
+
+/// The footer's button says `+ new group` when it has this much room, and
+/// `+ new` when it does not.
+const NEW_GROUP_LABEL_MIN_WIDTH: u16 = 12;
+
+/// The least room a branch keeps on a group's second row before the upstream
+/// badges after it come off whole. `feat/d…` still names the branch.
+const MIN_BRANCH_WIDTH: usize = 6;
+
+/// The narrow tree: one row per group, glyph and name on an agent row.
+///
+/// `width` is the content width — the list without its separator. Under
+/// twenty columns a branch row and a state word cost more than they say, and
+/// the glyph and its colour already carry the state.
+pub(crate) fn sidebar_narrow(width: u16) -> bool {
+    width <= NARROW_SIDEBAR_WIDTH
+}
+
+/// The footer button's label for a footer this wide.
+pub(crate) fn sidebar_new_button_label(width: u16) -> &'static str {
+    if width >= NEW_GROUP_LABEL_MIN_WIDTH {
+        "+ new group"
+    } else {
+        "+ new"
+    }
+}
 
 pub(crate) struct AgentPanelEntry {
     pub ws_idx: usize,
@@ -48,25 +83,35 @@ fn sidebar_sort_label(sort: AgentPanelSort) -> &'static str {
     }
 }
 
-/// The sort toggle, right-aligned on the list's own header row.
+/// The sort toggle on the list's own header row, left of the `≡ «` pair.
 ///
-/// It shares the header with ` groups` rather than owning a row: the tree has a
-/// single header now, and a label that cost a whole row would be the widest
-/// thing on the panel.
+/// `area` is the list rect (`workspace_list_rect`). It shares the header with
+/// ` groups` rather than owning a row: the tree has a single header now, and a
+/// label that cost a whole row would be the widest thing on the panel. Under
+/// `SORT_TOGGLE_MIN_WIDTH` columns it is not drawn at all — the sort still
+/// applies, and the keyboard still flips it.
 pub(crate) fn sidebar_sort_toggle_rect(area: Rect, sort: AgentPanelSort) -> Rect {
-    let content = expanded_sidebar_content(area);
-    if content.width == 0 || content.height == 0 {
+    if area.width < SORT_TOGGLE_MIN_WIDTH || area.height == 0 {
         return Rect::default();
     }
 
     let label = sidebar_sort_label(sort);
-    let width = display_width_u16(label).min(content.width);
-    Rect::new(
-        content.x + content.width.saturating_sub(width),
-        content.y,
-        width,
-        1,
-    )
+    let width = display_width_u16(label);
+    // ` ≡ «`: the two glyph cells, the space between them and the one before.
+    let right = area.x + area.width.saturating_sub(4);
+    Rect::new(right.saturating_sub(width), area.y, width, 1)
+}
+
+/// The global menu's `≡`, on the header row two cells left of `«`.
+///
+/// `area` is the whole sidebar, separator included, like
+/// `expanded_sidebar_toggle_rect`.
+pub(crate) fn sidebar_menu_glyph_rect(area: Rect) -> Rect {
+    let content = expanded_sidebar_content(area);
+    if content.width < 3 || content.height == 0 {
+        return Rect::default();
+    }
+    Rect::new(content.x + content.width.saturating_sub(3), content.y, 1, 1)
 }
 
 /// Drop the workspace's own name from the front of an agent's name.
@@ -192,8 +237,9 @@ pub(crate) fn format_event_age(elapsed: std::time::Duration) -> String {
     }
 }
 
-fn workspace_row_height(ws: &crate::workspace::Workspace) -> u16 {
-    if ws.branch().is_some() {
+/// Two rows when the group has a branch to say and the room to say it in.
+fn workspace_row_height(ws: &crate::workspace::Workspace, narrow: bool) -> u16 {
+    if !narrow && ws.branch().is_some() {
         2
     } else {
         1
@@ -504,10 +550,10 @@ pub(crate) fn sidebar_rows(app: &AppState) -> Vec<SidebarRow> {
 ///
 /// Agents sit flush under their group; the gap belongs between groups, which is
 /// what makes a group and its agents read as one block.
-fn sidebar_row_height(app: &AppState, rows: &[SidebarRow], idx: usize) -> (u16, u16) {
+fn sidebar_row_height(app: &AppState, rows: &[SidebarRow], idx: usize, narrow: bool) -> (u16, u16) {
     let height = match rows.get(idx) {
         Some(SidebarRow::Group { ws_idx, indented }) => match app.workspaces.get(*ws_idx) {
-            Some(ws) if !*indented => workspace_row_height(ws),
+            Some(ws) if !*indented => workspace_row_height(ws, narrow),
             Some(_) => 1,
             None => return (0, 0),
         },
@@ -546,8 +592,9 @@ fn workspace_list_visible_count(app: &AppState, area: Rect, scroll: usize) -> us
     let mut used_rows = 0u16;
     let mut visible = 0usize;
     let rows = sidebar_rows(app);
+    let narrow = sidebar_narrow(area.width);
     for idx in scroll..rows.len() {
-        let (height, gap) = sidebar_row_height(app, &rows, idx);
+        let (height, gap) = sidebar_row_height(app, &rows, idx, narrow);
         if height == 0 {
             continue;
         }
@@ -611,8 +658,9 @@ pub(crate) fn compute_workspace_list_areas(
     let headers = Vec::new();
 
     let rows = sidebar_rows(app);
+    let narrow = sidebar_narrow(ws_area.width);
     for idx in app.workspace_scroll..rows.len() {
-        let (height, gap) = sidebar_row_height(app, &rows, idx);
+        let (height, gap) = sidebar_row_height(app, &rows, idx, narrow);
         if height == 0 {
             continue;
         }
@@ -855,7 +903,30 @@ pub(super) fn render_sidebar(
         workspace_list_rect(area),
         is_navigating,
     );
+    render_sidebar_menu_glyph(app, frame, area, p);
     render_sidebar_toggle(app, frame, area, false, p);
+}
+
+/// The global menu's `≡` on the header row.
+///
+/// A click target only, so it goes with the mouse the way `«` beside it does.
+/// It carries the attention badge the old `menu` button wore: peach — the
+/// warning tier, an update is waiting — in the one cell it has, since a dot
+/// before it would cost a second.
+fn render_sidebar_menu_glyph(app: &AppState, frame: &mut Frame, area: Rect, p: &Palette) {
+    if !app.mouse_capture {
+        return;
+    }
+    let rect = sidebar_menu_glyph_rect(area);
+    if rect == Rect::default() {
+        return;
+    }
+    let style = if app.global_menu_attention_badge_visible() {
+        Style::default().fg(p.peach).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(p.overlay0)
+    };
+    frame.render_widget(Paragraph::new(Span::styled(glyphs::MENU, style)), rect);
 }
 
 fn render_workspace_list(
@@ -913,6 +984,7 @@ fn render_workspace_list(
     let metrics = workspace_list_scroll_metrics(app, area);
     let scrollbar_rect = workspace_list_scrollbar_rect(app, area);
     let cards = &app.view.workspace_card_areas;
+    let narrow = sidebar_narrow(area.width);
 
     for card in cards {
         let i = card.ws_idx;
@@ -955,7 +1027,15 @@ fn render_workspace_list(
         if let Some((_, _, pane_id)) = card.agent() {
             if row_y < list_bottom {
                 if let Some(entry) = entries_by_pane.get(&pane_id) {
-                    render_agent_row(app, frame, entry, card.rect, card.indented, row_style);
+                    render_agent_row(
+                        app,
+                        frame,
+                        entry,
+                        card.rect,
+                        card.indented,
+                        narrow,
+                        row_style,
+                    );
                 }
             }
             continue;
@@ -1035,72 +1115,25 @@ fn render_workspace_list(
 
         if row_height > 1 && row_y + 1 < list_bottom {
             if let Some(branch) = ws.branch() {
-                let upstream_label = ws.git_ahead_behind().and_then(|(ahead, behind)| {
-                    let mut parts = Vec::new();
-                    if ahead > 0 {
-                        parts.push((format!("{}{ahead}", glyphs::AHEAD), p.green));
-                    }
-                    if behind > 0 {
-                        parts.push((format!("{}{behind}", glyphs::BEHIND), p.peach));
-                    }
-                    (!parts.is_empty()).then_some(parts)
-                });
-                // Seconds-since-last-agent-event, rendered as a compact age hint
-                // trailing the branch (e.g. "main   2m"). Reading the clock in a
-                // pure render is fine; no state is mutated.
-                let age_label = ws.last_agent_event_at(&app.terminals).map(|at| {
-                    format_event_age(std::time::Instant::now().saturating_duration_since(at))
-                });
-                let upstream_reserved = upstream_label
-                    .as_ref()
-                    .map(|parts| {
-                        parts.iter().map(|(label, _)| label.len()).sum::<usize>() + parts.len()
-                    })
-                    .unwrap_or(0);
-                let age_reserved = age_label.as_ref().map(|label| label.len() + 1).unwrap_or(0);
-                // Memory-pressure nudge: only when the repo's shep memory file
-                // is >=80% of its cap, i.e. agents should consolidate soon.
-                let memory_label = ws
-                    .memory_usage_percent()
-                    .filter(|percent| *percent >= 80)
-                    .map(|percent| format!("mem {percent}%"));
-                let memory_reserved = memory_label
-                    .as_ref()
-                    .map(|label| label.len() + 1)
-                    .unwrap_or(0);
-                let reserved = upstream_reserved + age_reserved + memory_reserved;
-                let max_branch_len = (card.rect.width as usize).saturating_sub(5 + reserved);
-                let branch_display = truncate_end(&branch, max_branch_len);
+                // The branch and where it stands against upstream, and nothing
+                // else: the event age and the memory nudge were host facts on a
+                // group row, and they live on the board now. The branch is
+                // the one fact here that truncates; the two badges after it
+                // come off whole, the ahead one last.
+                let branch_indent = if card.indented { "     " } else { "   " };
                 let branch_color = if selected || is_active {
                     p.mauve
                 } else {
                     p.overlay0
                 };
-                let branch_indent = if card.indented { "     " } else { "   " };
-                let mut spans = vec![
-                    Span::styled(branch_indent, Style::default()),
-                    Span::styled(branch_display, Style::default().fg(branch_color)),
-                ];
-                if let Some(parts) = upstream_label {
-                    spans.push(Span::styled(" ", Style::default()));
-                    for (idx, (label, color)) in parts.into_iter().enumerate() {
-                        if idx > 0 {
-                            spans.push(Span::styled(" ", Style::default()));
-                        }
-                        spans.push(Span::styled(label, Style::default().fg(color)));
-                    }
-                }
-                if let Some(age_label) = age_label {
-                    spans.push(Span::styled(" ", Style::default()));
-                    spans.push(Span::styled(
-                        age_label,
-                        Style::default().fg(p.overlay0).add_modifier(Modifier::DIM),
-                    ));
-                }
-                if let Some(memory_label) = memory_label {
-                    spans.push(Span::styled(" ", Style::default()));
-                    spans.push(Span::styled(memory_label, Style::default().fg(p.peach)));
-                }
+                let mut spans = vec![Span::styled(branch_indent, Style::default())];
+                spans.extend(group_branch_row(
+                    &branch,
+                    ws.git_ahead_behind(),
+                    (card.rect.width as usize).saturating_sub(display_width(branch_indent) + 1),
+                    branch_color,
+                    p,
+                ));
                 frame.render_widget(
                     Paragraph::new(Line::from(spans)),
                     Rect::new(card.rect.x, row_y + 1, card.rect.width, 1),
@@ -1132,42 +1165,78 @@ fn render_workspace_list(
     }
 
     if app.mouse_capture && list_bottom > area.y {
+        // One button, the width of the footer: `«` moved up to the header
+        // and the menu is the `≡` beside it, so the row is the new-group
+        // affordance and nothing else.
         let new_rect = app.sidebar_new_button_rect();
         frame.render_widget(
-            Paragraph::new(Span::styled(" new", Style::default().fg(p.overlay0))),
+            Paragraph::new(Span::styled(
+                format!(" {}", sidebar_new_button_label(new_rect.width)),
+                Style::default().fg(p.overlay0),
+            )),
             new_rect,
         );
-
-        let menu_rect = app.global_launcher_rect();
-        let menu_line = if app.global_menu_attention_badge_visible() {
-            Line::from(vec![
-                Span::styled(
-                    format!("{} ", glyphs::DOT),
-                    Style::default().fg(p.accent).add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("menu", Style::default().fg(p.overlay0)),
-            ])
-        } else {
-            Line::from(vec![Span::styled("menu", Style::default().fg(p.overlay0))])
-        };
-        frame.render_widget(
-            Paragraph::new(menu_line).alignment(Alignment::Right),
-            menu_rect,
-        );
     }
+}
+
+/// A group's second row: the branch, then `↑N` and `↓N` when the group
+/// stands ahead of or behind its upstream.
+///
+/// `width` is the room after the indent. The branch truncates to what the
+/// badges leave it, down to `MIN_BRANCH_WIDTH`; past that the badges drop
+/// whole, behind before ahead, rather than clipping.
+fn group_branch_row<'a>(
+    branch: &str,
+    ahead_behind: Option<(usize, usize)>,
+    width: usize,
+    branch_color: ratatui::style::Color,
+    p: &Palette,
+) -> Vec<Span<'a>> {
+    let mut badges: Vec<Vec<Span<'a>>> = Vec::new();
+    if let Some((ahead, behind)) = ahead_behind {
+        if ahead > 0 {
+            badges.push(vec![Span::styled(
+                format!("{}{ahead}", glyphs::AHEAD),
+                Style::default().fg(p.green),
+            )]);
+        }
+        if behind > 0 {
+            badges.push(vec![Span::styled(
+                format!("{}{behind}", glyphs::BEHIND),
+                Style::default().fg(p.peach),
+            )]);
+        }
+    }
+    let badges_reserved: usize = badges
+        .iter()
+        .map(|badge| super::text::spans_width(badge) + 1)
+        .sum();
+    let branch_budget = width
+        .saturating_sub(badges_reserved)
+        .max(MIN_BRANCH_WIDTH.min(width));
+    let mut facts = vec![vec![Span::styled(
+        truncate_end(branch, branch_budget),
+        Style::default().fg(branch_color),
+    )]];
+    facts.extend(badges);
+    fit_strip(facts, &Span::raw(" "), width)
 }
 
 /// One agent, on one row, under the group it belongs to.
 ///
 /// The group above it already says where it lives, so this row says only what
-/// the group cannot: which agent, how it is doing, and how much context it has
-/// left. Facts trail to the right edge and drop whole rather than truncate.
+/// the group cannot: which agent and how it is doing. The context gauge is
+/// the pane title's and the board's; it was a bare `72%` here, a number with
+/// no meter, on the one surface that could least afford the columns. Facts
+/// trail to the right edge and drop whole rather than truncate; in the narrow
+/// tree there are none, and the glyph and its colour carry the state.
 fn render_agent_row(
     app: &AppState,
     frame: &mut Frame,
     entry: &AgentPanelEntry,
     rect: Rect,
     indented: bool,
+    narrow: bool,
     row_style: Style,
 ) {
     let p = &app.palette;
@@ -1211,13 +1280,12 @@ fn render_agent_row(
     // Trailing facts drop whole, cheapest first, until the name has room to
     // say which agent this is.
     let mut trailing: Vec<(String, Style)> = Vec::new();
-    if let Some(percent) = entry.context_percent {
-        trailing.push((format!("{percent}%"), muted));
+    if !narrow {
+        trailing.push((status.to_string(), Style::default().fg(status_color)));
+        if let Some(custom_status) = &entry.custom_status {
+            trailing.push((custom_status.clone(), muted));
+        }
     }
-    if let Some(custom_status) = &entry.custom_status {
-        trailing.insert(0, (custom_status.clone(), muted));
-    }
-    trailing.insert(0, (status.to_string(), Style::default().fg(status_color)));
 
     let facts_width = |facts: &[(String, Style)]| -> usize {
         facts
@@ -1235,7 +1303,12 @@ fn render_agent_row(
         trailing.pop();
     }
     let facts = facts_width(&trailing);
-    let name_budget = width.saturating_sub(fixed + facts + 2).max(1);
+    let name_budget = if trailing.is_empty() {
+        width.saturating_sub(fixed + 1)
+    } else {
+        width.saturating_sub(fixed + facts + 2)
+    }
+    .max(1);
     let name = truncate_end(name, name_budget);
 
     let mut spans = vec![
@@ -1244,19 +1317,22 @@ fn render_agent_row(
         Span::styled(" ", Style::default()),
         Span::styled(name.clone(), name_style),
     ];
-    // Pin the facts one column in from the right edge, as every other strip does.
-    let used = fixed + display_width(&name);
-    let pad = width
-        .saturating_sub(1)
-        .saturating_sub(facts)
-        .saturating_sub(used)
-        .max(1);
-    spans.push(Span::styled(" ".repeat(pad), Style::default()));
-    for (idx, (text, style)) in trailing.into_iter().enumerate() {
-        if idx > 0 {
-            spans.push(Span::styled(" ", Style::default()));
+    if !trailing.is_empty() {
+        // Pin the facts one column in from the right edge, as every other
+        // strip does.
+        let used = fixed + display_width(&name);
+        let pad = width
+            .saturating_sub(1)
+            .saturating_sub(facts)
+            .saturating_sub(used)
+            .max(1);
+        spans.push(Span::styled(" ".repeat(pad), Style::default()));
+        for (idx, (text, style)) in trailing.into_iter().enumerate() {
+            if idx > 0 {
+                spans.push(Span::styled(" ", Style::default()));
+            }
+            spans.push(Span::styled(text, style));
         }
-        spans.push(Span::styled(text, style));
     }
 
     frame.render_widget(Paragraph::new(Line::from(spans)).style(row_style), rect);
@@ -1272,16 +1348,13 @@ pub(crate) fn collapsed_sidebar_toggle_rect(area: Rect) -> Rect {
     Rect::new(x, bottom_y, 1, 1)
 }
 
+/// The expanded sidebar's `«`: the header row's last content column, beside
+/// the `≡` of `sidebar_menu_glyph_rect`. `area` is the whole sidebar.
 pub(crate) fn expanded_sidebar_toggle_rect(area: Rect) -> Rect {
     if area.width <= 1 || area.height == 0 {
         return Rect::default();
     }
-    Rect::new(
-        area.x + area.width.saturating_sub(2),
-        area.y + area.height.saturating_sub(1),
-        1,
-        1,
-    )
+    Rect::new(area.x + area.width.saturating_sub(2), area.y, 1, 1)
 }
 
 fn render_sidebar_toggle(
@@ -1292,8 +1365,8 @@ fn render_sidebar_toggle(
     p: &Palette,
 ) {
     // Expanded, `«` is purely a click target, and with `mouse_capture = false`
-    // shep never hears the click — so it goes, the same way the `new` and
-    // `menu` buttons a row above it do. Collapsed, `»` stays whatever the mouse
+    // shep never hears the click — so it goes, the same way the `≡` beside it
+    // and the `+ new group` footer do. Collapsed, `»` stays whatever the mouse
     // is doing: it is the only remaining evidence that a sidebar exists, and it
     // is where the attention badge lights up.
     if !collapsed && !app.mouse_capture {
@@ -1404,13 +1477,182 @@ mod tests {
         }
     }
 
+    /// `≡` and `«` share the header row: the last two content cells with a
+    /// space between, and neither touches the separator.
     #[test]
-    fn expanded_sidebar_toggle_sits_inside_sidebar_content() {
-        let area = Rect::new(0, 0, 26, 20);
+    fn menu_glyph_and_collapse_share_row_zero() {
+        let area = Rect::new(0, 3, 26, 20);
         let toggle = expanded_sidebar_toggle_rect(area);
+        let menu = sidebar_menu_glyph_rect(area);
 
-        assert_eq!(toggle.x, area.x + area.width - 2);
-        assert_eq!(toggle.y, area.y + area.height - 1);
+        assert_eq!(toggle, Rect::new(24, 3, 1, 1));
+        assert_eq!(menu, Rect::new(22, 3, 1, 1));
+        assert_eq!(toggle.y, area.y, "the toggle sits on the header row");
+        assert_eq!(menu.y, area.y);
+        assert!(menu.x + 1 < toggle.x, "a space between the two glyphs");
+        assert!(toggle.x < area.x + area.width - 1, "inside the content");
+
+        let rows = sidebar_screen(26, 20, true);
+        assert_eq!(&rows[0][22..], "≡ «", "{:?}", rows[0]);
+        // Without a mouse neither is drawn: both are click targets only.
+        let rows = sidebar_screen(26, 20, false);
+        assert_eq!(&rows[0][22..], "   ", "{:?}", rows[0]);
+    }
+
+    /// The `≡` wears the attention badge the old `menu` button did, in its
+    /// one cell: peach, the warning tier, an update is waiting.
+    #[test]
+    fn menu_glyph_carries_the_attention_badge_in_peach() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.update_available = Some("0.9.0".into());
+        let area = Rect::new(0, 0, 26, 20);
+        let mut terminal =
+            Terminal::new(TestBackend::new(26, 20)).expect("test terminal should initialize");
+        terminal
+            .draw(|frame| render_sidebar_menu_glyph(&app, frame, area, &app.palette))
+            .expect("menu glyph should render");
+        let menu = sidebar_menu_glyph_rect(area);
+        let cell = &terminal.backend().buffer()[(menu.x, menu.y)];
+        assert_eq!(cell.symbol(), glyphs::MENU);
+        assert_eq!(cell.fg, app.palette.peach);
+        assert!(cell.modifier.contains(Modifier::BOLD));
+
+        app.update_available = None;
+        terminal
+            .draw(|frame| render_sidebar_menu_glyph(&app, frame, area, &app.palette))
+            .expect("menu glyph should render");
+        let cell = &terminal.backend().buffer()[(menu.x, menu.y)];
+        assert_eq!(cell.fg, app.palette.overlay0);
+    }
+
+    /// A 26-column sidebar keeps its sort toggle, left of ` ≡ «`; a narrower
+    /// one has no room for it beside ` groups` and drops it whole.
+    #[test]
+    fn sort_toggle_hidden_below_26() {
+        let list = workspace_list_rect(Rect::new(0, 0, 26, 20));
+        let toggle = sidebar_sort_toggle_rect(list, AgentPanelSort::Grouped);
+        assert_eq!(toggle, Rect::new(14, 0, 7, 1));
+        assert_eq!(
+            sidebar_sort_toggle_rect(list, AgentPanelSort::Priority),
+            Rect::new(13, 0, 8, 1)
+        );
+        let rows = sidebar_screen(26, 20, true);
+        assert_eq!(rows[0], " groups       grouped ≡ «");
+
+        let list = workspace_list_rect(Rect::new(0, 0, 25, 20));
+        assert_eq!(
+            sidebar_sort_toggle_rect(list, AgentPanelSort::Grouped),
+            Rect::default()
+        );
+        let rows = sidebar_screen(25, 20, true);
+        assert!(!rows[0].contains("grouped"), "{:?}", rows[0]);
+        assert!(rows[0].contains("≡ «"), "{:?}", rows[0]);
+    }
+
+    /// The sidebar drawn from the snapshot fixture at a given size, one
+    /// string per row, without the separator column.
+    fn sidebar_screen(width: u16, height: u16, mouse: bool) -> Vec<String> {
+        let mut app = crate::ui::snapshot::fixture::session();
+        app.mouse_capture = mouse;
+        let area = Rect::new(0, 0, width, height);
+        app.view.sidebar_rect = area;
+        app.view.workspace_card_areas = compute_workspace_card_areas(&app, area);
+        let mut terminal = Terminal::new(TestBackend::new(width, height))
+            .expect("test terminal should initialize");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        terminal
+            .draw(|frame| render_sidebar(&app, &runtimes, frame, area))
+            .expect("sidebar should render");
+        let buffer = terminal.backend().buffer();
+        (0..height)
+            .map(|y| {
+                (0..width.saturating_sub(1))
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// A group's second row is the branch and where it stands against
+    /// upstream, and nothing else: the fixture's `workmayt` is 2 ahead, 1
+    /// behind, at 87% of its memory cap, with an agent event 20s ago, and
+    /// only the first two of those are on the row.
+    #[test]
+    fn group_row_shows_branch_and_upstream_only() {
+        let rows = sidebar_screen(26, 24, true);
+        assert_eq!(rows[3].trim_end(), "   fix/stripe-web… ↑2 ↓1");
+        assert!(!rows[3].contains("mem"), "{:?}", rows[3]);
+        assert!(!rows[3].contains("20s"), "{:?}", rows[3]);
+        // `shep` is only behind: one badge, and the branch keeps its room.
+        let shep = rows
+            .iter()
+            .find(|row| row.contains("feat/design-pass"))
+            .expect("the shep group's branch row");
+        assert_eq!(shep.trim_end(), "   feat/design-pass ↓4");
+        // Wide enough, the branch is whole and the badges follow it.
+        let wide = sidebar_screen(36, 24, true);
+        assert_eq!(wide[3].trim_end(), "   fix/stripe-webhook ↑2 ↓1");
+    }
+
+    /// The branch truncates; the badges come off whole, behind before ahead.
+    #[test]
+    fn group_branch_row_drops_badges_whole_before_the_branch_floor() {
+        let p = Palette::shep();
+        let text = |width: usize| -> String {
+            group_branch_row("fix/stripe-webhook", Some((2, 1)), width, p.mauve, &p)
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect()
+        };
+        assert_eq!(text(30), "fix/stripe-webhook ↑2 ↓1");
+        assert_eq!(text(15), "fix/stri… ↑2 ↓1");
+        // Under the branch's floor the badges go rather than the branch.
+        assert_eq!(text(9), "fix/s… ↑2");
+        assert_eq!(text(6), "fix/s…");
+        for width in 0..40 {
+            let row = text(width);
+            assert!(display_width(&row) <= width, "{width}: {row:?}");
+            assert!(!row.ends_with(' '), "{width}: {row:?}");
+        }
+    }
+
+    /// An agent row is glyph, name and state word — the context percentage
+    /// is the pane title's and the board's now.
+    #[test]
+    fn agent_row_drops_the_context_percent() {
+        let rows = sidebar_screen(26, 24, true);
+        assert_eq!(rows[4].trim_end(), "   ◉ claude      blocked");
+        assert!(
+            rows.iter().all(|row| !row.contains('%')),
+            "no row carries a percentage: {rows:#?}"
+        );
+    }
+
+    /// At twenty content columns and under, a group is one row and an agent
+    /// row is glyph and name: the glyph and its colour carry the state.
+    #[test]
+    fn narrow_sidebar_is_one_row_per_group_and_no_state_word() {
+        assert!(sidebar_narrow(20));
+        assert!(!sidebar_narrow(21));
+
+        // 21 columns: 20 of content, narrow.
+        let rows = sidebar_screen(21, 24, true);
+        assert_eq!(rows[2].trim_end(), " ◉ workmayt ◆ ⇥2");
+        assert_eq!(rows[3].trim_end(), "   ◉ claude");
+        assert_eq!(rows[4].trim_end(), "   ⠹ opencode");
+        assert_eq!(rows[5].trim_end(), "");
+        assert_eq!(rows[6].trim_end(), " ● emberline");
+        assert!(
+            rows.iter()
+                .all(|row| !row.contains("blocked") && !row.contains("fix/")),
+            "{rows:#?}"
+        );
+        assert_eq!(rows[23].trim_end(), " + new group");
+
+        // One column more and the branch rows and state words are back.
+        let rows = sidebar_screen(22, 24, true);
+        assert!(rows[3].contains("fix/"), "{:?}", rows[3]);
+        assert!(rows[4].contains("blocked"), "{:?}", rows[4]);
     }
 
     fn workspace_visible_order(app: &AppState) -> Vec<usize> {

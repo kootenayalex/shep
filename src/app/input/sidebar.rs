@@ -92,40 +92,33 @@ impl AppState {
         );
     }
 
-    /// The row `new` and `menu` share, at the very bottom of the tree.
+    /// The tree's last row, the full content width.
     ///
-    /// It ends two columns short of the content edge: the expanded `«` toggle
-    /// sits on this row now that the list runs the full height, and two buttons
-    /// on the same cell is one button too many.
+    /// It used to stop two columns short for the `«` toggle; that sits on the
+    /// header row now, beside the menu's `≡`, so the footer is one button.
     pub(crate) fn sidebar_footer_rect(&self) -> Rect {
         let ws_area = self.workspace_list_rect();
         if ws_area == Rect::default() {
             return Rect::default();
         }
         let y = ws_area.y + ws_area.height.saturating_sub(1);
-        Rect::new(ws_area.x, y, ws_area.width.saturating_sub(2), 1)
+        Rect::new(ws_area.x, y, ws_area.width, 1)
     }
 
+    /// `+ new group`: the whole footer.
     pub(crate) fn sidebar_new_button_rect(&self) -> Rect {
-        let footer = self.sidebar_footer_rect();
-        let width = 5u16.min(footer.width.max(1));
-        Rect::new(footer.x, footer.y, width, footer.height)
+        self.sidebar_footer_rect()
     }
 
+    /// The `≡` on the sidebar's header row, or the phone's header switch.
     pub(crate) fn global_launcher_rect(&self) -> Rect {
         if self.view.layout == ViewLayout::Mobile {
             return self.view.mobile_menu_hit_area;
         }
-
-        let footer = self.sidebar_footer_rect();
-        let width = if self.global_menu_attention_badge_visible() {
-            8
-        } else {
-            6
+        if self.sidebar_collapsed {
+            return Rect::default();
         }
-        .min(footer.width.max(1));
-        let x = footer.x + footer.width.saturating_sub(width);
-        Rect::new(x, footer.y, width, footer.height)
+        crate::ui::sidebar_menu_glyph_rect(self.view.sidebar_rect)
     }
 
     pub(crate) fn global_menu_labels(&self) -> Vec<&'static str> {
@@ -167,7 +160,16 @@ impl AppState {
         let max_x = screen.x + screen.width.saturating_sub(menu_w);
         let desired_x = launcher.x + launcher.width.saturating_sub(menu_w);
         let x = desired_x.min(max_x);
-        let y = launcher.y.saturating_sub(menu_h);
+        // The menu hangs off its launcher: below it when the launcher sits on
+        // the sidebar's header row (or anywhere too high for the menu to open
+        // upward), above it otherwise. Either way it stays on the screen.
+        let room_above = launcher.y.saturating_sub(screen.y);
+        let max_y = screen.y + screen.height.saturating_sub(menu_h);
+        let y = if room_above >= menu_h {
+            launcher.y.saturating_sub(menu_h)
+        } else {
+            launcher.y.saturating_add(launcher.height).min(max_y)
+        };
         Rect::new(x, y, menu_w, menu_h)
     }
     pub(super) fn on_sidebar_divider(&self, col: u16, row: u16) -> bool {
@@ -403,6 +405,85 @@ mod tests {
         ));
 
         assert_eq!(app.state.mode, Mode::GlobalMenu);
+    }
+
+    /// The footer is one button, the whole content width: the corner that
+    /// used to be `«` now asks for a new group like the rest of the row.
+    #[test]
+    fn new_group_button_spans_the_footer() {
+        let mut app = app_for_mouse_test();
+        let footer = app.state.sidebar_footer_rect();
+        let list = app.state.workspace_list_rect();
+        assert_eq!(
+            footer,
+            Rect::new(list.x, list.y + list.height - 1, list.width, 1)
+        );
+        assert_eq!(app.state.sidebar_new_button_rect(), footer);
+        assert_eq!(
+            crate::ui::sidebar_new_button_label(footer.width),
+            "+ new group"
+        );
+        assert_eq!(crate::ui::sidebar_new_button_label(11), "+ new");
+
+        app.handle_mouse(mouse(
+            MouseEventKind::Down(MouseButton::Left),
+            footer.x + footer.width - 1,
+            footer.y,
+        ));
+        assert!(app.state.request_new_workspace);
+        assert!(
+            !app.state.sidebar_collapsed,
+            "the corner is no longer the toggle"
+        );
+    }
+
+    /// The launcher is the `≡` on the sidebar's header row, so the menu hangs
+    /// below it; a launcher with room above it still opens upward.
+    #[test]
+    fn global_menu_opens_below_a_top_row_launcher() {
+        let mut app = app_for_mouse_test();
+        let launcher = app.state.global_launcher_rect();
+        assert_eq!(
+            launcher,
+            crate::ui::sidebar_menu_glyph_rect(app.state.view.sidebar_rect)
+        );
+        assert_eq!(launcher.y, app.state.view.sidebar_rect.y);
+
+        let menu = app.state.global_menu_rect();
+        assert_eq!(menu.y, launcher.y + 1, "{menu:?} hangs under {launcher:?}");
+        assert_eq!(
+            menu.x, launcher.x,
+            "anchored on the glyph, opening rightward"
+        );
+        let screen = app.state.screen_rect();
+        assert!(menu.x + menu.width <= screen.x + screen.width, "{menu:?}");
+        assert!(menu.y + menu.height <= screen.y + screen.height, "{menu:?}");
+
+        app.handle_mouse(mouse(
+            MouseEventKind::Down(MouseButton::Left),
+            launcher.x,
+            launcher.y,
+        ));
+        assert_eq!(app.state.mode, Mode::GlobalMenu);
+        app.handle_mouse(mouse(
+            MouseEventKind::Down(MouseButton::Left),
+            menu.x + 2,
+            menu.y + 4,
+        ));
+        assert_eq!(app.state.mode, Mode::KeybindHelp);
+
+        // A sidebar that starts lower on the screen than the menu is tall
+        // gets the menu above its launcher, as before.
+        let mut app = app_for_mouse_test();
+        app.state.view.sidebar_rect = Rect::new(0, 12, 26, 8);
+        let launcher = app.state.global_launcher_rect();
+        let menu = app.state.global_menu_rect();
+        assert_eq!(launcher.y, 12);
+        assert_eq!(
+            menu.y + menu.height,
+            launcher.y,
+            "{menu:?} above {launcher:?}"
+        );
     }
 
     #[test]

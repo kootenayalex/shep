@@ -6,11 +6,10 @@ use ratatui::{
     Frame,
 };
 
+use super::gauge::context_gauge_spans;
 use super::glyphs;
 use super::scrollbar::{render_pane_scrollbar, should_show_scrollbar};
-#[cfg(test)]
-use super::text::display_width;
-use super::text::truncate_end;
+use super::text::{contract_home, display_width, spans_width, truncate_end, truncate_start};
 use super::widgets::panel_contrast_fg;
 use crate::app::state::Palette;
 use crate::app::{AppState, Mode};
@@ -22,13 +21,129 @@ pub(crate) fn pane_is_scrolled_back(rt: &TerminalRuntime) -> bool {
         .is_some_and(|metrics| metrics.offset_from_bottom > 0)
 }
 
-fn pane_border_title(label: &str, pane_width: u16, _focused: bool) -> Option<String> {
+/// The least room the working directory gets in a pane title before it
+/// comes off the title whole. `~/…/shep` still names the repo.
+const MIN_CWD_WIDTH: usize = 12;
+
+/// The least of the agent's name the title keeps before the branch beside
+/// it goes: `claude · fix/stripe-webhook` on a wide pane, `claude · fix/st…`
+/// on a narrower one, `claude` alone on a narrow one.
+const MIN_LABEL_WIDTH: usize = 12;
+
+/// The least of a branch worth printing beside the agent; under this the
+/// branch drops rather than reading `f…`.
+const MIN_BRANCH_WIDTH: usize = 6;
+
+/// A pane's title, in two halves: ` agent · branch ` at the left of the top
+/// border and ` cwd · <gauge> NN% ` pinned to its right.
+///
+/// `width` is the room between the border's corners. The right half is a
+/// ladder — the directory comes off before the gauge, and the gauge before
+/// the title stops saying which agent this is — and the left half truncates
+/// to whatever the right leaves: the branch first, down to a floor, then the
+/// branch goes and the name truncates.
+///
+/// The state is not here. It used to trail as ` · blocked`, in the state's
+/// colour; the border ring is already that colour and the sidebar row already
+/// says the word, and a pane title saying it a third time cost the columns
+/// the branch now has.
+pub(crate) fn pane_title_parts<'a>(
+    label: &str,
+    branch: Option<&str>,
+    cwd: Option<&str>,
+    percent: Option<u8>,
+    width: u16,
+    focused: bool,
+    p: &Palette,
+) -> (Vec<Span<'a>>, Vec<Span<'a>>) {
     let label = label.trim();
-    if label.is_empty() || pane_width <= 4 {
-        return None;
+    let width = width as usize;
+    if label.is_empty() || width == 0 {
+        return (Vec::new(), Vec::new());
     }
-    let max_label_width = pane_width.saturating_sub(4) as usize;
-    Some(format!(" {} ", truncate_end(label, max_label_width)))
+
+    let mut label_style = Style::default().fg(if focused { p.accent } else { p.overlay0 });
+    let mut branch_style = Style::default().fg(p.mauve);
+    if focused {
+        label_style = label_style.add_modifier(Modifier::BOLD);
+        branch_style = branch_style.add_modifier(Modifier::BOLD);
+    }
+    let dim = Style::default().fg(p.overlay0);
+
+    let branch = branch.map(str::trim).filter(|branch| !branch.is_empty());
+    let sep_width = display_width(glyphs::SEP_SPACED);
+    // The right half yields to the name on the left, and the directory
+    // yields to a short branch too: a directory is a place, the branch says
+    // which line of work this is, and a title that named the place but not
+    // the work read as the wrong pane. The gauge outranks the branch — on a
+    // narrow pane the group row beside it already names the branch, and the
+    // gauge is nowhere else.
+    let name_floor = display_width(label).min(MIN_LABEL_WIDTH) + 2;
+    let branch_floor = if branch.is_some() {
+        sep_width + MIN_BRANCH_WIDTH
+    } else {
+        0
+    };
+    let right_budget = width.saturating_sub(name_floor + branch_floor);
+    let gauge_budget = width.saturating_sub(name_floor);
+    let gauge: Vec<Span<'a>> = percent
+        .map(|percent| context_gauge_spans(percent, p))
+        .unwrap_or_default();
+    let cwd = cwd
+        .map(str::trim)
+        .filter(|cwd| !cwd.is_empty())
+        .map(|cwd| contract_home(std::path::Path::new(cwd)));
+    let mut right: Vec<Span<'a>> = Vec::new();
+    // Rung one: cwd and gauge. The path truncates from the front to what the
+    // gauge leaves it, down to a floor that still shows the last directory.
+    if let Some(cwd) = cwd.as_deref() {
+        let inner = right_budget.saturating_sub(2);
+        let cwd_budget = if gauge.is_empty() {
+            inner
+        } else {
+            inner.saturating_sub(spans_width(&gauge) + sep_width)
+        }
+        .max(MIN_CWD_WIDTH.min(inner));
+        let shown = truncate_start(cwd, cwd_budget);
+        let mut candidate = vec![Span::raw(" "), Span::styled(shown, dim)];
+        if !gauge.is_empty() {
+            candidate.push(Span::styled(glyphs::SEP_SPACED, dim));
+            candidate.extend(gauge.iter().cloned());
+        }
+        candidate.push(Span::raw(" "));
+        if spans_width(&candidate) <= right_budget {
+            right = candidate;
+        }
+    }
+    // Rung two: the gauge alone.
+    if right.is_empty() && !gauge.is_empty() && spans_width(&gauge) + 2 <= gauge_budget {
+        right.push(Span::raw(" "));
+        right.extend(gauge);
+        right.push(Span::raw(" "));
+    }
+
+    let left_budget = width.saturating_sub(spans_width(&right));
+    let inner = left_budget.saturating_sub(2);
+    let mut left: Vec<Span<'a>> = vec![Span::raw(" ")];
+    let label_width = display_width(label);
+    match branch {
+        Some(branch) if inner >= label_width + sep_width + MIN_BRANCH_WIDTH => {
+            left.push(Span::styled(label.to_string(), label_style));
+            left.push(Span::styled(glyphs::SEP_SPACED, dim));
+            left.push(Span::styled(
+                truncate_end(branch, inner - label_width - sep_width),
+                branch_style,
+            ));
+        }
+        _ => {
+            if inner == 0 {
+                return (Vec::new(), right);
+            }
+            left.push(Span::styled(truncate_end(label, inner), label_style));
+        }
+    }
+    left.push(Span::raw(" "));
+    (left, right)
 }
 
 fn stable_terminal_inner_rect(pane_inner: Rect) -> Rect {
@@ -576,16 +691,17 @@ fn line_touches_pane(x: u16, y: u16, info: &PaneInfo, pane_gaps: bool) -> bool {
 fn render_pane_border_titles(app: &AppState, ws: &crate::workspace::Workspace, frame: &mut Frame) {
     let buf = frame.buffer_mut();
     let area = buf.area;
+    let branch = ws.branch();
     for info in &app.view.pane_infos {
         if !info.borders.contains(Borders::TOP) || info.rect.width <= 4 {
             continue;
         }
         let pane = ws.pane_state(info.id);
-        let terminal = pane.and_then(|pane| app.terminals.get(&pane.attached_terminal_id));
-        let Some(title) = terminal
-            .and_then(|terminal| terminal.border_label(app.show_agent_labels_on_pane_borders))
-            .and_then(|label| pane_border_title(&label, info.rect.width, info.is_focused))
+        let Some(terminal) = pane.and_then(|pane| app.terminals.get(&pane.attached_terminal_id))
         else {
+            continue;
+        };
+        let Some(label) = terminal.border_label(app.show_agent_labels_on_pane_borders) else {
             continue;
         };
         let y = info.rect.y;
@@ -602,54 +718,25 @@ fn render_pane_border_titles(app: &AppState, ws: &crate::workspace::Workspace, f
         if start_x >= end_x {
             continue;
         }
-        let color = if info.is_focused {
-            app.palette.accent
-        } else {
-            app.palette.overlay0
-        };
-        let mut style = Style::default().fg(color);
-        if info.is_focused {
-            style = style.add_modifier(Modifier::BOLD);
-        }
-        let title_width = title.chars().count();
-        buf.set_stringn(
-            start_x,
-            y,
-            title,
-            end_x.saturating_sub(start_x) as usize,
-            style,
-        );
-
-        // State suffix in the ring color, same recognized-agent condition as
-        // pane_ring_color, so the border label reads `agent · state`.
-        let (Some(pane), Some(terminal)) = (pane, terminal) else {
-            continue;
-        };
-        let recognized = terminal
-            .effective_known_agent()
-            .or(terminal.detected_agent)
-            .is_some();
-        if !recognized || terminal.state == crate::detect::AgentState::Unknown {
-            continue;
-        }
-        let suffix_x = start_x.saturating_add(u16::try_from(title_width).unwrap_or(u16::MAX));
-        let max = end_x.saturating_sub(suffix_x) as usize;
-        if max == 0 {
-            continue;
-        }
-        let state = super::status::state_label(terminal.state, pane.seen);
-        let suffix_style = Style::default().fg(super::status::state_label_color(
-            terminal.state,
-            pane.seen,
+        let cwd = terminal.cwd.to_string_lossy();
+        let (left, right) = pane_title_parts(
+            &label,
+            branch.as_deref(),
+            Some(cwd.as_ref()),
+            terminal.context_percent,
+            end_x.saturating_sub(start_x),
+            info.is_focused,
             &app.palette,
-        ));
-        buf.set_stringn(
-            suffix_x,
-            y,
-            format!("{} {state} ", glyphs::SEP),
-            max,
-            suffix_style,
         );
+        buf.set_line(start_x, y, &Line::from(left), end_x.saturating_sub(start_x));
+        // The right half runs up to the corner: its own trailing space is the
+        // one column in that every strip keeps at its right edge, the mirror
+        // of the space after `╭` on the left.
+        let right_width = u16::try_from(spans_width(&right)).unwrap_or(u16::MAX);
+        let right_x = end_x.saturating_sub(right_width);
+        if right_width > 0 && right_x >= start_x {
+            buf.set_line(right_x, y, &Line::from(right), right_width);
+        }
     }
 }
 
@@ -864,40 +951,217 @@ fn render_empty(app: &AppState, frame: &mut Frame, area: Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::detect::AgentState;
     use crate::layout::PaneId;
     use crate::selection::Selection;
     use crate::terminal::TerminalRuntime;
     use crate::terminal::TerminalState;
     use crate::workspace::Workspace;
 
-    #[test]
-    fn pane_border_title_trims_and_truncates() {
-        assert_eq!(
-            pane_border_title(" claude ", 20, false).as_deref(),
-            Some(" claude ")
-        );
-        assert_eq!(
-            pane_border_title(" claude ", 20, true).as_deref(),
-            Some(" claude ")
-        );
-        assert_eq!(pane_border_title("", 20, false), None);
-        assert_eq!(
-            pane_border_title("abcdef", 8, false).as_deref(),
-            Some(" abc… ")
-        );
-        assert_eq!(
-            pane_border_title("abcdef", 8, true).as_deref(),
-            Some(" abc… ")
-        );
-        assert_eq!(pane_border_title("abcdef", 4, false), None);
+    fn title_text(spans: &[Span<'_>]) -> String {
+        spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    fn title_at(
+        label: &str,
+        branch: Option<&str>,
+        cwd: Option<&str>,
+        percent: Option<u8>,
+        width: u16,
+    ) -> (String, String) {
+        let p = Palette::shep();
+        let (left, right) = pane_title_parts(label, branch, cwd, percent, width, false, &p);
+        (title_text(&left), title_text(&right))
     }
 
     #[test]
-    fn pane_border_title_truncates_cjk_by_display_width() {
-        let title = pane_border_title("1 模块组织（已定）", 12, false).unwrap();
+    fn pane_title_trims_and_truncates_the_label() {
+        assert_eq!(title_at(" claude ", None, None, None, 16).0, " claude ");
+        assert_eq!(
+            title_at("", None, None, None, 16),
+            (String::new(), String::new())
+        );
+        assert_eq!(title_at("abcdef", None, None, None, 6).0, " abc… ");
+        assert_eq!(
+            title_at("abcdef", None, None, None, 0),
+            (String::new(), String::new())
+        );
+        let p = Palette::shep();
+        let (left, _) = pane_title_parts("claude", None, None, None, 20, true, &p);
+        assert_eq!(left[1].style.fg, Some(p.accent));
+        assert!(left[1].style.add_modifier.contains(Modifier::BOLD));
+    }
 
-        assert_eq!(title, " 1 模块… ");
-        assert!(display_width(title.as_str()) <= 10);
+    #[test]
+    fn pane_title_truncates_cjk_by_display_width() {
+        let (left, _) = title_at("1 模块组织（已定）", None, None, None, 10);
+
+        assert_eq!(left, " 1 模块… ");
+        assert!(display_width(left.as_str()) <= 10);
+    }
+
+    /// Wide: ` agent · branch ` on the left and ` cwd · gauge ` on the right.
+    /// Narrowing drops the directory first, then the gauge, and only then
+    /// does the branch give way — the name outlives everything.
+    #[test]
+    fn pane_title_drops_cwd_before_the_gauge() {
+        let full = title_at(
+            "claude",
+            Some("fix/stripe-webhook"),
+            Some("~/vault/dev/workmayt"),
+            Some(72),
+            80,
+        );
+        let gauge = title_text(&context_gauge_spans(72, &Palette::shep()));
+        assert_eq!(full.0, " claude · fix/stripe-webhook ");
+        assert_eq!(full.1, format!(" ~/vault/dev/workmayt · {gauge} "));
+
+        // Too narrow for the whole path: it truncates from the front, and
+        // the branch beside the name shrinks to its floor rather than going.
+        let squeezed = title_at(
+            "claude",
+            Some("fix/stripe-webhook"),
+            Some("~/vault/dev/workmayt"),
+            Some(72),
+            50,
+        );
+        assert_eq!(squeezed.1, format!(" …ult/dev/workmayt · {gauge} "));
+        assert_eq!(squeezed.0, " claude · fix/s… ");
+
+        // Under the path's floor it comes off whole, the gauge stays, and the
+        // branch has its room back.
+        let no_cwd = title_at(
+            "claude",
+            Some("fix/stripe-webhook"),
+            Some("~/vault/dev/workmayt"),
+            Some(72),
+            40,
+        );
+        assert_eq!(no_cwd.1, format!(" {gauge} "));
+        assert_eq!(no_cwd.0, " claude · fix/stripe-webh… ");
+
+        // Narrower still, the gauge outranks the branch: the group row in
+        // the sidebar names the branch, and the gauge is nowhere else.
+        let gauge_only = title_at(
+            "claude",
+            Some("fix/stripe-webhook"),
+            Some("~/vault/dev/workmayt"),
+            Some(72),
+            24,
+        );
+        assert_eq!(gauge_only.1, format!(" {gauge} "));
+        assert_eq!(gauge_only.0, " claude ");
+
+        // Then the gauge goes and the branch has the room, down to its floor.
+        let name_only = title_at(
+            "claude",
+            Some("fix/stripe-webhook"),
+            Some("~/vault/dev/workmayt"),
+            Some(72),
+            17,
+        );
+        assert_eq!(name_only.1, "");
+        assert_eq!(name_only.0, " claude · fix/s… ");
+
+        // Under the branch's floor the branch drops whole.
+        let bare = title_at(
+            "claude",
+            Some("fix/stripe-webhook"),
+            Some("~/vault/dev/workmayt"),
+            Some(72),
+            12,
+        );
+        assert_eq!(bare, (" claude ".to_string(), String::new()));
+
+        // Every width fits, and the halves never overlap.
+        for width in 0..90u16 {
+            let (left, right) = title_at(
+                "claude",
+                Some("fix/stripe-webhook"),
+                Some("~/vault/dev/workmayt"),
+                Some(72),
+                width,
+            );
+            assert!(
+                display_width(&left) + display_width(&right) <= width as usize,
+                "{width}: {left:?} {right:?}"
+            );
+        }
+    }
+
+    /// The border ring and the sidebar row carry the state; the title does
+    /// not say it a third time.
+    #[test]
+    fn pane_title_has_no_state_suffix() {
+        let (mut app, ws, _) = titled_pane_app(80, AgentState::Blocked);
+        app.show_agent_labels_on_pane_borders = true;
+        let row = top_border_row(&app, &ws, 80);
+        assert!(row.contains(" claude · fix/stripe-webhook "), "{row:?}");
+        assert!(!row.contains("blocked"), "{row:?}");
+        assert!(!row.contains("· blocked"), "{row:?}");
+    }
+
+    /// The right half's own trailing space is the one column in from the
+    /// corner, the mirror of the space after `╭`.
+    #[test]
+    fn pane_title_gauge_ends_one_column_in() {
+        let width = 60u16;
+        let (mut app, ws, _) = titled_pane_app(width, AgentState::Idle);
+        app.show_agent_labels_on_pane_borders = true;
+        let row = top_border_row(&app, &ws, width);
+        let cells = row_cells(&app, &ws, width);
+        let last = usize::from(width) - 1;
+        assert_eq!(cells[last], "╮", "{row:?}");
+        assert_eq!(cells[last - 1], " ", "{row:?}");
+        assert_eq!(cells[last - 2], "%", "{row:?}");
+        assert_eq!(cells[0], "╭", "{row:?}");
+        assert_eq!(cells[1], " ", "{row:?}");
+        assert_eq!(cells[2], "c", "{row:?}");
+    }
+
+    fn titled_pane_app(
+        width: u16,
+        state: AgentState,
+    ) -> (AppState, Workspace, crate::terminal::TerminalId) {
+        let mut app = AppState::test_new();
+        app.mode = Mode::Terminal;
+        app.view.terminal_area = Rect::new(0, 0, width, 3);
+        let mut ws = Workspace::test_new("test");
+        ws.cached_git_branch = Some("fix/stripe-webhook".into());
+        let pane_id = ws.tabs[0].root_pane;
+        app.view.pane_infos = vec![PaneInfo {
+            id: pane_id,
+            rect: Rect::new(0, 0, width, 3),
+            inner_rect: Rect::default(),
+            scrollbar_rect: None,
+            borders: Borders::ALL,
+            is_focused: true,
+        }];
+        let terminal_id = ws.tabs[0].panes[&pane_id].attached_terminal_id.clone();
+        let mut terminal_state =
+            TerminalState::new(terminal_id.clone(), "/tmp/vault/dev/workmayt".into());
+        terminal_state.detected_agent = Some(crate::detect::Agent::Claude);
+        terminal_state.agent_name = Some("claude".into());
+        terminal_state.state = state;
+        terminal_state.context_percent = Some(72);
+        app.terminals.insert(terminal_id.clone(), terminal_state);
+        (app, ws, terminal_id)
+    }
+
+    fn row_cells(app: &AppState, ws: &Workspace, width: u16) -> Vec<String> {
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, 3)).unwrap();
+        terminal
+            .draw(|frame| render_pane_borders(app, ws, frame))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        (0..width)
+            .map(|x| buffer[(x, 0)].symbol().to_string())
+            .collect()
+    }
+
+    fn top_border_row(app: &AppState, ws: &Workspace, width: u16) -> String {
+        row_cells(app, ws, width).concat()
     }
 
     #[test]

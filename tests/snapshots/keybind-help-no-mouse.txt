@@ -4,7 +4,7 @@
 --- screen ---
  shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
  ✦╭──────────────────────────────────────────────────────────────────────────╮8
- g│keybinds                                                        esc close │─╮
+ g│keybinds                                                        esc close │ ╮
   │ available commands and configured shortcuts                              │ │
  ◉│                                                                          │ │
   │ global                                                                  ▐│ │

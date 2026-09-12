@@ -1,90 +1,92 @@
-# navigate-overlay-small 80x24 · 33 styles
+# navigate-overlay-small 80x24 · 35 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
  ✦ workmayt's claude has been blocked 2m on a permission prompt.          07:08
- groups          grouped │╭──────────────────────────┬─────────────────────────╮
+ groups       grouped ≡ «│╭ claude ──── ████▍   72% ─┬ claude ──── ██▌     41% ╮
                          ││                          │                         │
  ◉ workmayt ◆ ⇥2         ││                          │                         │
-    ↑2 ↓1 20s mem 87%    ││                          │                         │
-   ◉ claude  blocked 72% ││                          │                         │
+   fix/stripe-web… ↑2 ↓1 ││                          │                         │
+   ◉ claude      blocked ││                          │                         │
    ⠹ opencode    working ││                          │                         │
                          ││                          │                         │
  ● emberline             ││                          │                         │
-   master 6m             ││                          │                         │
-   ● claude     done 88% ││                          │                         │
+   master                ││                          │                         │
+   ● claude         done ││                          │                         │
                          ││                          │                         │
  ⠹ shep                  ││                          │                         │
-   feat/design… ↓4 2m    ││                          │                         │
-   ○ claude     idle 12% ││                          │                         │
-   ⠹ codex   working 55% ││                          │                         │
+   feat/design-pass ↓4   ││                          │                         │
+   ○ claude         idle ││                          │                         │
+   ⠹ codex       working ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
- new               menu «│╰──────────────────────────┴─────────────────────────╯
+ + new group             │╰──────────────────────────┴─────────────────────────╯
  NAVIGATE  esc back  up / down ws  ⇥ pane  g navigator  c new tab  v split│  - s
 
 --- styles ---
-taaaattttttttttttttttttttttttttBBBBBBBBiiivvvvvvtttrrrttEEEttoooooooooyyyyyyAAyt
-uhuCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCuuuuuuuuuummmmmm
-kkkkkkk..........kkkkkkk.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbFFFFFFFFFFFFFFFFFFFFFFFFFF
-.........................bb..........................b.........................F
-csuDDDDDDDDuguzzuuuuuuuuubb..........................b.........................F
-uuuuffuqqunnnuqqqqqqquuuubb..........................b.........................F
-uuusuDDDDDDuusssssssunnnubb..........................b.........................F
-uuuGuxxxxxxxxuuuuGGGGGGGubb..........................b.........................F
-.........................bb..........................b.........................F
-.d.wwwwwwwww.............bb..........................b.........................F
-...jjjjjj.ll.............bb..........................b.........................F
-...d.wwwwww.....dddd.lll.bb..........................b.........................F
-.........................bb..........................b.........................F
-.F.wwww..................bb..........................b.........................F
-...jjjjjjjjjjjj.pp.ll....bb..........................b.........................F
-...e.wwwwww.....eeee.lll.bb..........................b.........................F
-...F.wwwww...FFFFFFF.lll.bb..........................b.........................F
-.........................bb..........................b.........................F
-.........................bb..........................b.........................F
-.........................bb..........................b.........................F
-.........................bb..........................b.........................F
-.........................bb..........................b.........................F
-jjjj...............jjjj.jbbbbbbbbbbbbbbbbbbbbbbbbbbbbbFFFFFFFFFFFFFFFFFFFFFFFFFF
-ooooooooootaaaiiiiiiiaaaaaaaaaiiiiiaiiiiiiiaiiiiiiiiiiiiaiiiiiiiiiiaiiiiiiiiiaii
+uaaaauuuuuuuuuuuuuuuuuuuuuuuuuuCCCCCCCCkkkwwwwwwuuusssuuFFFuupppppppppzzzzzzBBzu
+vjvDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDvvvvvvvvvvnnnnnn
+mmmmmmm.......mmmmmmm.l.lbbbccccccbbbbbboooooelllllbbbGllllllGGGGGGoooIIIlllllGG
+.........................bb..........................b.........................G
+dtvEEEEEEEEvivAAvvvvvvvvvbb..........................b.........................G
+vvviiiiiiiiiiiiiiivhhvrrvbb..........................b.........................G
+vvvtvEEEEEEvvvvvvtttttttvbb..........................b.........................G
+vvvHvyyyyyyyyvvvvHHHHHHHvbb..........................b.........................G
+.........................bb..........................b.........................G
+.f.xxxxxxxxx.............bb..........................b.........................G
+...llllll................bb..........................b.........................G
+...f.xxxxxx.........ffff.bb..........................b.........................G
+.........................bb..........................b.........................G
+.G.xxxx..................bb..........................b.........................G
+...llllllllllllllll.qq...bb..........................b.........................G
+...g.xxxxxx.........gggg.bb..........................b.........................G
+...G.xxxxx.......GGGGGGG.bb..........................b.........................G
+.........................bb..........................b.........................G
+.........................bb..........................b.........................G
+.........................bb..........................b.........................G
+.........................bb..........................b.........................G
+.........................bb..........................b.........................G
+llllllllllll.............bbbbbbbbbbbbbbbbbbbbbbbbbbbbbGGGGGGGGGGGGGGGGGGGGGGGGGG
+ppppppppppuaaakkkkkkkaaaaaaaaakkkkkakkkkkkkakkkkkkkkkkkkakkkkkkkkkkakkkkkkkkkakk
 
 --- legend ---
 . = (unstyled)
-A = fg:teal bg:surface1
-B = fg:text bg:panel_bg bold
-C = fg:text bg:surface0
-D = fg:text bg:surface0 bold
-E = fg:yellow bg:panel_bg
-F = fg:yellow bg:reset
-G = fg:yellow bg:surface0
+A = fg:teal bg:surface0
+B = fg:teal bg:surface1
+C = fg:text bg:panel_bg bold
+D = fg:text bg:surface0
+E = fg:text bg:surface0 bold
+F = fg:yellow bg:panel_bg
+G = fg:yellow bg:reset
+H = fg:yellow bg:surface0
+I = fg:yellow bg:surface1
 a = fg:accent bg:panel_bg bold
 b = fg:accent bg:reset
-c = fg:accent bg:surface0
-d = fg:blue bg:reset
-e = fg:green bg:reset
-f = fg:green bg:surface0
-g = fg:mauve bg:surface0
-h = fg:mauve bg:surface0 bold
-i = fg:overlay0 bg:panel_bg
-j = fg:overlay0 bg:reset
-k = fg:overlay0 bg:reset bold
-l = fg:overlay0 bg:reset dim
-m = fg:overlay0 bg:surface0
-n = fg:overlay0 bg:surface0 dim
-o = fg:panel_bg bg:accent bold
-p = fg:peach bg:reset
-q = fg:peach bg:surface0
-r = fg:red bg:panel_bg bold
-s = fg:red bg:surface0
-t = fg:reset bg:panel_bg
-u = fg:reset bg:surface0
-v = fg:subtext0 bg:panel_bg
-w = fg:subtext0 bg:reset
-x = fg:subtext0 bg:surface0
-y = fg:subtext0 bg:surface1
-z = fg:teal bg:surface0
+c = fg:accent bg:reset bold
+d = fg:accent bg:surface0
+e = fg:accent bg:surface1
+f = fg:blue bg:reset
+g = fg:green bg:reset
+h = fg:green bg:surface0
+i = fg:mauve bg:surface0
+j = fg:mauve bg:surface0 bold
+k = fg:overlay0 bg:panel_bg
+l = fg:overlay0 bg:reset
+m = fg:overlay0 bg:reset bold
+n = fg:overlay0 bg:surface0
+o = fg:overlay0 bg:surface1
+p = fg:panel_bg bg:accent bold
+q = fg:peach bg:reset
+r = fg:peach bg:surface0
+s = fg:red bg:panel_bg bold
+t = fg:red bg:surface0
+u = fg:reset bg:panel_bg
+v = fg:reset bg:surface0
+w = fg:subtext0 bg:panel_bg
+x = fg:subtext0 bg:reset
+y = fg:subtext0 bg:surface0
+z = fg:subtext0 bg:surface1

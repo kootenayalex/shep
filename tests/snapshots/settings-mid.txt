@@ -1,24 +1,24 @@
-# settings-mid 120x40 · 46 styles
+# settings-mid 120x40 · 51 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                                              workmayt › claude             ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board 2
  ✦ overseer · workmayt's claude has been blocked 2m on a permission prompt.                                       07:08
- groups          grouped │╭──────────────────────────────────────────────┬─────────────────────────────────────────────╮
+ groups       grouped ≡ «│╭ claude · fix/s…  …ev/workmayt · ████▍   72% ─┬ claude · fix/s…  …t/apps/site · ██▌     41% ╮
                          ││                                              │                                             │
  ◉ workmayt ◆ ⇥2         ││                                              │                                             │
-    ↑2 ↓1 20s mem 87%    ││                                              │                                             │
-   ◉ claude  blocked 72% ││                                              │                                             │
+   fix/stripe-web… ↑2 ↓1 ││                                              │                                             │
+   ◉ claude      blocked ││                                              │                                             │
    ⠹ opencode    working ││                                              │                                             │
                          ││                                              │                                             │
  ● emberline          ╭──────────────────────────────────────────────────────────────────────────╮                     │
-   master 6m          │ settings                                                                 │                     │
-   ● claude     done 8│ theme   sound   toasts   pane labels   integrations   experiments        │                     │
+   master             │ settings                                                                 │                     │
+   ● claude         do│ theme   sound   toasts   pane labels   integrations   experiments        │                     │
                       │──────────────────────────────────────────────────────────────────────────│                     │
  ⠹ shep               │                                                                          │                     │
-   feat/design… ↓4 2m │ ▸ shep                                                                   │                     │
-   ○ claude     idle 1│   catppuccin ✓                                                           │                     │
-   ⠹ codex   working 5│   catppuccin-latte                                                       │                     │
+   feat/design-pass ↓4│ ▸ shep                                                                   │                     │
+   ○ claude         id│   catppuccin ✓                                                           │                     │
+   ⠹ codex       worki│   catppuccin-latte                                                       │                     │
                       │   terminal                                                               │                     │
                       │   tokyo-night                                                            │                     │
                       │   tokyo-night-day                                                        │                     │
@@ -40,96 +40,101 @@
                          ││                                              │                                             │
                          ││                                              │                                             │
                          ││                                              │                                             │
- new               menu «│╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
+ + new group             │╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-zbbbbzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzNNNNNNNNmmmEEEEEEzzzzzzzzzzzzzwwwzzRRRzzdddzzgggzztttttttttGGGGGGKKGz
-BjjjjjjjjjjpppPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBpppppp
-nnnnnnnAAAAAAAAAAnnnnnnnAJccccccccccccccccccccccccccccccccccccccccccccccccSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-CxCQQQQQQQQCkCLLCCCCCCCCCJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-CCCCiiCvvCqqqCvvvvvvvCCCCJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-CCCxCQQQQQQCCxxxxxxxCqqqCJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-CCCTCHHHHHHHHCCCCTTTTTTTCJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AeAFFFFFFFFFAAAAAAAAAAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaAAAAAAAAAAAAAAAAAAAAAS
-AAAooooooAooAAAAAAAAAAaMMMMMMMMMyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyaAAAAAAAAAAAAAAAAAAAAAS
-AAAeAFFFFFFAAAAAeeeeAoarsssssrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrraAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIaAAAAAAAAAAAAAAAAAAAAAS
-ASAFFFFAAAAAAAAAAAAAAAayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyaAAAAAAAAAAAAAAAAAAAAAS
-AAAooooooooooooAuuAooAaOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOaAAAAAAAAAAAAAAAAAAAAAS
-AAAhAFFFFFFAAAAAhhhhAoaDDDDDDDDDDDDDffDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAASAFFFFFAAASSSSSSSAoaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAalllrrrrrrrrrlllrrrrrrrryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAayyyyyyyyyyyyyyyyyyyyyyyyyysssssssssyyOOOOOOOOOOOyyyyyyyyyyyyyyyyyyyyyyyyyyaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-AAAAAAAAAAAAAAAAAAAAAAAAAJcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAS
-ooooAAAAAAAAAAAAAAAooooAoJccccccccccccccccccccccccccccccccccccccccccccccccSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
-zbbbbbbmmmmmmmmmbbbbbbbbbbmmmmmmmmbmmmmmmmbmmmmmmmzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
+DbbbbDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDRRRRRRRRqqqIIIIIIDDDDDDDDDDDDDAAADDVVVDDfffDDiiiDDxxxxxxxxxKKKKKKOOKD
+FnnnnnnnnnntttTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFtttttt
+rrrrrrrEEEEEEErrrrrrrEsEsNddccccccsssllllllddsssssssssssssssuuuuuesssssdddWsssssssssmmmmmmWWsssssssssssssssuuuXXXsssssWW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+GBGUUUUUUUUGoGPPGGGGGGGGGNdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+GGGoooooooooooooooGkkGzzGNdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+GGGBGUUUUUUGGGGGGBBBBBBBGNdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+GGGYGLLLLLLLLGGGGYYYYYYYGNdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EgEJJJJJJJJJEEEEEEEEEEaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaEEEEEEEEEEEEEEEEEEEEEW
+EEEssssssEEEEEEEEEEEEEaQQQQQQQQQCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCaEEEEEEEEEEEEEEEEEEEEEW
+EEEgEJJJJJJEEEEEEEEEggavwwwwwvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMaEEEEEEEEEEEEEEEEEEEEEW
+EWEJJJJEEEEEEEEEEEEEEEaCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCaEEEEEEEEEEEEEEEEEEEEEW
+EEEssssssssssssssssEyyaSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSaEEEEEEEEEEEEEEEEEEEEEW
+EEEjEJJJJJJEEEEEEEEEjjaHHHHHHHHHHHHHhhHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEWEJJJJJEEEEEEEWWWWWaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEapppvvvvvvvvvpppvvvvvvvvCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaCCCCCCCCCCCCCCCCCCCCCCCCCCwwwwwwwwwCCSSSSSSSSSSSCCCCCCCCCCCCCCCCCCCCCCCCCCaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+EEEEEEEEEEEEEEEEEEEEEEEEENdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEdEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEW
+ssssssssssssEEEEEEEEEEEEENddddddddddddddddddddddddddddddddddddddddddddddddWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+DbbbbbbqqqqqqqqqbbbbbbbbbbqqqqqqqqbqqqqqqqbqqqqqqqDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
 
 --- legend ---
 . = (unstyled)
-A = fg:reset bg:reset dim
-B = fg:reset bg:surface0 dim
-C = fg:reset bg:surface_dim dim
-D = fg:subtext0 bg:panel_bg
-E = fg:subtext0 bg:panel_bg dim
-F = fg:subtext0 bg:reset dim
-G = fg:subtext0 bg:surface1 dim
-H = fg:subtext0 bg:surface_dim dim
-I = fg:surface0 bg:panel_bg
-J = fg:surface_dim bg:reset dim
-K = fg:teal bg:surface1 dim
-L = fg:teal bg:surface_dim dim
-M = fg:text bg:panel_bg bold
-N = fg:text bg:panel_bg bold+dim
-O = fg:text bg:surface0 bold
-P = fg:text bg:surface0 dim
-Q = fg:text bg:surface_dim bold+dim
-R = fg:yellow bg:panel_bg dim
-S = fg:yellow bg:reset dim
-T = fg:yellow bg:surface_dim dim
+A = fg:red bg:panel_bg bold+dim
+B = fg:red bg:surface_dim dim
+C = fg:reset bg:panel_bg
+D = fg:reset bg:panel_bg dim
+E = fg:reset bg:reset dim
+F = fg:reset bg:surface0 dim
+G = fg:reset bg:surface_dim dim
+H = fg:subtext0 bg:panel_bg
+I = fg:subtext0 bg:panel_bg dim
+J = fg:subtext0 bg:reset dim
+K = fg:subtext0 bg:surface1 dim
+L = fg:subtext0 bg:surface_dim dim
+M = fg:surface0 bg:panel_bg
+N = fg:surface_dim bg:reset dim
+O = fg:teal bg:surface1 dim
+P = fg:teal bg:surface_dim dim
+Q = fg:text bg:panel_bg bold
+R = fg:text bg:panel_bg bold+dim
+S = fg:text bg:surface0 bold
+T = fg:text bg:surface0 dim
+U = fg:text bg:surface_dim bold+dim
+V = fg:yellow bg:panel_bg dim
+W = fg:yellow bg:reset dim
+X = fg:yellow bg:surface1 dim
+Y = fg:yellow bg:surface_dim dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold+dim
-c = fg:accent bg:reset dim
-d = fg:blue bg:panel_bg dim
-e = fg:blue bg:reset dim
-f = fg:green bg:panel_bg
-g = fg:green bg:panel_bg dim
-h = fg:green bg:reset dim
-i = fg:green bg:surface_dim dim
-j = fg:mauve bg:surface0 bold+dim
-k = fg:mauve bg:surface_dim dim
-l = fg:overlay0 bg:panel_bg
-m = fg:overlay0 bg:panel_bg dim
-n = fg:overlay0 bg:reset bold+dim
-o = fg:overlay0 bg:reset dim
-p = fg:overlay0 bg:surface0 dim
-q = fg:overlay0 bg:surface_dim dim
-r = fg:overlay1 bg:panel_bg
-s = fg:panel_bg bg:accent bold
-t = fg:panel_bg bg:accent bold+dim
-u = fg:peach bg:reset dim
-v = fg:peach bg:surface_dim dim
-w = fg:red bg:panel_bg bold+dim
-x = fg:red bg:surface_dim dim
-y = fg:reset bg:panel_bg
-z = fg:reset bg:panel_bg dim
+c = fg:accent bg:reset bold+dim
+d = fg:accent bg:reset dim
+e = fg:accent bg:surface1 dim
+f = fg:blue bg:panel_bg dim
+g = fg:blue bg:reset dim
+h = fg:green bg:panel_bg
+i = fg:green bg:panel_bg dim
+j = fg:green bg:reset dim
+k = fg:green bg:surface_dim dim
+l = fg:mauve bg:reset bold+dim
+m = fg:mauve bg:reset dim
+n = fg:mauve bg:surface0 bold+dim
+o = fg:mauve bg:surface_dim dim
+p = fg:overlay0 bg:panel_bg
+q = fg:overlay0 bg:panel_bg dim
+r = fg:overlay0 bg:reset bold+dim
+s = fg:overlay0 bg:reset dim
+t = fg:overlay0 bg:surface0 dim
+u = fg:overlay0 bg:surface1 dim
+v = fg:overlay1 bg:panel_bg
+w = fg:panel_bg bg:accent bold
+x = fg:panel_bg bg:accent bold+dim
+y = fg:peach bg:reset dim
+z = fg:peach bg:surface_dim dim

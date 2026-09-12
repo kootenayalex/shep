@@ -204,6 +204,25 @@
 - `ui.hide_tab_bar_when_single_tab` defaults to `true`: a group with one
   agent no longer spends a row on a tab strip with one tab in it.
 
+- The sidebar keeps the branch and the upstream badges, and nothing else. A
+  group's second row is `branch ↑N ↓N` — the event age and the `mem NN%`
+  nudge were host facts on a group row and belong to the board — and an
+  agent row is glyph, name and state word, without the bare `72%` it used to
+  trail. The header row is ` groups … grouped ≡ «`: the sort toggle (from a
+  26-column sidebar up), the global menu, which opens under its `≡`, and the
+  collapse toggle, which moved up from the footer; the footer is one
+  `+ new group` button across its width. The `≡` turns peach when an update
+  is waiting, as the old `menu` button's dot did. At twenty content columns
+  and under the tree goes narrow: one row per group and glyph-plus-name per
+  agent, the state carried by the glyph and its colour.
+
+- Pane titles carry the branch, the directory and the context gauge:
+  ` claude · fix/stripe-webhook ` at the left of the top border and
+  ` ~/vault/dev/workmayt · ███▍   72% ` pinned to its right. Narrowing drops
+  the directory before the gauge and the gauge before the name, and the
+  ` · blocked` suffix is gone — the border ring is already the state's
+  colour and the sidebar row already says the word.
+
 - The context gauge on board cards and the agent detail screen warms to
   peach at 80% and stays dim below, instead of yellow from 60 and red from
   85. Yellow is a working agent and red is a blocked one; a meter is neither

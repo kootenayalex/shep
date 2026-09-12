@@ -1,13 +1,13 @@
-# navigator-mid 120x40 · 36 styles
+# navigator-mid 120x40 · 41 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                                              workmayt › claude             ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board 2
  ✦ overseer · workmayt's claude has been blocked 2m on a permission prompt.                                       07:08
- groups          grouped │╭──────────────────────────────────────────────┬─────────────────────────────────────────────╮
+ groups       grouped ≡ «│╭ claude · fix/s…  …ev/workmayt · ████▍   72% ─┬ claude · fix/s…  …t/apps/site · ██▌     41% ╮
                          ││                                              │                                             │
  ◉ workmayt ◆ ⇥2         ││                                              │                                             │
-    ↑2 ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮      │
+   fix/╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮      │
    ◉ cl│ / search panes                                                                                       5 │      │
    ⠹ op│────────────────────────────────────────────────────────────────────────────────────────────────────────│      │
        │ ▸ → ◆ ◉ workmayt (2)                                                        1 blocked · 1 working      │      │
@@ -40,86 +40,91 @@
        ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯      │
                          ││                                              │                                             │
                          ││                                              │                                             │
- new               menu «│╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
+ + new group             │╰──────────────────────────────────────────────┴─────────────────────────────────────────────╯
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-sbbbbssssssssssssssssssssssssssssssssssssssssssssssEEEEEEEEkkkvvvvvvsssssssssssssqqqssHHHssdddssfffsspppppppppxxxxxxBBxs
-tiiiiiiiiiinnnFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFtttttttttttttttttttttttttttttttttttttttnnnnnn
-mmmmmmm..........mmmmmmm.AccccccccccccccccccccccccccccccccccccccccccccccccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-.........................Ac..............................................c.............................................I
-uruGGGGGGGGujuCCuuuuuuuuuAc..............................................c.............................................I
-uuuuhhuaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......I
-uuuruGGakkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka......I
-uuuJuyyazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzza......I
-.......aooooooopoppppppppppppoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooa......I
-.e.wwwwakkkkkkkdDvvvvvvvvvvvvvDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDkkkkkkkkkkkkkkkkkkkkkkkkkkkka......I
-...llllakkkkkkkHDvvvvvvvvDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDkkkkkkkkkkkkkkkkkkkkkkkkkkkka......I
-...e.wwassssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.I.wwwwassssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-...llllassssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-...g.wwassssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-...I.wwassssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......assssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......I
-.......akkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkka......I
-.......abbbbbbkkkkkkkkkbkkkkkkkkkbbbbbbbbbkkkkkkkkkbbbbbbkkkkkkkbbbkkkkkksssssssssssssssssssssssssssssssssssssssa......I
-.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......I
-.........................Ac..............................................c.............................................I
-.........................Ac..............................................c.............................................I
-llll...............llll.lAccccccccccccccccccccccccccccccccccccccccccccccccIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-sbbbbbbkkkkkkkkkbbbbbbbbbbkkkkkkkkbkkkkkkkbkkkkkkkssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss
+wbbbbwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwIIIIIIIInnnzzzzzzwwwwwwwwwwwwwuuuwwLLLwwfffwwhhhwwtttttttttBBBBBBFFBw
+xllllllllllqqqJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxqqqqqq
+ppppppp.......ppppppp.o.oEccddddddoookkkkkkccooooooooooooooorrrrreooooocccMooooooooojjjjjjMMooooooooooooooorrrNNNoooooMM
+.........................Ec..............................................c.............................................M
+yvyKKKKKKKKymyGGyyyyyyyyyEc..............................................c.............................................M
+yyymmmmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......M
+yyyvyKKannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna......M
+yyyOyCCaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDa......M
+.......assssssststtttttttttttsssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssa......M
+.g.AAAAannnnnnnfHzzzzzzzzzzzzzHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHnnnnnnnnnnnnnnnnnnnnnnnnnnnna......M
+...ooooannnnnnnLHzzzzzzzzHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHnnnnnnnnnnnnnnnnnnnnnnnnnnnna......M
+...g.AAawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.M.AAAAawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+...ooooawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+...i.AAawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+...M.AAawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......awwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna......M
+.......abbbbbbnnnnnnnnnbnnnnnnnnnbbbbbbbbbnnnnnnnnnbbbbbbnnnnnnnbbbnnnnnnwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwa......M
+.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......M
+.........................Ec..............................................c.............................................M
+.........................Ec..............................................c.............................................M
+oooooooooooo.............EccccccccccccccccccccccccccccccccccccccccccccccccMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+wbbbbbbnnnnnnnnnbbbbbbbbbbnnnnnnnnbnnnnnnnbnnnnnnnwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
 
 --- legend ---
 . = (unstyled)
-A = fg:surface_dim bg:reset
-B = fg:teal bg:surface1
-C = fg:teal bg:surface_dim
-D = fg:text bg:panel_bg
-E = fg:text bg:panel_bg bold
-F = fg:text bg:surface0
-G = fg:text bg:surface_dim bold
-H = fg:yellow bg:panel_bg
-I = fg:yellow bg:reset
-J = fg:yellow bg:surface_dim
+A = fg:subtext0 bg:reset
+B = fg:subtext0 bg:surface1
+C = fg:subtext0 bg:surface_dim
+D = fg:surface1 bg:panel_bg
+E = fg:surface_dim bg:reset
+F = fg:teal bg:surface1
+G = fg:teal bg:surface_dim
+H = fg:text bg:panel_bg
+I = fg:text bg:panel_bg bold
+J = fg:text bg:surface0
+K = fg:text bg:surface_dim bold
+L = fg:yellow bg:panel_bg
+M = fg:yellow bg:reset
+N = fg:yellow bg:surface1
+O = fg:yellow bg:surface_dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:reset
-d = fg:blue bg:panel_bg
-e = fg:blue bg:reset
-f = fg:green bg:panel_bg
-g = fg:green bg:reset
-h = fg:green bg:surface_dim
-i = fg:mauve bg:surface0 bold
-j = fg:mauve bg:surface_dim
-k = fg:overlay0 bg:panel_bg
-l = fg:overlay0 bg:reset
-m = fg:overlay0 bg:reset bold
-n = fg:overlay0 bg:surface0
-o = fg:panel_bg bg:accent
-p = fg:panel_bg bg:accent bold
-q = fg:red bg:panel_bg bold
-r = fg:red bg:surface_dim
-s = fg:reset bg:panel_bg
-t = fg:reset bg:surface0
-u = fg:reset bg:surface_dim
-v = fg:subtext0 bg:panel_bg
-w = fg:subtext0 bg:reset
-x = fg:subtext0 bg:surface1
-y = fg:subtext0 bg:surface_dim
-z = fg:surface1 bg:panel_bg
+d = fg:accent bg:reset bold
+e = fg:accent bg:surface1
+f = fg:blue bg:panel_bg
+g = fg:blue bg:reset
+h = fg:green bg:panel_bg
+i = fg:green bg:reset
+j = fg:mauve bg:reset
+k = fg:mauve bg:reset bold
+l = fg:mauve bg:surface0 bold
+m = fg:mauve bg:surface_dim
+n = fg:overlay0 bg:panel_bg
+o = fg:overlay0 bg:reset
+p = fg:overlay0 bg:reset bold
+q = fg:overlay0 bg:surface0
+r = fg:overlay0 bg:surface1
+s = fg:panel_bg bg:accent
+t = fg:panel_bg bg:accent bold
+u = fg:red bg:panel_bg bold
+v = fg:red bg:surface_dim
+w = fg:reset bg:panel_bg
+x = fg:reset bg:surface0
+y = fg:reset bg:surface_dim
+z = fg:subtext0 bg:panel_bg

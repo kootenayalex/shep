@@ -115,20 +115,6 @@ impl Workspace {
         self.tabs.iter().any(|tab| tab.has_working_pane(terminals))
     }
 
-    /// Most-recent effective agent-state change across all panes in this
-    /// workspace, if any. The sidebar renders `now - this` as a short age hint.
-    pub fn last_agent_event_at(
-        &self,
-        terminals: &HashMap<TerminalId, TerminalState>,
-    ) -> Option<std::time::Instant> {
-        self.tabs
-            .iter()
-            .flat_map(|tab| tab.panes.values())
-            .filter_map(|pane| terminals.get(&pane.attached_terminal_id))
-            .filter_map(|terminal| terminal.last_agent_state_change_at)
-            .max()
-    }
-
     pub fn pane_details(&self, terminals: &HashMap<TerminalId, TerminalState>) -> Vec<PaneDetail> {
         self.tabs
             .iter()

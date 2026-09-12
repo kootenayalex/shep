@@ -1,96 +1,99 @@
-# pair-phone-small 80x24 · 39 styles
+# pair-phone-small 80x24 · 42 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
  ✦ workmayt's claude has been blocked 2m on a permission prompt.          07:08
- groups          grouped │╭──────────────────────────┬─────────────────────────╮
+ groups       grouped ≡ «│╭ claude ──── ████▍   72% ─┬ claude ──── ██▌     41% ╮
                          ││                          │                         │
  ◉ workmayt ◆ ⇥2         ││                          │                         │
-    ↑2 ↓1 20s mem 87%    ││                          │                         │
-   ◉ claude  blocked 72% ││                          │                         │
+   fix/stripe-web… ↑2 ↓1 ││                          │                         │
+   ◉ claude      blocked ││                          │                         │
    ⠹ opencode    working ││                          │                         │
                 ╭──────────────────────────────────────────────╮               │
  ● emberline    │ no room for the QR - type this instead:      │               │
-   master 6m    │ address  100.64.0.1:7431                     │               │
+   master       │ address  100.64.0.1:7431                     │               │
    ● claude     │ code     7K4M-9QP2                           │               │
                 │ expires  in 5 min, and after one use         │               │
  ⠹ shep         │                                              │               │
-   feat/design… │ esc closes this and cancels the code         │               │
+   feat/design-p│ esc closes this and cancels the code         │               │
    ○ claude     ╰──────────────────────────────────────────────╯               │
-   ⠹ codex   working 55% ││                          │                         │
+   ⠹ codex       working ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
                          ││                          │                         │
- new               menu «│╰──────────────────────────┴─────────────────────────╯
+ + new group             │╰──────────────────────────┴─────────────────────────╯
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-uccccuuuuuuuuuuuuuuuuuuuuuuuuuuHHHHHHHHkkkyyyyyyuuurrruuKKKuupppppppppAAAAAADDAu
-whwIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIwwwwwwwwwwnnnnnn
-lllllllvvvvvvvvvvlllllllvCddddddddddddddddddddddddddddLLLLLLLLLLLLLLLLLLLLLLLLLL
-vvvvvvvvvvvvvvvvvvvvvvvvvCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-xsxJJJJJJJJxixEExxxxxxxxxCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-xxxxggxqqxoooxqqqqqqqxxxxCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-xxxsxJJJJJJxxsssssssxoooxCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-xxxMxBBBBBBBBxxxxMMMMMMMxCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-vvvvvvvvvvvvvvvvaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavvvvvvvvvvvvvvvL
-vevzzzzzzzzzvvvvabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbttttttavvvvvvvvvvvvvvvL
-vvvmmmmmmvmmvvvvajjjjjjjjjjFFFFFFFFFFFFFFFtttttttttttttttttttttavvvvvvvvvvvvvvvL
-vvvevzzzzzzvvvvvajjjjjjjjjjGGGGGGGGGtttttttttttttttttttttttttttavvvvvvvvvvvvvvvL
-vvvvvvvvvvvvvvvvajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjtttttttttavvvvvvvvvvvvvvvL
-vLvzzzzvvvvvvvvvattttttttttttttttttttttttttttttttttttttttttttttavvvvvvvvvvvvvvvL
-vvvmmmmmmmmmmmmvajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjtttttttttavvvvvvvvvvvvvvvL
-vvvfvzzzzzzvvvvvaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaavvvvvvvvvvvvvvvL
-vvvLvzzzzzvvvLLLLLLLvmmmvCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-vvvvvvvvvvvvvvvvvvvvvvvvvCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-vvvvvvvvvvvvvvvvvvvvvvvvvCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-vvvvvvvvvvvvvvvvvvvvvvvvvCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-vvvvvvvvvvvvvvvvvvvvvvvvvCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-vvvvvvvvvvvvvvvvvvvvvvvvvCdvvvvvvvvvvvvvvvvvvvvvvvvvvdvvvvvvvvvvvvvvvvvvvvvvvvvL
-mmmmvvvvvvvvvvvvvvvmmmmvmCddddddddddddddddddddddddddddLLLLLLLLLLLLLLLLLLLLLLLLLL
-ucccccckkkkkkkkkcccccccccckkkkkkkkckkkkkkkckkkkkkkuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+wccccwwwwwwwwwwwwwwwwwwwwwwwwwwJJJJJJJJmmmAAAAAAwwwtttwwMMMwwrrrrrrrrrCCCCCCFFCw
+yjyKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKyyyyyyyyyypppppp
+nnnnnnnxxxxxxxnnnnnnnxoxoEeeddddddeeeeeeqqqqqfoooooeeeNooooooNNNNNNqqqOOOoooooNN
+xxxxxxxxxxxxxxxxxxxxxxxxxEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+zuzLLLLLLLLzkzGGzzzzzzzzzEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+zzzkkkkkkkkkkkkkkkziizsszEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+zzzuzLLLLLLzzzzzzuuuuuuuzEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+zzzPzDDDDDDDDzzzzPPPPPPPzEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+xxxxxxxxxxxxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxN
+xgxBBBBBBBBBxxxxabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvaxxxxxxxxxxxxxxxN
+xxxooooooxxxxxxxallllllllllHHHHHHHHHHHHHHHvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxN
+xxxgxBBBBBBxxxxxallllllllllIIIIIIIIIvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxN
+xxxxxxxxxxxxxxxxalllllllllllllllllllllllllllllllllllllvvvvvvvvvaxxxxxxxxxxxxxxxN
+xNxBBBBxxxxxxxxxavvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvaxxxxxxxxxxxxxxxN
+xxxoooooooooooooalllllllllllllllllllllllllllllllllllllvvvvvvvvvaxxxxxxxxxxxxxxxN
+xxxhxBBBBBBxxxxxaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaxxxxxxxxxxxxxxxN
+xxxNxBBBBBxxxxxxxNNNNNNNxEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+xxxxxxxxxxxxxxxxxxxxxxxxxEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+xxxxxxxxxxxxxxxxxxxxxxxxxEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+xxxxxxxxxxxxxxxxxxxxxxxxxEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+xxxxxxxxxxxxxxxxxxxxxxxxxEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+xxxxxxxxxxxxxxxxxxxxxxxxxEexxxxxxxxxxxxxxxxxxxxxxxxxxexxxxxxxxxxxxxxxxxxxxxxxxxN
+ooooooooooooxxxxxxxxxxxxxEeeeeeeeeeeeeeeeeeeeeeeeeeeeeNNNNNNNNNNNNNNNNNNNNNNNNNN
+wccccccmmmmmmmmmccccccccccmmmmmmmmcmmmmmmmcmmmmmmmwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
 
 --- legend ---
 . = (unstyled)
-A = fg:subtext0 bg:surface1 dim
-B = fg:subtext0 bg:surface_dim dim
-C = fg:surface_dim bg:reset dim
-D = fg:teal bg:surface1 dim
-E = fg:teal bg:surface_dim dim
-F = fg:text bg:panel_bg
-G = fg:text bg:panel_bg bold
-H = fg:text bg:panel_bg bold+dim
-I = fg:text bg:surface0 dim
-J = fg:text bg:surface_dim bold+dim
-K = fg:yellow bg:panel_bg dim
-L = fg:yellow bg:reset dim
-M = fg:yellow bg:surface_dim dim
+A = fg:subtext0 bg:panel_bg dim
+B = fg:subtext0 bg:reset dim
+C = fg:subtext0 bg:surface1 dim
+D = fg:subtext0 bg:surface_dim dim
+E = fg:surface_dim bg:reset dim
+F = fg:teal bg:surface1 dim
+G = fg:teal bg:surface_dim dim
+H = fg:text bg:panel_bg
+I = fg:text bg:panel_bg bold
+J = fg:text bg:panel_bg bold+dim
+K = fg:text bg:surface0 dim
+L = fg:text bg:surface_dim bold+dim
+M = fg:yellow bg:panel_bg dim
+N = fg:yellow bg:reset dim
+O = fg:yellow bg:surface1 dim
+P = fg:yellow bg:surface_dim dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:panel_bg bold+dim
-d = fg:accent bg:reset dim
-e = fg:blue bg:reset dim
-f = fg:green bg:reset dim
-g = fg:green bg:surface_dim dim
-h = fg:mauve bg:surface0 bold+dim
-i = fg:mauve bg:surface_dim dim
-j = fg:overlay0 bg:panel_bg
-k = fg:overlay0 bg:panel_bg dim
-l = fg:overlay0 bg:reset bold+dim
-m = fg:overlay0 bg:reset dim
-n = fg:overlay0 bg:surface0 dim
-o = fg:overlay0 bg:surface_dim dim
-p = fg:panel_bg bg:accent bold+dim
-q = fg:peach bg:surface_dim dim
-r = fg:red bg:panel_bg bold+dim
-s = fg:red bg:surface_dim dim
-t = fg:reset bg:panel_bg
-u = fg:reset bg:panel_bg dim
-v = fg:reset bg:reset dim
-w = fg:reset bg:surface0 dim
-x = fg:reset bg:surface_dim dim
-y = fg:subtext0 bg:panel_bg dim
-z = fg:subtext0 bg:reset dim
+d = fg:accent bg:reset bold+dim
+e = fg:accent bg:reset dim
+f = fg:accent bg:surface1 dim
+g = fg:blue bg:reset dim
+h = fg:green bg:reset dim
+i = fg:green bg:surface_dim dim
+j = fg:mauve bg:surface0 bold+dim
+k = fg:mauve bg:surface_dim dim
+l = fg:overlay0 bg:panel_bg
+m = fg:overlay0 bg:panel_bg dim
+n = fg:overlay0 bg:reset bold+dim
+o = fg:overlay0 bg:reset dim
+p = fg:overlay0 bg:surface0 dim
+q = fg:overlay0 bg:surface1 dim
+r = fg:panel_bg bg:accent bold+dim
+s = fg:peach bg:surface_dim dim
+t = fg:red bg:panel_bg bold+dim
+u = fg:red bg:surface_dim dim
+v = fg:reset bg:panel_bg
+w = fg:reset bg:panel_bg dim
+x = fg:reset bg:reset dim
+y = fg:reset bg:surface0 dim
+z = fg:reset bg:surface_dim dim

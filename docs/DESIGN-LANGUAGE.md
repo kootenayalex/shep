@@ -151,7 +151,7 @@ Badges sit beside a name and answer a different question from state.
 | queued input | `⇥N` | teal | N prompts waiting for idle |
 | git ahead | `↑N` | green | commits to push |
 | git behind | `↓N` | peach | commits to pull |
-| memory pressure | `mem NN%` | peach | at or over 80% of the cap |
+| memory pressure | `mem NN%` | peach | at or over 80% of the cap; the board's, not the sidebar's |
 | context window | `███▍░░ NN%` | peach at or over 80%, overlay0 below | how full the agent's context is |
 | plan mode | `plan` | mauve | the agent is planning, not editing |
 | bypassing permissions | `bypass` | peach | the agent is not asking before acting |
@@ -225,6 +225,30 @@ edge in overlay0. Narrowing drops the word `overseer` before it elides the
 sentence — the mark still says who is speaking. It is the overseer's only
 voice outside the board, and clicking anywhere on it opens the board.
 
+**The sidebar says who and how; the pane title says where and how full.**
+A group row is its glyph, name and badges, and under it the branch with
+`↑N`/`↓N` — the branch truncates, the two badges come off whole. An agent row
+is its glyph, name and state word. That is the whole fact set: the event age
+and `mem NN%` were host facts on a group row and live on the board, and the
+bare `72%` an agent row used to trail was a meter with no bar on the one
+surface that could least afford the columns. At twenty content columns and
+under the tree goes narrow — one row per group, glyph and name per agent —
+and the glyph and its colour carry the state on their own, as they always
+could. The header row is ` groups … grouped ≡ «`: the sort toggle from a
+26-column sidebar up, then the global menu and the collapse toggle, both
+mouse-only; the footer is one `+ new group` button.
+
+The pane title is ` agent · branch ` at the left of the top border and
+` cwd · <gauge> NN% ` pinned to its right, the branch in mauve. Its ladder,
+walked until everything fits: the directory truncates from the front to a
+floor, then comes off whole, then the gauge goes, then the branch shrinks to
+a floor and goes, and the name is last to truncate. The directory yields to a
+short branch — a place is not a line of work — but the gauge outranks the
+branch, because the group row beside a narrow pane already names the branch
+and the gauge is nowhere else. There is no state word: the border ring is
+the state's colour and the sidebar row says the word, and the title saying
+it a third time cost the columns the branch has now.
+
 **A layout collapses on its own threshold, not the app's.** The board is four
 columns where the rest of shep is one, so it stacks at four times the width —
 on a standard 80×24 its lanes were 20 columns and every card had elided its
@@ -239,7 +263,8 @@ indistinguishable from a keybinding that does not exist.
 `mouse_capture = false` is a supported configuration, and in it shep receives no
 mouse events at all. **Anything that can only be clicked is not drawn** when it
 cannot be clicked: the tab-scroll arrows, the `+` new-tab button, the sidebar's
-`new` and `menu` buttons, and the expanded sidebar's `«` collapse button.
+`+ new group` footer, and the expanded sidebar's `≡` menu and `«` collapse
+glyphs on its header row.
 
 Two carve-outs, both because the mark is doing a second job:
 

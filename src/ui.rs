@@ -59,6 +59,8 @@ pub(crate) use self::scrollbar::{
     scrollbar_offset_from_row, scrollbar_thumb_grab_offset, should_show_scrollbar,
 };
 use self::settings::render_settings_overlay;
+#[cfg(test)]
+pub(crate) use self::sidebar::sidebar_new_button_label;
 use self::sidebar::{render_sidebar, render_sidebar_collapsed};
 use self::status::{
     copy_feedback_rect, render_config_diagnostic, render_copy_feedback, render_toast_notification,
@@ -80,10 +82,10 @@ pub(crate) use self::{
     sidebar::{
         agent_panel_entries, collapsed_sidebar_sections, collapsed_sidebar_toggle_rect,
         compute_workspace_card_areas, expanded_sidebar_toggle_rect, normalized_workspace_scroll,
-        sidebar_rows, sidebar_sort_toggle_rect, workspace_drop_indicator_row,
-        workspace_list_entries, workspace_list_entries_expanded, workspace_list_rect,
-        workspace_list_scroll_metrics, workspace_list_scrollbar_rect, workspace_parent_group_state,
-        SidebarRow, WorkspaceListEntry,
+        sidebar_menu_glyph_rect, sidebar_rows, sidebar_sort_toggle_rect,
+        workspace_drop_indicator_row, workspace_list_entries, workspace_list_entries_expanded,
+        workspace_list_rect, workspace_list_scroll_metrics, workspace_list_scrollbar_rect,
+        workspace_parent_group_state, SidebarRow, WorkspaceListEntry,
     },
 };
 pub(crate) use self::{
@@ -1197,9 +1199,9 @@ mod tests {
 
         assert!(line1.starts_with(" · one"));
         assert!(!line1.contains("1 one"));
-        // The branch line carries the age now that every agent has one; the
-        // row is still "branch, then how long it has been this way".
-        assert_eq!(line2, "   main 0s");
+        // The branch line is the branch and its upstream badges, nothing
+        // else: a fresh repo with no upstream is the bare branch.
+        assert_eq!(line2, "   main");
 
         std::fs::remove_dir_all(repo).ok();
     }

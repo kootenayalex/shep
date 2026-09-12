@@ -4,7 +4,7 @@
 --- screen ---
  shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
  ✦╭──────────────────────────────────────────────────────────────────────────╮8
- g│ settings                                                                 │─╮
+ g│ settings                                                                 │ ╮
   │ theme   sound   toasts   pane labels   integrations   experiments        │ │
  ◉│──────────────────────────────────────────────────────────────────────────│ │
   │                                                                          │ │
@@ -24,7 +24,7 @@
   │                                                                          │ │
   │ ↑↓ select  tab section                                                   │ │
   │                           ↵ apply    esc close                           │ │
- n╰──────────────────────────────────────────────────────────────────────────╯─╯
+ +╰──────────────────────────────────────────────────────────────────────────╯─╯
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---

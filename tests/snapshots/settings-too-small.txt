@@ -1,36 +1,38 @@
-# settings-too-small 24x7 · 13 styles
+# settings-too-small 24x7 · 15 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
  ◉ wo…  tab 1 │        ◉
  ◉ 1 blocked  │ switch
-╭───────────┬──────────╮
+╭ claude ───┬ claude ──╮
 │ settings needs 16x8  │
 │           │          │
 │           │          │
 ╰───────────┴──────────╯
 
 --- styles ---
-gegkkkgbbbbbbgjiiiiiiiif
-gdddddddddddggjlllllllll
-aaaaaaaaaaaaammmmmmmmmmm
-accccccccccccccccccccchm
-ahhhhhhhhhhhahhhhhhhhhhm
-ahhhhhhhhhhhahhhhhhhhhhm
-aaaaaaaaaaaaammmmmmmmmmm
+igimmmiddddddilkkkkkkkkh
+ifffffffffffiilnnnnnnnnn
+bbaaaaaabbbbboccccccoooo
+beeeeeeeeeeeeeeeeeeeeejo
+bjjjjjjjjjjjbjjjjjjjjjjo
+bjjjjjjjjjjjbjjjjjjjjjjo
+bbbbbbbbbbbbbooooooooooo
 
 --- legend ---
 . = (unstyled)
-a = fg:accent bg:reset dim
-b = fg:overlay1 bg:panel_bg dim
-c = fg:panel_bg bg:peach bold
-d = fg:red bg:panel_bg bold+dim
-e = fg:red bg:panel_bg dim
-f = fg:red bg:surface0 dim
-g = fg:reset bg:panel_bg dim
-h = fg:reset bg:reset dim
-i = fg:reset bg:surface0 dim
-j = fg:surface_dim bg:surface0 dim
-k = fg:text bg:panel_bg bold+dim
-l = fg:text bg:surface0 bold+dim
-m = fg:yellow bg:reset dim
+a = fg:accent bg:reset bold+dim
+b = fg:accent bg:reset dim
+c = fg:overlay0 bg:reset dim
+d = fg:overlay1 bg:panel_bg dim
+e = fg:panel_bg bg:peach bold
+f = fg:red bg:panel_bg bold+dim
+g = fg:red bg:panel_bg dim
+h = fg:red bg:surface0 dim
+i = fg:reset bg:panel_bg dim
+j = fg:reset bg:reset dim
+k = fg:reset bg:surface0 dim
+l = fg:surface_dim bg:surface0 dim
+m = fg:text bg:panel_bg bold+dim
+n = fg:text bg:surface0 bold+dim
+o = fg:yellow bg:reset dim
