@@ -180,6 +180,27 @@
   out as alt plus an unnameable control character; every `ESC ctrl+letter`
   pair now reads as ctrl+alt+letter.
 
+- The titlebar counts agents, not groups, and knows which side it is on.
+  Its centre reads `group › agent` (the focused agent, not a tab number);
+  its right slot is a state tally — `◉ 1  ⠹ 2  ● 1  ○ 1`, one glyph and
+  colour per state, the same ones as everywhere else — beside a
+  `desktop | board` pill whose lit half is the current view and whose
+  unlit `board` half counts the overseer's waiting proposals. Clicking a
+  half switches; nothing on those rows ever reaches a pane. On a narrow
+  terminal the slot walks a ladder — drop idle, drop done, shorten the pill,
+  drop working, drop blocked — so what remains is a prefix of a known order,
+  and on the board the centre says `✦ overseer`. The hint bar is four keys
+  on the desktop (`prefix`, the board chord, `?`, `q`) and two on the board.
+
+- An overseer strip under the titlebar (`[ui] overseer_strip`, on by
+  default): `✦ overseer · <the first sentence of its narrative> · hh:mm`,
+  whenever the overseer plugin has written a `BOARD.md`. The plugin's files
+  are sampled every two seconds from the scheduled tick — four stats, and a
+  read only when a file moved — so render never opens them. Click the strip
+  to open the board. It drops the word `overseer` before it elides the
+  sentence, and never draws on the board, on a phone, or before the plugin
+  has spoken.
+
 - `ui.hide_tab_bar_when_single_tab` defaults to `true`: a group with one
   agent no longer spends a row on a tab strip with one tab in it.
 

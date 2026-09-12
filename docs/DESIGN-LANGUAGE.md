@@ -204,6 +204,27 @@ in the order a glance wants them and the line stops at the first one that does
 not fit, so what remains is a prefix of a known order rather than a gap-toothed
 subset of it.
 
+**The titlebar's right slot is a ladder.** The state tally (`◉ 1  ⠹ 2  ● 1
+○ 1`, one fact per state with the agent table's glyph and colour, zero counts
+absent) and the `desktop | board` pill share the slot with `group › agent` in
+the centre. Rungs, walked until everything fits: full, drop idle, drop done,
+shorten the pill to `desk`, drop working, drop blocked, the pill alone. `update
+ready` leads every rung but the last. `src/ui/chrome.rs::titlebar_layout` is
+the one function that lays it out, and the mouse asks the same function, so
+the pill is clickable exactly where it is drawn.
+
+**The pill is the one place `accent` paints a background.** Its lit half —
+the view you are on — is accent behind panel-bg bold text; the unlit half is
+surface1 behind subtext. Focus tier, because the pill is a selection between
+two views and not a state. The unlit `board` half carries ` N` in teal (the
+queued tier: proposals waiting for you) when the overseer has captured any.
+
+**The overseer strip is one row and no buttons.** `✦ overseer · <first
+sentence> · hh:mm` on surface0, the mark in mauve, the time pinned to the right
+edge in overlay0. Narrowing drops the word `overseer` before it elides the
+sentence — the mark still says who is speaking. It is the overseer's only
+voice outside the board, and clicking anywhere on it opens the board.
+
 **A layout collapses on its own threshold, not the app's.** The board is four
 columns where the rest of shep is one, so it stacks at four times the width —
 on a standard 80×24 its lanes were 20 columns and every card had elided its

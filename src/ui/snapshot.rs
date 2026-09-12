@@ -283,7 +283,7 @@ fn assert_screen(state: &mut AppState, name: &str, width: u16, height: u16) {
 // The fixture
 // ---------------------------------------------------------------------------
 
-mod fixture {
+pub(crate) mod fixture {
     use super::*;
     use crate::detect::{Agent, AgentState};
     use crate::workspace::Workspace;
@@ -345,7 +345,7 @@ mod fixture {
     ///
     /// Deliberately deterministic: the spinner tick is pinned, host vitals are
     /// literals rather than a live read, and every age sits mid-bucket.
-    pub(super) fn session() -> AppState {
+    pub(crate) fn session() -> AppState {
         let mut billing = Workspace::test_new("workmayt");
         let billing_root = billing.tabs[0].root_pane;
         let billing_second = billing.test_split(Direction::Horizontal);
@@ -503,6 +503,12 @@ mod fixture {
             memory_used_bytes: Some(41 * 1024 * 1024 * 1024),
         };
         state.dashboard_sample.sampled_at = Some(Instant::now());
+
+        // The overseer has spoken: the strip has a sentence, the pill has
+        // proposals to count, and the health list has two warnings.
+        state.overseer.sample = crate::app::overseer::OverseerSample::test_fixture();
+        state.overseer_strip = true;
+        state.docket_sample = crate::app::state::DocketSample::test_fixture_with_proposals();
 
         state
     }

@@ -321,6 +321,9 @@ pane_borders = true
 pane_gaps = true
 show_agent_labels_on_pane_borders = false
 hide_tab_bar_when_single_tab = true
+titlebar = true
+hint_bar = true
+overseer_strip = true
 agent_panel_sort = "spaces"
 accent = "cyan"
 ```
@@ -371,6 +374,10 @@ Set `pane_borders = false` to remove split pane borders. Set `pane_gaps = false`
 Set `show_agent_labels_on_pane_borders = true` if you want detected agent labels in split pane borders when no manual pane label is set.
 
 `hide_tab_bar_when_single_tab` hides the tab row when the active workspace has exactly one tab, and is on by default: a group with one agent has no tab to choose. New tabs can still be created with the configured keybinding. When a second tab appears, Herdr restores the tab row and resizes panes to make room for it. Set it to `false` to keep the row on every group.
+
+`titlebar` and `hint_bar` are the desktop chrome: the top row reads `shep · group › agent`, a tally of agents by state (`◉ 1  ⠹ 2  ● 1  ○ 1`) and the `desktop | board` pill, whose unlit `board` half counts the proposals the overseer has waiting; the bottom row names the prefix chord, the board chord, `?` and `q`. On a narrow terminal the tally drops idle, then done, then shortens the pill, then drops working and blocked — always a prefix of that order, never a gap. Both are on by default.
+
+`overseer_strip` shows one line under the titlebar whenever the overseer plugin has a narrative: `✦ overseer · <its first sentence>` with the time of its last tick at the right edge. Clicking it opens the board; there are no other controls on it. It is never drawn on the board, on the mobile layout, or when the plugin has not written anything yet. On by default; set it to `false` to keep the row.
 
 ## Notifications
 

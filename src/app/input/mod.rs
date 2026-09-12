@@ -35,6 +35,7 @@ fn modified_url_click_modifier_matches_terminal_mouse_reporting() {
 }
 
 mod board;
+mod chrome;
 mod copy_mode;
 mod modal;
 mod mouse;
@@ -250,6 +251,13 @@ impl App {
     }
 
     pub(super) fn handle_mouse(&mut self, mouse: MouseEvent) {
+        // The chrome first: its rows are never a pane's, whatever mode the
+        // pane is in.
+        if self.state.view.layout == crate::app::state::ViewLayout::Desktop
+            && self.handle_chrome_mouse(mouse)
+        {
+            return;
+        }
         if self.handle_overlay_mouse(mouse) {
             return;
         }

@@ -888,6 +888,9 @@ pub struct UiConfig {
     pub titlebar: bool,
     /// Show the persistent key-hint bar at the bottom of the desktop layout. Default: true.
     pub hint_bar: bool,
+    /// Show the overseer's one-line strip under the titlebar whenever the
+    /// overseer plugin has a narrative. Default: true.
+    pub overseer_strip: bool,
     /// Open on the session board instead of dropping straight into a pane, so
     /// a session with several agents starts with the overview. Enter focuses
     /// the selected pane. Default: true.
@@ -1351,6 +1354,7 @@ impl Default for UiConfig {
             hide_tab_bar_when_single_tab: true,
             titlebar: true,
             hint_bar: true,
+            overseer_strip: true,
             open_on_board: true,
             board_view: BoardViewConfig::Docket,
             escape_returns_to_board: true,
@@ -1589,15 +1593,18 @@ hide_tab_bar_when_single_tab = false
         let default_config = Config::default();
         assert!(default_config.ui.titlebar);
         assert!(default_config.ui.hint_bar);
+        assert!(default_config.ui.overseer_strip);
 
         let toml = r#"
 [ui]
 titlebar = false
 hint_bar = false
+overseer_strip = false
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         assert!(!config.ui.titlebar);
         assert!(!config.ui.hint_bar);
+        assert!(!config.ui.overseer_strip);
     }
 
     #[test]

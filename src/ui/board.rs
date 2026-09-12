@@ -71,7 +71,7 @@ pub(crate) enum BoardDir {
 ///
 /// This used to be the board's *axis*. It is now only arithmetic: the lanes are
 /// the user's own groups, and state is carried by the card's glyph and colour.
-fn summary_bucket(state: AgentState, seen: bool) -> usize {
+pub(super) fn summary_bucket(state: AgentState, seen: bool) -> usize {
     match (state, seen) {
         (AgentState::Blocked, _) => 0,
         (AgentState::Idle, false) => 1,

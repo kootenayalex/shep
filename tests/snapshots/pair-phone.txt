@@ -1,8 +1,9 @@
-# pair-phone 200x55 · 32 styles
+# pair-phone 200x55 · 42 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                                                                                         workmayt · 1                                                                                  ◉ 1 blocked
+ shep                                                                                      workmayt › claude                                                     ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board 2
+ ✦ overseer · workmayt's claude has been blocked 2m on a permission prompt.                                                                                                                       07:08
  groups          grouped │╭──────────────────────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────╮
                          ││                                                                                      │                                                                                     │
  ◉ workmayt ◆ ⇥2         ││                                                                                      │                                                                                     │
@@ -13,12 +14,11 @@
  ● emberline             ││                                                                                      │                                                                                     │
    master 6m             ││                                                                                      │                                                                                     │
    ● claude     done 88% ││                                                                                      │                                                                                     │
-                         ││                                                                                      │                                                                                     │
- ⠹ shep                  ││                                                ╭───────────────────────────────────────────────╮                                                                           │
+                         ││                                                ╭───────────────────────────────────────────────╮                                                                           │
+ ⠹ shep                  ││                                                │ █████████████████████████████████████████████ │                                                                           │
    feat/design… ↓4 2m    ││                                                │ █████████████████████████████████████████████ │                                                                           │
-   ○ claude     idle 12% ││                                                │ █████████████████████████████████████████████ │                                                                           │
-   ⠹ codex   working 55% ││                                                │ ████ ▄▄▄▄▄ █▄▀ █▄▄▄█  ▄▄▀█ █▄▀█▄ █ ▄▄▄▄▄ ████ │                                                                           │
-                         ││                                                │ ████ █   █ █▀██  ▄ ▀▄▄█ ▄▄▀ █▀ ▀▄█ █   █ ████ │                                                                           │
+   ○ claude     idle 12% ││                                                │ ████ ▄▄▄▄▄ █▄▀ █▄▄▄█  ▄▄▀█ █▄▀█▄ █ ▄▄▄▄▄ ████ │                                                                           │
+   ⠹ codex   working 55% ││                                                │ ████ █   █ █▀██  ▄ ▀▄▄█ ▄▄▀ █▀ ▀▄█ █   █ ████ │                                                                           │
                          ││                                                │ ████ █▄▄▄█ █ █▄█ ▄▀█ █▀▀   ▄  █▄██ █▄▄▄█ ████ │                                                                           │
                          ││                                                │ ████▄▄▄▄▄▄▄█ ▀▄▀ █▄█▄▀ █ █ █ █▄▀▄█▄▄▄▄▄▄▄████ │                                                                           │
                          ││                                                │ ████ ▀██ ▀▄ ▄ ▄ ▀▄▀█▀█▄ ▀█▄█▄▀   ▄▄▄ ▄▀█▄████ │                                                                           │
@@ -56,96 +56,106 @@
                          ││                                                                                      │                                                                                     │
                          ││                                                                                      │                                                                                     │
  new               menu «│╰──────────────────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────╯
- ctrl+b prefix  w groups  c tab  ? keys  q detach
+ ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-sccccsssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssCCCCCCCCjjjvssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssppppppppppps
-kkkkkkkttttttttttkkkkkkktyddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-uquDDDDDDDDuhuzzuuuuuuuuuydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-uuuugguooummmuooooooouuuuydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-uuuquDDDDDDuuqqqqqqqummmuydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-uuuFuxxxxxxxxuuuuFFFFFFFuydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tetwwwwwwwwwtttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttlllllltlltttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttetwwwwwwttttteeeetllltydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tEtwwwwttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttlllllllllllltnntllttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttftwwwwwwtttttfffftllltydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttEtwwwwwtttEEEEEEEtllltydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttaiiiiiiiiiiAAAAAAAAAAAAAAArrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttaiiiiiiiiiiBBBBBBBBBrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiirrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiirrrrrrrrrratttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaatttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-tttttttttttttttttttttttttydttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttE
-lllltttttttttttttttlllltlyddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-sccccccjjjjjjjjjcjjjjjjjjjcjjjjjjcjjjjjjjcjjjjjjjsssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss
+xccccxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxKKKKKKKKmmmBBBBBBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxuuuxxNNNxxeeexxgggxxrrrrrrrrrDDDDDDGGDx
+zjjjjjjjjjjpppLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzpppppp
+nnnnnnnyyyyyyyyyynnnnnnnyFddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+AvAMMMMMMMMAkAHHAAAAAAAAAFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+AAAAiiAttAqqqAtttttttAAAAFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+AAAvAMMMMMMAAvvvvvvvAqqqAFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+AAAPAEEEEEEEEAAAAPPPPPPPAFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yfyCCCCCCCCCyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyooooooyooyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyfyCCCCCCyyyyyffffyoooyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yOyCCCCyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyooooooooooooyssyooyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyhyCCCCCCyyyyyhhhhyoooyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyOyCCCCCyyyOOOOOOOyoooyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyallllllllllIIIIIIIIIIIIIIIwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyallllllllllJJJJJJJJJwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyalllllllllllllllllllllllllllllllllllllwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyawwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyalllllllllllllllllllllllllllllllllllllwwwwwwwwwwayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+yyyyyyyyyyyyyyyyyyyyyyyyyFdyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyydyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyO
+ooooyyyyyyyyyyyyyyyooooyoFddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+xccccccmmmmmmmmmccccccccccmmmmmmmmcmmmmmmmcmmmmmmmxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 --- legend ---
 . = (unstyled)
-A = fg:text bg:panel_bg
-B = fg:text bg:panel_bg bold
-C = fg:text bg:panel_bg bold+dim
-D = fg:text bg:surface_dim bold+dim
-E = fg:yellow bg:reset dim
-F = fg:yellow bg:surface_dim dim
+A = fg:reset bg:surface_dim dim
+B = fg:subtext0 bg:panel_bg dim
+C = fg:subtext0 bg:reset dim
+D = fg:subtext0 bg:surface1 dim
+E = fg:subtext0 bg:surface_dim dim
+F = fg:surface_dim bg:reset dim
+G = fg:teal bg:surface1 dim
+H = fg:teal bg:surface_dim dim
+I = fg:text bg:panel_bg
+J = fg:text bg:panel_bg bold
+K = fg:text bg:panel_bg bold+dim
+L = fg:text bg:surface0 dim
+M = fg:text bg:surface_dim bold+dim
+N = fg:yellow bg:panel_bg dim
+O = fg:yellow bg:reset dim
+P = fg:yellow bg:surface_dim dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:panel_bg bold+dim
 d = fg:accent bg:reset dim
-e = fg:blue bg:reset dim
-f = fg:green bg:reset dim
-g = fg:green bg:surface_dim dim
-h = fg:mauve bg:surface_dim dim
-i = fg:overlay0 bg:panel_bg
-j = fg:overlay0 bg:panel_bg dim
-k = fg:overlay0 bg:reset bold+dim
-l = fg:overlay0 bg:reset dim
-m = fg:overlay0 bg:surface_dim dim
-n = fg:peach bg:reset dim
-o = fg:peach bg:surface_dim dim
-p = fg:red bg:panel_bg bold+dim
-q = fg:red bg:surface_dim dim
-r = fg:reset bg:panel_bg
-s = fg:reset bg:panel_bg dim
-t = fg:reset bg:reset dim
-u = fg:reset bg:surface_dim dim
-v = fg:subtext0 bg:panel_bg dim
-w = fg:subtext0 bg:reset dim
-x = fg:subtext0 bg:surface_dim dim
-y = fg:surface_dim bg:reset dim
-z = fg:teal bg:surface_dim dim
+e = fg:blue bg:panel_bg dim
+f = fg:blue bg:reset dim
+g = fg:green bg:panel_bg dim
+h = fg:green bg:reset dim
+i = fg:green bg:surface_dim dim
+j = fg:mauve bg:surface0 bold+dim
+k = fg:mauve bg:surface_dim dim
+l = fg:overlay0 bg:panel_bg
+m = fg:overlay0 bg:panel_bg dim
+n = fg:overlay0 bg:reset bold+dim
+o = fg:overlay0 bg:reset dim
+p = fg:overlay0 bg:surface0 dim
+q = fg:overlay0 bg:surface_dim dim
+r = fg:panel_bg bg:accent bold+dim
+s = fg:peach bg:reset dim
+t = fg:peach bg:surface_dim dim
+u = fg:red bg:panel_bg bold+dim
+v = fg:red bg:surface_dim dim
+w = fg:reset bg:panel_bg
+x = fg:reset bg:panel_bg dim
+y = fg:reset bg:reset dim
+z = fg:reset bg:surface0 dim

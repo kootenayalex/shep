@@ -13,6 +13,7 @@ mod config_io;
 mod creation;
 mod ids;
 mod input;
+pub(crate) mod overseer;
 mod review;
 mod runtime;
 mod runtime_mutations;
@@ -563,6 +564,7 @@ impl App {
                 layout: state::ViewLayout::Desktop,
                 titlebar_rect: Rect::default(),
                 hint_bar_rect: Rect::default(),
+                overseer_strip_rect: Rect::default(),
                 sidebar_rect: Rect::default(),
                 workspace_card_areas: Vec::new(),
                 tab_bar_rect: Rect::default(),
@@ -627,6 +629,7 @@ impl App {
             hide_tab_bar_when_single_tab: config.ui.hide_tab_bar_when_single_tab,
             titlebar: config.ui.titlebar,
             hint_bar: config.ui.hint_bar,
+            overseer_strip: config.ui.overseer_strip,
             escape_returns_to_board: config.ui.escape_returns_to_board,
             board_default_view: board_view_from_config(config.ui.board_view),
             escape_host_is_legacy: false,
@@ -675,6 +678,9 @@ impl App {
             dashboard_sample: crate::app::state::DashboardSample::default(),
             docket_sample: crate::app::state::DocketSample::default(),
             docket_db: crate::docket::docket_db_path(),
+            overseer: overseer::OverseerState::new(crate::plugin_paths::plugin_state_dir(
+                "overseer",
+            )),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         };
@@ -1427,6 +1433,7 @@ impl App {
                 self.state.hide_tab_bar_when_single_tab = config.ui.hide_tab_bar_when_single_tab;
                 self.state.titlebar = config.ui.titlebar;
                 self.state.hint_bar = config.ui.hint_bar;
+                self.state.overseer_strip = config.ui.overseer_strip;
                 self.state.escape_returns_to_board = config.ui.escape_returns_to_board;
                 self.state.board_default_view = board_view_from_config(config.ui.board_view);
                 self.state.agent_panel_sort =

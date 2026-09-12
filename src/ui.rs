@@ -6,7 +6,7 @@ use ratatui::{
 };
 
 pub(crate) mod board;
-mod chrome;
+pub(crate) mod chrome;
 mod dialogs;
 mod gauge;
 mod glyphs;
@@ -21,7 +21,7 @@ mod scrollbar;
 mod settings;
 mod sidebar;
 #[cfg(test)]
-mod snapshot;
+pub(crate) mod snapshot;
 mod status;
 mod tabs;
 mod text;
@@ -231,6 +231,15 @@ fn compute_view_internal(
     } else {
         (Rect::default(), area)
     };
+    // The overseer's strip is the row under the titlebar, reserved only when
+    // it has a sentence to put there, so a quiet overseer costs no rows.
+    let (overseer_strip_rect, area) = if app.overseer_strip_visible() && area.height > 2 {
+        let [strip_rect, rest] =
+            Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(area);
+        (strip_rect, rest)
+    } else {
+        (Rect::default(), area)
+    };
     let (area, hint_bar_rect) = if app.hint_bar && area.height > 2 {
         let [rest, hint_bar_rect] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(area);
@@ -328,6 +337,7 @@ fn compute_view_internal(
         layout: ViewLayout::Desktop,
         titlebar_rect,
         hint_bar_rect,
+        overseer_strip_rect,
         sidebar_rect: sidebar_area,
         workspace_card_areas,
         tab_bar_rect,
@@ -400,6 +410,7 @@ fn compute_mobile_view(
         layout: ViewLayout::Mobile,
         titlebar_rect: Rect::default(),
         hint_bar_rect: Rect::default(),
+        overseer_strip_rect: Rect::default(),
         sidebar_rect: Rect::default(),
         workspace_card_areas: Vec::new(),
         tab_bar_rect: Rect::default(),
@@ -442,6 +453,9 @@ pub fn render_with_runtime_registry(
     if app.view.layout != ViewLayout::Mobile {
         if app.view.titlebar_rect.height > 0 {
             chrome::render_titlebar(app, terminal_runtimes, frame, app.view.titlebar_rect);
+        }
+        if app.view.overseer_strip_rect.height > 0 {
+            chrome::render_overseer_strip(app, frame, app.view.overseer_strip_rect);
         }
         if app.view.hint_bar_rect.height > 0 {
             chrome::render_hint_bar(app, frame, app.view.hint_bar_rect);
@@ -875,7 +889,8 @@ mod tests {
         let prefix = crate::config::format_key_combo((app.prefix_code, app.prefix_mods));
         assert!(row.contains(&prefix), "missing prefix chord in {row:?}");
         assert!(row.contains("prefix"), "missing prefix label in {row:?}");
-        assert!(row.contains("groups"), "missing groups hint in {row:?}");
+        assert!(row.contains("board"), "missing board hint in {row:?}");
+        assert!(row.contains("keys"), "missing keys hint in {row:?}");
         assert!(row.contains("detach"), "missing detach hint in {row:?}");
     }
 

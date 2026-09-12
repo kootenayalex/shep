@@ -264,11 +264,15 @@ impl App {
         }
 
         // The docket rows cost a sqlite read, so they are sampled only while
-        // the board is up — any of its screens, since the dashboard strip on
-        // the agent lanes counts them too.
-        if self.state.mode == crate::app::state::Mode::Board
-            && self.state.refresh_docket_if_stale(now)
-        {
+        // something on screen counts them: the board (any of its screens),
+        // or the desktop chrome, whose pill counts the waiting proposals.
+        if self.state.docket_sample_wanted() && self.state.refresh_docket_if_stale(now) {
+            changed = true;
+        }
+
+        // The overseer's files: three stats every two seconds, a read only
+        // when one moved. The strip and the board are its readers.
+        if self.state.overseer_sample_wanted() && self.state.refresh_overseer_if_stale(now) {
             changed = true;
         }
 

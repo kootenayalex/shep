@@ -1,8 +1,8 @@
-# docket-small 80x24 · 22 styles
+# docket-small 80x24 · 23 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                             workmayt · 1                      ◉ 1 blocked
+ shep                              ✦ overseer   ◉ 1  ⠹ 2  ● 1   desktop  board
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ docket · what needs doing                                                    │
 │ agents 5  2 need you  ·  docket 2 due · 3 inbox  ·  blocked 1  ·  done 1     │
@@ -25,33 +25,33 @@
 │   recurring · due today · 1w                                                 │
 │ i inspect  n new  p slate  r recur  d done  x discard  a agents  esc close   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- ctrl+b prefix  w groups  c tab  ? keys  q detach
+ ctrl+alt+b desktop  ? keys
 
 --- styles ---
-nbbbbnnnnnnnnnnnnnnnnnnnnnnnnnnnnntttttttteeepnnnnnnnnnnnnnnnnnnnnnnmmmmmmmmmmmn
+pbbbbppppppppppppppppppppppppppppppeeeeeeeeeepppoooppwwwppdddpprrrrrrrrrjjjjjjjp
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-abbbbbbbbeeeeeeeeeeeeeeeeeennnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-aeeeeeeeesmmmmmmmmmmmmqqqqqeeeeeeeieeeeersseeeeeeqqqqqllllllllsqqqqqdddddsnnnnna
-aeeeeeesssssqqqqqeeeeessseeeeeeeeeeeeqqqqqeeeessseeeeeeeeeeeeeeennnnnnnnnnnnnnna
-affffffeennnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-aehneeessssssssssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-annneeeeeeeeeeeennnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-aehneeesssssssssssssssssssssssssssssssssssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-annneeeeeeeeeeeennnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-aehneeeessssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssna
-annneeeeeeeeeeeennnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-abbbbiiiiinnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-ackoggguuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuoooooooooooooooooooooooooooooooooooooooa
-aooogggggggggjjjjjjjjjjooooooooooooooooooooooooooooooooooooooooooooooooooooooooa
-annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-aevneeessssssssssssssssssssssssnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-annneeeeeeeeeeeevvvvvvvvveeeeennnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna
-anbeeeeeeeeeebeeeeeebeeeeeeeebeeeeeeeebeeeeeeebeeeeeeeeeebeeeeeeeeebbbeeeeeennna
+abbbbbbbbffffffffffffffffffppppppppppppppppppppppppppppppppppppppppppppppppppppa
+affffffffuoooooooooooosssssfffffffkffffftuuffffffsssssnnnnnnnnusssssdddddupppppa
+affffffuuuuusssssfffffuuuffffffffffffsssssffffuuufffffffffffffffpppppppppppppppa
+aggggggffppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+afipfffuuuuuuuuuuuuuuuuuuppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+apppffffffffffffpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+afipfffuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuupppppppppppppppppppppppppppppa
+apppffffffffffffpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+afipffffuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuupa
+apppffffffffffffpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+abbbbkkkkkpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+acmqhhhvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa
+aqqqhhhhhhhhhllllllllllqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+afwpfffuuuuuuuuuuuuuuuuuuuuuuuuppppppppppppppppppppppppppppppppppppppppppppppppa
+apppffffffffffffwwwwwwwwwfffffpppppppppppppppppppppppppppppppppppppppppppppppppa
+apbffffffffffbffffffbffffffffbffffffffbfffffffbffffffffffbfffffffffbbbffffffpppa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-nbbbbbbeeeeeeeeebeeeeeeeeebeeeeeebeeeeeeebeeeeeeennnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+pbbbbbbbbbbffffffffffbfffffppppppppppppppppppppppppppppppppppppppppppppppppppppp
 
 --- legend ---
 . = (unstyled)
@@ -59,21 +59,22 @@ a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:surface0 bold
 d = fg:blue bg:panel_bg
-e = fg:overlay0 bg:panel_bg
-f = fg:overlay0 bg:panel_bg bold
-g = fg:overlay0 bg:surface0
-h = fg:overlay1 bg:panel_bg
-i = fg:peach bg:panel_bg
-j = fg:peach bg:surface0
-k = fg:peach bg:surface0 bold
-l = fg:red bg:panel_bg
-m = fg:red bg:panel_bg bold
-n = fg:reset bg:panel_bg
-o = fg:reset bg:surface0
-p = fg:subtext0 bg:panel_bg
-q = fg:surface0 bg:panel_bg
-r = fg:surface1 bg:panel_bg
-s = fg:text bg:panel_bg
-t = fg:text bg:panel_bg bold
-u = fg:text bg:surface0 bold
-v = fg:yellow bg:panel_bg
+e = fg:mauve bg:panel_bg bold
+f = fg:overlay0 bg:panel_bg
+g = fg:overlay0 bg:panel_bg bold
+h = fg:overlay0 bg:surface0
+i = fg:overlay1 bg:panel_bg
+j = fg:panel_bg bg:accent bold
+k = fg:peach bg:panel_bg
+l = fg:peach bg:surface0
+m = fg:peach bg:surface0 bold
+n = fg:red bg:panel_bg
+o = fg:red bg:panel_bg bold
+p = fg:reset bg:panel_bg
+q = fg:reset bg:surface0
+r = fg:subtext0 bg:surface1
+s = fg:surface0 bg:panel_bg
+t = fg:surface1 bg:panel_bg
+u = fg:text bg:panel_bg
+v = fg:text bg:surface0 bold
+w = fg:yellow bg:panel_bg

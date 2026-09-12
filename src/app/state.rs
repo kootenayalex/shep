@@ -780,6 +780,8 @@ pub struct ViewState {
     pub layout: ViewLayout,
     pub titlebar_rect: Rect,
     pub hint_bar_rect: Rect,
+    /// The overseer strip's row under the titlebar; zero-height when hidden.
+    pub overseer_strip_rect: Rect,
     pub sidebar_rect: Rect,
     pub workspace_card_areas: Vec<WorkspaceCardArea>,
     pub tab_bar_rect: Rect,
@@ -1018,6 +1020,41 @@ impl AppState {
             .refresh(std::time::Instant::now(), &self.docket_db);
     }
 
+    /// Look at the overseer's state dir again if the sample has aged out.
+    /// Returns whether anything it shows changed.
+    pub fn refresh_overseer_if_stale(&mut self, now: std::time::Instant) -> bool {
+        let dir = self.overseer.state_dir.clone();
+        self.overseer.sample.refresh_if_stale(now, &dir)
+    }
+
+    /// Whether the desktop chrome shows the overseer strip: the config allows
+    /// it, the board — where the narrative has a whole region — is not up,
+    /// and there is a narrative to put on it. The desktop layout's
+    /// `compute_view` is the only caller that reserves the row; the mobile
+    /// layout never asks.
+    pub(crate) fn overseer_strip_visible(&self) -> bool {
+        self.overseer_strip && self.mode != Mode::Board && self.overseer.sample.narrative.is_some()
+    }
+
+    /// Whether the overseer's files are worth their stats right now: the
+    /// board is up, or the desktop chrome that shows them is.
+    pub(crate) fn overseer_sample_wanted(&self) -> bool {
+        self.mode == Mode::Board
+            || (self.view.layout == ViewLayout::Desktop && (self.titlebar || self.overseer_strip))
+    }
+
+    /// Whether the docket rows are worth their sqlite read right now: the
+    /// board is up (any of its screens counts them), or the desktop titlebar
+    /// is — its pill counts the overseer's proposals, which only exist once
+    /// the overseer has spoken, so a session without one never opens the
+    /// store from the desktop.
+    pub(crate) fn docket_sample_wanted(&self) -> bool {
+        self.mode == Mode::Board
+            || (self.view.layout == ViewLayout::Desktop
+                && self.titlebar
+                && self.overseer.sample.narrative.is_some())
+    }
+
     /// Re-read every agent's own session file whose sample has aged out.
     ///
     /// Sampled here, beside the dashboard sample, so `render` stays pure — and
@@ -1187,6 +1224,43 @@ impl DocketSample {
             sampled: true,
             sampled_at: Some(std::time::Instant::now()),
         }
+    }
+
+    /// [`Self::test_fixture`] plus two inbox items the overseer captured
+    /// (`source.kind == "situation"`): what the titlebar pill counts and the
+    /// board's proposals region lists.
+    #[cfg(test)]
+    pub(crate) fn test_fixture_with_proposals() -> Self {
+        use crate::api::schema::{DocketItem, DocketKind, DocketStatus};
+        let mut sample = Self::test_fixture();
+        for (id, title, updated) in [
+            (
+                12,
+                "ask claude about the stripe retry budget",
+                "2026-09-11T07:05:00Z",
+            ),
+            (
+                13,
+                "emberline's push is unseen — look",
+                "2026-09-11T07:08:00Z",
+            ),
+        ] {
+            sample.rows.push(DocketItem {
+                id,
+                title: title.to_string(),
+                kind: DocketKind::Captured,
+                status: DocketStatus::Inbox,
+                due: None,
+                repeat: None,
+                source: Some(serde_json::json!({"kind": "situation", "ref": "pane p5"})),
+                notes: None,
+                created: updated.to_string(),
+                updated: updated.to_string(),
+                last_fired: None,
+                overdue: false,
+            });
+        }
+        sample
     }
 }
 
@@ -1907,6 +1981,9 @@ pub struct AppState {
     pub hide_tab_bar_when_single_tab: bool,
     pub titlebar: bool,
     pub hint_bar: bool,
+    /// Show the overseer's one-line strip under the titlebar when it has
+    /// something to say (`[ui] overseer_strip`).
+    pub overseer_strip: bool,
     /// Esc in an agent pane returns to the session board; `shift+esc` carries
     /// the interrupt through to the agent instead.
     pub escape_returns_to_board: bool,
@@ -2002,6 +2079,8 @@ pub struct AppState {
     /// plain data, and so a test can point it at a scratch directory instead
     /// of the real `<state dir>/docket.db`.
     pub(crate) docket_db: std::path::PathBuf,
+    /// What the overseer plugin last wrote, sampled beside the docket.
+    pub(crate) overseer: crate::app::overseer::OverseerState,
     /// Set when a persisted session snapshot would change.
     pub session_dirty: bool,
     /// Terminal runtimes that should be shut down by the app/runtime layer
@@ -2310,6 +2389,7 @@ impl AppState {
                 layout: ViewLayout::Desktop,
                 titlebar_rect: Rect::default(),
                 hint_bar_rect: Rect::default(),
+                overseer_strip_rect: Rect::default(),
                 sidebar_rect: Rect::default(),
                 workspace_card_areas: Vec::new(),
                 tab_bar_rect: Rect::default(),
@@ -2374,6 +2454,7 @@ impl AppState {
             hide_tab_bar_when_single_tab: false,
             titlebar: false,
             hint_bar: false,
+            overseer_strip: false,
             escape_returns_to_board: false,
             board_default_view: BoardView::Docket,
             escape_host_is_legacy: false,
@@ -2432,6 +2513,9 @@ impl AppState {
             dashboard_sample: DashboardSample::default(),
             docket_sample: DocketSample::default(),
             docket_db: test_docket_db_path(),
+            overseer: crate::app::overseer::OverseerState::new(
+                crate::app::overseer::test_state_dir(),
+            ),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         }
