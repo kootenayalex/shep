@@ -44,6 +44,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.shep.companion.screens.ChannelsScreen
+import dev.shep.companion.screens.DocketScreen
 import dev.shep.companion.screens.MemoryScreen
 import dev.shep.companion.screens.PairingScreen
 import dev.shep.companion.screens.ServerScreen
@@ -134,11 +135,15 @@ class MainActivity : ComponentActivity() {
  * Hint-bar destinations. Shortcuts mirror the TUI vocabulary without adding
  * an icon dependency or making the phone carry a second navigation model.
  *
- * Three, under the Hick's-law ceiling the desktop and the prototype use.
+ * Four, under the Hick's-law ceiling the desktop and the prototype use. The
+ * docket sits between memory and shep because it is the other thing a person
+ * writes down: memory is what every agent should know, the docket is what
+ * Alex should do.
  */
 enum class Tab(val label: String, val shortcut: String) {
     Agents("agents", "a"),
     Memory("memory", "m"),
+    Docket("docket", "d"),
     Shep("shep", "s"),
 }
 
@@ -387,9 +392,10 @@ fun ShepApp(
 
 /**
  * The paired experience: a hint-bar Scaffold over the four destinations, with
- * the pane view pushed as a full-screen detail over the Chats tab on phones, or
- * docked side-by-side on iPad-class widths (A6 two-pane). A3 deep-links route
- * here by setting the tab + selecting a pane.
+ * the pane view pushed as a full-screen detail over the agents tab on phones, or
+ * docked side-by-side on iPad-class widths (A6 two-pane; agents only — the
+ * docket is a list on every width). A3 deep-links route here by setting the
+ * tab + selecting a pane.
  */
 @Composable
 fun NavShell(
@@ -503,6 +509,7 @@ fun NavShell(
                                 onCollapsedChange = { collapsedSpaces = it },
                             )
                             Tab.Memory -> MemoryScreen(client)
+                            Tab.Docket -> DocketScreen(client)
                             Tab.Shep -> ServerScreen(client = client, onRePair = onUnpair)
                         }
                     }

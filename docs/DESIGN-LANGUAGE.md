@@ -97,7 +97,7 @@ desktop side, so a typo cannot rename a state in the UI while the server keeps
 calling it something else.
 
 - Desktop: `task_appearance` in `src/ui/status.rs`.
-- Companion: `ShepSemantic.task` in `ui/theme/ShepSemantic.kt`.
+- Companion: none — the phone never had a task screen, and the queue is retired.
 
 ## Docket states
 
@@ -121,6 +121,7 @@ lane's heading counts them (`due 2 !1`). Due today takes the working tier's
 yellow — it is the thing happening now — and lights the date row the same way.
 
 - Desktop: `docket_appearance` in `src/ui/status.rs`.
+- Companion: `ShepSemantic.docket` in `ui/theme/ShepSemantic.kt`.
 
 ### The docket card
 

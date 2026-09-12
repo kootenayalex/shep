@@ -1,5 +1,6 @@
 package dev.shep.companion.ui.theme
 
+import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -93,6 +94,34 @@ class ShepSemanticTest {
         ShepSemantic.MANUAL_TIERS.forEach { tier ->
             assertEquals(tier, false, ShepSemantic.manual(tier, "x").glyph in detected)
         }
+    }
+
+    /**
+     * The docket table, all six rows. Desktop twin: `docket_appearance` in
+     * src/ui/status.rs. Overdue is peach and `!` — a warning, not a stop — and
+     * due today borrows the working tier's yellow because it is the thing
+     * happening now.
+     */
+    @Test
+    fun `docket states match the design language`() {
+        data class Row(val status: String, val overdue: Boolean, val today: Boolean, val glyph: String, val label: String, val color: Color)
+        listOf(
+            Row("inbox", false, false, "○", "inbox", ShepPalette.overlay1),
+            Row("open", true, false, "!", "overdue", ShepPalette.peach),
+            Row("open", false, true, "●", "due today", ShepPalette.yellow),
+            Row("open", false, false, "●", "open", ShepPalette.overlay1),
+            Row("done", false, false, "●", "done", ShepPalette.green),
+            Row("discarded", false, false, "·", "discarded", ShepPalette.overlay0),
+        ).forEach { row ->
+            val it = ShepSemantic.docket(row.status, overdue = row.overdue, dueToday = row.today)
+            assertEquals(row.label, row.glyph, it.glyph)
+            assertEquals(row.label, it.label)
+            assertEquals(row.label, row.color, it.color)
+        }
+        // Overdue never borrows the blocked agent's red.
+        assertNotEquals(ShepPalette.red, ShepSemantic.docket("open", overdue = true).color)
+        // Inbox has no date, so the flags cannot promote it out of the hollow ring.
+        assertEquals("○", ShepSemantic.docket("inbox", overdue = true, dueToday = true).glyph)
     }
 
     @Test

@@ -92,6 +92,28 @@ object ShepSemantic {
         )
     }
 
+    /**
+     * The docket vocabulary, from the docket table in `docs/DESIGN-LANGUAGE.md`
+     * (desktop: `docket_appearance` in src/ui/status.rs). A docket item is a
+     * reminder, not a process, so it borrows the task table's shapes — hollow
+     * for undecided, filled for live, green when settled — and adds one mark,
+     * `!`, so an overdue item is never told apart by colour alone. Peach rather
+     * than red because red is what a blocked agent gets and an item three days
+     * late is a nag, not a stop.
+     *
+     * [status] is the wire label (`inbox` / `open` / `done` / `discarded`).
+     */
+    fun docket(status: String, overdue: Boolean = false, dueToday: Boolean = false): StateAppearance =
+        when {
+            status == "inbox" -> StateAppearance("○", "inbox", ShepPalette.overlay1, "in the inbox, undecided")
+            status == "open" && overdue -> StateAppearance("!", "overdue", ShepPalette.peach, "open and overdue")
+            status == "open" && dueToday -> StateAppearance("●", "due today", ShepPalette.yellow, "open, due today")
+            status == "open" -> StateAppearance("●", "open", ShepPalette.overlay1, "open")
+            status == "done" -> StateAppearance("●", "done", ShepPalette.green, "done")
+            status == "discarded" -> StateAppearance("·", "discarded", ShepPalette.overlay0, "discarded")
+            else -> StateAppearance("·", status.ifBlank { "inbox" }, ShepPalette.overlay0, "state unknown")
+        }
+
     /** Just the ink, for the many places that colour a label rather than draw a glyph. */
     fun agentColor(status: String): Color = agent(status).color
 

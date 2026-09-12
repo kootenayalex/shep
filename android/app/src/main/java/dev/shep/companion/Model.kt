@@ -716,3 +716,176 @@ fun parseTranscript(result: JSONObject): Transcript? {
         turns = turns,
     )
 }
+
+// ---------------------------------------------------------------------------
+// Docket — the personal assistant's list, served by `docket.*`.
+// ---------------------------------------------------------------------------
+
+/** Where a docket item came from and how it is handled. Wire: `DocketKind` in src/api/schema/docket.rs. */
+enum class DocketKind(val wire: String) {
+    Captured("captured"),
+    Slated("slated"),
+    Recurring("recurring");
+
+    companion object {
+        fun parse(raw: String?): DocketKind = entries.firstOrNull { it.wire == raw } ?: Captured
+    }
+}
+
+/** Lifecycle of a docket item. Wire: `DocketStatus` in src/api/schema/docket.rs. */
+enum class DocketStatus(val wire: String) {
+    Inbox("inbox"),
+    Open("open"),
+    Done("done"),
+    Discarded("discarded");
+
+    companion object {
+        fun parse(raw: String?): DocketStatus = entries.firstOrNull { it.wire == raw } ?: Inbox
+    }
+}
+
+/** The repeat intervals the server knows (`DocketRepeat`), in the order the chips show them. */
+val DOCKET_REPEATS = listOf("1d", "1w", "2w", "1m")
+
+/**
+ * One docket row.
+ *
+ * [sourceLabel] is computed once here — `memory.md:12` for a file, `pane p3`
+ * for a session — the way the desktop's `source_tags` does, so the card does
+ * not carry path logic. [overdue] is the server's verdict (`due < today` on an
+ * open item), and [dueToday] is derived against the list's own `today` so the
+ * phone's clock never disagrees with the store's.
+ */
+data class DocketItem(
+    val id: Long,
+    val title: String,
+    val kind: DocketKind,
+    val status: DocketStatus,
+    val due: String?,
+    val repeat: String?,
+    val sourceLabel: String?,
+    val notes: String?,
+    val overdue: Boolean,
+    val updated: String,
+    val dueToday: Boolean,
+)
+
+/** `docket.list`: the store's `today` (`YYYY-MM-DD`) and every item it returned. */
+data class Docket(
+    val today: String,
+    val items: List<DocketItem>,
+)
+
+/**
+ * `{"file": "/a/b/memory.md", "line": 12}` -> `memory.md:12`;
+ * `{"pane": "p3", …}` -> `pane p3`; the overseer's `{"kind": "situation",
+ * "ref": "SHEP"}` -> `situation SHEP`. Anything else is not worth a row.
+ */
+fun docketSourceLabel(source: JSONObject?): String? {
+    source ?: return null
+    source.optStringOrNull("file")?.let { file ->
+        val base = file.trimEnd('/').substringAfterLast('/').ifEmpty { file }
+        val line = source.optIntOrNull("line")
+        return if (line != null) "$base:$line" else base
+    }
+    source.optStringOrNull("pane")?.let { return "pane $it" }
+    val ref = source.optStringOrNull("ref") ?: return null
+    val kind = source.optStringOrNull("kind")
+    return if (kind != null) "$kind $ref" else ref
+}
+
+/** One item as `docket.list` and every mutation (`{item}`) return it. */
+fun parseDocketItem(o: JSONObject, today: String): DocketItem {
+    val due = o.optStringOrNull("due")
+    val status = DocketStatus.parse(o.optStringOrNull("status"))
+    return DocketItem(
+        id = o.optLong("id"),
+        title = o.optStringOrNull("title") ?: "",
+        kind = DocketKind.parse(o.optStringOrNull("kind")),
+        status = status,
+        due = due,
+        repeat = o.optStringOrNull("repeat"),
+        sourceLabel = docketSourceLabel(o.optJSONObject("source")),
+        notes = o.optStringOrNull("notes"),
+        overdue = o.optBoolean("overdue", false),
+        updated = o.optStringOrNull("updated") ?: "",
+        dueToday = status == DocketStatus.Open && due != null && due == today,
+    )
+}
+
+fun parseDocket(result: JSONObject): Docket {
+    val today = result.optStringOrNull("today") ?: ""
+    val arr = result.optJSONArray("items") ?: JSONArray()
+    val items = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+        .map { parseDocketItem(it, today) }
+    return Docket(today = today, items = items)
+}
+
+/**
+ * `overdue 3d` / `due today` / `in 5d` / `—`, matching the desktop's `DueLabel`.
+ * Days are counted on the calendar, not the clock: both strings are
+ * `YYYY-MM-DD`, so the arithmetic is on local dates.
+ */
+fun docketDueLabel(due: String?, today: String): String {
+    if (due == null) return "—"
+    val days = runCatching {
+        java.time.temporal.ChronoUnit.DAYS.between(
+            java.time.LocalDate.parse(today),
+            java.time.LocalDate.parse(due),
+        )
+    }.getOrNull() ?: return due
+    return when {
+        days < 0 -> "overdue ${-days}d"
+        days == 0L -> "due today"
+        else -> "in ${days}d"
+    }
+}
+
+/** `YYYY-MM-DD` and a real calendar date; the light validation the edit sheet does. */
+fun isDocketDate(text: String): Boolean =
+    Regex("""\d{4}-\d{2}-\d{2}""").matches(text) &&
+        runCatching { java.time.LocalDate.parse(text) }.isSuccess
+
+/** The docket's lanes in the desktop board's reading order (`DocketLane` in src/ui/board.rs). */
+enum class DocketLane(val title: String) {
+    Inbox("inbox"),
+    Due("due"),
+    Slated("slated"),
+    Recurring("recurring"),
+    Done("done"),
+}
+
+/** How many finished items the done lane keeps; the desktop's `DONE_LANE_LIMIT`. */
+const val DOCKET_DONE_LIMIT = 10
+
+/**
+ * Bucket items into lanes exactly as the desktop's `docket_board_model` does:
+ * inbox; open items due today or earlier (overdue first, as the store orders
+ * them); open one-offs dated later or undated; open recurring items not yet
+ * due; the newest ten done items. Discarded items are not on the board at all,
+ * and an empty lane keeps its place.
+ */
+fun docketLanes(docket: Docket): List<Pair<DocketLane, List<DocketItem>>> {
+    val lanes = DocketLane.entries.associateWith { mutableListOf<DocketItem>() }
+    for (item in docket.items) {
+        val lane = when (item.status) {
+            DocketStatus.Inbox -> DocketLane.Inbox
+            DocketStatus.Open -> when {
+                item.overdue || item.dueToday -> DocketLane.Due
+                item.kind == DocketKind.Recurring -> DocketLane.Recurring
+                else -> DocketLane.Slated
+            }
+            DocketStatus.Done -> DocketLane.Done
+            DocketStatus.Discarded -> continue
+        }
+        lanes.getValue(lane).add(item)
+    }
+    val due = lanes.getValue(DocketLane.Due)
+    due.sortWith(compareByDescending<DocketItem> { it.overdue }.thenBy { it.due ?: "" })
+    val done = lanes.getValue(DocketLane.Done)
+    val newestDone = done.sortedWith(compareByDescending<DocketItem> { it.updated }.thenByDescending { it.id })
+        .take(DOCKET_DONE_LIMIT)
+    return DocketLane.entries.map { lane ->
+        lane to if (lane == DocketLane.Done) newestDone else lanes.getValue(lane).toList()
+    }
+}

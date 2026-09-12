@@ -4,6 +4,21 @@
 
 ### Added
 
+- The Android companion has a `docket` tab, between memory and shep: the
+  desktop board's five lanes — inbox, due, slated, recurring, done — as
+  collapsible sections over `docket.list`, each card the design language's
+  four rows (glyph · `#id` · title / kind · date · repeat / source / notes),
+  with the due lane's heading counting its overdue items in peach. Tap a card
+  to edit it (`docket.update`); long-press for the board's verbs — an inbox
+  item is promoted as slated (with a typed `YYYY-MM-DD` date) or as weekly
+  recurring, an open item is marked done (a repeating one rolls forward) — and
+  discard on either. `+ add` writes a captured item into the inbox by default,
+  or a slated/recurring one with a date and repeat. The list polls every five
+  seconds while the tab is showing and re-reads after every change. Maestro
+  flow `15-docket.yaml` covers the tab. Out of scope here: a `docket` push
+  notification kind and a `shep://docket` deep link (they need a server
+  `NotifyKind` and a manifest host), and a tablet two-pane docket.
+
 - An overseer plugin, bundled in the checkout at `plugins/overseer/` (link
   it with `shep plugin link plugins/overseer`). Its `pane.agent_status_changed`
   and `pane.exited` hooks run one tick: `shep doctor --json`,
