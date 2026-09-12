@@ -15,7 +15,7 @@
  ⠹ opencode  workmayt    fix/stripe-webhook   working 20s     ██▌     41% │▌○ #12 ask claude about the…  a keep  x drop
  ● claude    emberline   master               done 6m         █████▎  88% │   from  pane p5
  ⠹ codex     shep        feat/design-pass     working 2m      ███▎    55% │
- ○ claude    shep        feat/design-pass     idle 1h         ▊       12% │ chat
+ ○ claude    shep        feat/design-pass     idle 1h         ▊       12% │ chat  · never types into a pane
                                                                           │
  docket  due 2 !1  ·  inbox 5                                             │
  ! #3 sign the four incorporation forms                        overdue 3d │
@@ -40,7 +40,7 @@
                                                                           │
                                                                           │
                                                                           │
-                                                                          │ › ▮ ask the overseer
+                                                                          │ › ask the overseer
  ctrl+alt+b desktop  enter focus  jk move  a keep  x drop  tab chat  ? keys
 
 --- styles ---
@@ -57,7 +57,7 @@ zaaaazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzziiiiiiiiiizzzzzzzzzzzzzzz
 .L.GGGGGGGGGCCCCCCCCCCCCjjjjjjjjjjjjjjjjjjjjjLLLLLLLLLLLLLLL..oooBBBmmmmm.EbqAnnnnIIIIIIIIIIIIIIIIIIIIIAAhnnnnnnnynnnnnA
 .d.GGGGGGGGGCCCCCCCCCCCCjjjjjjjjjjjjjjjjjjjjjddddddddddddddd..uuuuuusssss.EnnnnnnnnnnnnnnnnAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 .L.GGGGGGGGGCCCCCCCCCCCCjjjjjjjjjjjjjjjjjjjjjLLLLLLLLLLLLLLL..ooooBBmmmmm.E
-.f.GGGGGGGGGCCCCCCCCCCCCjjjjjjjjjjjjjjjjjjjjjfffffffffffffff..oBBBBBmmmmm.E.HHHH
+.f.GGGGGGGGGCCCCCCCCCCCCjjjjjjjjjjjjjjjjjjjjjfffffffffffffff..oBBBBBmmmmm.E.HHHHppppppppppppppppppppppppppp
 ..........................................................................E
 .HHHHHHppppppGssspppppppppppG.............................................E
 .t.mmmGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG........................ssssssssss.E
@@ -82,7 +82,7 @@ zaaaazzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzziiiiiiiiiizzzzzzzzzzzzzzz
 ..........................................................................E
 ..........................................................................E
 ..........................................................................E
-..........................................................................E.p.pmmmmmmmmmmmmmmmmm
+..........................................................................E.p.mmmmmmmmmmmmmmmm
 zaaaaaaaaaallllllllllaaaaallllllllaalllllllalllllllalllllllaaalllllllalllllzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
 
 --- legend ---

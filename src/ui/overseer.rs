@@ -4,9 +4,10 @@
 //! ones nobody has looked at), the *agents* table, the *docket*'s due lane and
 //! newest inbox, and one *health* row. Right column: the overseer's narrative
 //! (*read of the room*), its *proposals* (inbox items it captured, to keep or
-//! drop), and the *chat* with the headless runtime — a placeholder in this
-//! phase. Above both, one header row: the tick, the brain, the host, and the
-//! only button to the overseer's full session.
+//! drop), and the *chat* with the headless runtime: the newest turns that
+//! fit, bottom-anchored over the input line. Above both, one header row: the
+//! tick, the brain, the host, and the only button to the overseer's full
+//! session.
 //!
 //! The TUI draws all the structure; the plugin's narrative is prose. Every
 //! region is a heading, a *prefix* of its rows, and a blank row, and every
@@ -29,7 +30,9 @@ use super::sidebar::format_event_age;
 use super::status::{agent_icon_for, docket_appearance, state_label, DocketUrgency};
 use super::text::{display_width, fit_strip, spans_width, truncate_end};
 use crate::api::schema::DocketStatus;
-use crate::app::overseer::{HealthFinding, HealthLevel, ProposalCard};
+use crate::app::overseer::{
+    overseer_runtime_name, ChatRole, ChatTurn, HealthFinding, HealthLevel, ProposalCard,
+};
 use crate::app::state::{AppState, Palette};
 use crate::detect::AgentState;
 use crate::layout::PaneId;
@@ -121,15 +124,6 @@ pub(crate) struct HeaderFacts {
     pub memory_percent: Option<u8>,
 }
 
-/// One line of the chat with the overseer. Empty in this phase; the region
-/// draws its heading and input from the layout alone.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ChatLine {
-    pub from_you: bool,
-    pub at: String,
-    pub text: String,
-}
-
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct OverseerModel {
     pub header: HeaderFacts,
@@ -144,7 +138,8 @@ pub(crate) struct OverseerModel {
     pub health: Vec<HealthFinding>,
     pub narrative: Vec<String>,
     pub proposals: Vec<ProposalCard>,
-    pub chat: Vec<ChatLine>,
+    /// The chat's tail, oldest first; the region shows the newest that fit.
+    pub chat: Vec<ChatTurn>,
 }
 
 /// What the header knows, from the samples already in state.
@@ -156,14 +151,7 @@ pub(crate) fn header_facts(app: &AppState) -> HeaderFacts {
         brain_age: sample
             .brain_age(std::time::SystemTime::now())
             .map(format_event_age),
-        runtime: app
-            .plugins_config
-            .get("overseer")
-            .and_then(|table| table.get("runtime"))
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .map(str::to_string),
+        runtime: overseer_runtime_name(app),
         load: vitals.load_percent.zip(vitals.cores),
         memory_percent: vitals.memory_percent,
     }
@@ -252,7 +240,7 @@ pub(crate) fn overseer_model(app: &AppState) -> OverseerModel {
         health: app.overseer.sample.health.clone(),
         narrative: app.overseer.sample.narrative_lines(),
         proposals,
-        chat: Vec::new(),
+        chat: app.overseer.chat.clone(),
     }
 }
 
@@ -1453,6 +1441,83 @@ fn render_proposals(app: &AppState, frame: &mut Frame, model: &OverseerModel, re
     }
 }
 
+/// Where a chat row's text starts: ` you  ` or ` ✦    `, then the age in
+/// three cells and two spaces.
+const CHAT_TEXT_COL: usize = 1 + 3 + 2 + 3 + 2;
+
+/// The chat heading's hint, whole facts dropping until it fits: the answer
+/// time goes first, the runtime second, the promise last.
+fn chat_hint(runtime: Option<&str>, room: usize) -> String {
+    let s = glyphs::SEP;
+    let runtime_fact = runtime.map(|name| format!("{name} headless"));
+    let ladder: [Vec<Option<&str>>; 4] = [
+        vec![
+            runtime_fact.as_deref(),
+            Some("answers in a few seconds"),
+            Some("never types into a pane"),
+        ],
+        vec![runtime_fact.as_deref(), Some("never types into a pane")],
+        vec![Some("never types into a pane")],
+        vec![],
+    ];
+    ladder
+        .iter()
+        .map(|facts| {
+            facts
+                .iter()
+                .flatten()
+                .map(|fact| format!("{s} {fact}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .find(|hint| hint.is_empty() || 2 + display_width(hint) <= room)
+        .unwrap_or_default()
+}
+
+/// One screen row of the chat: a turn's first line carries who and when,
+/// the rest hang under the text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ChatRow {
+    pub role: ChatRole,
+    /// `Some` on a turn's first row: its age, `6m`.
+    pub age: Option<String>,
+    pub text: String,
+}
+
+/// The newest turns that fit in `budget` rows, wrapped to `text_width`,
+/// oldest first. A turn is shown whole or not at all, so the oldest visible
+/// turn never starts mid-sentence.
+pub(crate) fn chat_rows(
+    turns: &[ChatTurn],
+    text_width: usize,
+    budget: usize,
+    now: u64,
+) -> Vec<ChatRow> {
+    let mut rows: Vec<ChatRow> = Vec::new();
+    for turn in turns.iter().rev() {
+        let mut lines = wrap_words(turn.text.trim(), text_width.max(1));
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
+        if rows.len() + lines.len() > budget {
+            break;
+        }
+        let age = format_event_age(std::time::Duration::from_secs(now.saturating_sub(turn.at)));
+        let mut turn_rows: Vec<ChatRow> = lines
+            .into_iter()
+            .enumerate()
+            .map(|(i, text)| ChatRow {
+                role: turn.role,
+                age: (i == 0).then(|| age.clone()),
+                text,
+            })
+            .collect();
+        turn_rows.extend(rows);
+        rows = turn_rows;
+    }
+    rows
+}
+
 fn render_chat(app: &AppState, frame: &mut Frame, model: &OverseerModel, layout: &OverseerLayout) {
     let rect = layout.chat;
     if !rect.shown() {
@@ -1460,32 +1525,109 @@ fn render_chat(app: &AppState, frame: &mut Frame, model: &OverseerModel, layout:
     }
     let p = &app.palette;
     let width = usize::from(rect.body.width);
-    let hint = match &model.header.runtime {
-        Some(runtime) => format!(
-            "{s} {runtime} headless {s} never types into a pane",
-            s = glyphs::SEP
-        ),
-        None => format!("{} never types into a pane", glyphs::SEP),
-    };
+    let hint = chat_hint(
+        model.header.runtime.as_deref(),
+        width.saturating_sub(1 + display_width("chat") + RIGHT_MARGIN),
+    );
     frame.render_widget(
         Paragraph::new(Line::from(heading_spans(
             p, p.text, "chat", "", &hint, width,
         ))),
         rect.heading,
     );
-    let _ = &model.chat;
-    if layout.chat_input.height > 0 {
-        frame.render_widget(
-            Paragraph::new(Line::from(vec![
+    if layout.chat_input.height == 0 {
+        return;
+    }
+    let chat = &app.overseer;
+    let dim = Style::default().fg(p.overlay0);
+
+    // The turns, bottom-anchored above the pending row and the input.
+    let pending_rows = usize::from(chat.chat_pending);
+    let budget = usize::from(rect.body.height)
+        .saturating_sub(1)
+        .saturating_sub(pending_rows);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let rows = chat_rows(
+        &model.chat,
+        width.saturating_sub(CHAT_TEXT_COL + RIGHT_MARGIN),
+        budget,
+        now,
+    );
+    let first_y = layout.chat_input.y - (pending_rows + rows.len()) as u16;
+    for (i, row) in rows.iter().enumerate() {
+        let mut spans = vec![Span::raw(" ")];
+        match row.age.as_deref() {
+            Some(age) => {
+                let (who, who_style) = match row.role {
+                    ChatRole::You => (
+                        "you".to_string(),
+                        Style::default().fg(p.accent).add_modifier(Modifier::BOLD),
+                    ),
+                    ChatRole::Overseer => (
+                        format!("{}  ", glyphs::OVERSEER),
+                        Style::default().fg(p.mauve).add_modifier(Modifier::BOLD),
+                    ),
+                };
+                spans.push(Span::styled(who, who_style));
+                spans.push(Span::styled(format!("  {age:>3}  "), dim));
+            }
+            None => spans.push(Span::raw(" ".repeat(CHAT_TEXT_COL - 1))),
+        }
+        let text_style = match row.role {
+            ChatRole::You => Style::default().fg(p.text),
+            ChatRole::Overseer => Style::default().fg(p.subtext0),
+        };
+        spans.push(Span::styled(row.text.clone(), text_style));
+        draw_line(frame, rect.body, first_y + i as u16, spans);
+    }
+    if chat.chat_pending {
+        draw_line(
+            frame,
+            rect.body,
+            layout.chat_input.y - 1,
+            vec![
                 Span::raw(" "),
-                Span::styled(glyphs::LEADS_TO, Style::default().fg(p.overlay1)),
-                Span::raw(" "),
-                Span::styled(glyphs::CURSOR, Style::default().fg(p.overlay1)),
-                Span::styled(" ask the overseer", Style::default().fg(p.overlay0)),
-            ])),
-            layout.chat_input,
+                Span::styled(
+                    format!(
+                        "{} thinking{}",
+                        super::spinner_frame(app.spinner_tick),
+                        glyphs::ELLIPSIS
+                    ),
+                    Style::default().fg(p.yellow),
+                ),
+            ],
         );
     }
+
+    // The input line: `› text▮` with the keys, `› ask the overseer` without.
+    let mut spans = vec![
+        Span::raw(" "),
+        Span::styled(glyphs::LEADS_TO, Style::default().fg(p.overlay1)),
+        Span::raw(" "),
+    ];
+    let room = width.saturating_sub(3 + 1 + RIGHT_MARGIN);
+    if chat.chat_focused {
+        // The tail of a long line, so the cursor is always on screen.
+        let mut text = chat.chat_input.as_str();
+        while display_width(text) > room {
+            let mut chars = text.chars();
+            chars.next();
+            text = chars.as_str();
+        }
+        spans.push(Span::styled(text.to_string(), Style::default().fg(p.text)));
+        spans.push(Span::styled(glyphs::CURSOR, Style::default().fg(p.accent)));
+    } else if chat.chat_input.is_empty() {
+        spans.push(Span::styled("ask the overseer", dim));
+    } else {
+        spans.push(Span::styled(
+            truncate_end(&chat.chat_input, room),
+            Style::default().fg(p.text),
+        ));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)), layout.chat_input);
 }
 
 #[cfg(test)]
@@ -1845,6 +1987,101 @@ mod tests {
             .expect("proposal card");
         assert!(card.contains("a keep  x drop"), "{card:?}");
         assert!(card.contains(glyphs::MARKER), "{card:?}");
+    }
+
+    #[test]
+    fn chat_shows_the_newest_turns_that_fit() {
+        let now = 10_000;
+        let turns: Vec<ChatTurn> = (0..6)
+            .map(|i| ChatTurn {
+                at: now - (6 - i) * 60,
+                role: if i % 2 == 0 {
+                    ChatRole::You
+                } else {
+                    ChatRole::Overseer
+                },
+                text: if i == 3 {
+                    "a long answer that wraps onto a second line at this width".into()
+                } else {
+                    format!("turn {i}")
+                },
+            })
+            .collect();
+        // Turn 3 costs two rows at width 30; everything else one.
+        let rows = chat_rows(&turns, 30, 100, now);
+        assert_eq!(rows.len(), 7);
+        assert_eq!(rows[0].text, "turn 0");
+        assert_eq!(rows[0].age.as_deref(), Some("6m"));
+        assert_eq!(rows[3].age.as_deref(), Some("3m"));
+        assert_eq!(rows[4].age, None, "a continuation row hangs, unlabelled");
+        assert_eq!(rows[4].role, ChatRole::Overseer);
+
+        // Three rows: the newest two turns; turn 3 would need two more.
+        let rows = chat_rows(&turns, 30, 3, now);
+        assert_eq!(
+            rows.iter().map(|r| r.text.as_str()).collect::<Vec<_>>(),
+            vec!["turn 4", "turn 5"],
+            "a turn is whole or absent"
+        );
+        // Four rows: turn 3 fits whole.
+        let rows = chat_rows(&turns, 30, 4, now);
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[0].age.as_deref(), Some("3m"));
+        assert!(chat_rows(&turns, 30, 0, now).is_empty());
+        assert!(chat_rows(&[], 30, 5, now).is_empty());
+    }
+
+    #[test]
+    fn chat_heading_drops_facts_in_order() {
+        assert_eq!(
+            chat_hint(Some("claude"), 80),
+            "· claude headless · answers in a few seconds · never types into a pane"
+        );
+        assert_eq!(
+            chat_hint(Some("claude"), 50),
+            "· claude headless · never types into a pane"
+        );
+        assert_eq!(chat_hint(Some("claude"), 40), "· never types into a pane");
+        assert_eq!(chat_hint(Some("claude"), 10), "");
+        assert_eq!(
+            chat_hint(None, 80),
+            "· answers in a few seconds · never types into a pane"
+        );
+    }
+
+    #[test]
+    fn chat_region_draws_turns_pending_and_the_input() {
+        let mut state = overseer_state(160, 45);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        state.overseer.chat = crate::app::overseer::OverseerState::test_chat_fixture(now);
+        state.overseer.chat_pending = true;
+        state.overseer.chat_focused = true;
+        state.overseer.chat_input = "ok".into();
+        let rows = screen(&state, 160, 45);
+        let input = rows.last().expect("input row");
+        assert!(input.ends_with("› ok▮"), "{input:?}");
+        let pending = &rows[rows.len() - 2];
+        assert!(pending.contains("thinking…"), "{pending:?}");
+        let follow_up = &rows[rows.len() - 3];
+        assert!(
+            follow_up.contains("you   3m  is the disk warning urgent?"),
+            "{follow_up:?}"
+        );
+        assert!(
+            rows.iter()
+                .any(|r| r.contains("✦     5m  answer workmayt's claude")),
+            "{rows:#?}"
+        );
+        // Unfocused with a draft: the draft stays, the cursor goes.
+        state.overseer.chat_focused = false;
+        let rows = screen(&state, 160, 45);
+        assert!(rows.last().expect("input").ends_with("› ok"));
+        state.overseer.chat_input.clear();
+        let rows = screen(&state, 160, 45);
+        assert!(rows.last().expect("input").ends_with("› ask the overseer"));
     }
 
     #[test]

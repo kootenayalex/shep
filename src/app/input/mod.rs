@@ -182,6 +182,15 @@ impl App {
                 insert_navigator_search_text(&mut self.state, &self.terminal_runtimes, text);
                 true
             }
+            Mode::Board => {
+                if !self.state.overseer.chat_focused {
+                    return false;
+                }
+                // One line: a pasted newline would send on its own.
+                let text = text.replace(['\r', '\n'], " ");
+                self.state.overseer.chat_input.push_str(&text);
+                true
+            }
             _ => false,
         }
     }

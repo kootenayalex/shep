@@ -839,6 +839,8 @@ impl Mode {
     ///
     /// Known limitation: `Navigator`'s search box is also held on ASCII, since this `Mode`-level
     /// predicate can't see `search_focused` (non-ASCII filtering there would need a runtime check).
+    /// The board's chat input (`overseer.chat_focused`) has the same limitation for the same
+    /// reason.
     pub(crate) fn wants_ascii_input(self) -> bool {
         matches!(
             self,
@@ -1036,17 +1038,13 @@ impl AppState {
     /// Look at the overseer's state dir again if the sample has aged out.
     /// Returns whether anything it shows changed.
     pub fn refresh_overseer_if_stale(&mut self, now: std::time::Instant) -> bool {
-        let dir = self.overseer.state_dir.clone();
-        self.overseer.sample.refresh_if_stale(now, &dir)
+        self.overseer.refresh_if_stale(now)
     }
 
     /// Look at the overseer's state dir now — after a tick the board asked
     /// for has finished, when the files are known to have moved.
     pub fn refresh_overseer(&mut self) -> bool {
-        let dir = self.overseer.state_dir.clone();
-        self.overseer
-            .sample
-            .refresh(std::time::Instant::now(), &dir)
+        self.overseer.refresh(std::time::Instant::now())
     }
 
     /// Whether the desktop chrome shows the overseer strip: the config allows

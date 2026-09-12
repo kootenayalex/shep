@@ -7,10 +7,11 @@
 //! `[runtimes.<name>]` table in `config.toml` overrides either recipe. This
 //! module is pure resolution; the `PATH` lookup is injected so it can be
 //! tested without touching the machine, and nothing here spawns a process
-//! except [`run_headless`], which the `shep runtime ask` CLI calls.
+//! except [`run_headless`] (the `shep runtime ask` CLI) and
+//! [`run_headless_captured`] (the board's chat).
 
 use std::collections::BTreeMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -285,6 +286,19 @@ pub struct HeadlessOutcome {
     pub timed_out: bool,
 }
 
+/// A headless run with its output kept: what [`run_headless_captured`]
+/// returns. Each stream is capped at [`HEADLESS_CAPTURE_MAX_BYTES`].
+#[derive(Debug)]
+pub struct HeadlessCapture {
+    pub outcome: HeadlessOutcome,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// The most of each captured stream that is kept; the rest is dropped with
+/// a note at the end of the text.
+pub const HEADLESS_CAPTURE_MAX_BYTES: usize = 64 * 1024;
+
 /// Run `spec` once with `prompt`, streaming the child's stdout and stderr to
 /// ours. The prompt goes on stdin (closed after the write) or as the last
 /// argument, per `spec.prompt`. On timeout the child is killed.
@@ -294,16 +308,53 @@ pub fn run_headless(
     timeout: Duration,
     cwd: Option<&Path>,
 ) -> std::io::Result<HeadlessOutcome> {
+    run_headless_with(spec, prompt, timeout, cwd, false).map(|capture| capture.outcome)
+}
+
+/// [`run_headless`] with the child's stdout and stderr captured instead of
+/// inherited, each capped at [`HEADLESS_CAPTURE_MAX_BYTES`]. The board's
+/// chat uses this: the answer is the stdout.
+pub fn run_headless_captured(
+    spec: &HeadlessSpec,
+    prompt: &str,
+    timeout: Duration,
+    cwd: Option<&Path>,
+) -> std::io::Result<HeadlessCapture> {
+    run_headless_with(spec, prompt, timeout, cwd, true)
+}
+
+/// The one launch-and-wait loop behind both entry points. With `capture`
+/// the output streams are piped and drained on threads (a child that fills
+/// a pipe nobody reads would otherwise block forever); without it they are
+/// the caller's own and the returned strings are empty.
+fn run_headless_with(
+    spec: &HeadlessSpec,
+    prompt: &str,
+    timeout: Duration,
+    cwd: Option<&Path>,
+    capture: bool,
+) -> std::io::Result<HeadlessCapture> {
     let mut argv = spec.argv.clone();
     if spec.prompt == HeadlessPrompt::Arg {
         argv.push(prompt.to_string());
     }
-    let mut command = Command::new(&argv[0]);
+    let Some(program) = argv.first() else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "headless recipe has an empty argv",
+        ));
+    };
+    let mut command = Command::new(program);
     command.args(&argv[1..]);
     if let Some(cwd) = cwd {
         command.current_dir(cwd);
     }
-    command.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let (out, err) = if capture {
+        (Stdio::piped(), Stdio::piped())
+    } else {
+        (Stdio::inherit(), Stdio::inherit())
+    };
+    command.stdout(out).stderr(err);
     command.stdin(if spec.prompt == HeadlessPrompt::Stdin {
         Stdio::piped()
     } else {
@@ -316,6 +367,12 @@ pub fn run_headless(
             let _ = stdin.write_all(prompt.as_bytes());
             // Dropping closes stdin so the runtime sees EOF and starts.
         })
+    });
+    let stdout_reader = child.stdout.take().map(|stdout| {
+        std::thread::spawn(move || read_capped_output(stdout, HEADLESS_CAPTURE_MAX_BYTES, "output"))
+    });
+    let stderr_reader = child.stderr.take().map(|stderr| {
+        std::thread::spawn(move || read_capped_output(stderr, HEADLESS_CAPTURE_MAX_BYTES, "output"))
     });
     let deadline = Instant::now() + timeout;
     let outcome = loop {
@@ -338,7 +395,46 @@ pub fn run_headless(
     if let Some(writer) = writer {
         let _ = writer.join();
     }
-    Ok(outcome)
+    let drain = |reader: Option<std::thread::JoinHandle<String>>| {
+        reader
+            .and_then(|reader| reader.join().ok())
+            .unwrap_or_default()
+    };
+    Ok(HeadlessCapture {
+        outcome,
+        stdout: drain(stdout_reader),
+        stderr: drain(stderr_reader),
+    })
+}
+
+/// Read a child's stream to EOF keeping the first `cap` bytes; anything past
+/// that is consumed and dropped so the child never blocks on a full pipe,
+/// and the text ends with a note naming `what` was cut.
+pub(crate) fn read_capped_output(mut reader: impl Read, cap: usize, what: &str) -> String {
+    let mut kept = Vec::with_capacity(cap.min(8192));
+    let mut buf = [0u8; 8192];
+    let mut truncated = false;
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                let remaining = cap.saturating_sub(kept.len());
+                if remaining > 0 {
+                    kept.extend_from_slice(&buf[..n.min(remaining)]);
+                }
+                if n > remaining {
+                    truncated = true;
+                }
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
+        }
+    }
+    let mut output = String::from_utf8_lossy(&kept).into_owned();
+    if truncated {
+        output.push_str(&format!("\n[shep truncated {what} after {cap} bytes]"));
+    }
+    output
 }
 
 #[cfg(test)]
@@ -541,5 +637,55 @@ mod tests {
         let outcome = run_headless(&slow, "x", Duration::from_millis(200), None).unwrap();
         assert!(outcome.timed_out);
         assert_eq!(outcome.exit_code, None);
+    }
+
+    #[test]
+    fn run_headless_captured_returns_stdout_and_times_out() {
+        let echo = HeadlessSpec {
+            argv: vec![
+                "sh".into(),
+                "-c".into(),
+                "read -r line; printf 'answer: %s\\n' \"$line\"; echo warn >&2".into(),
+            ],
+            prompt: HeadlessPrompt::Stdin,
+            output: Default::default(),
+        };
+        let capture = run_headless_captured(&echo, "hello", Duration::from_secs(10), None).unwrap();
+        assert_eq!(capture.outcome.exit_code, Some(0));
+        assert!(!capture.outcome.timed_out);
+        assert_eq!(capture.stdout, "answer: hello\n");
+        assert_eq!(capture.stderr, "warn\n");
+
+        let slow = HeadlessSpec {
+            argv: vec!["sh".into(), "-c".into(), "echo early; sleep 30".into()],
+            prompt: HeadlessPrompt::Arg,
+            output: Default::default(),
+        };
+        let capture = run_headless_captured(&slow, "x", Duration::from_millis(200), None).unwrap();
+        assert!(capture.outcome.timed_out);
+        assert_eq!(capture.outcome.exit_code, None);
+        assert_eq!(
+            capture.stdout, "early\n",
+            "what arrived before the kill is kept"
+        );
+
+        let failing = HeadlessSpec {
+            argv: vec!["sh".into(), "-c".into(), "echo nope >&2; exit 3".into()],
+            prompt: HeadlessPrompt::Arg,
+            output: Default::default(),
+        };
+        let capture = run_headless_captured(&failing, "x", Duration::from_secs(10), None).unwrap();
+        assert_eq!(capture.outcome.exit_code, Some(3));
+        assert_eq!(capture.stderr, "nope\n");
+    }
+
+    #[test]
+    fn read_capped_output_keeps_the_head_and_says_so() {
+        assert_eq!(
+            read_capped_output("abcdef".as_bytes(), 3, "output"),
+            "abc\n[shep truncated output after 3 bytes]"
+        );
+        assert_eq!(read_capped_output("abc".as_bytes(), 3, "output"), "abc");
+        assert_eq!(read_capped_output("".as_bytes(), 3, "output"), "");
     }
 }

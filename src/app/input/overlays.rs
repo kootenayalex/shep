@@ -273,10 +273,16 @@ impl App {
                         }
                     }
                     MouseEventKind::Down(MouseButton::Left) => {
-                        if overseer::session_button_at(&self.state, mouse.column, mouse.row) {
+                        // A click on the input takes the keys; a click
+                        // anywhere else on the board gives them back.
+                        let on_input =
+                            overseer::chat_input_at(&self.state, mouse.column, mouse.row);
+                        self.state.overseer.chat_focused = on_input;
+                        if on_input {
+                            // Focused; nothing else to do.
+                        } else if overseer::session_button_at(&self.state, mouse.column, mouse.row)
+                        {
                             self.open_overseer_session();
-                        } else if overseer::chat_input_at(&self.state, mouse.column, mouse.row) {
-                            // The chat lands in the next phase.
                         } else if let Some(row) =
                             overseer::row_at(&self.state, mouse.column, mouse.row)
                         {

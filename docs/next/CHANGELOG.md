@@ -170,6 +170,26 @@
 
 ### Changed
 
+- The overseer board's `chat` is a thread with the overseer's headless
+  runtime. `tab` on the board hands the keys to the input line (`› ▮`);
+  type, Enter sends, Esc or `tab` hands them back to the board — never to
+  the desktop — and a click on the input or anywhere else on the board does
+  the same. Each question goes to the runtime named by `[plugins.overseer]
+  runtime` (or `SHEP_OVERSEER_RUNTIME`) through its `[headless]` recipe with
+  the plugin's hard rules, the `situation.md` of the last tick, the last
+  twelve turns and the question; the answer (at most six lines, plain
+  prose) lands as an `✦` row, a `⠹ thinking…` row standing in until it does
+  (two minutes at most). Without a runtime the overseer answers
+  `no headless runtime: set [plugins.overseer] runtime`; a runtime that
+  fails or times out answers with the reason. The thread is `chat.jsonl` in
+  the plugin's state dir — one `{at, role, text}` line per turn, the last 200
+  shown — so it survives a restart and the plugin's own session can read
+  it. The chat obeys the rules the narrative does: it never types into a
+  pane, never touches the server, never nudges. The region shows the newest
+  turns that fit above the input, each `you  6m  …` or `✦  5m  …`, wrapped
+  with a hanging indent; the hint bar reads `enter send  esc back` while the
+  input has the keys.
+
 - The overseer board is a full-screen sibling of the desktop, not a panel
   over it. `ctrl+alt+b` (`keys.switch_view`) now lands on a one-screen
   overview: a header strip (`tick`, `brain`, the brain's runtime, the shep

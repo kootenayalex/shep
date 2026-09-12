@@ -5,8 +5,12 @@
 //! docket item, keep the proposal); `a` and `x` keep or drop a proposal and
 //! otherwise `a` goes round the views. The docket verbs go through the same
 //! store path as the docket board's, by id.
+//!
+//! `tab` hands the keys to the chat input; while it has them, printable
+//! keys type, enter sends and esc gives them back — to the board, not to
+//! the desktop. The switch chord is checked before any of this.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{
     state::{AppState, BoardView, Mode},
@@ -69,6 +73,10 @@ impl AppState {
 
 impl App {
     pub(crate) fn handle_board_overseer_key(&mut self, key: KeyEvent) {
+        if self.state.overseer.chat_focused {
+            self.handle_overseer_chat_key(key);
+            return;
+        }
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => leave_modal(&mut self.state),
             KeyCode::Up | KeyCode::Char('k') => self.state.overseer_move_selection(BoardDir::Up),
@@ -90,8 +98,31 @@ impl App {
                 self.state.board.suspended = true;
                 open_keybind_help(&mut self.state);
             }
-            // Reserved for the chat, which lands in the next phase.
-            KeyCode::Tab => {}
+            KeyCode::Tab => self.state.overseer.chat_focused = true,
+            _ => {}
+        }
+    }
+
+    /// Keys while the chat input has them. Esc and tab give them back;
+    /// nothing here leaves the board.
+    fn handle_overseer_chat_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Tab => self.state.overseer.chat_focused = false,
+            KeyCode::Enter => {
+                let question = std::mem::take(&mut self.state.overseer.chat_input);
+                self.send_overseer_chat(question);
+            }
+            KeyCode::Backspace => {
+                self.state.overseer.chat_input.pop();
+            }
+            KeyCode::Char('u') if key.modifiers == KeyModifiers::CONTROL => {
+                self.state.overseer.chat_input.clear();
+            }
+            KeyCode::Char(c)
+                if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT =>
+            {
+                self.state.overseer.chat_input.push(c);
+            }
             _ => {}
         }
     }
@@ -433,6 +464,257 @@ mod tests {
         assert!(app.state.board.tick_in_flight.is_none());
         assert!(app.state.plugin_command_logs.is_empty());
         assert!(app.state.board.docket_notice.is_none());
+        cleanup(&path);
+    }
+
+    /// A `[runtimes.fake-brain]` whose headless recipe is a shell script
+    /// that prints `answer`, wired as the overseer's runtime, with the chat
+    /// pointed at a scratch state dir. Returns the dir.
+    fn fake_brain(app: &mut App, script: &str) -> std::path::PathBuf {
+        crate::env_compat::remove_process_env_for_test("SHEP_OVERSEER_RUNTIME");
+        let dir = crate::app::overseer::test_state_dir();
+        std::fs::create_dir_all(&dir).expect("state dir");
+        let bin = dir.join("fake-brain.sh");
+        std::fs::write(&bin, format!("#!/bin/sh\n{script}\n")).expect("script");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        }
+        app.state.runtimes_config.insert(
+            "fake-brain".into(),
+            crate::config::RuntimeOverrideConfig {
+                headless_argv: vec![bin.display().to_string()],
+                ..Default::default()
+            },
+        );
+        app.state.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str("runtime = \"fake-brain\"").expect("table"),
+        );
+        app.state.overseer.state_dir = dir.clone();
+        dir
+    }
+
+    async fn pump_chat(app: &mut App) {
+        let event = tokio::time::timeout(std::time::Duration::from_secs(20), app.event_rx.recv())
+            .await
+            .expect("the runtime answers in time")
+            .expect("the channel is open");
+        assert!(
+            matches!(event, crate::events::AppEvent::OverseerChatFinished { .. }),
+            "{event:?}"
+        );
+        app.handle_internal_event(event);
+    }
+
+    fn chat_lines(dir: &std::path::Path) -> Vec<String> {
+        std::fs::read_to_string(dir.join("chat.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_string)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn send_then_finished_appends_both_turns() {
+        let (mut app, path, _) = overseer_app();
+        // The prompt arrives on stdin; the script proves it saw the question
+        // and the rules by echoing a fixed answer only then.
+        let dir = fake_brain(
+            &mut app,
+            "prompt=$(cat); case \"$prompt\" in *'Hard rules'*'you: what first?'*) echo 'answer workmayt first.';; *) echo unexpected; exit 1;; esac",
+        );
+        std::fs::write(dir.join("situation.md"), "claude is blocked.\n").expect("situation");
+        app.state.overseer.chat_focused = true;
+        for c in "what first?".chars() {
+            app.handle_board_key(key(KeyCode::Char(c)));
+        }
+        assert_eq!(app.state.overseer.chat_input, "what first?");
+        app.handle_board_key(key(KeyCode::Enter));
+        assert!(app.state.overseer.chat_pending);
+        assert_eq!(app.state.overseer.chat_input, "");
+        assert_eq!(app.state.overseer.chat.len(), 1);
+        assert_eq!(
+            app.state.mode,
+            Mode::Board,
+            "sending never leaves the board"
+        );
+
+        pump_chat(&mut app).await;
+        assert!(!app.state.overseer.chat_pending);
+        let turns = &app.state.overseer.chat;
+        assert_eq!(turns.len(), 2);
+        assert_eq!(turns[0].role, crate::app::overseer::ChatRole::You);
+        assert_eq!(turns[1].role, crate::app::overseer::ChatRole::Overseer);
+        assert_eq!(turns[1].text, "answer workmayt first.");
+        let lines = chat_lines(&dir);
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(lines[1].contains(r#""text":"answer workmayt first.""#));
+
+        // A refresh past the TTL re-reads nothing new and keeps the thread.
+        app.state
+            .overseer
+            .refresh_if_stale(std::time::Instant::now() + std::time::Duration::from_secs(5));
+        assert_eq!(app.state.overseer.chat.len(), 2);
+
+        // Blank questions are not questions.
+        app.state.overseer.chat_input = "   ".into();
+        app.handle_board_key(key(KeyCode::Enter));
+        assert!(!app.state.overseer.chat_pending);
+        assert_eq!(chat_lines(&dir).len(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn a_failed_runtime_becomes_an_overseer_row() {
+        let (mut app, path, _) = overseer_app();
+        let dir = fake_brain(&mut app, "echo 'no credits' >&2; exit 7");
+        app.send_overseer_chat("hello?".into());
+        pump_chat(&mut app).await;
+        assert!(!app.state.overseer.chat_pending);
+        let last = app.state.overseer.chat.last().expect("an overseer row");
+        assert_eq!(last.role, crate::app::overseer::ChatRole::Overseer);
+        assert_eq!(
+            last.text,
+            "the overseer did not answer: fake-brain exited 7: no credits"
+        );
+        assert_eq!(chat_lines(&dir).len(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn no_runtime_configured_says_so_without_spawning() {
+        let (mut app, path, _) = overseer_app();
+        crate::env_compat::remove_process_env_for_test("SHEP_OVERSEER_RUNTIME");
+        let dir = crate::app::overseer::test_state_dir();
+        app.state.overseer.state_dir = dir.clone();
+        app.send_overseer_chat("anyone there?".into());
+        assert!(!app.state.overseer.chat_pending, "answered on the spot");
+        assert_eq!(app.state.overseer.chat.len(), 2);
+        assert_eq!(
+            app.state.overseer.chat[1].text,
+            crate::app::overseer::CHAT_NO_RUNTIME
+        );
+        assert!(app.event_rx.try_recv().is_err(), "nothing was spawned");
+        assert_eq!(
+            chat_lines(&dir).len(),
+            2,
+            "the dir was created for the file"
+        );
+
+        // A configured name that resolves to nothing is the same row, with
+        // the reason.
+        app.state.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str("runtime = \"no-such-runtime\"").expect("table"),
+        );
+        app.send_overseer_chat("still there?".into());
+        assert!(!app.state.overseer.chat_pending);
+        let last = app.state.overseer.chat.last().expect("row");
+        assert!(last.text.starts_with(crate::app::overseer::CHAT_NO_RUNTIME));
+        assert!(
+            last.text.contains("unknown runtime no-such-runtime"),
+            "{:?}",
+            last.text
+        );
+        assert!(app.event_rx.try_recv().is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn tab_toggles_chat_focus() {
+        let (mut app, path, _) = overseer_app();
+        assert!(!app.state.overseer.chat_focused);
+        app.handle_board_key(key(KeyCode::Tab));
+        assert!(app.state.overseer.chat_focused);
+        // With the keys, `j` types rather than moves, and `q` does not quit.
+        let before = app.state.overseer_selection();
+        app.handle_board_key(key(KeyCode::Char('j')));
+        app.handle_board_key(key(KeyCode::Char('q')));
+        assert_eq!(app.state.overseer.chat_input, "jq");
+        assert_eq!(app.state.overseer_selection(), before);
+        assert_eq!(app.state.mode, Mode::Board);
+        app.handle_board_key(key(KeyCode::Backspace));
+        assert_eq!(app.state.overseer.chat_input, "j");
+        app.handle_board_key(key(KeyCode::Tab));
+        assert!(!app.state.overseer.chat_focused);
+        assert_eq!(
+            app.state.overseer.chat_input, "j",
+            "unfocus keeps the draft"
+        );
+        // Back on the board, `j` moves again.
+        app.handle_board_key(key(KeyCode::Char('j')));
+        assert_eq!(app.state.overseer.chat_input, "j");
+        assert_ne!(app.state.overseer_selection(), before);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn esc_leaves_the_input_not_the_board() {
+        let (mut app, path, _) = overseer_app();
+        app.handle_board_key(key(KeyCode::Tab));
+        app.handle_board_key(key(KeyCode::Char('x')));
+        app.handle_board_key(key(KeyCode::Esc));
+        assert!(!app.state.overseer.chat_focused);
+        assert_eq!(app.state.mode, Mode::Board);
+        assert_eq!(app.state.board.view, BoardView::Overseer);
+        // The second esc is the board's.
+        app.handle_board_key(key(KeyCode::Esc));
+        assert_eq!(app.state.mode, Mode::Terminal);
+        // Leaving with the keys on the input and coming back: the board has
+        // them again, the draft is still there.
+        app.state.open_board();
+        app.handle_board_key(key(KeyCode::Tab));
+        app.handle_board_key(key(KeyCode::Char('y')));
+        leave_modal(&mut app.state);
+        app.state.open_board();
+        assert!(!app.state.overseer.chat_focused);
+        assert_eq!(app.state.overseer.chat_input, "xy");
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn paste_lands_in_the_chat_input() {
+        let (mut app, path, _) = overseer_app();
+        assert!(
+            !app.paste_into_active_text_input("nope"),
+            "an unfocused chat takes no paste"
+        );
+        app.handle_board_key(key(KeyCode::Tab));
+        assert!(app.paste_into_active_text_input("two\nlines"));
+        assert_eq!(app.state.overseer.chat_input, "two lines");
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn a_click_on_the_input_focuses_and_elsewhere_unfocuses() {
+        use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+        let (mut app, path, _) = overseer_app();
+        crate::ui::compute_view(&mut app.state, ratatui::layout::Rect::new(0, 0, 160, 45));
+        let model = overseer_model(&app.state);
+        let layout = crate::ui::overseer::overseer_layout(
+            &app.state,
+            &model,
+            crate::ui::board::board_area(&app.state),
+        );
+        let click = |col: u16, row: u16| MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: col,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert!(app.handle_overlay_mouse(click(layout.chat_input.x + 2, layout.chat_input.y)));
+        assert!(app.state.overseer.chat_focused);
+        // A click on a heading: nobody's row, but the keys go back.
+        assert!(
+            app.handle_overlay_mouse(click(layout.agents.heading.x + 2, layout.agents.heading.y))
+        );
+        assert!(!app.state.overseer.chat_focused);
+        assert_eq!(app.state.mode, Mode::Board);
         cleanup(&path);
     }
 }

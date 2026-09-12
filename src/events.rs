@@ -175,6 +175,9 @@ pub enum AppEvent {
         stderr: String,
         error: Option<String>,
     },
+    /// The overseer's runtime answered a board chat question (`Ok`), or
+    /// could not (`Err` says why, for the screen).
+    OverseerChatFinished { answer: Result<String, String> },
     /// Background `git worktree add` completed.
     WorktreeAddFinished(Box<WorktreeAddResult>),
     /// Background `git worktree remove` completed.

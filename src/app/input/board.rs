@@ -39,6 +39,9 @@ impl AppState {
         self.board.view = self.board_default_view.lanes();
         self.board.docket_notice = None;
         self.board.suspended = false;
+        // The board opens with the keys on the board; a draft in the chat
+        // input survives, the focus does not.
+        self.overseer.chat_focused = false;
         self.mode = Mode::Board;
     }
 

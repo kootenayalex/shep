@@ -148,6 +148,11 @@ impl App {
             return;
         }
 
+        if let AppEvent::OverseerChatFinished { answer } = ev {
+            self.handle_overseer_chat_finished(answer);
+            return;
+        }
+
         if let AppEvent::WorktreeAddFinished(result) = ev {
             self.handle_worktree_add_finished(*result);
             return;

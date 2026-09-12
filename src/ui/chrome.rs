@@ -592,6 +592,10 @@ pub(super) fn render_hint_bar(app: &AppState, frame: &mut Frame, area: Rect) {
         // detail screens say what esc does — back, not close — so the board
         // is always one step away.
         let view_hints: &[(&str, &'static str)] = match app.board.view {
+            // While the chat has the keys, only the chat's keys are true.
+            BoardView::Overseer if app.overseer.chat_focused => {
+                &[("enter", "send"), ("esc", "back")]
+            }
             BoardView::Overseer => &[
                 ("enter", "focus"),
                 ("jk", "move"),

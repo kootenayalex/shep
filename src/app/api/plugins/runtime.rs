@@ -246,31 +246,6 @@ fn current_unix_ms() -> u64 {
         .unwrap_or(0)
 }
 
-pub(super) fn read_capped_plugin_output(mut reader: impl Read, cap: usize) -> String {
-    let mut kept = Vec::with_capacity(cap.min(8192));
-    let mut buf = [0u8; 8192];
-    let mut truncated = false;
-    loop {
-        match reader.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                let remaining = cap.saturating_sub(kept.len());
-                if remaining > 0 {
-                    kept.extend_from_slice(&buf[..n.min(remaining)]);
-                }
-                if n > remaining {
-                    truncated = true;
-                }
-            }
-            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(_) => break,
-        }
-    }
-    let mut output = String::from_utf8_lossy(&kept).into_owned();
-    if truncated {
-        output.push_str(&format!(
-            "\n[shep truncated plugin output after {cap} bytes]"
-        ));
-    }
-    output
+pub(super) fn read_capped_plugin_output(reader: impl Read, cap: usize) -> String {
+    crate::runtimes::read_capped_output(reader, cap, "plugin output")
 }

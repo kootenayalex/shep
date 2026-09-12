@@ -9,15 +9,23 @@
 //! `DocketSample` mirrors the docket: a TTL gates the whole sample, and inside
 //! it a per-file mtime guard means a quiet dir costs three `stat`s and no reads.
 //!
-//! Nothing here creates the dir or any file. A missing dir is simply an
-//! overseer that has not spoken yet.
+//! The board's chat with the overseer's headless runtime lives here too: a
+//! `chat.jsonl` in the same dir (one [`ChatTurn`] per line, mirrored under
+//! the same mtime guard), the prompt that carries the plugin's hard rules
+//! and the last few turns, and the send path that spawns the runtime on a
+//! thread and reports back through [`AppEvent::OverseerChatFinished`].
+//!
+//! Nothing on the read side creates the dir or any file. A missing dir is
+//! simply an overseer that has not spoken yet; only a sent question writes.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use super::state::DocketSample;
+use super::state::{AppState, DocketSample};
+use super::App;
+use crate::events::AppEvent;
 
 /// How stale the sample may get before the dir is stat'ed again. The
 /// dashboard's interval: the overseer ticks on agent events, not per frame.
@@ -27,6 +35,8 @@ pub(crate) const OVERSEER_SAMPLE_INTERVAL: Duration = Duration::from_secs(2);
 pub(crate) const MAX_PROPOSALS: usize = 5;
 
 const SITUATION_FILE: &str = "situation.json";
+const SITUATION_MD_FILE: &str = "situation.md";
+const CHAT_FILE: &str = "chat.jsonl";
 const BOARD_FILE: &str = "BOARD.md";
 const BOARD_SOURCE_FILE: &str = "BOARD.md.source";
 const BRAIN_STAMP_FILE: &str = "last-brain";
@@ -112,19 +122,15 @@ fn clock_token(at: &str) -> Option<String> {
 }
 
 impl OverseerSample {
-    /// Look at the dir again if the previous sample has aged out, re-reading
-    /// only the files whose mtime moved. Returns whether anything changed.
-    pub fn refresh_if_stale(&mut self, now: Instant, dir: &Path) -> bool {
-        if self
-            .sampled_at
+    /// Whether the previous sample is still fresh enough to skip the stats.
+    /// [`OverseerState::refresh_if_stale`] is the gate that uses it.
+    pub fn within_ttl(&self, now: Instant) -> bool {
+        self.sampled_at
             .is_some_and(|at| now.saturating_duration_since(at) < OVERSEER_SAMPLE_INTERVAL)
-        {
-            return false;
-        }
-        self.sample(now, dir)
     }
 
-    /// Look at the dir now, whatever the sample's age.
+    /// Look at the dir now, whatever the sample's age, re-reading only the
+    /// files whose mtime moved. Returns whether anything changed.
     pub fn refresh(&mut self, now: Instant, dir: &Path) -> bool {
         self.sample(now, dir)
     }
@@ -286,12 +292,165 @@ impl OverseerSample {
     }
 }
 
-/// The sample plus where it comes from. The dir is a field so a test can
-/// point it at scratch space, the way `docket_db` does.
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
+/// Who said a chat line. The wire spelling is what `chat.jsonl` holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum ChatRole {
+    You,
+    Overseer,
+}
+
+/// One line of the chat with the overseer, as `chat.jsonl` keeps it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct ChatTurn {
+    /// Unix seconds.
+    pub at: u64,
+    pub role: ChatRole,
+    pub text: String,
+}
+
+/// How many lines of `chat.jsonl` are kept in memory: the tail.
+pub(crate) const CHAT_KEEP_TURNS: usize = 200;
+
+/// How many previous turns a question carries with it.
+pub(crate) const CHAT_CONTEXT_TURNS: usize = 12;
+
+/// How long the runtime gets to answer one question.
+pub(crate) const CHAT_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// The board's answer when no runtime is configured; a row, not an error.
+pub(crate) const CHAT_NO_RUNTIME: &str = "no headless runtime: set [plugins.overseer] runtime";
+
+/// The rules the plugin's brain prompt opens with, copied here so the chat
+/// answers under the same constraints as the narrative. A test holds this
+/// text against `plugins/overseer/overseer-tick` so the two cannot drift.
+pub(crate) const OVERSEER_HARD_RULES: &str = "\
+Hard rules you must respect in what you write:
+1. You never answer for an agent. A blocked agent is the person's to answer; you may draft a suggested answer with a reason.
+2. You never touch the server, restart anything, or kill anything.
+3. You never nudge or queue prompts.
+4. Capture proposes, the person disposes: proposals are inbox items only, no dates, no repeats, and only for genuinely owed things visible in the situation.";
+
+/// What the chat asks of the runtime, after the rules.
+const CHAT_TASK: &str = "You are the overseer of this shep session; answer in at most 6 short lines, plain prose, no markdown headings.";
+
+fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// The last [`CHAT_KEEP_TURNS`] lines of `chat.jsonl` in `dir`, oldest
+/// first. A line that does not parse is skipped with a warning; a missing
+/// file is an empty chat.
+pub(crate) fn read_chat(dir: &Path) -> Vec<ChatTurn> {
+    let path = dir.join(CHAT_FILE);
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
+        Err(err) => {
+            tracing::warn!(error = %err, path = %path.display(), "overseer chat unreadable");
+            return Vec::new();
+        }
+    };
+    let lines: Vec<&str> = text
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .collect();
+    let start = lines.len().saturating_sub(CHAT_KEEP_TURNS);
+    lines[start..]
+        .iter()
+        .filter_map(|line| match serde_json::from_str::<ChatTurn>(line) {
+            Ok(turn) => Some(turn),
+            Err(err) => {
+                tracing::warn!(error = %err, path = %path.display(), "overseer chat line skipped");
+                None
+            }
+        })
+        .collect()
+}
+
+/// Append one turn to `chat.jsonl` in `dir`, creating the dir and the file
+/// when they are missing.
+pub(crate) fn append_chat(dir: &Path, turn: &ChatTurn) -> std::io::Result<()> {
+    use std::io::Write;
+    std::fs::create_dir_all(dir)?;
+    let mut line = serde_json::to_string(turn).map_err(std::io::Error::other)?;
+    line.push('\n');
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join(CHAT_FILE))?;
+    file.write_all(line.as_bytes())
+}
+
+/// The prompt for one question: the rules, the task, the situation the tick
+/// last wrote, the last [`CHAT_CONTEXT_TURNS`] turns, and the question.
+pub(crate) fn build_chat_prompt(situation_md: &str, turns: &[ChatTurn], question: &str) -> String {
+    let mut prompt = String::new();
+    prompt.push_str(OVERSEER_HARD_RULES);
+    prompt.push_str("\n\n");
+    prompt.push_str(CHAT_TASK);
+    prompt.push_str("\n\nThe situation, as last sensed:\n");
+    let situation = situation_md.trim();
+    prompt.push_str(if situation.is_empty() {
+        "(the overseer has not sensed the session yet)"
+    } else {
+        situation
+    });
+    prompt.push('\n');
+    let start = turns.len().saturating_sub(CHAT_CONTEXT_TURNS);
+    if start < turns.len() {
+        prompt.push_str("\nThe conversation so far:\n");
+        for turn in &turns[start..] {
+            let who = match turn.role {
+                ChatRole::You => "you",
+                ChatRole::Overseer => "overseer",
+            };
+            prompt.push_str(&format!("{who}: {}\n", turn.text.trim()));
+        }
+    }
+    prompt.push_str(&format!("\nyou: {}\noverseer:", question.trim()));
+    prompt
+}
+
+/// The runtime the chat asks: `[plugins.overseer] runtime`, else
+/// `SHEP_OVERSEER_RUNTIME` in the server's environment.
+pub(crate) fn overseer_runtime_name(app: &AppState) -> Option<String> {
+    app.plugins_config
+        .get("overseer")
+        .and_then(|table| table.get("runtime"))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            crate::env_compat::var("SHEP_OVERSEER_RUNTIME")
+                .map(|name| name.trim().to_string())
+                .filter(|name| !name.is_empty())
+        })
+}
+
+/// The sample plus where it comes from, and the chat beside it. The dir is a
+/// field so a test can point it at scratch space, the way `docket_db` does.
 #[derive(Debug, Clone)]
 pub(crate) struct OverseerState {
     pub sample: OverseerSample,
     pub state_dir: PathBuf,
+    /// `chat.jsonl`, mirrored: the tail, oldest first.
+    pub chat: Vec<ChatTurn>,
+    pub chat_mtime: Option<SystemTime>,
+    /// What is typed into the chat and not yet sent.
+    pub chat_input: String,
+    /// Whether keys go to the chat input rather than the board.
+    pub chat_focused: bool,
+    /// A question is out with the runtime; its answer is an event away.
+    pub chat_pending: bool,
 }
 
 impl OverseerState {
@@ -299,7 +458,184 @@ impl OverseerState {
         Self {
             sample: OverseerSample::default(),
             state_dir,
+            chat: Vec::new(),
+            chat_mtime: None,
+            chat_input: String::new(),
+            chat_focused: false,
+            chat_pending: false,
         }
+    }
+
+    /// Look at the dir again if the sample has aged out — the files the
+    /// sample mirrors and the chat, one mtime guard each. Returns whether
+    /// anything changed.
+    pub fn refresh_if_stale(&mut self, now: Instant) -> bool {
+        if self.sample.within_ttl(now) {
+            return false;
+        }
+        self.refresh(now)
+    }
+
+    /// Look at the dir now, whatever the sample's age.
+    pub fn refresh(&mut self, now: Instant) -> bool {
+        let dir = self.state_dir.clone();
+        let changed = self.sample.refresh(now, &dir);
+        self.sample_chat(&dir) || changed
+    }
+
+    fn sample_chat(&mut self, dir: &Path) -> bool {
+        let stamp = mtime(&dir.join(CHAT_FILE));
+        if stamp == self.chat_mtime {
+            return false;
+        }
+        self.chat_mtime = stamp;
+        self.chat = read_chat(dir);
+        true
+    }
+
+    /// Append a turn to the file and the mirror together. The mirror's
+    /// stamp follows the file so the next refresh does not re-read what it
+    /// already holds; a write that fails is logged and the turn stays on
+    /// screen for this session.
+    fn record_turn(&mut self, role: ChatRole, text: String) {
+        let turn = ChatTurn {
+            at: unix_now(),
+            role,
+            text,
+        };
+        if let Err(err) = append_chat(&self.state_dir, &turn) {
+            tracing::warn!(error = %err, dir = %self.state_dir.display(), "overseer chat not written");
+        }
+        self.chat_mtime = mtime(&self.state_dir.join(CHAT_FILE));
+        self.chat.push(turn);
+        if self.chat.len() > CHAT_KEEP_TURNS {
+            let drop = self.chat.len() - CHAT_KEEP_TURNS;
+            self.chat.drain(..drop);
+        }
+    }
+
+    /// The chat's fixture: a question, an answer, and a follow-up.
+    #[cfg(test)]
+    pub(crate) fn test_chat_fixture(now: u64) -> Vec<ChatTurn> {
+        vec![
+            ChatTurn {
+                at: now - 6 * 60,
+                role: ChatRole::You,
+                text: "what should I do first?".into(),
+            },
+            ChatTurn {
+                at: now - 5 * 60,
+                role: ChatRole::Overseer,
+                text: "answer workmayt's claude: it wants to run the stripe integration tests, \
+                       and the fix branch is waiting on that. then look at emberline's push."
+                    .into(),
+            },
+            ChatTurn {
+                at: now - 3 * 60,
+                role: ChatRole::You,
+                text: "is the disk warning urgent?".into(),
+            },
+        ]
+    }
+}
+
+impl App {
+    /// Send `question` to the overseer's runtime. The `you` turn lands on
+    /// the file and the screen at once; the answer comes back as an
+    /// [`AppEvent::OverseerChatFinished`] from a thread that owns nothing of
+    /// the app. Without a runtime the overseer answers with the fact.
+    pub(crate) fn send_overseer_chat(&mut self, question: String) {
+        let question = question.trim().to_string();
+        if question.is_empty() {
+            return;
+        }
+        let overseer = &mut self.state.overseer;
+        overseer.chat_input.clear();
+        overseer.record_turn(ChatRole::You, question.clone());
+        overseer.chat_pending = true;
+        self.mark_render_dirty();
+
+        let Some(name) = overseer_runtime_name(&self.state) else {
+            self.finish_overseer_chat(CHAT_NO_RUNTIME.to_string());
+            return;
+        };
+        let spec = match crate::runtimes::resolve_headless(&name, &self.state.runtimes_config) {
+            Ok((spec, _)) => spec,
+            Err(err) => {
+                tracing::warn!(runtime = %name, error = %err, "overseer chat runtime unresolvable");
+                self.finish_overseer_chat(format!("{CHAT_NO_RUNTIME} ({err})"));
+                return;
+            }
+        };
+        let state_dir = self.state.overseer.state_dir.clone();
+        let situation =
+            std::fs::read_to_string(state_dir.join(SITUATION_MD_FILE)).unwrap_or_default();
+        // The question is already the last turn; the prompt names it once.
+        let turns = &self.state.overseer.chat;
+        let earlier = &turns[..turns.len().saturating_sub(1)];
+        let prompt = build_chat_prompt(&situation, earlier, &question);
+        let event_tx = self.event_tx.clone();
+        std::thread::spawn(move || {
+            let answer = match crate::runtimes::run_headless_captured(
+                &spec,
+                &prompt,
+                CHAT_TIMEOUT,
+                Some(&state_dir),
+            ) {
+                Ok(capture) if capture.outcome.timed_out => Err(format!(
+                    "{name} did not answer within {}s",
+                    CHAT_TIMEOUT.as_secs()
+                )),
+                Ok(capture) if capture.outcome.exit_code != Some(0) => {
+                    let tail = capture
+                        .stderr
+                        .lines()
+                        .rev()
+                        .find(|line| !line.trim().is_empty())
+                        .unwrap_or("")
+                        .trim()
+                        .to_string();
+                    Err(match capture.outcome.exit_code {
+                        Some(code) if tail.is_empty() => format!("{name} exited {code}"),
+                        Some(code) => format!("{name} exited {code}: {tail}"),
+                        None => format!("{name} was killed"),
+                    })
+                }
+                Ok(capture) => {
+                    let text = capture.stdout.trim().to_string();
+                    if text.is_empty() {
+                        Err(format!("{name} said nothing"))
+                    } else {
+                        Ok(text)
+                    }
+                }
+                Err(err) => Err(format!("{name} could not start: {err}")),
+            };
+            let _ = event_tx.blocking_send(AppEvent::OverseerChatFinished { answer });
+        });
+    }
+
+    /// The runtime's answer, or why there is none, becomes the overseer's
+    /// turn.
+    pub(crate) fn handle_overseer_chat_finished(&mut self, answer: Result<String, String>) {
+        let text = match answer {
+            Ok(text) => text,
+            Err(reason) => format!("the overseer did not answer: {reason}"),
+        };
+        self.finish_overseer_chat(text);
+    }
+
+    fn finish_overseer_chat(&mut self, text: String) {
+        let overseer = &mut self.state.overseer;
+        overseer.record_turn(ChatRole::Overseer, text);
+        overseer.chat_pending = false;
+        self.mark_render_dirty();
+    }
+
+    fn mark_render_dirty(&self) {
+        self.render_dirty
+            .store(true, std::sync::atomic::Ordering::Release);
+        self.render_notify.notify_one();
     }
 }
 
@@ -404,7 +740,7 @@ mod tests {
         write(&dir, "last-brain", "");
 
         let mut sample = OverseerSample::default();
-        assert!(sample.refresh_if_stale(Instant::now(), &dir));
+        assert!(sample.refresh(Instant::now(), &dir));
         assert_eq!(sample.tick_at.as_deref(), Some("10:22"));
         assert_eq!(sample.health.len(), 2);
         assert_eq!(sample.health[1].level, HealthLevel::Warn);
@@ -423,15 +759,15 @@ mod tests {
     fn refresh_is_a_stat_when_nothing_moved() {
         let dir = test_state_dir();
         write(&dir, "BOARD.md", "one line.\n");
-        let mut sample = OverseerSample::default();
+        let mut state = OverseerState::new(dir.clone());
         let t0 = Instant::now();
-        assert!(sample.refresh_if_stale(t0, &dir));
+        assert!(state.refresh_if_stale(t0));
         // Inside the TTL: nothing is even stat'ed.
-        assert!(!sample.refresh_if_stale(t0 + Duration::from_millis(500), &dir));
+        assert!(!state.refresh_if_stale(t0 + Duration::from_millis(500)));
         // An unconditional look still reports nothing moved.
-        assert!(!sample.refresh(t0 + Duration::from_millis(600), &dir));
+        assert!(!state.refresh(t0 + Duration::from_millis(600)));
         // Past it, with nothing moved: a stat, no change.
-        assert!(!sample.refresh_if_stale(t0 + Duration::from_secs(3), &dir));
+        assert!(!state.refresh_if_stale(t0 + Duration::from_secs(3)));
         // Rewrite the narrative and bump the mtime past the filesystem's
         // granularity so the guard can see it.
         let later = std::time::SystemTime::now() + Duration::from_secs(5);
@@ -439,21 +775,39 @@ mod tests {
         std::fs::File::open(dir.join("BOARD.md"))
             .and_then(|file| file.set_modified(later))
             .expect("set mtime");
-        assert!(sample.refresh_if_stale(t0 + Duration::from_secs(6), &dir));
-        assert_eq!(sample.first_sentence().as_deref(), Some("another line."));
+        assert!(state.refresh_if_stale(t0 + Duration::from_secs(6)));
+        assert_eq!(
+            state.sample.first_sentence().as_deref(),
+            Some("another line.")
+        );
+        // The chat is under the same guard: a line appended is seen on the
+        // next look past the TTL, and only then.
+        append_chat(
+            &dir,
+            &ChatTurn {
+                at: 1,
+                role: ChatRole::You,
+                text: "hi".into(),
+            },
+        )
+        .expect("append");
+        assert!(!state.refresh_if_stale(t0 + Duration::from_secs(7)));
+        assert!(state.refresh_if_stale(t0 + Duration::from_secs(9)));
+        assert_eq!(state.chat.len(), 1);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_missing_dir_is_a_silent_empty_sample() {
         let dir = test_state_dir();
-        let mut sample = OverseerSample::default();
+        let mut state = OverseerState::new(dir.clone());
         // Nothing there is nothing to redraw, first look or fiftieth.
-        assert!(!sample.refresh_if_stale(Instant::now(), &dir));
-        assert!(sample.sampled);
-        assert_eq!(sample.narrative, None);
-        assert!(sample.health.is_empty());
-        assert!(sample.situation_older_than(0));
+        assert!(!state.refresh_if_stale(Instant::now()));
+        assert!(state.sample.sampled);
+        assert_eq!(state.sample.narrative, None);
+        assert!(state.sample.health.is_empty());
+        assert!(state.chat.is_empty());
+        assert!(state.sample.situation_older_than(0));
         assert!(!dir.exists(), "sampling must not create the state dir");
     }
 
@@ -558,5 +912,132 @@ mod tests {
         );
         assert_eq!(cards[0].reference.as_deref(), Some("pane p2"));
         assert_eq!(cards[0].notes_line.as_deref(), Some("note 2"));
+    }
+
+    #[test]
+    fn chat_jsonl_round_trips_and_skips_bad_lines() {
+        let dir = test_state_dir();
+        assert!(read_chat(&dir).is_empty(), "no file is an empty chat");
+        let you = ChatTurn {
+            at: 1_700_000_000,
+            role: ChatRole::You,
+            text: "what first?".into(),
+        };
+        let overseer = ChatTurn {
+            at: 1_700_000_005,
+            role: ChatRole::Overseer,
+            text: "answer claude.".into(),
+        };
+        append_chat(&dir, &you).expect("creates the dir and the file");
+        append_chat(&dir, &overseer).expect("appends");
+        {
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(dir.join("chat.jsonl"))
+                .expect("open");
+            writeln!(file, "not json").expect("write");
+            writeln!(file).expect("blank line");
+        }
+        let text = std::fs::read_to_string(dir.join("chat.jsonl")).expect("read");
+        assert!(text.starts_with(r#"{"at":1700000000,"role":"you","text":"what first?"}"#));
+        assert!(text.contains(r#""role":"overseer""#));
+        assert_eq!(read_chat(&dir), vec![you.clone(), overseer.clone()]);
+
+        // Only the tail is kept.
+        for i in 0..(CHAT_KEEP_TURNS + 10) {
+            append_chat(
+                &dir,
+                &ChatTurn {
+                    at: i as u64,
+                    role: ChatRole::You,
+                    text: format!("turn {i}"),
+                },
+            )
+            .expect("append");
+        }
+        let chat = read_chat(&dir);
+        assert_eq!(chat.len(), CHAT_KEEP_TURNS);
+        assert_eq!(chat[0].text, "turn 10");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn build_chat_prompt_has_rules_situation_last_12_turns_and_question() {
+        let turns: Vec<ChatTurn> = (0..15)
+            .map(|i| ChatTurn {
+                at: i,
+                role: if i % 2 == 0 {
+                    ChatRole::You
+                } else {
+                    ChatRole::Overseer
+                },
+                text: format!("turn {i}"),
+            })
+            .collect();
+        let prompt = build_chat_prompt("# situation\nclaude is blocked.", &turns, "and now?");
+        assert!(prompt.starts_with(OVERSEER_HARD_RULES), "rules lead");
+        let rules_end = prompt
+            .find("You are the overseer of this shep session")
+            .expect("task");
+        let situation_at = prompt.find("claude is blocked.").expect("situation");
+        let first_turn = prompt
+            .find("overseer: turn 3\n")
+            .expect("the 12th-newest turn");
+        let question_at = prompt.find("you: and now?").expect("question");
+        assert!(rules_end < situation_at && situation_at < first_turn && first_turn < question_at);
+        assert!(!prompt.contains("turn 2\n"), "older turns are left out");
+        assert!(prompt.contains("overseer: turn 13\n"));
+        assert!(prompt.contains("you: turn 14\n"));
+        assert!(prompt.ends_with("you: and now?\noverseer:"));
+        assert!(prompt.contains("at most 6 short lines"));
+
+        // No situation and no turns: the prompt says so rather than going
+        // blank, and carries no conversation header.
+        let bare = build_chat_prompt("", &[], "hello?");
+        assert!(bare.contains("has not sensed the session yet"));
+        assert!(!bare.contains("The conversation so far"));
+        assert!(bare.ends_with("you: hello?\noverseer:"));
+    }
+
+    /// The rules are the plugin's words. Rule 4 in the script carries a
+    /// `{max_proposals}` count the chat has no use for, so each rule is
+    /// held clause by clause.
+    #[test]
+    fn hard_rules_match_the_plugin_text() {
+        let script = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("plugins/overseer/overseer-tick"),
+        )
+        .expect("the overseer plugin's tick script");
+        let mut rules = 0;
+        for line in OVERSEER_HARD_RULES.lines() {
+            if line.starts_with(|c: char| c.is_ascii_digit()) {
+                rules += 1;
+            }
+            for clause in line.split(", ") {
+                assert!(
+                    script.contains(clause),
+                    "the plugin no longer says {clause:?}; update OVERSEER_HARD_RULES"
+                );
+            }
+        }
+        assert_eq!(rules, 4);
+    }
+
+    #[test]
+    fn runtime_name_is_config_then_env() {
+        crate::env_compat::remove_process_env_for_test("SHEP_OVERSEER_RUNTIME");
+        let mut app = AppState::test_new();
+        assert_eq!(overseer_runtime_name(&app), None);
+        app.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str("runtime = \" codex \"").expect("table"),
+        );
+        assert_eq!(overseer_runtime_name(&app).as_deref(), Some("codex"));
+        app.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str("runtime = \"\"").expect("table"),
+        );
+        assert_eq!(overseer_runtime_name(&app), None, "an empty name is none");
     }
 }

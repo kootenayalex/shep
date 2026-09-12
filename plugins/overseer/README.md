@@ -43,6 +43,14 @@ The prompt goes on stdin, so the runtime never sees it on argv. Point
 `runtime` at a local model behind a `[runtimes.<name>] headless_argv` if you
 would rather not send a session summary anywhere.
 
+The same runtime answers the board's `chat` (`tab` on the overseer board):
+the TUI hands it the hard rules below, `situation.md`, the last twelve turns
+and the question, and shows the answer. The thread is `chat.jsonl` in the
+state dir, one `{"at", "role", "text"}` line per turn (`role` is `you` or
+`overseer`), appended by the TUI; the plugin does not write it. The chat
+obeys the same rules as the narrative — an answer is words on the board, never
+keys into a pane.
+
 ## What it never does
 
 - Never answers for an agent: no keys, no text, nothing to any pane's input.
@@ -61,7 +69,8 @@ rules hold by construction, not by discipline.
 - `overseer-tick` — the tick (Python 3, stdlib only).
 - `overseer-board` — the pane: redraws `BOARD.md` every five seconds.
 - state, under `SHEP_PLUGIN_STATE_DIR`: `situation.md`, `situation.json`,
-  `BOARD.md`, `BOARD.md.source`, `last-brain`, `journal.log`.
+  `BOARD.md`, `BOARD.md.source`, `last-brain`, `journal.log`, and the board's
+  `chat.jsonl` (written by the TUI, read by anyone).
 
 Alex's vault skill `/shep-overseer` is the richer, claude-only variant of the
 same charter (paging, nudging, memory-file capture); this plugin is the part

@@ -560,6 +560,30 @@ fn snapshot_overseer_small() {
     overseer_at("overseer-small", SMALL);
 }
 
+/// The chat mid-conversation: three turns, an answer on its way, and a
+/// question half typed with the keys on the input.
+#[test]
+fn snapshot_overseer_chat_mid() {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    state.board.view = BoardView::Overseer;
+    state.overseer.sample.brain_mtime =
+        Some(std::time::SystemTime::now() - Duration::from_secs(190));
+    state.plugins_config.insert(
+        "overseer".into(),
+        toml::from_str("runtime = \"claude\"").expect("a toml table"),
+    );
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    state.overseer.chat = crate::app::overseer::OverseerState::test_chat_fixture(now);
+    state.overseer.chat_pending = true;
+    state.overseer.chat_focused = true;
+    state.overseer.chat_input = "ok. anything before I answer workmayt?".into();
+    assert_screen(&mut state, "overseer-chat-mid", MID.0, MID.1);
+}
+
 fn board_at(name: &str, size: (u16, u16)) {
     let mut state = fixture::session();
     state.mode = Mode::Board;
