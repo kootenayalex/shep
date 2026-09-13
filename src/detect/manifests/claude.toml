@@ -1,7 +1,7 @@
 id = "claude"
-version = "2026.09.12.1"
+version = "2026.09.13.1"
 min_engine_version = 2
-updated_at = "2026-09-12T00:00:00Z"
+updated_at = "2026-09-13T00:00:00Z"
 aliases = ["claude-code"]
 
 # How to start claude by name (`shep agent start <name> --runtime claude`) and
@@ -91,6 +91,30 @@ not = [
   { contains = ["tab/arrow keys"] },
   { contains = ["arrow keys to navigate"] },
   { contains = ["↑/↓ to navigate"] },
+]
+
+# Background work still in flight. After the main turn ends Claude Code puts
+# the prompt box back but keeps counting running background shells in the
+# footer under it (`· 1 shell ·`), so the screen reads idle while a task the
+# session will be woken for is still running. That is working: input queued
+# for "when it is idle" must wait, and the overseer must not nudge. `← N
+# agents` is the finished-agents marker and stays on idle sessions, so only an
+# agent count without the arrow counts as running. Any blocker hint in the
+# footer lines hands the decision back to the blocked rules.
+[[rules]]
+id = "background_tasks_running"
+state = "working"
+priority = 960
+region = "bottom_non_empty_lines(2)"
+visible_working = true
+any = [
+  { line_regex = ['· \d+ shells?( ·|\s*$)'] },
+  { line_regex = ['(^|[^←]) \d+ agents?( ·|\s*$)'] },
+]
+not = [
+  { contains = ["esc to cancel"] },
+  { contains = ["enter to select"] },
+  { contains = ["do you want to proceed?"] },
 ]
 
 [[rules]]

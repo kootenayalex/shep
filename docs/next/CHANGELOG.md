@@ -442,6 +442,12 @@
 
 ### Fixed
 
+- A Claude session whose main turn ended while a background shell or agent it
+  started is still running no longer reads as idle: the footer count under the
+  prompt box (`· 1 shell ·`, `· 2 agents ·`) now detects as working, so input
+  queued for its next idle waits and the overseer does not nudge it. The
+  `← N agents` finished-results marker stays idle. Bundled claude manifest
+  `2026.09.13.1`, mirrored to the website.
 - The companion's board keeps the connection line, and the end-to-end flows
   navigate by test id. The board landed without the `live · shep <version>` /
   `reconnect` status the agents header carries, so the screen the phone now

@@ -770,6 +770,60 @@ fn claude_empty_osc_empty_screen_is_idle_fallback() {
 
 // --- Codex OSC rules ---
 
+const CLAUDE_IDLE_FOOTER: &str = "⏺ Done.\n\n────────────────────────────────────────\n❯\n────────────────────────────────────────\n  ⏵⏵ bypass permissions on (shift+tab to cycle)\n";
+
+#[test]
+fn claude_running_background_shell_keeps_the_session_working() {
+    // The main turn is over (static title, empty prompt box) but the footer
+    // still counts a running background shell: the session will be woken for
+    // it, so it is not idle and queued input must keep waiting.
+    let screen = CLAUDE_IDLE_FOOTER.replace(
+        "(shift+tab to cycle)",
+        "(shift+tab to cycle) · 1 shell · ← 2 agents · ↓ to manage",
+    );
+    let result = osc_explain(Agent::Claude, &screen, "✳ Claude Code", "");
+    assert_eq!(result.state, AgentState::Working);
+    assert_eq!(
+        result.matched_rule.as_ref().map(|r| r.id.as_str()),
+        Some("background_tasks_running")
+    );
+    assert!(result.visible_working);
+
+    let agents = CLAUDE_IDLE_FOOTER.replace(
+        "(shift+tab to cycle)",
+        "(shift+tab to cycle) · 3 agents · ↓ to manage",
+    );
+    let result = osc_explain(Agent::Claude, &agents, "✳ Claude Code", "");
+    assert_eq!(result.state, AgentState::Working);
+}
+
+#[test]
+fn claude_finished_agents_marker_is_still_idle() {
+    // `← N agents` stays in the footer of an idle session after its agents
+    // returned; it is a results marker, not running work.
+    let screen =
+        CLAUDE_IDLE_FOOTER.replace("(shift+tab to cycle)", "(shift+tab to cycle) · ← 2 agents");
+    let result = osc_explain(Agent::Claude, &screen, "✳ Claude Code", "");
+    assert_eq!(result.state, AgentState::Idle);
+    assert_eq!(
+        result.matched_rule.as_ref().map(|r| r.id.as_str()),
+        Some("live_prompt_box")
+    );
+
+    let plain = osc_explain(Agent::Claude, CLAUDE_IDLE_FOOTER, "✳ Claude Code", "");
+    assert_eq!(plain.state, AgentState::Idle);
+}
+
+#[test]
+fn claude_blocker_outranks_a_running_background_shell() {
+    // A permission prompt while a background shell runs is still blocked:
+    // the footer rule steps aside for any blocker hint in its lines.
+    let screen = "──────────\n  1. Yes\n  2. No\n\nEnter to select · ↑/↓ to navigate · Esc to cancel\n  ⏵⏵ bypass permissions on · 1 shell · ↓ to manage\n";
+    let result = osc_explain(Agent::Claude, screen, "✳ Task title", "");
+    assert_eq!(result.state, AgentState::Blocked);
+    assert!(result.visible_blocker);
+}
+
 #[test]
 fn codex_osc_title_braille_spinner_is_working() {
     // "⠋" is U+280B, in the braille block
