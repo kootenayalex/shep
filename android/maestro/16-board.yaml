@@ -1,0 +1,135 @@
+# The board — the phone's landing screen, mirroring the desktop's
+# `ui.open_on_board`: the overseer's read of the room, its health findings, the
+# docket lanes, its proposals and the chat that resumes its own session.
+#
+# Needs a paired app (run 01 first) and, on the computer:
+#   - the overseer plugin linked, with a headless runtime to think with
+#     (`[plugins.overseer] runtime = "claude"` in the config dir),
+#   - one tick already run, so there is a narrative and there are findings,
+#   - at least one docket item.
+# The proposals block needs an inbox item the overseer captured itself
+# (`source.kind == "situation"`); a tick usually writes a few. It is gated on
+# the heading being visible, so the flow stays green without one.
+#
+# The throwaway stack that gives you all of that — never the launchd server:
+#   just dev-stack up
+#   S="env -u HERDR_SOCKET_PATH SHEP_SOCKET_PATH=/tmp/shep-dev/api.sock target/debug/shep"
+#   $S docket add "water the ficus"
+#   $S docket add "pay the hosting bill" --kind slated --due <yesterday>
+#   $S overseer tick --max-age 0        # a real brain call, 20–40 s
+#   maestro --device emulator-5554 test android/maestro/16-board.yaml
+#
+# Text anchors only (no ids) per device-testing conventions — with one
+# exception, the chat composer: its `ask the overseer` placeholder is painted
+# *under* the text field, so Maestro's bounds filter drops it from the
+# hierarchy even though it is on screen. The field's `overseer-composer`
+# testTag is the only handle on it.
+appId: dev.shep.companion
+env:
+  QUESTION: "one line: what needs me?"
+---
+# No clearState: the saved pairing is what makes this flow idempotent, and
+# OxygenOS/ColorOS block `pm clear` for shell anyway.
+- launchApp
+
+# ── the board is where the phone lands ──────────────────────────────────
+# Header, then the pill, then one anchor per region on the first screenful.
+- assertVisible: "· board"
+- assertVisible: "desktop"
+- assertVisible: "agents"
+# The docket heading is five separate text nodes — `docket`, `  due `, the
+# count, ` !N`, `  ·  inbox ` — so the desktop's `docket  due 2 !1` is not one
+# string to match. The label between the title and the count is the anchor.
+- assertVisible: "  due "
+- assertVisible:
+    id: "overseer-composer"
+- assertVisible: "send"
+
+# The rest of the regions are below the fold in a LazyColumn, so they are not
+# in the hierarchy until they are scrolled to.
+- scrollUntilVisible:
+    element:
+      text: "health"
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: ".*read of the room.*"
+    direction: DOWN
+    timeout: 30000
+
+# ── the pill is the one switch between the two views ────────────────────
+# `desktop` is unique; the pill's `board` half is not (the hint bar has a
+# `board` tab too), so it is taken as the half to the right of `desktop`.
+- tapOn: "desktop"
+- assertVisible: "· agents"
+# The overseer's one row outside the board: `✦ overseer · <first sentence>`.
+- assertVisible: ".*overseer.*"
+
+# Tapping the strip opens the board at its top; the read of the room is a
+# scroll down from there, as it is on a fresh launch.
+- tapOn: ".*overseer.*"
+- assertVisible: "· board"
+- scrollUntilVisible:
+    element:
+      text: ".*read of the room.*"
+    direction: DOWN
+    timeout: 30000
+
+# And back the other way, this time on the pill rather than the strip.
+- tapOn: "desktop"
+- assertVisible: "· agents"
+- tapOn:
+    text: "board"
+    rightOf:
+      text: "desktop"
+- assertVisible: "· board"
+
+# ── proposals: inbox only, you dispose ──────────────────────────────────
+# Only when the overseer has actually proposed something. `keep` promotes the
+# first proposal to slated — check it from the shell with
+# `shep docket list --json`, not from here.
+- scrollUntilVisible:
+    element:
+      text: "chat"
+    direction: DOWN
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "proposals"
+    commands:
+      - tapOn:
+          text: "keep"
+          index: 0
+
+# ── chat: the same conversation the desk is having ──────────────────────
+- scrollUntilVisible:
+    element:
+      id: "overseer-composer"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "overseer-composer"
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "${QUESTION}"
+- tapOn: "send"
+# The IME covers the turns it just produced; back drops it (hideKeyboard is
+# UNAVAILABLE on OxygenOS, pressKey works everywhere).
+- pressKey: back
+
+# The `you` turn is appended the moment the server records it…
+- scrollUntilVisible:
+    element:
+      text: "you"
+    direction: DOWN
+    timeout: 30000
+- assertVisible: "you"
+# …and the answer comes back over `overseer.chat_turn` whenever the runtime is
+# done thinking. `✦` alone is the overseer's own turn: the strip is on the
+# other screen and the region heading is `✦ read of the room`. On a chat that
+# already has history this passes on an older turn — the run that proves the
+# round trip is the first one against a fresh `chat.jsonl`.
+- extendedWaitUntil:
+    visible: "✦"
+    timeout: 120000

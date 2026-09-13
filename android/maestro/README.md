@@ -46,6 +46,12 @@ maestro --device <serial> test maestro/08-live-input.yaml     # …14
 
 # Docket tab (adds one inbox item — throwaway server only):
 maestro --device <serial> test maestro/15-docket.yaml
+
+# The board — the landing screen: regions, the desktop|board pill, keep on a
+# proposal, and a real question to the overseer. Needs the overseer plugin
+# linked, a headless runtime and one tick already run; `just dev-stack up`
+# sets all three up on a throwaway server, and 16's header has the recipe:
+maestro --device <serial> test maestro/16-board.yaml
 ```
 
 Flows 08–13 type into a plain shell agent named `shell` (`-e AGENT=` to
@@ -104,3 +110,27 @@ maestro --device <phone-serial> test \
   connection-refused. Re-pair per the `android-adb-repair` skill (needs the
   on-screen pairing code — a manual step), then the same flows work with
   `--device <phone-serial>`.
+
+## Gotchas learned (2026-09-12, the board)
+
+- **The board is now the landing screen**, and its region headings are words
+  the hint bar also uses. `docket` matches the board's docket heading *and*
+  the `d docket` tab, `board` matches the pill's half *and* the `b board` tab —
+  a plain `tapOn:` takes the first one, which is the wrong one. Pin the pill
+  half with `rightOf: {text: "desktop"}` and reach a tab by a word only that
+  tab has. `agents` is no longer a tab at all: the `desktop | board` pill is
+  the switch, and `agents` on the board is a region heading that does nothing
+  when tapped.
+- **A region's heading is several text nodes, not one.** The desktop's
+  `docket  due 2 !1 · inbox 5` is `docket`, `  due `, `2`, ` !1`,
+  `  ·  inbox `, `5` — six nodes, so that whole line is not a string to match.
+  Anchor on one of the labels (`"  due "`).
+- **A placeholder painted under its text field is invisible to Maestro.** The
+  board's composer really does read `ask the overseer` on screen, but the
+  `BasicTextField` is drawn over it and Maestro's bounds filter drops what is
+  behind. Hence the one id in flow 16: the field's `overseer-composer`
+  testTag (`testTagsAsResourceId` is on, so a testTag is an `id:` selector).
+- **A `LazyColumn` only has its visible rows in the hierarchy.** The board is
+  taller than the screen, so `health`, `✦ read of the room`, `proposals` and
+  `chat` need `scrollUntilVisible` before any assertion about them — a plain
+  `assertVisible` fails on a region that simply has not been composed yet.
