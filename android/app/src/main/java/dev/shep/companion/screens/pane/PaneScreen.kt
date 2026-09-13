@@ -50,6 +50,10 @@ import dev.shep.companion.net.paneStream
 import dev.shep.companion.screens.ReviewScreen
 import dev.shep.companion.ageCarriedForward
 import dev.shep.companion.formatAge
+import dev.shep.companion.repoName
+import dev.shep.companion.screens.ComposerButton
+import dev.shep.companion.screens.ComposerField
+import dev.shep.companion.screens.ContextGauge
 import dev.shep.companion.nowLine
 import dev.shep.companion.statusColor
 import dev.shep.companion.terminal.GridState
@@ -507,25 +511,46 @@ private fun PaneTitleBar(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                listOfNotNull(row.workspaceLabel, row.branch, row.paneId).joinToString(" · "),
-                style = ShepType.paneId,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                listOfNotNull(
-                    nowLine(status, row.manualState?.label, row.activityLine),
-                    ageCarriedForward(row.stateAgeSeconds, nowElapsedMs - openedAtMs)
-                        ?.let { formatAge(it) },
-                ).joinToString(" · "),
-                style = ShepType.metaSmall.copy(
-                    color = row.manualState?.let { ShepSemantic.manual(it.tier, it.label).color }
-                        ?: statusColor(status),
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // Where and how full, the way the desktop's pane title says it
+            // (`docs/DESIGN-LANGUAGE.md:249`): the group, the branch, the repo
+            // the worktree came from, and the context gauge. The pane id moved
+            // down a line — it is the least-read fact here and it was sitting
+            // in the middle of the three that are read.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    listOfNotNull(
+                        row.workspaceLabel,
+                        row.branch,
+                        row.worktreeRepo ?: row.cwd?.let { repoName(it) },
+                    ).joinToString(" · "),
+                    style = ShepType.paneId,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                row.contextPercent?.let {
+                    Spacer(Modifier.width(ShepSpace.small))
+                    ContextGauge(it)
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    listOfNotNull(
+                        nowLine(status, row.manualState?.label, row.activityLine),
+                        ageCarriedForward(row.stateAgeSeconds, nowElapsedMs - openedAtMs)
+                            ?.let { formatAge(it) },
+                    ).joinToString(" · "),
+                    style = ShepType.metaSmall.copy(
+                        color = row.manualState
+                            ?.let { ShepSemantic.manual(it.tier, it.label).color }
+                            ?: statusColor(status),
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(" · ${row.paneId}", style = ShepType.paneId, maxLines = 1)
+            }
         }
         TextSizeControl(fontSizeSp, onFontSizeSp)
         StateGlyph(
@@ -659,57 +684,33 @@ private fun ModeChip(label: String, on: Boolean, onClick: () -> Unit) {
     ShepChip(label, on, modifier = Modifier.testTag("mode-in-$label"), onClick = onClick)
 }
 
+/**
+ * Type at the agent: a field with `queue` and `send` beside it.
+ *
+ * The field itself is [ComposerField], shared with the board's chat — the
+ * well, the hairline, the copper cursor and the placeholder are the same
+ * composer in both places, and only the buttons differ, because only the
+ * buttons mean different things.
+ */
 @Composable
 private fun QueueComposer(
     value: String,
     onValue: (String) -> Unit,
     onSend: (queue: Boolean) -> Unit,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(ShepPalette.surfaceDim)
-            .padding(ShepSpace.small),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
-    ) {
-        Box(
-            Modifier
-                .weight(1f)
-                .clip(ShepShape.field)
-                .background(ShepPalette.surface0)
-                .border(ShepSize.border, ShepPalette.surface1, ShepShape.field)
-                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
-        ) {
-            if (value.isEmpty()) {
-                Text("prompt claude…", style = ShepType.hint.copy(color = ShepPalette.overlay0))
-            }
-            BasicTextField(
-                value = value,
-                onValueChange = onValue,
-                textStyle = ShepType.hint.copy(color = ShepPalette.text),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(ShepPalette.accent),
-                modifier = Modifier.fillMaxWidth().testTag("composer"),
-            )
-        }
-        Box(
-            Modifier
-                .minimumInteractiveComponentSize()
-                .clip(ShepShape.field)
-                .background(ShepPalette.tealDim)
-                .border(ShepSize.border, ShepPalette.teal, ShepShape.field)
-                .clickable { onSend(true) }
-                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
-            contentAlignment = Alignment.Center,
-        ) { Text("queue", style = ShepType.key.copy(color = ShepPalette.teal)) }
-        Box(
-            Modifier
-                .minimumInteractiveComponentSize()
-                .clip(ShepShape.field)
-                .background(ShepPalette.accent)
-                .clickable { onSend(false) }
-                .padding(horizontal = ShepSpace.medium, vertical = ShepSpace.small),
-            contentAlignment = Alignment.Center,
-        ) { Text("send", style = ShepType.key.copy(color = ShepPalette.panelBg)) }
+    ComposerField(value = value, onValue = onValue, placeholder = "prompt claude…") {
+        ComposerButton(
+            label = "queue",
+            ink = ShepPalette.teal,
+            background = ShepPalette.tealDim,
+            border = ShepPalette.teal,
+            onClick = { onSend(true) },
+        )
+        ComposerButton(
+            label = "send",
+            ink = ShepPalette.panelBg,
+            background = ShepPalette.accent,
+            onClick = { onSend(false) },
+        )
     }
 }

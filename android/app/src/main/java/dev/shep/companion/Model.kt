@@ -25,6 +25,14 @@ data class AgentRow(
     val tabName: String? = null,
     val paneNumber: Int? = null,
     val branch: String? = null,
+    /**
+     * Commits this group's branch is ahead of / behind its upstream, from
+     * `session.overview` (`git_ahead` / `git_behind` on the agent). Null
+     * without an upstream, and null against a server too old to send them —
+     * the board's `↑N not pushed` hint is simply absent rather than a zero.
+     */
+    val gitAhead: Int? = null,
+    val gitBehind: Int? = null,
     val displayAgent: String? = null,
     /**
      * What to call this agent, decided by the server so the desktop board and
@@ -180,6 +188,8 @@ fun parseOverview(result: JSONObject): SessionOverview? {
                 tabName = a.optStringOrNull("tab_name"),
                 paneNumber = a.optIntOrNull("pane_number"),
                 branch = a.optStringOrNull("branch"),
+                gitAhead = a.optIntOrNull("git_ahead"),
+                gitBehind = a.optIntOrNull("git_behind"),
                 displayAgent = a.optStringOrNull("display_agent"),
                 displayName = a.optStringOrNull("display_name"),
                 activityLine = a.optStringOrNull("activity_line"),
@@ -764,6 +774,12 @@ data class DocketItem(
     val due: String?,
     val repeat: String?,
     val sourceLabel: String?,
+    /**
+     * The raw `source.kind`, unlabelled. `proposals` filters on it: an inbox
+     * item the overseer captured says `situation`, and that is what tells a
+     * proposal apart from something you wrote down yourself.
+     */
+    val sourceKind: String?,
     val notes: String?,
     val overdue: Boolean,
     val updated: String,
@@ -806,6 +822,7 @@ fun parseDocketItem(o: JSONObject, today: String): DocketItem {
         due = due,
         repeat = o.optStringOrNull("repeat"),
         sourceLabel = docketSourceLabel(o.optJSONObject("source")),
+        sourceKind = o.optJSONObject("source")?.optStringOrNull("kind"),
         notes = o.optStringOrNull("notes"),
         overdue = o.optBoolean("overdue", false),
         updated = o.optStringOrNull("updated") ?: "",
@@ -888,4 +905,252 @@ fun docketLanes(docket: Docket): List<Pair<DocketLane, List<DocketItem>>> {
     return DocketLane.entries.map { lane ->
         lane to if (lane == DocketLane.Done) newestDone else lanes.getValue(lane).toList()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Overseer — what the plugin last sensed and said, served by `overseer.*`.
+// ---------------------------------------------------------------------------
+
+/**
+ * `shep doctor`'s verdict on one check, as the overseer copied it into its
+ * situation. Wire: `OverseerHealthLevel` in src/api/schema/overseer.rs.
+ */
+enum class HealthLevel(val wire: String) {
+    Ok("ok"),
+    Warn("warn"),
+    Fail("fail");
+
+    companion object {
+        fun parse(raw: String?): HealthLevel = entries.firstOrNull { it.wire == raw } ?: Ok
+    }
+}
+
+/** One health check and what it found. Wire: `OverseerHealthFinding`. */
+data class HealthFinding(
+    val level: HealthLevel,
+    val check: String,
+    val detail: String,
+    /** What would fix it, when the check knows. The board shows it on a long press. */
+    val fix: String?,
+)
+
+/** Who said a chat line. Wire: `OverseerChatRole` in src/api/schema/overseer.rs. */
+enum class ChatRole(val wire: String) {
+    You("you"),
+    Overseer("overseer");
+
+    companion object {
+        fun parse(raw: String?): ChatRole = entries.firstOrNull { it.wire == raw } ?: Overseer
+    }
+}
+
+/**
+ * One line of the chat with the overseer — one line of the plugin's
+ * `chat.jsonl`. Wire: `OverseerChatTurn`.
+ *
+ * [at] is unix seconds and is half of what identifies a turn: the same turn
+ * reaches the board twice, once as an `overseer.chat_turn` event and once in
+ * the next sample's tail, and `(at, role)` is what tells those two copies
+ * apart from two real turns.
+ */
+data class ChatTurn(val at: Long, val role: ChatRole, val text: String)
+
+/**
+ * What the overseer knows right now. Wire: `OverseerSample` in
+ * src/api/schema/overseer.rs, built by `App::overseer_sample_info`
+ * (src/app/overseer.rs).
+ *
+ * Every field is something the server read off the plugin's state dir, so the
+ * phone's board and the desktop's board are looking at the same files rather
+ * than at two guesses about them.
+ */
+data class OverseerSample(
+    val pluginLinked: Boolean,
+    val sampled: Boolean,
+    /** `BOARD.md`, header dropped, one entry per non-empty line. */
+    val narrative: List<String>,
+    /** `brain` or `deterministic` — who wrote the narrative. */
+    val source: String,
+    /** `hh:mm` of the last tick, when the situation says. */
+    val tickAt: String?,
+    val situationAgeSeconds: Long?,
+    val brainAgeSeconds: Long?,
+    /** The headless runtime the chat asks. Null means the chat cannot ask anything. */
+    val runtime: String?,
+    val tickInFlight: Boolean,
+    val health: List<HealthFinding>,
+    /** The tail of the chat, oldest first. */
+    val chat: List<ChatTurn>,
+    val chatTotal: Long,
+    val chatPending: Boolean,
+    val sessionId: String?,
+    val sessionStarted: Boolean,
+)
+
+/** One `chat.jsonl` line as the sample and the `overseer.chat_turn` event send it. */
+fun parseChatTurn(obj: JSONObject): ChatTurn = ChatTurn(
+    at = obj.optLong("at"),
+    role = ChatRole.parse(obj.optStringOrNull("role")),
+    text = obj.optString("text"),
+)
+
+/** One health finding as `overseer.sample` sends it. */
+private fun parseHealthFinding(obj: JSONObject): HealthFinding = HealthFinding(
+    level = HealthLevel.parse(obj.optStringOrNull("level")),
+    check = obj.optString("check"),
+    detail = obj.optString("detail"),
+    fix = obj.optStringOrNull("fix"),
+)
+
+/**
+ * Parse an `overseer.sample` result (`{sample: {…}}`).
+ *
+ * A payload that is not one — or nothing at all — parses to the same shape
+ * with `sampled` false, so the board renders its agent-side regions and says
+ * out loud that the overseer is missing rather than showing a screen of blanks.
+ */
+fun parseOverseerSample(result: JSONObject): OverseerSample {
+    val s = result.optJSONObject("sample") ?: JSONObject()
+    val healthArr = s.optJSONArray("health") ?: JSONArray()
+    val chatArr = s.optJSONArray("chat") ?: JSONArray()
+    val session = s.optJSONObject("session") ?: JSONObject()
+    return OverseerSample(
+        pluginLinked = s.optBoolean("plugin_linked", false),
+        sampled = s.optBoolean("sampled", false),
+        narrative = s.optStringList("narrative"),
+        source = s.optStringOrNull("source") ?: "deterministic",
+        tickAt = s.optStringOrNull("tick_at"),
+        situationAgeSeconds = s.optLongOrNull("situation_age_seconds"),
+        brainAgeSeconds = s.optLongOrNull("brain_age_seconds"),
+        runtime = s.optStringOrNull("runtime"),
+        tickInFlight = s.optBoolean("tick_in_flight", false),
+        health = (0 until healthArr.length()).mapNotNull { healthArr.optJSONObject(it) }
+            .map(::parseHealthFinding),
+        chat = (0 until chatArr.length()).mapNotNull { chatArr.optJSONObject(it) }
+            .map(::parseChatTurn),
+        chatTotal = s.optLong("chat_total"),
+        chatPending = s.optBoolean("chat_pending", false),
+        sessionId = session.optStringOrNull("id"),
+        sessionStarted = session.optBoolean("started", false),
+    )
+}
+
+/**
+ * The narrative's opening sentence — what the agents strip has room for.
+ *
+ * The desktop's `OverseerSample::first_sentence` (src/app/overseer.rs:242) over
+ * the same lines: skip a header (`# BOARD — …` from the tick's template, or
+ * `OVERSEER · …`), take the first line left, and stop at the first sentence
+ * end. The wire already drops the header for `narrative`, but a board written
+ * by an older tick still carries one, and a strip that opens with
+ * `# BOARD — 07:08` says nothing at all.
+ */
+fun firstSentence(narrative: List<String>): String? {
+    val lines = narrative.map { it.trim() }.filter { it.isNotEmpty() }
+    val first = lines.firstOrNull() ?: return null
+    val index = if (first.startsWith("OVERSEER ·") || first.startsWith("# ")) 1 else 0
+    val line = lines.getOrNull(index) ?: return null
+    val end = listOf(". ", "! ", "? ")
+        .mapNotNull { mark -> line.indexOf(mark).takeIf { it >= 0 } }
+        .minOrNull()
+        ?.plus(1)
+        ?: line.length
+    return line.take(end).trim().takeIf { it.isNotEmpty() }
+}
+
+/** How many proposals the board shows at once; the desktop's `MAX_PROPOSALS`. */
+const val MAX_PROPOSALS = 5
+
+/**
+ * The proposals waiting on the board: inbox items the overseer captured
+ * (`source.kind == "situation"`), newest first, at most [MAX_PROPOSALS].
+ *
+ * The desktop's `app::overseer::proposals` (src/app/overseer.rs:1113) over the
+ * same rows. Anything you wrote down yourself stays in the docket region: the
+ * point of the split is that these are somebody else's suggestions and you
+ * have not agreed to them yet.
+ */
+fun proposals(docket: Docket): List<DocketItem> = docket.items
+    .filter { it.status == DocketStatus.Inbox && it.sourceKind == "situation" }
+    .sortedWith(compareByDescending<DocketItem> { it.updated }.thenByDescending { it.id })
+    .take(MAX_PROPOSALS)
+
+/**
+ * The docket region of the board: the due lane whole, then the inbox items not
+ * already showing as proposals, with the heading's three counts.
+ *
+ * Mirrors `overseer_model` in src/ui/overseer.rs:218-239 — same lanes, same
+ * subtraction, same counts — so the heading on the phone reads what the
+ * heading at the desk reads.
+ */
+data class BoardDocket(
+    val rows: List<DocketItem>,
+    val due: Int,
+    val overdue: Int,
+    val inbox: Int,
+)
+
+fun boardDocket(docket: Docket, proposals: List<DocketItem>): BoardDocket {
+    val lanes = docketLanes(docket).toMap()
+    val due = lanes[DocketLane.Due].orEmpty()
+    val inbox = lanes[DocketLane.Inbox].orEmpty()
+    val proposed = proposals.map { it.id }.toSet()
+    return BoardDocket(
+        rows = due + inbox.filterNot { it.id in proposed },
+        due = due.size,
+        overdue = due.count { it.overdue },
+        inbox = inbox.size,
+    )
+}
+
+/**
+ * One row of the board's `needs you` region: why this agent is waiting on a
+ * human, and what its second line says about it.
+ *
+ * [detail] is the desktop's `said` — the last thing the agent's screen showed,
+ * else what it says it is doing. [ahead] is how many commits a finished
+ * agent's branch has that its upstream does not, which is the one thing left
+ * to do about an agent that is otherwise done.
+ */
+data class NeedsYouRow(
+    val row: AgentRow,
+    val blocked: Boolean,
+    val detail: String,
+    val ahead: Int?,
+)
+
+/**
+ * Who is waiting on you, in the desktop's order: blocked first, then finished
+ * and not yet looked at, board order holding inside each
+ * (`overseer_model`, src/ui/overseer.rs:189-216).
+ *
+ * `done` is already the server's word for "finished and unseen" — the seen
+ * split happens server-side — so this needs no second opinion about it.
+ */
+fun needsYou(rows: List<AgentRow>): List<NeedsYouRow> {
+    fun said(row: AgentRow): String =
+        row.activityLine?.let { trimActivity(it) }?.takeIf { it.isNotEmpty() }
+            ?: row.customStatus
+            ?: row.status
+    val blocked = rows.filter { it.status == "blocked" }
+        .map { NeedsYouRow(it, blocked = true, detail = said(it), ahead = null) }
+    val done = rows.filter { it.status == "done" }
+        .map { NeedsYouRow(it, blocked = false, detail = said(it), ahead = it.gitAhead) }
+    return blocked + done
+}
+
+/**
+ * Whether a failed call means "this server does not have that method".
+ *
+ * Worth being strict about: latching a fallback on *any* error means one
+ * dropped packet permanently downgrades the connection to the thinner method,
+ * and nothing short of a restart puts it back. shep rejects an unknown method
+ * while deserialising the request, so the message says so.
+ *
+ * Lives here rather than beside one screen because two of them now ask it —
+ * the agents list about `session.overview`, the board about `overseer.sample`.
+ */
+fun looksUnsupported(message: String?): Boolean {
+    val text = message?.lowercase() ?: return false
+    return "unknown variant" in text || "unknown method" in text || "unsupported" in text
 }

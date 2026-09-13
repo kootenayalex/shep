@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import dev.shep.companion.ui.theme.ShepMotion
 import kotlinx.coroutines.delay
 
 /**
@@ -30,4 +32,20 @@ fun rememberSecondsTicker(): State<Long> {
         }
     }
     return now
+}
+
+/**
+ * One spinner frame every [ShepMotion.SPINNER_FRAME_MS].
+ *
+ * `spinnerFrame` divides by eight, so stepping by eight advances exactly one
+ * frame. Public because two things now draw a moving agent — the glyph on a
+ * row, and the working count in the chrome tally — and they have to spin
+ * together, or one session appears to be running at two speeds.
+ */
+@Composable
+fun rememberSpinnerTick(): State<Int> = produceState(0) {
+    while (true) {
+        delay(ShepMotion.SPINNER_FRAME_MS)
+        value += 8
+    }
 }

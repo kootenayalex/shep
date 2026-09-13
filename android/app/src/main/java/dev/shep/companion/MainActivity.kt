@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import dev.shep.companion.screens.BoardScreen
 import dev.shep.companion.screens.ChannelsScreen
 import dev.shep.companion.screens.DocketScreen
 import dev.shep.companion.screens.MemoryScreen
@@ -132,18 +133,28 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Hint-bar destinations. Shortcuts mirror the TUI vocabulary without adding
- * an icon dependency or making the phone carry a second navigation model.
+ * Destinations. Shortcuts mirror the TUI vocabulary without adding an icon
+ * dependency or making the phone carry a second navigation model.
  *
- * Four, under the Hick's-law ceiling the desktop and the prototype use. The
- * docket sits between memory and shep because it is the other thing a person
- * writes down: memory is what every agent should know, the docket is what
- * Alex should do.
+ * Four in the bar, still under the Hick's-law ceiling the desktop and the
+ * prototype use — but not the same four. The board is now where the phone
+ * lands, and `agents` came *out* of the bar rather than making it five:
+ * the desktop already has one control that moves between those two views,
+ * the `desktop | board` pill, and a fifth tab would have been a second way to
+ * do the same thing sitting an inch below the first. [Agents] stays a [Tab]
+ * because everything else still routes to it — a `shep://pane?pane=` tap, the
+ * end of pairing, the tablet's docked pane — it just is not a place you go by
+ * pressing a word in the bar. Its shortcut belongs to the pill.
+ *
+ * The docket sits between board and memory because it is the other thing a
+ * person writes down: memory is what every agent should know, the docket is
+ * what Alex should do.
  */
-enum class Tab(val label: String, val shortcut: String) {
-    Agents("agents", "a"),
-    Memory("memory", "m"),
+enum class Tab(val label: String, val shortcut: String, val inHintBar: Boolean = true) {
+    Board("board", "b"),
+    Agents("agents", "a", inHintBar = false),
     Docket("docket", "d"),
+    Memory("memory", "m"),
     Shep("shep", "s"),
 }
 
@@ -155,9 +166,12 @@ fun ShepApp(
 ) {
     var client by remember { mutableStateOf<BridgeClient?>(null) }
     var paired by remember { mutableStateOf(false) }
-    // Which tab the shell opens on. Only pairing sets it — "go to agents" and
-    // "choose what to be notified about" are the same door into two rooms.
-    var startTab by remember { mutableStateOf(Tab.Agents) }
+    // Which tab the shell opens on. The board, mirroring the desktop's
+    // `ui.open_on_board`: the first question on picking up the phone is "what
+    // needs me", not "list everything that is running". Only pairing sets it
+    // otherwise — "go to agents" and "choose what to be notified about" are
+    // the same door into two rooms.
+    var startTab by remember { mutableStateOf(Tab.Board) }
     var connectError by remember { mutableStateOf<String?>(null) }
     // True while the first auto-connect with a saved pairing is in flight —
     // shows a connecting spinner instead of flashing the manual pairing form.
@@ -391,17 +405,18 @@ fun ShepApp(
 }
 
 /**
- * The paired experience: a hint-bar Scaffold over the four destinations, with
- * the pane view pushed as a full-screen detail over the agents tab on phones, or
- * docked side-by-side on iPad-class widths (A6 two-pane; agents only — the
- * docket is a list on every width). A3 deep-links route here by setting the
- * tab + selecting a pane.
+ * The paired experience: a hint-bar Scaffold over the destinations, with the
+ * pane view pushed as a full-screen detail over the agents tab on phones, or
+ * docked side-by-side on iPad-class widths (A6 two-pane; the two views that
+ * list agents — board and agents — since a pane opened from the board should
+ * not have to throw away the board to show itself). A3 deep-links route here
+ * by setting the tab + selecting a pane.
  */
 @Composable
 fun NavShell(
     client: BridgeClient,
     onUnpair: () -> Unit,
-    initialTab: Tab = Tab.Agents,
+    initialTab: Tab = Tab.Board,
     deepLinkPane: String? = null,
     onDeepLinkConsumed: () -> Unit = {},
 ) {
@@ -466,16 +481,25 @@ fun NavShell(
             },
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
-                if (wide && tab == Tab.Agents) {
+                if (wide && (tab == Tab.Agents || tab == Tab.Board)) {
                     Row(Modifier.fillMaxSize()) {
                         Box(Modifier.weight(1f)) {
-                            ChannelsScreen(
-                                client = client,
-                                onOpenPane = { paneDetail = it },
-                                onUnpair = onUnpair,
-                                collapsed = collapsedSpaces,
-                                onCollapsedChange = { collapsedSpaces = it },
-                            )
+                            if (tab == Tab.Board) {
+                                BoardScreen(
+                                    client = client,
+                                    onOpenPane = { paneDetail = it },
+                                    onSelectTab = { tab = it },
+                                )
+                            } else {
+                                ChannelsScreen(
+                                    client = client,
+                                    onOpenPane = { paneDetail = it },
+                                    onUnpair = onUnpair,
+                                    onSelectTab = { tab = it },
+                                    collapsed = collapsedSpaces,
+                                    onCollapsedChange = { collapsedSpaces = it },
+                                )
+                            }
                         }
                         Box(
                             Modifier
@@ -501,10 +525,16 @@ fun NavShell(
                         label = "tab",
                     ) { current ->
                         when (current) {
+                            Tab.Board -> BoardScreen(
+                                client = client,
+                                onOpenPane = { paneDetail = it },
+                                onSelectTab = { tab = it },
+                            )
                             Tab.Agents -> ChannelsScreen(
                                 client = client,
                                 onOpenPane = { paneDetail = it },
                                 onUnpair = onUnpair,
+                                onSelectTab = { tab = it },
                                 collapsed = collapsedSpaces,
                                 onCollapsedChange = { collapsedSpaces = it },
                             )

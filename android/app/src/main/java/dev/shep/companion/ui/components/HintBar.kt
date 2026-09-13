@@ -30,7 +30,10 @@ fun HintBar(selected: Tab, onSelect: (Tab) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(ShepSpace.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Tab.entries.forEach { tab ->
+        // Not every destination is a bar entry: `agents` is reached by the
+        // `desktop | board` pill, which is the desktop's own switch between
+        // those two views, so the bar does not offer a second one.
+        Tab.entries.filter { it.inHintBar }.forEach { tab ->
             Row(
                 Modifier
                     .minimumInteractiveComponentSize()

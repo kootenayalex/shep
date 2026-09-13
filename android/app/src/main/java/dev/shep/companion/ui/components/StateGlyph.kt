@@ -2,9 +2,7 @@ package dev.shep.companion.ui.components
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -14,7 +12,6 @@ import dev.shep.companion.ui.theme.ShepMotion
 import dev.shep.companion.ui.theme.ShepSemantic
 import dev.shep.companion.ui.theme.ShepType
 import dev.shep.companion.ui.theme.StateAppearance
-import kotlinx.coroutines.delay
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 
@@ -86,18 +83,4 @@ private fun Glyph(appearance: StateAppearance, modifier: Modifier, style: TextSt
         textAlign = TextAlign.Center,
         modifier = modifier.semantics { contentDescription = appearance.description },
     )
-}
-
-/**
- * One frame every [ShepMotion.SPINNER_FRAME_MS].
- *
- * `spinnerFrame` divides by eight, so stepping by eight advances exactly one
- * frame.
- */
-@Composable
-private fun rememberSpinnerTick(): State<Int> = produceState(0) {
-    while (true) {
-        delay(ShepMotion.SPINNER_FRAME_MS)
-        value += 8
-    }
 }

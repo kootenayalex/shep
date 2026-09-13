@@ -47,21 +47,30 @@ import dev.shep.companion.EXPECTED_PROTOCOL
 import dev.shep.companion.PaneNode
 import dev.shep.companion.SessionHost
 import dev.shep.companion.SessionTotals
+import dev.shep.companion.Tab
 import dev.shep.companion.GroupNode
 import dev.shep.companion.asAgentRow
 import dev.shep.companion.ageCarriedForward
+import dev.shep.companion.firstSentence
 import dev.shep.companion.formatAge
+import dev.shep.companion.looksUnsupported
 import dev.shep.companion.nowLine
+import dev.shep.companion.parseDocket
+import dev.shep.companion.parseOverseerSample
 import dev.shep.companion.parseOverview
 import dev.shep.companion.parseSnapshot
 import dev.shep.companion.parseTree
+import dev.shep.companion.proposals
 import dev.shep.companion.repoName
 import dev.shep.companion.ManualState
 import dev.shep.companion.statusColor
 import dev.shep.companion.totalsFromRows
 import dev.shep.companion.ui.components.ActionText
+import dev.shep.companion.ui.components.ChromeRow
 import dev.shep.companion.ui.components.EmptyState
 import dev.shep.companion.ui.components.Meter
+import dev.shep.companion.ui.components.OverseerStrip
+import dev.shep.companion.ui.components.PillHalf
 import dev.shep.companion.ui.components.Notice
 import dev.shep.companion.ui.components.NoticeTone
 import dev.shep.companion.ui.components.ScreenHeader
@@ -222,19 +231,6 @@ fun buildChannels(groups: List<GroupNode>, rows: List<AgentRow>): List<ChannelSe
         }
 }
 
-/**
- * Whether a failed call means "this server does not have that method".
- *
- * Worth being strict about: latching the fallback on *any* error means one
- * dropped packet permanently downgrades the connection to the thinner
- * `session.snapshot`, and nothing short of a restart puts it back. shep rejects
- * an unknown method while deserialising the request, so the message says so.
- */
-fun looksUnsupported(message: String?): Boolean {
-    val text = message?.lowercase() ?: return false
-    return "unknown variant" in text || "unknown method" in text || "unsupported" in text
-}
-
 /** What a confirm dialog is about to do, and the words for it. */
 private data class Confirm(
     val title: String,
@@ -271,6 +267,7 @@ fun ChannelsScreen(
     client: BridgeClient,
     onOpenPane: (AgentRow) -> Unit,
     onUnpair: () -> Unit,
+    onSelectTab: (Tab) -> Unit = {},
     collapsed: Set<String> = emptySet(),
     onCollapsedChange: (Set<String>) -> Unit = {},
 ) {
@@ -288,6 +285,13 @@ fun ChannelsScreen(
     var confirming by remember { mutableStateOf<Confirm?>(null) }
     var settingState by remember { mutableStateOf<Channel?>(null) }
     var customStates by remember { mutableStateOf<List<ManualState>>(emptyList()) }
+    // The overseer's one row outside the board, and the count on the pill's
+    // unlit half. Both are read on the keepalive rather than on every refresh:
+    // a narrative changes once a tick, and a proposal is not urgent enough to
+    // pay for a round trip every time a pane blinks.
+    var overseerLine by remember { mutableStateOf<String?>(null) }
+    var overseerTickAt by remember { mutableStateOf<String?>(null) }
+    var proposalCount by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     // One clock for the whole list rather than one per row: every age on the
@@ -365,10 +369,38 @@ fun ChannelsScreen(
             subscribedPanes = paneIds
         }
 
+        // The strip's one sentence and the pill's count, both cheap: the
+        // sample is asked for no chat turns at all, and neither read is worth
+        // failing the screen over. `overseerSupported` latches off only on a
+        // server that genuinely lacks the method, the same rule the overview
+        // is under — a blip must not cost the strip permanently.
+        var overseerSupported = true
+        suspend fun readOverseer() {
+            if (overseerSupported) {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        client.call("overseer.sample", JSONObject().put("chat_turns", 0))
+                    }
+                }
+                result
+                    .onSuccess {
+                        val sample = parseOverseerSample(it)
+                        overseerLine = firstSentence(sample.narrative)
+                        overseerTickAt = sample.tickAt
+                    }
+                    .onFailure {
+                        if (looksUnsupported(it.message)) overseerSupported = false
+                    }
+            }
+            withContext(Dispatchers.IO) { runCatching { client.call("docket.list") } }
+                .onSuccess { proposalCount = proposals(parseDocket(it)).size }
+        }
+
         refresh()
+        readOverseer()
         subscribe(rows.map { it.paneId }.toSet())
         val keepalive = launch {
-            while (isActive) { delay(15000); refreshSignal.trySend(Unit) }
+            while (isActive) { delay(15000); readOverseer(); refreshSignal.trySend(Unit) }
         }
         try {
             for (signal in refreshSignal) {
@@ -481,7 +513,17 @@ fun ChannelsScreen(
             )
         }
         notice?.let { Notice(it, onDismiss = { notice = null }) }
-        DashboardStrip(totals, host) { statusColor(it) }
+        ChromeRow(
+            totals = totals,
+            proposals = proposalCount,
+            current = PillHalf.Desktop,
+            onSelect = { if (it == PillHalf.Board) onSelectTab(Tab.Board) },
+        )
+        // Hidden until the overseer has said something: a strip that says
+        // nothing is a row of chrome charging rent.
+        overseerLine?.let {
+            OverseerStrip(it, overseerTickAt) { onSelectTab(Tab.Board) }
+        }
         if (sections.isEmpty()) {
             EmptyState(
                 "nothing running",
@@ -1182,17 +1224,19 @@ private fun RenameSheet(
  * The context window as a bar plus its number.
  *
  * A bar because the thing worth seeing down a list is *which agent is nearly
- * full*, and a column of bare percentages does not show that. Warms through
- * yellow to red as it fills, matching the desktop.
+ * full*, and a column of bare percentages does not show that.
+ *
+ * The ink is `ShepSemantic.gauge`: peach at or over 80, overlay0 below, and
+ * nothing hotter. This used to warm yellow at 60 and red at 85 while claiming
+ * in this very comment to match the desktop, which it did not — the desktop
+ * has had one threshold since `gauge_color` (src/ui/gauge.rs), and a meter
+ * that spends the working and stop tiers on a number shouts louder than the
+ * blocked agent three rows up.
  */
 @Composable
 fun ContextGauge(percent: Int) {
     val clamped = percent.coerceIn(0, 100)
-    val color = when {
-        clamped >= 85 -> ShepPalette.red
-        clamped >= 60 -> ShepPalette.yellow
-        else -> ShepPalette.overlay0
-    }
+    val color = ShepSemantic.gauge(clamped)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Meter(
             fraction = clamped / 100f,

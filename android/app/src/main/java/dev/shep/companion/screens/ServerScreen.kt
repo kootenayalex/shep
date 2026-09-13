@@ -17,6 +17,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +31,7 @@ import dev.shep.companion.NotifyKind
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.ConnectionEvent
 import dev.shep.companion.ConnectionLog
+import dev.shep.companion.parseOverseerSample
 import dev.shep.companion.ui.components.ButtonTone
 import dev.shep.companion.ui.components.ExplainLine
 import dev.shep.companion.ui.components.ExplainRow
@@ -41,6 +43,9 @@ import dev.shep.companion.ui.theme.ShepSize
 import dev.shep.companion.ui.theme.ShepSpace
 import dev.shep.companion.ui.theme.ShepType
 import androidx.compose.material3.minimumInteractiveComponentSize
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 /**
  * Settings tab: what shep will notify about, and whether push works at all.
@@ -66,6 +71,25 @@ fun ServerScreen(
     // drop shows the drop rather than the history as of the last composition.
     val history = remember(client, client?.isOpen) { ConnectionLog.entries(context) }
     var historyOpen by remember { mutableStateOf(false) }
+    // One read, on opening this screen: `<runtime> headless · tick hh:mm`.
+    var overseerLine by remember { mutableStateOf("unknown") }
+    LaunchedEffect(client) {
+        val live = client ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            runCatching { live.call("overseer.sample", JSONObject().put("chat_turns", 0)) }
+        }
+            .onSuccess {
+                val sample = parseOverseerSample(it)
+                overseerLine = when {
+                    !sample.pluginLinked -> "plugin not linked"
+                    else -> listOfNotNull(
+                        sample.runtime?.let { name -> "$name headless" } ?: "no runtime",
+                        sample.tickAt?.let { at -> "tick $at" },
+                    ).joinToString(" · ")
+                }
+            }
+            .onFailure { overseerLine = "not served by this shep" }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenHeader("shep")
@@ -104,6 +128,11 @@ fun ServerScreen(
                 Text("connection", style = ShepType.sectionLabel)
                 ServerInfoRow("status", if (client?.isOpen == true) "connected" else "offline")
                 ServerInfoRow("version", client?.serverVersion ?: "unknown")
+                // Whether the thing that answers the board's chat is actually
+                // there. A silent overseer and an unconfigured one look
+                // identical from the board, and this is the screen that exists
+                // to tell a broken setup from a quiet one.
+                ServerInfoRow("overseer", overseerLine)
                 Spacer(Modifier.height(ShepSpace.small))
                 // The status line can only say what is true this second. When
                 // the link is the thing that is broken, the useful question is

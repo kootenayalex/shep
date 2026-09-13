@@ -1,6 +1,7 @@
 package dev.shep.companion.screens
 
 import dev.shep.companion.AgentRow
+import dev.shep.companion.looksUnsupported
 import dev.shep.companion.parseTree
 import dev.shep.companion.ui.theme.ShepPalette
 import org.json.JSONObject

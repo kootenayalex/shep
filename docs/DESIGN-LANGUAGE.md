@@ -172,10 +172,16 @@ nothing hotter: it used to go yellow at 60 and red at 85, which spent the
 working and stop tiers on a number. One gauge, drawn by `src/ui/gauge.rs`,
 wherever a context percentage appears.
 
+- Companion: `ShepSemantic.gauge` in `ui/theme/ShepSemantic.kt`, drawn by
+  `ContextGauge`. It carried the 60/85 ladder until the board landed.
+
 The overseer's mark is `✦`, mauve, wherever the overseer speaks. Not `◆`: that
 is the needs-review badge, and one glyph carries one meaning. `≡` is the global
 menu, `⚠` a health finding (peach: a warning), and `«`/`»` fold the sidebar
 away and back — all pinned in `src/ui/glyphs.rs`.
+
+- Companion: `ShepSemantic.overseer` and `ShepSemantic.health` in
+  `ui/theme/ShepSemantic.kt`.
 
 The worktree badge is the one entry that reads differently on the two surfaces,
 and deliberately: the phone puts it in a card header beside an id, where a
@@ -213,11 +219,20 @@ ready` leads every rung but the last. `src/ui/chrome.rs::titlebar_layout` is
 the one function that lays it out, and the mouse asks the same function, so
 the pill is clickable exactly where it is drawn.
 
+- Companion: `StateTally` in `ui/components/Chrome.kt`, over
+  `ShepSemantic.TALLY_ORDER`. The phone has no ladder — the title is in its
+  own header row — so the tally simply elides.
+
 **The pill is the one place `accent` paints a background.** Its lit half —
 the view you are on — is accent behind panel-bg bold text; the unlit half is
 surface1 behind subtext. Focus tier, because the pill is a selection between
 two views and not a state. The unlit `board` half carries ` N` in teal (the
 queued tier: proposals waiting for you) when the overseer has captured any.
+
+- Companion: `ViewPill` in `ui/components/Chrome.kt`, and the same ground a
+  selected `ShepChip` already paints — the pill is two halves of one chip, not
+  a second colour rule. It is also the phone's *only* way between the two
+  views: `board` is a hint-bar tab and `agents` is not.
 
 **The board is a screen, not a panel.** It takes the desktop's place under
 the same titlebar and hint bar — no border, no title, no footer of its own —

@@ -4,6 +4,23 @@
 
 ### Added
 
+- The Android companion lands on the board. A new `board` tab — where the app
+  now opens, mirroring the desktop's `ui.open_on_board` — carries the same
+  regions the desktop's does: what needs you (with `↑N not pushed` from the
+  new `git_ahead`), the agents table, the docket's due lane and inbox, the
+  health findings, the overseer's `✦ read of the room`, its proposals with
+  keep and drop, and a chat with the headless overseer over `overseer.chat`,
+  which is the same resumed conversation the desktop board and the session
+  pane share. Chrome follows: the desktop's glyph tally and the
+  `desktop | board` pill replace the old words-and-counts dashboard strip,
+  and the pill — not a fifth tab — is the phone's switch between the two
+  views, so the bar stays four wide (`board · docket · memory · shep`). The
+  agents list gains the overseer's one-row strip, tapping it opens the board.
+  The context gauge is fixed to the desktop's one threshold (peach at 80,
+  nothing hotter); it had warmed yellow at 60 and red at 85 while claiming to
+  match. A pane's title bar now reads `group · branch · repo · gauge` with the
+  pane id moved down a line, and the shep tab reports whether the overseer has
+  a headless runtime at all.
 - `shep overseer sample|chat|tick` puts the overseer in a terminal. `sample`
   prints one compact board — the `✦ read of the room`, a
   `tick hh:mm · brain Nm ago · <runtime> headless` line, health findings, the

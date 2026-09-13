@@ -124,6 +124,73 @@ class ShepSemanticTest {
         assertEquals("○", ShepSemantic.docket("inbox", overdue = true, dueToday = true).glyph)
     }
 
+    /**
+     * The overseer's mark, from `docs/DESIGN-LANGUAGE.md:175`. `✦` and mauve,
+     * and never `◆` — that is the needs-review badge, and the two can sit on
+     * the same board.
+     */
+    @Test
+    fun `the overseer's mark is its own`() {
+        assertEquals("✦", ShepSemantic.overseer.glyph)
+        assertEquals(ShepPalette.mauve, ShepSemantic.overseer.color)
+        assertNotEquals(ShepSemantic.reviewBadge("needs_review")!!.first, ShepSemantic.overseer.glyph)
+        // Nor is it an agent state: the overseer is not one of the things on
+        // the board, it is the thing talking about them.
+        listOf("blocked", "working", "done", "idle", "?").forEach {
+            assertNotEquals(ShepSemantic.overseer.glyph, ShepSemantic.agent(it).glyph)
+        }
+    }
+
+    /**
+     * The three health rows, from `docs/DESIGN-LANGUAGE.md:175-178` and the
+     * desktop's `health_facts` (src/ui/overseer.rs). A warning is peach, never
+     * red; a failed check does borrow the stop tier whole, because a bridge
+     * that is not listening stops you exactly the way a blocked agent does.
+     */
+    @Test
+    fun `health findings match the design language`() {
+        assertEquals("✓" to ShepPalette.green, ShepSemantic.health("ok").let { it.glyph to it.color })
+        assertEquals("⚠" to ShepPalette.peach, ShepSemantic.health("warn").let { it.glyph to it.color })
+        assertEquals("◉" to ShepPalette.red, ShepSemantic.health("fail").let { it.glyph to it.color })
+        // Never colour alone: three levels, three glyphs.
+        val glyphs = listOf("ok", "warn", "fail").map { ShepSemantic.health(it).glyph }
+        assertEquals(glyphs.size, glyphs.toSet().size)
+        // A level this build has never heard of is absent, not a crash.
+        assertEquals(ShepPalette.overlay0, ShepSemantic.health("future-level").color)
+    }
+
+    /**
+     * The gauge is a meter, not a state. It used to go yellow at 60 and red at
+     * 85 — spending the working and stop tiers on a number — which
+     * `docs/DESIGN-LANGUAGE.md:170-173` calls the mistake and `gauge_color`
+     * (src/ui/gauge.rs) fixed at the desk.
+     */
+    @Test
+    fun `gauge never spends a state tier`() {
+        val tiers = listOf(ShepPalette.red, ShepPalette.yellow, ShepPalette.blue, ShepPalette.green)
+        (0..100).forEach { percent ->
+            val ink = ShepSemantic.gauge(percent)
+            tiers.forEach { assertNotEquals("at $percent%", it, ink) }
+        }
+        assertEquals(ShepPalette.overlay0, ShepSemantic.gauge(0))
+        assertEquals(ShepPalette.overlay0, ShepSemantic.gauge(79))
+        assertEquals(ShepPalette.peach, ShepSemantic.gauge(80))
+        assertEquals(ShepPalette.peach, ShepSemantic.gauge(100))
+    }
+
+    /**
+     * The tally's order, from the titlebar's right slot (`right_run` in
+     * src/ui/chrome.rs): urgency first, so a glance that only reaches the
+     * first fact reaches the right one.
+     */
+    @Test
+    fun `the tally reads in the desktop's order`() {
+        assertEquals(listOf("blocked", "working", "done", "idle"), ShepSemantic.TALLY_ORDER)
+        // Every entry is a real state with a glyph of its own.
+        val glyphs = ShepSemantic.TALLY_ORDER.map { ShepSemantic.agent(it).glyph }
+        assertEquals(glyphs.size, glyphs.toSet().size)
+    }
+
     @Test
     fun `the spinner rotates at the desktop's cadence`() {
         // spinnerFrame divides by eight, so eight steps is one frame and thirty-two

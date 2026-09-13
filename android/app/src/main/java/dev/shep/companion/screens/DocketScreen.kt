@@ -126,28 +126,37 @@ fun DocketScreen(client: BridgeClient) {
         }
     }
 
+    val actions = remember(client, scope) { DocketActions(client, scope) }
+
     /**
      * One mutating call. The returned `{item}` is swapped into the list at
      * once so the row moves lanes before the next poll lands, then the list is
      * re-read so the store's ordering (and any overseer additions) win.
+     *
+     * The call itself lives in [DocketActions] because the board disposes of
+     * the same rows from its proposals region; what stays here is what only
+     * this screen does with the answer — swap the row, close the sheet.
      */
     fun mutate(method: String, params: JSONObject, label: String) {
-        scope.launch {
-            withContext(Dispatchers.IO) { runCatching { client.call(method, params) } }
-                .onSuccess { result ->
-                    val current = view
-                    val returned = result.optJSONObject("item")
-                    if (current != null && returned != null) {
-                        val item = parseDocketItem(returned, current.today)
-                        val rest = current.items.filterNot { it.id == item.id }
-                        view = current.copy(items = listOf(item) + rest)
-                    }
-                    notice = label
-                    sheet = null
-                    refresh()
+        actions.mutate(
+            method,
+            params,
+            label,
+            onItem = { returned ->
+                val current = view
+                if (current != null) {
+                    val item = parseDocketItem(returned, current.today)
+                    val rest = current.items.filterNot { it.id == item.id }
+                    view = current.copy(items = listOf(item) + rest)
                 }
-                .onFailure { notice = "$method failed: ${it.message}" }
-        }
+            },
+            onSuccess = {
+                notice = it
+                sheet = null
+                scope.launch { refresh() }
+            },
+            onFailure = { notice = it },
+        )
     }
 
     Column(Modifier.fillMaxSize()) {

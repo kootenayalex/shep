@@ -142,6 +142,24 @@ class OverviewParseTest {
         assertEquals(listOf("first", "second", "third"), rows.map { it.agent })
     }
 
+    /**
+     * `git_ahead` / `git_behind` are what the board's `↑N not pushed` hint is
+     * made of. Absent means no upstream — or a server too old to say — and
+     * must stay null: a zero would claim the branch is level with a remote
+     * that may not exist.
+     */
+    @Test
+    fun `an agent carries how far ahead and behind its branch is`() {
+        val withGit = JSONObject(fullAgent).put("git_ahead", 3).put("git_behind", 0)
+        val row = parseOverview(payload(withGit.toString()))!!.agents.single()
+        assertEquals(3, row.gitAhead)
+        assertEquals(0, row.gitBehind)
+
+        val bare = parseOverview(payload(fullAgent))!!.agents.single()
+        assertNull(bare.gitAhead)
+        assertNull(bare.gitBehind)
+    }
+
     @Test
     fun `a non-overview payload parses as null so the caller can fall back`() {
         assertNull(parseOverview(JSONObject("""{"snapshot":{"agents":[]}}""")))

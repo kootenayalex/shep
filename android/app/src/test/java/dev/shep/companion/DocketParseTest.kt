@@ -142,6 +142,34 @@ class DocketParseTest {
         assertEquals(listOf(9L, 8L), lanes[DocketLane.Done])
     }
 
+    /**
+     * The raw `source.kind` rides along beside the label, because the label is
+     * for reading and the kind is what `proposals` filters on: an inbox item
+     * the overseer captured says `situation`, and that is the whole difference
+     * between a proposal and something you wrote down yourself.
+     */
+    @Test
+    fun `the raw source kind survives beside its label`() {
+        val items = parse(
+            """
+            {"today":"2026-09-11","items":[
+              {"id":1,"title":"a","kind":"captured","status":"inbox",
+               "source":{"kind":"situation","ref":"pane p3"},"created":"c","updated":"u"},
+              {"id":2,"title":"b","kind":"captured","status":"inbox",
+               "source":{"pane":"p3"},"created":"c","updated":"u"},
+              {"id":3,"title":"c","kind":"slated","status":"open","created":"c","updated":"u"}
+            ]}
+            """.trimIndent()
+        ).items
+
+        assertEquals("situation", items[0].sourceKind)
+        assertEquals("situation pane p3", items[0].sourceLabel)
+        // A pane source has a label but no kind — it is not the overseer's.
+        assertNull(items[1].sourceKind)
+        assertEquals("pane p3", items[1].sourceLabel)
+        assertNull(items[2].sourceKind)
+    }
+
     @Test
     fun `the done lane keeps only the newest ten`() {
         val items = (1..12).joinToString(",") {

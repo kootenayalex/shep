@@ -145,6 +145,67 @@ object ShepSemantic {
     }
 
     /**
+     * The overseer's own mark, wherever the overseer speaks: the strip on the
+     * agents list, the board's `✦ read of the room` heading, and every line it
+     * says in the chat.
+     *
+     * `✦` and mauve, from `docs/DESIGN-LANGUAGE.md:175-178` (desktop:
+     * `glyphs::MARKER` in src/ui/glyphs.rs, drawn by src/ui/overseer.rs).
+     * Deliberately not `◆`, which is the needs-review badge — one glyph
+     * carries one meaning, and the two would otherwise sit on the same screen
+     * saying different things.
+     */
+    val overseer = StateAppearance(
+        glyph = "✦",
+        label = "overseer",
+        color = ShepPalette.mauve,
+        description = "the overseer",
+    )
+
+    /**
+     * One health finding, from `docs/DESIGN-LANGUAGE.md:175-178` and the
+     * desktop's `health_facts` (src/ui/overseer.rs:1289).
+     *
+     * A warning is peach and never red: red is what a blocked agent gets, and
+     * a disk at 90% is a nag. A *failed* check does stop you the way a blocked
+     * agent does, so it borrows the stop tier whole — glyph and ink both.
+     *
+     * [level] is the wire spelling (`ok` / `warn` / `fail`), as everything else
+     * in this object takes its wire word rather than an enum.
+     */
+    fun health(level: String): StateAppearance = when (level) {
+        "ok" -> StateAppearance("✓", "ok", ShepPalette.green, "healthy")
+        "warn" -> StateAppearance("⚠", "warn", ShepPalette.peach, "a warning")
+        "fail" -> StateAppearance("◉", "fail", ShepPalette.red, "failing")
+        else -> StateAppearance("·", level.ifBlank { "ok" }, ShepPalette.overlay0, "unknown check")
+    }
+
+    /**
+     * The context gauge's ink: peach at or over [GAUGE_WARM_PERCENT], overlay0
+     * below it. Never anything hotter.
+     *
+     * A gauge is a meter, not a state. It used to warm through yellow at 60 to
+     * red at 85, which spent the working and the stop tier on a number — so a
+     * full context window shouted louder than a blocked agent. The desktop
+     * fixed this in `gauge_color` (src/ui/gauge.rs:40-46) with one threshold,
+     * and `docs/DESIGN-LANGUAGE.md:170-173` calls the old ladder the mistake.
+     */
+    fun gauge(percent: Int): Color =
+        if (percent >= GAUGE_WARM_PERCENT) ShepPalette.peach else ShepPalette.overlay0
+
+    /** Where the gauge warms. The desktop's `WARM_PERCENT` (src/ui/gauge.rs:35). */
+    const val GAUGE_WARM_PERCENT = 80
+
+    /**
+     * The order the state tally reads in, from the titlebar's right slot
+     * (`right_run` in src/ui/chrome.rs:212-264, and
+     * `docs/DESIGN-LANGUAGE.md:207-214`): what stopped, what is moving, what
+     * finished, what is settled. Urgency first, so a glance that only reaches
+     * the first fact reaches the right one.
+     */
+    val TALLY_ORDER = listOf("blocked", "working", "done", "idle")
+
+    /**
      * The review-lifecycle badge, or `null` when there is nothing to say.
      *
      * `◆` is mauve rather than yellow because yellow is the working tier, and
