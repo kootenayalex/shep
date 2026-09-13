@@ -9,6 +9,12 @@
 //! tested without touching the machine, and nothing here spawns a process
 //! except [`run_headless`] (the `shep runtime ask` CLI) and
 //! [`run_headless_captured`] (the board's chat).
+//!
+//! A recipe also says how to splice arguments after its `argv`: the session
+//! ones ([`session_args`]) and the MCP ones ([`mcp_args`]), which point the
+//! runtime at a client config so it can reach `shep mcp`. Both halves must
+//! meet — a recipe that declares neither takes neither, whatever a caller
+//! offers.
 
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
@@ -42,6 +48,9 @@ pub struct ResolvedLaunch {
     pub session_new_args: Option<Vec<String>>,
     /// The recipe's `session_resume_args`.
     pub session_resume_args: Option<Vec<String>>,
+    /// The recipe's `mcp_config_args`, when it can be handed an MCP client
+    /// config; see [`mcp_args`] for the splice.
+    pub mcp_config_args: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,6 +148,7 @@ pub fn resolve_launch(
             source: RecipeSource::Config,
             session_new_args: over.and_then(|over| over.session_new_args.clone()),
             session_resume_args: over.and_then(|over| over.session_resume_args.clone()),
+            mcp_config_args: over.and_then(|over| over.mcp_config_args.clone()),
         });
     }
     let Some(agent) = agent else {
@@ -160,6 +170,9 @@ pub fn resolve_launch(
         }
         if over.session_resume_args.is_some() {
             spec.session_resume_args = over.session_resume_args.clone();
+        }
+        if over.mcp_config_args.is_some() {
+            spec.mcp_config_args = over.mcp_config_args.clone();
         }
     }
     resolve_launch_spec(name, &spec, find_on_path)
@@ -192,6 +205,7 @@ pub fn resolve_launch_spec(
                 source: RecipeSource::Manifest,
                 session_new_args: spec.session_new_args.clone(),
                 session_resume_args: spec.session_resume_args.clone(),
+                mcp_config_args: spec.mcp_config_args.clone(),
             });
         }
         tried.push(candidate.to_string());
@@ -221,6 +235,7 @@ pub fn resolve_headless(
                 output: Default::default(),
                 session_new_args: over.headless_session_new_args.clone(),
                 session_resume_args: over.headless_session_resume_args.clone(),
+                mcp_config_args: over.headless_mcp_config_args.clone(),
             },
             RecipeSource::Config,
         ));
@@ -243,8 +258,33 @@ pub fn resolve_headless(
         if over.headless_session_resume_args.is_some() {
             spec.session_resume_args = over.headless_session_resume_args.clone();
         }
+        if over.headless_mcp_config_args.is_some() {
+            spec.mcp_config_args = over.headless_mcp_config_args.clone();
+        }
     }
     Ok((spec, RecipeSource::Manifest))
+}
+
+/// The launch recipe's `mcp_config_args` for `name`: the config override's
+/// when it replaces the launch outright or sets them on their own, else the
+/// manifest's `[launch]`. No `PATH` lookup, because the caller that needs
+/// these words is not the one that spawns the binary — the overseer's session
+/// pane execs the runtime itself and only wants to know what to append.
+pub fn launch_mcp_config_args(
+    name: &str,
+    overrides: &BTreeMap<String, RuntimeOverrideConfig>,
+) -> Option<Vec<String>> {
+    let name = name.trim();
+    let over = override_for(name, overrides);
+    if over.is_some_and(|over| !over.argv.is_empty()) {
+        return over.and_then(|over| over.mcp_config_args.clone());
+    }
+    if let Some(args) = over.and_then(|over| over.mcp_config_args.clone()) {
+        return Some(args);
+    }
+    agent_for(name)
+        .and_then(crate::detect::manifest::launch_spec)
+        .and_then(|spec| spec.mcp_config_args)
 }
 
 /// The conversation a headless question belongs to: `id` is substituted
@@ -279,6 +319,40 @@ pub fn substitute_session_id(args: &[String], id: &str) -> Vec<String> {
     args.iter()
         .map(|word| word.replace(SESSION_ID_PLACEHOLDER, id))
         .collect()
+}
+
+/// The placeholder a recipe carries where the MCP client config's path goes.
+pub const MCP_CONFIG_PLACEHOLDER: &str = "{mcp_config}";
+
+/// The placeholder for the name the server's tools appear under, so a recipe
+/// can name them without repeating the spelling shep chose
+/// (claude: `--allowedTools mcp__shep`).
+pub const MCP_SERVER_PLACEHOLDER: &str = "{mcp_server}";
+
+/// The MCP arguments for `config` under `spec`: the recipe's `mcp_config_args`
+/// with both placeholders replaced verbatim in every word. `None` when there
+/// is no config to attach or the recipe does not say how to attach one — the
+/// two halves must meet, so a caller offering a config to a runtime that
+/// cannot take it changes nothing.
+pub fn mcp_args(spec: &HeadlessSpec, config: Option<&Path>) -> Option<Vec<String>> {
+    substitute_mcp_config(spec.mcp_config_args.as_deref()?, config?)
+}
+
+/// `{mcp_config}` -> `config`, `{mcp_server}` -> the server name, in every
+/// word. `None` when `args` is empty, so an empty recipe never splices.
+pub fn substitute_mcp_config(args: &[String], config: &Path) -> Option<Vec<String>> {
+    if args.is_empty() {
+        return None;
+    }
+    let path = config.display().to_string();
+    Some(
+        args.iter()
+            .map(|word| {
+                word.replace(MCP_CONFIG_PLACEHOLDER, &path)
+                    .replace(MCP_SERVER_PLACEHOLDER, crate::mcp_config::MCP_SERVER_NAME)
+            })
+            .collect(),
+    )
 }
 
 /// Every runtime shep can name — the detection manifests plus any
@@ -375,8 +449,9 @@ pub fn run_headless(
     prompt: &str,
     timeout: Duration,
     cwd: Option<&Path>,
+    mcp: Option<&Path>,
 ) -> std::io::Result<HeadlessOutcome> {
-    run_headless_with(spec, prompt, timeout, cwd, None, false).map(|capture| capture.outcome)
+    run_headless_with(spec, prompt, timeout, cwd, None, mcp, false).map(|capture| capture.outcome)
 }
 
 /// [`run_headless`] with the child's stdout and stderr captured instead of
@@ -389,20 +464,26 @@ pub fn run_headless_captured(
     timeout: Duration,
     cwd: Option<&Path>,
     session: Option<&HeadlessSession>,
+    mcp: Option<&Path>,
 ) -> std::io::Result<HeadlessCapture> {
-    run_headless_with(spec, prompt, timeout, cwd, session, true)
+    run_headless_with(spec, prompt, timeout, cwd, session, mcp, true)
 }
 
 /// The argv a run uses: the recipe's, then the session arguments when
-/// there is a session and a recipe for it, then the prompt when it travels
+/// there is a session and a recipe for it, then the MCP arguments when
+/// there is a config and a recipe for it, then the prompt when it travels
 /// as an argument.
 pub fn headless_argv(
     spec: &HeadlessSpec,
     prompt: &str,
     session: Option<&HeadlessSession>,
+    mcp: Option<&Path>,
 ) -> Vec<String> {
     let mut argv = spec.argv.clone();
     if let Some(args) = session.and_then(|session| session_args(spec, session)) {
+        argv.extend(args);
+    }
+    if let Some(args) = mcp_args(spec, mcp) {
         argv.extend(args);
     }
     if spec.prompt == HeadlessPrompt::Arg {
@@ -415,15 +496,17 @@ pub fn headless_argv(
 /// the output streams are piped and drained on threads (a child that fills
 /// a pipe nobody reads would otherwise block forever); without it they are
 /// the caller's own and the returned strings are empty.
+#[allow(clippy::too_many_arguments)]
 fn run_headless_with(
     spec: &HeadlessSpec,
     prompt: &str,
     timeout: Duration,
     cwd: Option<&Path>,
     session: Option<&HeadlessSession>,
+    mcp: Option<&Path>,
     capture: bool,
 ) -> std::io::Result<HeadlessCapture> {
-    let argv = headless_argv(spec, prompt, session);
+    let argv = headless_argv(spec, prompt, session, mcp);
     let Some(program) = argv.first() else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -536,6 +619,7 @@ mod tests {
             env: BTreeMap::new(),
             session_new_args: None,
             session_resume_args: None,
+            mcp_config_args: None,
         }
     }
 
@@ -546,6 +630,7 @@ mod tests {
             output: Default::default(),
             session_new_args: None,
             session_resume_args: None,
+            mcp_config_args: None,
         }
     }
 
@@ -715,7 +800,8 @@ mod tests {
                 Some(&HeadlessSession {
                     id: "X".into(),
                     resume: true
-                })
+                }),
+                None
             ),
             vec!["llm", "ask"]
         );
@@ -739,7 +825,8 @@ mod tests {
                 Some(&HeadlessSession {
                     id: "X".into(),
                     resume: false
-                })
+                }),
+                None
             ),
             vec!["llm", "ask", "--new", "X"]
         );
@@ -750,7 +837,8 @@ mod tests {
                 Some(&HeadlessSession {
                     id: "X".into(),
                     resume: true
-                })
+                }),
+                None
             ),
             vec!["llm", "ask", "--continue=X"]
         );
@@ -767,7 +855,8 @@ mod tests {
                 Some(&HeadlessSession {
                     id: "u-1".into(),
                     resume: false
-                })
+                }),
+                None
             ),
             vec![
                 "claude",
@@ -785,12 +874,13 @@ mod tests {
                 Some(&HeadlessSession {
                     id: "u-1".into(),
                     resume: true
-                })
+                }),
+                None
             ),
             vec!["claude", "-p", "--output-format", "text", "--resume", "u-1"]
         );
         assert_eq!(
-            headless_argv(&claude, "q", None),
+            headless_argv(&claude, "q", None, None),
             vec!["claude", "-p", "--output-format", "text"],
             "no session, no splice"
         );
@@ -837,9 +927,191 @@ mod tests {
                 Some(&HeadlessSession {
                     id: "S".into(),
                     resume: false
-                })
+                }),
+                None
             ),
             vec!["ask", "--sid", "S", "hello"]
+        );
+    }
+
+    #[test]
+    fn headless_argv_splices_mcp_args_after_the_session_args() {
+        let mut spec = headless(&["ask"], HeadlessPrompt::Arg);
+        spec.session_new_args = Some(vec!["--sid".into(), "{session_id}".into()]);
+        spec.session_resume_args = Some(vec!["--rid".into(), "{session_id}".into()]);
+        spec.mcp_config_args = Some(vec![
+            "--mcp-config".into(),
+            "{mcp_config}".into(),
+            "--allowedTools".into(),
+            "mcp__{mcp_server}".into(),
+        ]);
+        let config = PathBuf::from("/tmp/shep/mcp.json");
+        let session = HeadlessSession {
+            id: "S".into(),
+            resume: true,
+        };
+        assert_eq!(
+            headless_argv(&spec, "hello", Some(&session), Some(&config)),
+            vec![
+                "ask",
+                "--rid",
+                "S",
+                "--mcp-config",
+                "/tmp/shep/mcp.json",
+                "--allowedTools",
+                "mcp__shep",
+                "hello"
+            ],
+            "recipe, session, mcp, then the prompt"
+        );
+        // The tools do not need a conversation to be reachable.
+        assert_eq!(
+            headless_argv(&spec, "hello", None, Some(&config)),
+            vec![
+                "ask",
+                "--mcp-config",
+                "/tmp/shep/mcp.json",
+                "--allowedTools",
+                "mcp__shep",
+                "hello"
+            ]
+        );
+    }
+
+    #[test]
+    fn mcp_args_are_ignored_without_a_config_path() {
+        // A recipe that knows how to attach one, with nothing to attach.
+        let mut declared = headless(&["ask"], HeadlessPrompt::Stdin);
+        declared.mcp_config_args = Some(vec!["--mcp-config".into(), "{mcp_config}".into()]);
+        assert_eq!(mcp_args(&declared, None), None);
+        assert_eq!(headless_argv(&declared, "q", None, None), vec!["ask"]);
+
+        // And the other way: a config offered to a recipe that cannot take
+        // one changes nothing, so `--mcp-profile` is never a silent no-op
+        // that half-works.
+        let silent = headless(&["ask"], HeadlessPrompt::Stdin);
+        let config = PathBuf::from("/tmp/shep/mcp.json");
+        assert_eq!(mcp_args(&silent, Some(&config)), None);
+        assert_eq!(
+            headless_argv(&silent, "q", None, Some(&config)),
+            vec!["ask"]
+        );
+
+        // An empty recipe is not a recipe.
+        let mut empty = headless(&["ask"], HeadlessPrompt::Stdin);
+        empty.mcp_config_args = Some(Vec::new());
+        assert_eq!(mcp_args(&empty, Some(&config)), None);
+    }
+
+    #[test]
+    fn config_override_mcp_args_are_per_field() {
+        let mut overrides = BTreeMap::new();
+        // On its own it lands on the manifest's recipe, argv and all.
+        overrides.insert(
+            "claude".to_string(),
+            RuntimeOverrideConfig {
+                headless_mcp_config_args: Some(vec!["--mcp".into(), "{mcp_config}".into()]),
+                ..Default::default()
+            },
+        );
+        let (spec, source) = resolve_headless("claude", &overrides).unwrap();
+        assert_eq!(source, RecipeSource::Manifest);
+        assert_eq!(spec.argv, vec!["claude", "-p", "--output-format", "text"]);
+        assert_eq!(
+            mcp_args(&spec, Some(Path::new("/x.json"))),
+            Some(vec!["--mcp".into(), "/x.json".into()])
+        );
+        // The launch key is its own field and does not follow the headless one.
+        let launch = resolve_launch("claude", &overrides, &path_with(&["claude"])).unwrap();
+        assert_eq!(
+            launch.mcp_config_args,
+            Some(vec!["--mcp-config".into(), "{mcp_config}".into()]),
+            "still the manifest's"
+        );
+        assert_eq!(
+            launch_mcp_config_args("claude-code", &overrides),
+            launch.mcp_config_args,
+            "by alias too, without a PATH lookup"
+        );
+
+        // A full argv override that says nothing about MCP takes nothing
+        // from the manifest: the whole recipe is the override's.
+        overrides.insert(
+            "claude".to_string(),
+            RuntimeOverrideConfig {
+                argv: vec!["my-claude".into()],
+                headless_argv: vec!["my-claude".into(), "-p".into()],
+                ..Default::default()
+            },
+        );
+        let (spec, source) = resolve_headless("claude", &overrides).unwrap();
+        assert_eq!(source, RecipeSource::Config);
+        assert_eq!(spec.mcp_config_args, None);
+        let launch = resolve_launch("claude", &overrides, &path_with(&["my-claude"])).unwrap();
+        assert_eq!(launch.mcp_config_args, None);
+        assert_eq!(launch_mcp_config_args("claude", &overrides), None);
+
+        // With the fields, the override completes itself.
+        overrides.insert(
+            "claude".to_string(),
+            RuntimeOverrideConfig {
+                argv: vec!["my-claude".into()],
+                mcp_config_args: Some(vec!["--tools".into(), "{mcp_config}".into()]),
+                headless_argv: vec!["my-claude".into(), "-p".into()],
+                headless_mcp_config_args: Some(vec!["--tools".into(), "{mcp_config}".into()]),
+                ..Default::default()
+            },
+        );
+        let (spec, _) = resolve_headless("claude", &overrides).unwrap();
+        assert_eq!(
+            headless_argv(&spec, "q", None, Some(Path::new("/x.json"))),
+            vec!["my-claude", "-p", "--tools", "/x.json"]
+        );
+        assert_eq!(
+            launch_mcp_config_args("claude", &overrides),
+            Some(vec!["--tools".into(), "{mcp_config}".into()])
+        );
+    }
+
+    /// The recipe the pre-flight proved: the bare server prefix is what
+    /// auto-allows every tool, and a headless claude on a box whose
+    /// `settings.json` defaults to plan mode refuses tool calls without
+    /// `--permission-mode default`.
+    #[test]
+    fn claude_manifest_declares_mcp_config_args() {
+        let (headless, source) = resolve_headless("claude", &BTreeMap::new()).unwrap();
+        assert_eq!(source, RecipeSource::Manifest);
+        assert_eq!(
+            headless.mcp_config_args,
+            Some(vec![
+                "--mcp-config".into(),
+                "{mcp_config}".into(),
+                "--strict-mcp-config".into(),
+                "--allowedTools".into(),
+                "mcp__{mcp_server}".into(),
+                "--permission-mode".into(),
+                "default".into(),
+            ])
+        );
+        assert_eq!(
+            mcp_args(&headless, Some(Path::new("/s/mcp.json"))),
+            Some(vec![
+                "--mcp-config".into(),
+                "/s/mcp.json".into(),
+                "--strict-mcp-config".into(),
+                "--allowedTools".into(),
+                "mcp__shep".into(),
+                "--permission-mode".into(),
+                "default".into(),
+            ])
+        );
+
+        // The interactive pane is already a trusted session; it needs the
+        // file and nothing else.
+        let launch = resolve_launch("claude", &BTreeMap::new(), &path_with(&["claude"])).unwrap();
+        assert_eq!(
+            launch.mcp_config_args,
+            Some(vec!["--mcp-config".into(), "{mcp_config}".into()])
         );
     }
 
@@ -855,20 +1127,32 @@ mod tests {
             id: "abc".into(),
             resume: false,
         };
-        let capture =
-            run_headless_captured(&spec, "q", Duration::from_secs(10), None, Some(&session))
-                .unwrap();
+        let capture = run_headless_captured(
+            &spec,
+            "q",
+            Duration::from_secs(10),
+            None,
+            Some(&session),
+            None,
+        )
+        .unwrap();
         assert_eq!(capture.stdout, "--session-id\nabc\nq\n");
         let session = HeadlessSession {
             id: "abc".into(),
             resume: true,
         };
-        let capture =
-            run_headless_captured(&spec, "q", Duration::from_secs(10), None, Some(&session))
-                .unwrap();
+        let capture = run_headless_captured(
+            &spec,
+            "q",
+            Duration::from_secs(10),
+            None,
+            Some(&session),
+            None,
+        )
+        .unwrap();
         assert_eq!(capture.stdout, "--resume\nabc\nq\n");
         let capture =
-            run_headless_captured(&spec, "q", Duration::from_secs(10), None, None).unwrap();
+            run_headless_captured(&spec, "q", Duration::from_secs(10), None, None, None).unwrap();
         assert_eq!(capture.stdout, "q\n");
     }
 
@@ -900,12 +1184,12 @@ mod tests {
     #[test]
     fn run_headless_delivers_the_prompt_on_stdin_and_times_out() {
         let spec = headless(&["sh", "-c", "cat >/dev/null"], HeadlessPrompt::Stdin);
-        let outcome = run_headless(&spec, "hello", Duration::from_secs(10), None).unwrap();
+        let outcome = run_headless(&spec, "hello", Duration::from_secs(10), None, None).unwrap();
         assert_eq!(outcome.exit_code, Some(0));
         assert!(!outcome.timed_out);
 
         let slow = headless(&["sh", "-c", "sleep 30"], HeadlessPrompt::Arg);
-        let outcome = run_headless(&slow, "x", Duration::from_millis(200), None).unwrap();
+        let outcome = run_headless(&slow, "x", Duration::from_millis(200), None, None).unwrap();
         assert!(outcome.timed_out);
         assert_eq!(outcome.exit_code, None);
     }
@@ -921,7 +1205,8 @@ mod tests {
             HeadlessPrompt::Stdin,
         );
         let capture =
-            run_headless_captured(&echo, "hello", Duration::from_secs(10), None, None).unwrap();
+            run_headless_captured(&echo, "hello", Duration::from_secs(10), None, None, None)
+                .unwrap();
         assert_eq!(capture.outcome.exit_code, Some(0));
         assert!(!capture.outcome.timed_out);
         assert_eq!(capture.stdout, "answer: hello\n");
@@ -929,7 +1214,8 @@ mod tests {
 
         let slow = headless(&["sh", "-c", "echo early; sleep 30"], HeadlessPrompt::Arg);
         let capture =
-            run_headless_captured(&slow, "x", Duration::from_millis(200), None, None).unwrap();
+            run_headless_captured(&slow, "x", Duration::from_millis(200), None, None, None)
+                .unwrap();
         assert!(capture.outcome.timed_out);
         assert_eq!(capture.outcome.exit_code, None);
         assert_eq!(
@@ -939,7 +1225,8 @@ mod tests {
 
         let failing = headless(&["sh", "-c", "echo nope >&2; exit 3"], HeadlessPrompt::Arg);
         let capture =
-            run_headless_captured(&failing, "x", Duration::from_secs(10), None, None).unwrap();
+            run_headless_captured(&failing, "x", Duration::from_secs(10), None, None, None)
+                .unwrap();
         assert_eq!(capture.outcome.exit_code, Some(3));
         assert_eq!(capture.stderr, "nope\n");
     }

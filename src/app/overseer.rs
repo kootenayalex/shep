@@ -59,6 +59,16 @@ pub(crate) const CHAT_EMPTY: &str = "empty question";
 
 const SITUATION_FILE: &str = "situation.json";
 const SITUATION_MD_FILE: &str = "situation.md";
+/// The MCP client config both overseer faces point their runtime at, written
+/// into the plugin's state dir beside `situation.md` so the chat, the session
+/// pane and anyone reading the dir see the same file.
+const MCP_CONFIG_FILE: &str = "mcp.json";
+/// The `shep mcp` profile the overseer gets: read, inbox capture and paging.
+/// The tool list is the boundary — see `[plugins.overseer] tools`.
+pub(crate) const MCP_PROFILE: &str = "overseer";
+/// What `overseer-session` execs when nothing is configured, and so whose
+/// `[launch]` recipe says how to attach the config for the pane.
+const SESSION_DEFAULT_RUNTIME: &str = "claude";
 const CHAT_FILE: &str = "chat.jsonl";
 const BOARD_FILE: &str = "BOARD.md";
 const BOARD_SOURCE_FILE: &str = "BOARD.md.source";
@@ -480,10 +490,33 @@ pub(crate) fn overseer_session_cwd(app: &AppState) -> PathBuf {
         .unwrap_or_else(|| app.overseer.state_dir.clone())
 }
 
+/// Write the overseer's MCP client config into `state_dir` and return its
+/// path. `None` when it cannot be written — the runtime then runs without
+/// tools rather than not at all.
+fn write_overseer_mcp_config(state_dir: &Path) -> Option<PathBuf> {
+    let path = state_dir.join(MCP_CONFIG_FILE);
+    match crate::mcp_config::write_client_config(&path, MCP_PROFILE) {
+        Ok(()) => Some(path),
+        Err(err) => {
+            tracing::warn!(path = %path.display(), error = %err, "overseer mcp config not written");
+            None
+        }
+    }
+}
+
 /// The env the session pane gets so it runs the same conversation the chat
-/// does: the id, whether to resume it, and where.
+/// does: the id, whether to resume it, where — and how to reach shep's own
+/// tools, as the config's path plus the launch recipe's arguments already
+/// substituted, so the plugin script appends words rather than inventing a
+/// runtime's flag spelling. The arguments are `[]` when the runtime declares
+/// no way to attach a config.
 pub(crate) fn overseer_session_env(app: &AppState) -> Vec<(String, String)> {
     let (id, started) = app.overseer.overseer_session();
+    let config = app.overseer.state_dir.join(MCP_CONFIG_FILE);
+    let runtime = overseer_runtime_name(app).unwrap_or_else(|| SESSION_DEFAULT_RUNTIME.to_string());
+    let args = crate::runtimes::launch_mcp_config_args(&runtime, &app.runtimes_config)
+        .and_then(|args| crate::runtimes::substitute_mcp_config(&args, &config))
+        .unwrap_or_default();
     vec![
         ("SHEP_OVERSEER_SESSION_ID".to_string(), id),
         (
@@ -493,6 +526,14 @@ pub(crate) fn overseer_session_env(app: &AppState) -> Vec<(String, String)> {
         (
             "SHEP_OVERSEER_SESSION_CWD".to_string(),
             overseer_session_cwd(app).display().to_string(),
+        ),
+        (
+            "SHEP_OVERSEER_MCP_CONFIG".to_string(),
+            config.display().to_string(),
+        ),
+        (
+            "SHEP_OVERSEER_MCP_ARGS".to_string(),
+            serde_json::to_string(&args).unwrap_or_else(|_| "[]".to_string()),
         ),
     ]
 }
@@ -784,6 +825,14 @@ impl App {
         let state_dir = self.state.overseer.state_dir.clone();
         let situation =
             std::fs::read_to_string(state_dir.join(SITUATION_MD_FILE)).unwrap_or_default();
+        // Only a recipe that says how to attach one gets a config written:
+        // an answer from a runtime that cannot take tools should not leave a
+        // file claiming it could.
+        let mcp = spec
+            .mcp_config_args
+            .is_some()
+            .then(|| write_overseer_mcp_config(&state_dir))
+            .flatten();
         // A runtime that can name conversations shares one with the session
         // pane: the session is the memory, and the question runs where the
         // pane would. Any other runtime gets the last turns replayed and
@@ -819,6 +868,7 @@ impl App {
                         CHAT_TIMEOUT,
                         Some(&cwd),
                         session,
+                        mcp.as_deref(),
                     ),
                 )
             };
@@ -990,6 +1040,8 @@ impl App {
             return;
         };
         let context = self.current_plugin_context("overseer-session");
+        // The env names the config, so it has to exist before the pane does.
+        let _ = write_overseer_mcp_config(&self.state.overseer.state_dir);
         // The pane runs the same conversation the chat does; opening it is
         // what begins that conversation when nothing has yet.
         let session_env: std::collections::HashMap<String, String> =
@@ -1571,15 +1623,15 @@ mod tests {
         let env = overseer_session_env(&app);
         let (id, _) = app.overseer.overseer_session();
         assert_eq!(
-            env,
-            vec![
+            &env[..3],
+            &[
                 ("SHEP_OVERSEER_SESSION_ID".to_string(), id.clone()),
                 ("SHEP_OVERSEER_SESSION_RESUME".to_string(), "0".to_string()),
                 (
                     "SHEP_OVERSEER_SESSION_CWD".to_string(),
                     configured.display().to_string()
                 ),
-            ]
+            ][..]
         );
         app.overseer.mark_session_started();
         assert_eq!(overseer_session_env(&app)[1].1, "1");
@@ -1589,6 +1641,53 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(&dir);
         let _ = std::fs::remove_dir_all(&configured);
+    }
+
+    /// The pane is told where the config is and what to append to reach it,
+    /// so the plugin script never has to know a runtime's flag spelling.
+    #[test]
+    fn session_env_carries_mcp_config_and_args() {
+        crate::env_compat::remove_process_env_for_test("SHEP_OVERSEER_RUNTIME");
+        let mut app = AppState::test_new();
+        let dir = test_state_dir();
+        app.overseer.state_dir = dir.clone();
+        app.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str("runtime = \"claude\"").expect("table"),
+        );
+        let config = dir.join("mcp.json");
+        let env: std::collections::BTreeMap<String, String> =
+            overseer_session_env(&app).into_iter().collect();
+        assert_eq!(
+            env.get("SHEP_OVERSEER_MCP_CONFIG").map(String::as_str),
+            Some(config.display().to_string().as_str())
+        );
+        // The bundled claude `[launch]` recipe, already substituted.
+        let args: Vec<String> =
+            serde_json::from_str(env.get("SHEP_OVERSEER_MCP_ARGS").expect("args")).expect("json");
+        assert_eq!(
+            args,
+            vec!["--mcp-config".to_string(), config.display().to_string()]
+        );
+        assert!(
+            !config.exists(),
+            "asking for the env writes nothing; opening the pane does"
+        );
+
+        // A runtime whose launch recipe cannot take a config says so with an
+        // empty list rather than by leaving the variable out.
+        app.plugins_config.insert(
+            "overseer".into(),
+            toml::from_str("runtime = \"pi\"").expect("table"),
+        );
+        let env: std::collections::BTreeMap<String, String> =
+            overseer_session_env(&app).into_iter().collect();
+        assert_eq!(
+            env.get("SHEP_OVERSEER_MCP_ARGS").map(String::as_str),
+            Some("[]")
+        );
+        assert!(env.contains_key("SHEP_OVERSEER_MCP_CONFIG"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The rules are the plugin's words. Rule 4 in the script carries a

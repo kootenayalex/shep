@@ -611,6 +611,67 @@ pub(crate) mod tests {
         cleanup(&path);
     }
 
+    /// The chat only writes the client config when the runtime's recipe says
+    /// how to attach one, and then the words reach the child unchanged — the
+    /// brain's tools are the recipe's business, not the chat's.
+    #[tokio::test]
+    async fn chat_writes_mcp_json_and_passes_it_when_the_recipe_asks() {
+        let (mut app, path, _) = overseer_app();
+        let dir = fake_brain(&mut app, &recording_script("looked.", ""));
+        std::fs::write(dir.join("situation.md"), "all quiet.\n").expect("situation");
+
+        // Without `mcp_config_args` nothing is written and nothing spliced.
+        let _ = app.send_overseer_chat("anything?".into());
+        pump_chat(&mut app).await;
+        assert!(
+            !dir.join("mcp.json").exists(),
+            "a runtime that cannot take tools is not handed a config"
+        );
+        let cwd = std::fs::canonicalize(&dir)
+            .expect("dir")
+            .display()
+            .to_string();
+        // The script logs the cwd and then one `printf ' %s'` per argument,
+        // so "no arguments" is the cwd and the format's single space.
+        assert_eq!(argv_log(&dir), vec![format!("{cwd} ")], "no extra words");
+
+        // With it, the config is written and its path is the recipe's.
+        app.state
+            .runtimes_config
+            .get_mut("fake-brain")
+            .expect("the fake brain")
+            .headless_mcp_config_args = Some(vec![
+            "--mcp-config".into(),
+            "{mcp_config}".into(),
+            "--allowedTools".into(),
+            "mcp__{mcp_server}".into(),
+        ]);
+        let _ = app.send_overseer_chat("and now?".into());
+        pump_chat(&mut app).await;
+        let config = dir.join("mcp.json");
+        assert!(config.exists(), "the config is written before the run");
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&config).expect("config")).expect("json");
+        assert!(
+            written["mcpServers"]["shep"]["args"]
+                .as_array()
+                .is_some_and(|args| args.contains(&serde_json::Value::from("overseer"))),
+            "the overseer profile, not everything: {written}"
+        );
+        assert_eq!(
+            argv_log(&dir).last().map(String::as_str),
+            Some(
+                format!(
+                    "{cwd} --mcp-config {} --allowedTools mcp__shep",
+                    config.display()
+                )
+                .as_str()
+            )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        cleanup(&path);
+    }
+
     #[tokio::test]
     async fn first_chat_creates_then_resumes() {
         let (mut app, path, _) = overseer_app();

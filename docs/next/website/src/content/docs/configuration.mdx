@@ -574,6 +574,8 @@ Only what is set overrides: an empty `argv` keeps the manifest's `[launch]`, an 
 
 Four more keys are per-field and describe how the runtime names a conversation, with `{session_id}` standing for the id: `headless_session_new_args` and `headless_session_resume_args` for the headless recipe, `session_new_args` and `session_resume_args` for the launch (the bundled `claude` manifest carries `["--session-id", "{session_id}"]` and `["--resume", "{session_id}"]` for both). Set on their own they land on the manifest's recipe; set beside `headless_argv` (or `argv`) they complete the override, which otherwise cannot share a session. The overseer board's chat and session pane use them to be one conversation (see [`chat`](#session-board-as-the-leading-screen)).
 
+Two more are per-field the same way and say how the runtime takes an MCP client config: `mcp_config_args` for the launch and `headless_mcp_config_args` for the headless recipe, with `{mcp_config}` standing for the file shep writes and `{mcp_server}` for the name the tools appear under. They are spliced after the session arguments; a runtime that declares neither is never handed tools, whatever asks for them (see [Agents](/docs/agents/#launch-and-headless-recipes)).
+
 ## Plugins
 
 A `[plugins.<id>]` table holds settings for one installed plugin. shep does not
@@ -591,6 +593,8 @@ preset = "wide"
 ```
 
 One key there is read by shep itself: `[plugins.overseer] tools` replaces the built-in `overseer` profile of `shep mcp` (see [CLI reference](/docs/cli-reference/#runtimes)). It takes capability-group names (`read`, `docket-inbox`, `docket`, `nudge`, `send`, `mark`, `seen`, `push`, `overseer`, `tick`) or individual tool names (`docket_add`, `agent_read`, …), and anything not listed is neither offered nor answered. `shep mcp tools` prints what a given setting actually serves.
+
+That profile is what all three overseer faces mount. When the runtime's recipe declares `mcp_config_args`, shep writes `mcp.json` into the plugin's state dir and points the brain's tick (`shep runtime ask … --mcp-profile overseer`), the board's chat and the session pane at it, so the overseer's verbs are exactly the `mcp__shep__*` tools that setting permits. A runtime whose recipe says nothing about MCP simply answers without them; nothing else changes.
 
 ## Environment variables
 

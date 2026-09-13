@@ -116,6 +116,8 @@ fn overseer_session_execs_the_configured_agent_in_the_configured_dir() {
             .env_remove("SHEP_OVERSEER_SESSION_ID")
             .env_remove("SHEP_OVERSEER_SESSION_RESUME")
             .env_remove("SHEP_OVERSEER_SESSION_CWD")
+            .env_remove("SHEP_OVERSEER_MCP_CONFIG")
+            .env_remove("SHEP_OVERSEER_MCP_ARGS")
             .env("SHEP_PLUGIN_STATE_DIR", &state_dir);
         for (key, value) in env {
             cmd.env(key, value);
@@ -177,6 +179,146 @@ fn overseer_session_execs_the_configured_agent_in_the_configured_dir() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+/// The MCP mount: shep names the config and the words that attach it, the
+/// launcher only places them. A configured argv decides for itself with
+/// `{mcp_config}`; the default one gets `SHEP_OVERSEER_MCP_ARGS` appended.
+#[test]
+fn overseer_session_mounts_the_mcp_config() {
+    let dir = unique_test_dir();
+    let state_dir = dir.join("state");
+    let bin = dir.join("bin");
+    for d in [&state_dir, &bin] {
+        fs::create_dir_all(d).unwrap();
+    }
+    let fake = bin.join("claude");
+    fs::write(
+        &fake,
+        "#!/bin/sh
+for arg in \"$@\"; do echo \"$arg\"; done
+",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let path_var = format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let config = state_dir.join("mcp.json");
+    let run = |env: &[(&str, String)]| {
+        let mut cmd = std::process::Command::new(Path::new(PLUGIN_DIR).join("overseer-session"));
+        cmd.env_remove("SHEP_OVERSEER_SESSION_ARGV")
+            .env_remove("SHEP_OVERSEER_SESSION_ID")
+            .env_remove("SHEP_OVERSEER_SESSION_RESUME")
+            .env_remove("SHEP_OVERSEER_SESSION_CWD")
+            .env_remove("SHEP_OVERSEER_MCP_CONFIG")
+            .env_remove("SHEP_OVERSEER_MCP_ARGS")
+            .env_remove("SHEP_PLUGIN_CONFIG_JSON")
+            .env("PATH", &path_var)
+            .env("SHEP_PLUGIN_STATE_DIR", &state_dir);
+        for (key, value) in env {
+            cmd.env(key, value);
+        }
+        let out = cmd.output().unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .map(str::to_string)
+            .collect::<Vec<String>>()
+    };
+    let id = "0f5a1c2e-7b1d-4e3a-9c8b-0123456789ab".to_string();
+    let args = format!(
+        "[\"--mcp-config\", \"{}\", \"--strict-mcp-config\"]",
+        config.display()
+    );
+
+    // The default argv takes the words shep substituted, after the session.
+    let out = run(&[
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_RESUME", "1".to_string()),
+        ("SHEP_OVERSEER_MCP_CONFIG", config.display().to_string()),
+        ("SHEP_OVERSEER_MCP_ARGS", args.clone()),
+    ]);
+    assert_eq!(
+        out,
+        vec![
+            "--resume".to_string(),
+            id.clone(),
+            "--mcp-config".to_string(),
+            config.display().to_string(),
+            "--strict-mcp-config".to_string(),
+        ]
+    );
+
+    // An empty list is how "this runtime cannot take tools" arrives.
+    let out = run(&[
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_RESUME", "1".to_string()),
+        ("SHEP_OVERSEER_MCP_CONFIG", config.display().to_string()),
+        ("SHEP_OVERSEER_MCP_ARGS", "[]".to_string()),
+    ]);
+    assert_eq!(out, vec!["--resume".to_string(), id.clone()]);
+
+    // Junk is taken as no tools rather than guessed at.
+    let out = run(&[
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_RESUME", "1".to_string()),
+        ("SHEP_OVERSEER_MCP_ARGS", "not json".to_string()),
+    ]);
+    assert_eq!(out, vec!["--resume".to_string(), id.clone()]);
+
+    // A configured argv places the config itself and is not appended to.
+    let plugin_config = serde_json::json!({
+        "session_argv": ["claude", "--resume={session_id}", "--mcp-config", "{mcp_config}"],
+    });
+    let out = run(&[
+        ("SHEP_PLUGIN_CONFIG_JSON", plugin_config.to_string()),
+        ("SHEP_OVERSEER_SESSION_ID", id.clone()),
+        ("SHEP_OVERSEER_SESSION_RESUME", "1".to_string()),
+        ("SHEP_OVERSEER_MCP_CONFIG", config.display().to_string()),
+        ("SHEP_OVERSEER_MCP_ARGS", args),
+    ]);
+    assert_eq!(
+        out,
+        vec![
+            format!("--resume={id}"),
+            "--mcp-config".to_string(),
+            config.display().to_string(),
+        ]
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// The two halves of the mount, pinned to the scripts: the brain asks with a
+/// profile, and the session launcher reads the env shep sets. Either spelling
+/// drifting on its own is a mount that silently serves no tools.
+#[test]
+fn overseer_scripts_name_the_mcp_profile_and_env() {
+    let tick = fs::read_to_string(Path::new(PLUGIN_DIR).join("overseer-tick")).unwrap();
+    assert!(
+        tick.contains("\"--mcp-profile\""),
+        "the brain ask no longer passes --mcp-profile"
+    );
+    assert!(tick.contains("MCP_PROFILE = \"overseer\""));
+    assert!(
+        tick.contains("mcp__shep__*"),
+        "the brain prompt no longer says which tools exist"
+    );
+
+    let session = fs::read_to_string(Path::new(PLUGIN_DIR).join("overseer-session")).unwrap();
+    for name in ["SHEP_OVERSEER_MCP_CONFIG", "SHEP_OVERSEER_MCP_ARGS"] {
+        assert!(session.contains(name), "overseer-session lost {name}");
+    }
+    assert!(session.contains("{mcp_config}"));
+}
+
 /// One session, two faces: with shep's session env the launcher runs the
 /// board's conversation — `claude --session-id <id>` the first time,
 /// `claude --resume <id>` after — substitutes `{session_id}` into a
@@ -214,6 +356,8 @@ fn overseer_session_shares_the_boards_conversation() {
             .env_remove("SHEP_OVERSEER_SESSION_ID")
             .env_remove("SHEP_OVERSEER_SESSION_RESUME")
             .env_remove("SHEP_OVERSEER_SESSION_CWD")
+            .env_remove("SHEP_OVERSEER_MCP_CONFIG")
+            .env_remove("SHEP_OVERSEER_MCP_ARGS")
             .env_remove("SHEP_PLUGIN_CONFIG_JSON")
             .env("PATH", &path_var)
             .env("SHEP_PLUGIN_STATE_DIR", &state_dir);

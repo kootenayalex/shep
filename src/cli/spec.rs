@@ -889,7 +889,8 @@ fn runtime_command() -> Command {
                 .arg(required("name", "NAME"))
                 .arg(required("prompt", "PROMPT"))
                 .arg(option("timeout", "SECS"))
-                .arg(path_option("cwd", "PATH")),
+                .arg(path_option("cwd", "PATH"))
+                .arg(option("mcp-profile", "NAME")),
         )
 }
 

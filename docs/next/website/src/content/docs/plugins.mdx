@@ -357,6 +357,20 @@ the plugin's state dir — the chat runs there too). `overseer-session` runs
 `SHEP_OVERSEER_SITUATION`, `SHEP_OVERSEER_BOARD` and `SHEP_OVERSEER_CHAT`
 exported. shep keeps that session in a system workspace no list shows.
 
+All three faces of the overseer — the tick's brain, the board's chat and that
+session — reach shep through `shep mcp`, when the runtime's recipe says how to
+attach a client config (`mcp_config_args`; the bundled `claude` manifest does).
+shep writes `mcp.json` into the plugin's state dir and hands it over: the tick
+adds `--mcp-profile overseer` to its `shep runtime ask`, the chat passes the
+same file, and the session pane gets `SHEP_OVERSEER_MCP_CONFIG` with
+`SHEP_OVERSEER_MCP_ARGS` (the launch recipe's words, already substituted) —
+appended to the default argv, or placed by a `session_argv` that names
+`{mcp_config}` itself. The `overseer` profile is the boundary the hard rules
+now rest on: reading, `docket_add` into the inbox, and paging the phone. There
+is no tool that types into a pane, queues, restarts or kills, so the rules
+hold even when the prose is forgotten, and `[plugins.overseer] tools` is where
+that list is changed.
+
 ## Marketplace
 
 Community plugins are discoverable in the [marketplace](/plugins/), an automatic

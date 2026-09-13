@@ -1,7 +1,7 @@
 id = "claude"
-version = "2026.09.11.1"
+version = "2026.09.12.1"
 min_engine_version = 2
-updated_at = "2026-09-11T00:00:00Z"
+updated_at = "2026-09-12T00:00:00Z"
 aliases = ["claude-code"]
 
 # How to start claude by name (`shep agent start <name> --runtime claude`) and
@@ -12,11 +12,22 @@ bin = "claude"
 fallback_bins = ["openclaude"]
 version_args = ["--version"]
 argv = ["claude"]
+session_new_args = ["--session-id", "{session_id}"]
+session_resume_args = ["--resume", "{session_id}"]
+mcp_config_args = ["--mcp-config", "{mcp_config}"]
 
 [headless]
 argv = ["claude", "-p", "--output-format", "text"]
 prompt = "stdin"
 output = "text"
+session_new_args = ["--session-id", "{session_id}"]
+session_resume_args = ["--resume", "{session_id}"]
+# Headless claude needs three more things than the interactive pane does:
+# `--strict-mcp-config` so only this file's servers load, `--allowedTools
+# mcp__shep` (the bare server prefix auto-allows every tool it serves) and
+# `--permission-mode default`, because a `~/.claude/settings.json` with
+# `"defaultMode": "plan"` otherwise refuses every tool call.
+mcp_config_args = ["--mcp-config", "{mcp_config}", "--strict-mcp-config", "--allowedTools", "mcp__{mcp_server}", "--permission-mode", "default"]
 
 [[rules]]
 id = "osc_title_working"

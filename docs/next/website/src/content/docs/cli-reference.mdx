@@ -295,12 +295,12 @@ Use `pane send-text`, `pane send-keys`, `pane run`, and `terminal attach` for or
 
 ```bash
 shep runtime list [--json]
-shep runtime ask <runtime> <prompt|-> [--timeout SECS] [--cwd PATH]
+shep runtime ask <runtime> <prompt|-> [--timeout SECS] [--cwd PATH] [--mcp-profile NAME]
 ```
 
 `runtime list` asks the running server which runtimes it can name — every bundled detection manifest plus any `[runtimes.<name>]` table in `config.toml` — and, for each, whether it is `launchable` (a `[launch]` recipe exists and its program is on the server's `PATH`, with the resolved path) and whether it has a `headless` recipe.
 
-`runtime ask` runs the runtime's `[headless]` recipe once with the prompt on stdin (or as the last argument, when the recipe says `prompt = "arg"`), streams the runtime's stdout and stderr through, and exits with the runtime's exit code. `-` reads the prompt from stdin. `--timeout` (default 120 seconds) kills the runtime and exits 124 when it does not answer in time. Exit code 2 means the runtime is unknown (`runtime_unknown`) or has no headless recipe (`runtime_not_launchable`). It runs locally, so it needs no server.
+`runtime ask` runs the runtime's `[headless]` recipe once with the prompt on stdin (or as the last argument, when the recipe says `prompt = "arg"`), streams the runtime's stdout and stderr through, and exits with the runtime's exit code. `-` reads the prompt from stdin. `--timeout` (default 120 seconds) kills the runtime and exits 124 when it does not answer in time. Exit code 2 means the runtime is unknown (`runtime_unknown`) or has no headless recipe (`runtime_not_launchable`). It runs locally, so it needs no server. `--mcp-profile NAME` writes that profile's MCP client config to `<state dir>/mcp/NAME.json` and attaches it through the recipe's `mcp_config_args`, so the runtime can answer with shep's own tools; a runtime whose recipe does not declare them is asked without tools and says so on stderr. `ask` never passes session arguments — one question, its own conversation.
 
 ```bash
 shep mcp [serve] [--socket PATH] [--profile NAME] [--allow a,b] [--deny a,b] [--tools a,b]

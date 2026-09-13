@@ -27,8 +27,11 @@ MANIFEST_KEYS = {
     "headless",
 }
 EXTRACTOR_KEYS = {"id", "region", "regex", "capture"}
-LAUNCH_KEYS = {"bin", "fallback_bins", "version_args", "argv", "env"}
-HEADLESS_KEYS = {"argv", "prompt", "output"}
+# The three recipe arg lists that are spliced after `argv`: how to name a new
+# conversation, how to resume it, and how to attach an MCP client config.
+RECIPE_ARG_KEYS = {"session_new_args", "session_resume_args", "mcp_config_args"}
+LAUNCH_KEYS = {"bin", "fallback_bins", "version_args", "argv", "env"} | RECIPE_ARG_KEYS
+HEADLESS_KEYS = {"argv", "prompt", "output"} | RECIPE_ARG_KEYS
 HEADLESS_PROMPTS = {"stdin", "arg"}
 HEADLESS_OUTPUTS = {"text", "stream-json"}
 RULE_KEYS = {
@@ -172,7 +175,8 @@ def validate_launch(path: Path, launch: object) -> None:
 
     Mirrors `LaunchSpec` in src/detect/manifest.rs: a `bin` looked up on PATH,
     optional `fallback_bins`, `version_args`, an `argv` (default `[bin]`) and
-    an `env` table of strings.
+    an `env` table of strings, plus the optional `session_new_args`,
+    `session_resume_args` and `mcp_config_args` spliced after `argv`.
     """
     if not isinstance(launch, dict):
         raise CheckError(f"{path}: launch must be a table")
@@ -192,13 +196,37 @@ def validate_launch(path: Path, launch: object) -> None:
         isinstance(key, str) and isinstance(value, str) for key, value in env.items()
     ):
         raise CheckError(f"{path}: launch env must be a table of strings")
+    validate_recipe_args(path, "launch", launch)
+
+
+def validate_recipe_args(path: Path, label: str, spec: dict) -> None:
+    """The optional arg lists spliced after `argv`, each an array of strings.
+
+    A session recipe carries `{session_id}`; `mcp_config_args` carries
+    `{mcp_config}` (the client config shep writes) and may carry
+    `{mcp_server}` (the name the tools appear under). Mirrors `LaunchSpec`
+    and `HeadlessSpec` in src/detect/manifest.rs, where each is an
+    `Option<Vec<String>>`: present-but-empty is not the same as absent, so an
+    empty array is refused rather than silently meaning "no recipe".
+    """
+    for key in sorted(RECIPE_ARG_KEYS):
+        if key not in spec:
+            continue
+        words = string_list(path, f"{label} {key}", spec[key])
+        if not words:
+            raise CheckError(f"{path}: {label} {key} must not be empty")
+        if key == "mcp_config_args" and not any("{mcp_config}" in word for word in words):
+            raise CheckError(f"{path}: {label} {key} must use {{mcp_config}}")
+        if key.startswith("session_") and not any("{session_id}" in word for word in words):
+            raise CheckError(f"{path}: {label} {key} must use {{session_id}}")
 
 
 def validate_headless(path: Path, headless: object) -> None:
     """`[headless]` is the one-shot question command (`shep runtime ask`).
 
     Mirrors `HeadlessSpec`: a non-empty `argv`, `prompt` = stdin|arg (default
-    stdin) and `output` = text|stream-json (default text).
+    stdin), `output` = text|stream-json (default text), and the same optional
+    `session_new_args` / `session_resume_args` / `mcp_config_args`.
     """
     if not isinstance(headless, dict):
         raise CheckError(f"{path}: headless must be a table")
@@ -214,6 +242,7 @@ def validate_headless(path: Path, headless: object) -> None:
     output = headless.get("output", "text")
     if output not in HEADLESS_OUTPUTS:
         raise CheckError(f"{path}: headless output must be one of {sorted(HEADLESS_OUTPUTS)}")
+    validate_recipe_args(path, "headless", headless)
 
 
 def validate_extractors(path: Path, extractors: object) -> None:

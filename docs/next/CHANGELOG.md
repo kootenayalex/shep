@@ -4,6 +4,20 @@
 
 ### Added
 
+- Runtime recipes can say how to attach an MCP client config, and the overseer
+  uses it. `[launch]` and `[headless]` (and the matching `[runtimes.<name>]`
+  per-field keys `mcp_config_args` / `headless_mcp_config_args`) take an
+  argument list with `{mcp_config}` for the file shep writes and
+  `{mcp_server}` for the name the tools appear under; it is spliced after the
+  session arguments, and a recipe that declares none is never handed a config.
+  The bundled `claude` manifest carries both — the headless one adding
+  `--strict-mcp-config`, `--allowedTools mcp__shep` and `--permission-mode
+  default`, without which a box whose `settings.json` defaults to plan mode
+  refuses every tool call. `shep runtime ask … --mcp-profile NAME` puts it on
+  the command line, and the overseer's brain tick, board chat and session pane
+  all mount the `overseer` profile, so its hard rules rest on the tool list
+  rather than on the prompt: read, capture into the inbox, page the phone, and
+  no tool that acts on an agent.
 - The Android companion lands on the board. A new `board` tab — where the app
   now opens, mirroring the desktop's `ui.open_on_board` — carries the same
   regions the desktop's does: what needs you (with `↑N not pushed` from the

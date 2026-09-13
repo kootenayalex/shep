@@ -93,6 +93,7 @@ env = {}                            # environment the runtime needs
 
 session_new_args = ["--session-id", "{session_id}"]   # optional: name a conversation
 session_resume_args = ["--resume", "{session_id}"]    # optional: pick it up again
+mcp_config_args = ["--mcp-config", "{mcp_config}"]    # optional: attach an MCP client config
 
 [headless]
 argv = ["claude", "-p", "--output-format", "text"]
@@ -100,11 +101,14 @@ prompt = "stdin"                    # or "arg": appended as the last argument
 output = "text"                     # or "stream-json"
 session_new_args = ["--session-id", "{session_id}"]
 session_resume_args = ["--resume", "{session_id}"]
+mcp_config_args = ["--mcp-config", "{mcp_config}", "--strict-mcp-config", "--allowedTools", "mcp__{mcp_server}", "--permission-mode", "default"]
 ```
 
 `[launch]` is what `agent.start { runtime = "claude" }` and `shep agent start <name> --runtime claude` run. When `bin` is not on `PATH` the first `fallback_bins` entry that is takes its place in `argv[0]`; when none is, the error `runtime_not_launchable` names every binary tried. `[headless]` is the one-shot question command behind `shep runtime ask`: the prompt goes on stdin by default so a long prompt never hits an argv limit. The bundled manifests carry both sections for `claude`, `opencode`, `codex`, `gemini` and `copilot`; `shep runtime list` shows which runtimes this machine can actually launch.
 
 `session_new_args` and `session_resume_args` are optional on both and say how the runtime names a conversation: the caller's id replaces `{session_id}` in every word and the result is spliced after `argv` (before a prompt that travels as an argument). A recipe with both can share one conversation between a headless question and an interactive pane — the overseer board's chat and session do — and one without them cannot; one without the other counts as neither. `shep runtime ask` never uses them.
+
+`mcp_config_args` sits beside them and says how to hand the runtime an MCP client config, so shep can answer a question with its own tools in reach: `{mcp_config}` becomes the file shep wrote and `{mcp_server}` the name the tools appear under (`shep`, as in `mcp__shep__docket_add`). The result is spliced after the session arguments. Both halves must meet — a recipe without the key is never handed a config, and a config is never invented for a recipe that has one. The headless list is usually longer than the launch one because a CLI that trusts its interactive user still refuses tools in a one-shot run: bundled `claude` adds `--strict-mcp-config`, `--allowedTools mcp__shep` (the bare server prefix allows every tool that server offers) and `--permission-mode default`, which a `~/.claude/settings.json` defaulting to plan mode otherwise overrides. Only the `claude` manifest carries the key today; `codex`, `gemini`, `copilot` and `opencode` configure MCP through files of their own and are not wired up, which a later field for that shape is the honest way to fix.
 
 A `[runtimes.<name>]` table in `config.toml` overrides either recipe without editing a manifest (see [Configuration](/docs/configuration/#runtimes)). A local detection override that omits the sections does not make a runtime unlaunchable: the bundled recipe still applies.
 

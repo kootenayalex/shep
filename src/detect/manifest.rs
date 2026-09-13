@@ -200,6 +200,13 @@ pub struct LaunchSpec {
     /// "{session_id}"]`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_resume_args: Option<Vec<String>>,
+    /// Arguments that attach an MCP client config, spliced after the session
+    /// arguments with `{mcp_config}` replaced by the file shep wrote and
+    /// `{mcp_server}` by the name the tools appear under (claude:
+    /// `["--mcp-config", "{mcp_config}"]`). Absent = shep cannot hand this
+    /// runtime tools, and a caller offering a config is ignored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_config_args: Option<Vec<String>>,
 }
 
 /// `[headless]`: one-shot question to the CLI. The prompt goes on stdin by
@@ -221,6 +228,11 @@ pub struct HeadlessSpec {
     /// As on [`LaunchSpec`]: how to resume it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_resume_args: Option<Vec<String>>,
+    /// As on [`LaunchSpec`]: how to attach an MCP client config. The headless
+    /// recipe usually needs more than the launch one — a CLI that trusts its
+    /// interactive user still refuses tools in a one-shot run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_config_args: Option<Vec<String>>,
 }
 
 impl HeadlessSpec {

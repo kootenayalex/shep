@@ -353,6 +353,13 @@ pub struct RuntimeOverrideConfig {
     pub session_new_args: Option<Vec<String>>,
     /// Per-field: the interactive launch's `session_resume_args`.
     pub session_resume_args: Option<Vec<String>>,
+    /// Per-field: how the headless recipe attaches an MCP client config
+    /// (`["--mcp-config", "{mcp_config}"]`, with `{mcp_server}` for the
+    /// server name). Set on its own it lands on the manifest's `[headless]`;
+    /// a runtime whose recipe declares none is never handed tools.
+    pub headless_mcp_config_args: Option<Vec<String>>,
+    /// Per-field: the interactive launch's `mcp_config_args`.
+    pub mcp_config_args: Option<Vec<String>>,
 }
 
 #[derive(Debug)]

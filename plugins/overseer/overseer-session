@@ -10,11 +10,17 @@ something has already begun it, else `0`) and `SHEP_OVERSEER_SESSION_CWD`
 
 What runs, in order: `SHEP_OVERSEER_SESSION_ARGV` (shell words),
 `session_argv` from the plugin's `[plugins.overseer]` table — in both,
-`{session_id}` in any word becomes the id — else `claude --resume <id>`
-when resuming, `claude --session-id <id>` when not, and plain `claude`
-without an id. Where: `SHEP_OVERSEER_SESSION_CWD` when set, else
-`session_cwd` from that table (`~` expands) when it exists, else the
-plugin's state dir.
+`{session_id}` in any word becomes the id and `{mcp_config}` becomes
+`SHEP_OVERSEER_MCP_CONFIG` — else `claude --resume <id>` when resuming,
+`claude --session-id <id>` when not, and plain `claude` without an id, with
+`SHEP_OVERSEER_MCP_ARGS` (a JSON array shep already substituted from the
+runtime's launch recipe) appended. So a configured argv decides for itself
+where the config goes, and the default one gets it handed over. Where:
+`SHEP_OVERSEER_SESSION_CWD` when set, else `session_cwd` from that table
+(`~` expands) when it exists, else the plugin's state dir.
+
+The config points at `shep mcp --profile overseer`: read, inbox capture and
+paging. Tools are the only verbs this session has; it still acts on nothing.
 
 Exported for whatever runs: `SHEP_OVERSEER_STATE_DIR`,
 `SHEP_OVERSEER_SITUATION` (situation.md), `SHEP_OVERSEER_BOARD` (BOARD.md)
@@ -33,6 +39,25 @@ def fail(reason: str) -> "NoReturn":
     sys.exit(1)
 
 
+def mcp_args() -> list:
+    """`SHEP_OVERSEER_MCP_ARGS`: the launch recipe's words, already substituted.
+
+    shep knows the runtime's flag spelling and the config's path; this script
+    only appends them. Anything that is not a JSON array of strings is taken
+    as "no tools" rather than guessed at.
+    """
+    raw = os.environ.get("SHEP_OVERSEER_MCP_ARGS") or ""
+    if not raw.strip():
+        return []
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(value, list) and all(isinstance(word, str) for word in value):
+        return list(value)
+    return []
+
+
 def main() -> None:
     try:
         config = json.loads(os.environ.get("SHEP_PLUGIN_CONFIG_JSON") or "{}")
@@ -45,6 +70,7 @@ def main() -> None:
     resume = os.environ.get("SHEP_OVERSEER_SESSION_RESUME") == "1"
 
     override = os.environ.get("SHEP_OVERSEER_SESSION_ARGV")
+    chosen = True
     if override:
         argv = shlex.split(override)
     else:
@@ -54,13 +80,25 @@ def main() -> None:
         ):
             argv = list(configured)
         elif not session_id:
+            chosen = False
             argv = ["claude"]
         elif resume:
+            chosen = False
             argv = ["claude", "--resume", session_id]
         else:
+            chosen = False
             argv = ["claude", "--session-id", session_id]
     if session_id:
         argv = [word.replace("{session_id}", session_id) for word in argv]
+
+    mcp_config = os.environ.get("SHEP_OVERSEER_MCP_CONFIG") or ""
+    if chosen:
+        # A hand-written argv says where the config belongs; if it never
+        # names the placeholder, that is a choice to run without tools.
+        if mcp_config:
+            argv = [word.replace("{mcp_config}", mcp_config) for word in argv]
+    else:
+        argv += mcp_args()
 
     state_dir = os.environ.get("SHEP_PLUGIN_STATE_DIR") or os.getcwd()
     cwd = os.environ.get("SHEP_OVERSEER_SESSION_CWD") or ""

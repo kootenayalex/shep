@@ -183,6 +183,80 @@ prompt = "arg"
     cleanup_test_base(&base);
 }
 
+/// `--mcp-profile NAME` is how a plugin hands its runtime shep's own tools:
+/// the client config lands under the state dir and the recipe's words, with
+/// both placeholders filled in, reach the child.
+#[test]
+fn runtime_ask_mcp_profile_writes_the_config_and_splices_the_recipe_args() {
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    write_pi_override(
+        &config_home,
+        r#"
+[headless]
+argv = ["sh", "-c", "printf '%s|' \"$@\"", "sh"]
+mcp_config_args = ["--mcp-config", "{mcp_config}", "--allowedTools", "mcp__{mcp_server}"]
+"#,
+    );
+
+    let output = shep_cli(&config_home)
+        .args(["runtime", "ask", "pi", "hello", "--mcp-profile", "overseer"])
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let config = base
+        .join("state")
+        .join(app_dir_name())
+        .join("mcp")
+        .join("overseer.json");
+    assert!(config.is_file(), "{} was not written", config.display());
+    let written: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&config).unwrap()).unwrap();
+    let args = written["mcpServers"]["shep"]["args"].as_array().unwrap();
+    assert_eq!(args[0], "mcp");
+    assert_eq!(args[1], "--profile");
+    assert_eq!(args[2], "overseer");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        format!(
+            "--mcp-config|{}|--allowedTools|mcp__shep|",
+            config.display()
+        )
+    );
+
+    // Without the flag the question is asked with no tools at all.
+    let output = shep_cli(&config_home)
+        .args(["runtime", "ask", "pi", "hello"])
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "|");
+
+    // A runtime whose recipe cannot attach a config says so rather than
+    // pretending the tools are there.
+    write_pi_override(
+        &config_home,
+        r#"
+[headless]
+argv = ["sh", "-c", "printf '%s|' \"$@\"", "sh"]
+"#,
+    );
+    let output = shep_cli(&config_home)
+        .args(["runtime", "ask", "pi", "hello", "--mcp-profile", "read"])
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "|");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("declares no mcp_config_args"));
+
+    cleanup_test_base(&base);
+}
+
 // --- socket side: agent.start { runtime } and runtime.list -----------------
 
 struct SpawnedShep {
