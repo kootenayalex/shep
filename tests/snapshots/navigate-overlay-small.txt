@@ -1,4 +1,4 @@
-# navigate-overlay-small 80x24 · 35 styles
+# navigate-overlay-small 80x24 · 36 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
@@ -6,7 +6,7 @@
  ✦ workmayt's claude has been blocked 2m on a permission prompt.          07:08
  groups       grouped ≡ «│╭ claude ──── ████▍   72% ─┬ claude ──── ██▌     41% ╮
                          ││                          │                         │
- ◉ workmayt ◆ ⇥2         ││                          │                         │
+ ◉ workmayt ◆ ⇥2        +││                          │                         │
    fix/stripe-web… ↑2 ↓1 ││                          │                         │
    ◉ claude      blocked ││                          │                         │
    ⠹ opencode    working ││                          │                         │
@@ -28,42 +28,43 @@
  NAVIGATE  esc back  up / down ws  ⇥ pane  g navigator  c new tab  v split│  - s
 
 --- styles ---
-uaaaauuuuuuuuuuuuuuuuuuuuuuuuuuCCCCCCCCkkkwwwwwwuuusssuuFFFuupppppppppzzzzzzBBzu
-vjvDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDvvvvvvvvvvnnnnnn
-mmmmmmm.......mmmmmmm.l.lbbbccccccbbbbbboooooelllllbbbGllllllGGGGGGoooIIIlllllGG
-.........................bb..........................b.........................G
-dtvEEEEEEEEvivAAvvvvvvvvvbb..........................b.........................G
-vvviiiiiiiiiiiiiiivhhvrrvbb..........................b.........................G
-vvvtvEEEEEEvvvvvvtttttttvbb..........................b.........................G
-vvvHvyyyyyyyyvvvvHHHHHHHvbb..........................b.........................G
-.........................bb..........................b.........................G
-.f.xxxxxxxxx.............bb..........................b.........................G
-...llllll................bb..........................b.........................G
-...f.xxxxxx.........ffff.bb..........................b.........................G
-.........................bb..........................b.........................G
-.G.xxxx..................bb..........................b.........................G
-...llllllllllllllll.qq...bb..........................b.........................G
-...g.xxxxxx.........gggg.bb..........................b.........................G
-...G.xxxxx.......GGGGGGG.bb..........................b.........................G
-.........................bb..........................b.........................G
-.........................bb..........................b.........................G
-.........................bb..........................b.........................G
-.........................bb..........................b.........................G
-.........................bb..........................b.........................G
-llllllllllll.............bbbbbbbbbbbbbbbbbbbbbbbbbbbbbGGGGGGGGGGGGGGGGGGGGGGGGGG
-ppppppppppuaaakkkkkkkaaaaaaaaakkkkkakkkkkkkakkkkkkkkkkkkakkkkkkkkkkakkkkkkkkkakk
+vaaaavvvvvvvvvvvvvvvvvvvvvvvvvvDDDDDDDDkkkxxxxxxvvvtttvvGGGvvqqqqqqqqqAAAAAACCAv
+wjwEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEwwwwwwwwwwnnnnnn
+mmmmmmm.......mmmmmmm.l.lbbbccccccbbbbbboooooelllllbbbHllllllHHHHHHoooJJJlllllHH
+.........................bb..........................b.........................H
+duwFFFFFFFFwiwBBwwwwwwwppbb..........................b.........................H
+wwwiiiiiiiiiiiiiiiwhhwsswbb..........................b.........................H
+wwwuwFFFFFFwwwwwwuuuuuuuwbb..........................b.........................H
+wwwIwzzzzzzzzwwwwIIIIIIIwbb..........................b.........................H
+.........................bb..........................b.........................H
+.f.yyyyyyyyy.............bb..........................b.........................H
+...llllll................bb..........................b.........................H
+...f.yyyyyy.........ffff.bb..........................b.........................H
+.........................bb..........................b.........................H
+.H.yyyy..................bb..........................b.........................H
+...llllllllllllllll.rr...bb..........................b.........................H
+...g.yyyyyy.........gggg.bb..........................b.........................H
+...H.yyyyy.......HHHHHHH.bb..........................b.........................H
+.........................bb..........................b.........................H
+.........................bb..........................b.........................H
+.........................bb..........................b.........................H
+.........................bb..........................b.........................H
+.........................bb..........................b.........................H
+llllllllllll.............bbbbbbbbbbbbbbbbbbbbbbbbbbbbbHHHHHHHHHHHHHHHHHHHHHHHHHH
+qqqqqqqqqqvaaakkkkkkkaaaaaaaaakkkkkakkkkkkkakkkkkkkkkkkkakkkkkkkkkkakkkkkkkkkakk
 
 --- legend ---
 . = (unstyled)
-A = fg:teal bg:surface0
-B = fg:teal bg:surface1
-C = fg:text bg:panel_bg bold
-D = fg:text bg:surface0
-E = fg:text bg:surface0 bold
-F = fg:yellow bg:panel_bg
-G = fg:yellow bg:reset
-H = fg:yellow bg:surface0
-I = fg:yellow bg:surface1
+A = fg:subtext0 bg:surface1
+B = fg:teal bg:surface0
+C = fg:teal bg:surface1
+D = fg:text bg:panel_bg bold
+E = fg:text bg:surface0
+F = fg:text bg:surface0 bold
+G = fg:yellow bg:panel_bg
+H = fg:yellow bg:reset
+I = fg:yellow bg:surface0
+J = fg:yellow bg:surface1
 a = fg:accent bg:panel_bg bold
 b = fg:accent bg:reset
 c = fg:accent bg:reset bold
@@ -79,14 +80,14 @@ l = fg:overlay0 bg:reset
 m = fg:overlay0 bg:reset bold
 n = fg:overlay0 bg:surface0
 o = fg:overlay0 bg:surface1
-p = fg:panel_bg bg:accent bold
-q = fg:peach bg:reset
-r = fg:peach bg:surface0
-s = fg:red bg:panel_bg bold
-t = fg:red bg:surface0
-u = fg:reset bg:panel_bg
-v = fg:reset bg:surface0
-w = fg:subtext0 bg:panel_bg
-x = fg:subtext0 bg:reset
-y = fg:subtext0 bg:surface0
-z = fg:subtext0 bg:surface1
+p = fg:overlay1 bg:surface0
+q = fg:panel_bg bg:accent bold
+r = fg:peach bg:reset
+s = fg:peach bg:surface0
+t = fg:red bg:panel_bg bold
+u = fg:red bg:surface0
+v = fg:reset bg:panel_bg
+w = fg:reset bg:surface0
+x = fg:subtext0 bg:panel_bg
+y = fg:subtext0 bg:reset
+z = fg:subtext0 bg:surface0

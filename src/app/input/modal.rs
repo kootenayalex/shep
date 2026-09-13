@@ -907,6 +907,14 @@ pub(super) fn apply_context_menu_action(
         }
         (
             ContextMenuKind::Workspace { ws_idx } | ContextMenuKind::GitWorkspace { ws_idx, .. },
+            Some("New tab"),
+        ) => {
+            state.selected = ws_idx;
+            state.active = Some(ws_idx);
+            open_new_tab_dialog(state);
+        }
+        (
+            ContextMenuKind::Workspace { ws_idx } | ContextMenuKind::GitWorkspace { ws_idx, .. },
             Some("Rename"),
         ) => {
             open_rename_workspace(state, terminal_runtimes, ws_idx);
@@ -1488,6 +1496,14 @@ impl App {
                     self.state.mark_session_dirty();
                 }
                 leave_modal(&mut self.state);
+            }
+            (
+                ContextMenuKind::Workspace { ws_idx }
+                | ContextMenuKind::GitWorkspace { ws_idx, .. },
+                Some("New tab"),
+            ) => {
+                self.focus_workspace_idx_via_api(ws_idx);
+                open_new_tab_dialog(&mut self.state);
             }
             (
                 ContextMenuKind::Workspace { ws_idx }
@@ -2314,7 +2330,7 @@ mod tests {
         };
         let mut terminal_runtimes = crate::terminal::TerminalRuntimeRegistry::new();
 
-        apply_context_menu_action(&mut state, &mut terminal_runtimes, menu, 1);
+        apply_context_menu_action(&mut state, &mut terminal_runtimes, menu, 2);
 
         assert_eq!(state.selected, 0);
         assert_eq!(state.mode, Mode::ConfirmClose);
@@ -2454,5 +2470,67 @@ mod tests {
             "{labels:?}"
         );
         assert_eq!(labels, vec!["beta".to_string(), "New group".to_string()]);
+    }
+
+    /// `New tab` on a group's own menu lands the tab in that group, whichever
+    /// one was active when the menu opened.
+    #[test]
+    fn group_menu_new_tab_opens_the_dialog_in_that_group() {
+        let mut app = app_with_test_workspaces(&["main", "issue"]);
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.mode = Mode::ContextMenu;
+        let menu = ContextMenuState {
+            kind: ContextMenuKind::Workspace { ws_idx: 1 },
+            x: 0,
+            y: 0,
+            list: MenuListState::new(0),
+        };
+        let idx = menu
+            .items()
+            .iter()
+            .position(|item| *item == "New tab")
+            .expect("new tab item");
+
+        app.apply_context_menu_action_via_api(menu, idx);
+
+        assert_eq!(app.state.active, Some(1));
+        assert_eq!(app.state.mode, Mode::RenameTab);
+        assert!(app.state.creating_new_tab);
+    }
+
+    #[test]
+    fn group_menu_new_tab_by_key_targets_the_menu_group() {
+        let mut app = app_with_test_workspaces(&["main", "issue"]);
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.context_menu = Some(ContextMenuState {
+            kind: ContextMenuKind::GitWorkspace {
+                ws_idx: 1,
+                is_linked_worktree: false,
+                has_worktree_children: false,
+                collapsed: false,
+            },
+            x: 0,
+            y: 0,
+            list: MenuListState::new(0),
+        });
+        app.state.mode = Mode::ContextMenu;
+        assert_eq!(
+            app.state.context_menu.as_ref().map(|menu| menu.items()[0]),
+            Some("New tab"),
+            "the first item on every group menu"
+        );
+
+        handle_context_menu_key(
+            &mut app.state,
+            &mut app.terminal_runtimes,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()),
+        );
+
+        assert_eq!(app.state.active, Some(1));
+        assert_eq!(app.state.selected, 1);
+        assert_eq!(app.state.mode, Mode::RenameTab);
+        assert!(app.state.creating_new_tab);
     }
 }

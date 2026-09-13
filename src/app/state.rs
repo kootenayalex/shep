@@ -1642,12 +1642,13 @@ pub struct ContextMenuState {
 impl ContextMenuState {
     pub fn items(&self) -> &'static [&'static str] {
         match self.kind {
-            ContextMenuKind::Workspace { .. } => &["Rename", "Close"],
+            ContextMenuKind::Workspace { .. } => &["New tab", "Rename", "Close"],
             ContextMenuKind::GitWorkspace {
                 is_linked_worktree: false,
                 has_worktree_children: false,
                 ..
             } => &[
+                "New tab",
                 "Rename",
                 "Close",
                 "Request changes...",
@@ -1659,6 +1660,7 @@ impl ContextMenuState {
                 is_linked_worktree: true,
                 ..
             } => &[
+                "New tab",
                 "Rename",
                 "Close",
                 "Request changes...",
@@ -1672,6 +1674,7 @@ impl ContextMenuState {
                 collapsed: true,
                 ..
             } => &[
+                "New tab",
                 "Rename",
                 "Close with worktrees",
                 "New worktree",
@@ -1684,6 +1687,7 @@ impl ContextMenuState {
                 collapsed: false,
                 ..
             } => &[
+                "New tab",
                 "Rename",
                 "Close with worktrees",
                 "New worktree",
@@ -3034,6 +3038,7 @@ mod tests {
         assert_eq!(
             menu.items(),
             &[
+                "New tab",
                 "Rename",
                 "Close",
                 "Request changes...",
@@ -3061,6 +3066,7 @@ mod tests {
         assert_eq!(
             menu.items(),
             &[
+                "New tab",
                 "Rename",
                 "Close",
                 "Request changes...",
@@ -3110,6 +3116,7 @@ mod tests {
         assert_eq!(
             menu.items(),
             &[
+                "New tab",
                 "Rename",
                 "Close with worktrees",
                 "New worktree",

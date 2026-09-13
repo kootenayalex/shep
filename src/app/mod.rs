@@ -4802,7 +4802,7 @@ last_pane = "prefix+tab"
             kind: state::ContextMenuKind::Workspace { ws_idx: 1 },
             x: 2,
             y: 2,
-            list: state::MenuListState::new(1),
+            list: state::MenuListState::new(2),
         });
         app.state.mode = Mode::ContextMenu;
 

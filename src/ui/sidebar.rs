@@ -1123,10 +1123,24 @@ fn render_workspace_list(
             }
         }
 
+        // The active group's row ends in the `+` that adds a tab to it; the
+        // name gives up those two cells so the button never sits on a letter.
+        let new_tab_rect = app.sidebar_group_new_tab_rect(i);
+        let line1_width = if new_tab_rect.width > 0 && row_y < list_bottom {
+            card.rect.width.saturating_sub(new_tab_rect.width)
+        } else {
+            card.rect.width
+        };
         frame.render_widget(
             Paragraph::new(Line::from(line1)),
-            Rect::new(card.rect.x, row_y, card.rect.width, 1),
+            Rect::new(card.rect.x, row_y, line1_width, 1),
         );
+        if new_tab_rect.width > 0 && row_y < list_bottom {
+            frame.render_widget(
+                Paragraph::new(Span::styled(" +", Style::default().fg(p.overlay1))),
+                new_tab_rect,
+            );
+        }
 
         if row_height > 1 && row_y + 1 < list_bottom {
             if let Some(branch) = ws.branch() {
@@ -1652,7 +1666,9 @@ mod tests {
 
         // 21 columns: 20 of content, narrow.
         let rows = sidebar_screen(21, 24, true);
-        assert_eq!(rows[2].trim_end(), " ◉ workmayt ◆ ⇥2");
+        // The active group's row keeps its `+` even here: two cells for the
+        // one button that adds a pane.
+        assert_eq!(rows[2].trim_end(), " ◉ workmayt ◆ ⇥2   +");
         assert_eq!(rows[3].trim_end(), "   ◉ claude");
         assert_eq!(rows[4].trim_end(), "   ⠹ opencode");
         assert_eq!(rows[5].trim_end(), "");
@@ -2515,5 +2531,50 @@ mod tests {
         assert_eq!(app.collapsed_workspace_at_row(ws_area.y), Some(0));
         assert_eq!(app.collapsed_workspace_at_row(ws_area.y + 1), Some(1));
         assert_eq!(app.collapsed_workspace_at_row(ws_area.y + 2), None);
+    }
+
+    /// The active group's name row ends in ` +`, and the name yields the two
+    /// cells rather than sharing them.
+    #[test]
+    fn active_group_row_ends_with_the_new_tab_plus() {
+        let mut app = crate::app::state::AppState::test_new();
+        app.workspaces = vec![Workspace::test_new("repo")];
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.mouse_capture = true;
+        app.view.sidebar_rect = Rect::new(0, 0, 21, 6);
+        app.view.workspace_card_areas = vec![crate::app::state::WorkspaceCardArea {
+            kind: crate::app::state::WorkspaceCardKind::Group,
+            ws_idx: 0,
+            rect: Rect::new(0, 1, 20, 2),
+            indented: false,
+        }];
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+
+        let row_for = |app: &crate::app::state::AppState| {
+            let mut terminal = Terminal::new(TestBackend::new(20, 6)).expect("test terminal");
+            terminal
+                .draw(|frame| {
+                    render_workspace_list(app, &runtimes, frame, Rect::new(0, 0, 20, 6), false)
+                })
+                .expect("workspace list should render");
+            let buffer = terminal.backend().buffer();
+            (0..20).map(|x| buffer[(x, 1)].symbol()).collect::<String>()
+        };
+
+        let row = row_for(&app);
+        assert!(
+            row.ends_with(" +"),
+            "active group row carries the plus: {row:?}"
+        );
+        assert!(row.contains("repo"), "the name stays: {row:?}");
+
+        app.active = None;
+        let row = row_for(&app);
+        assert!(
+            !row.ends_with(" +"),
+            "an inactive group has no plus: {row:?}"
+        );
     }
 }

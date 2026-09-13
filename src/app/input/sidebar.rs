@@ -4,6 +4,10 @@ use crate::app::state::{AppState, ViewLayout};
 
 use super::ScrollbarClickTarget;
 
+/// A group row narrower than this keeps its whole width for the name; the
+/// `+` would cost more than it says.
+const GROUP_NEW_TAB_MIN_WIDTH: u16 = 8;
+
 impl AppState {
     pub(super) fn workspace_list_rect(&self) -> Rect {
         let sidebar = self.view.sidebar_rect;
@@ -108,6 +112,52 @@ impl AppState {
     /// `+ new group`: the whole footer.
     pub(crate) fn sidebar_new_button_rect(&self) -> Rect {
         self.sidebar_footer_rect()
+    }
+
+    /// The `+` at the end of the active group's row: a new tab in that group.
+    ///
+    /// One per sidebar, on the group new panes go to, so the answer to "how do
+    /// I add a pane here" sits on the row the human is looking at rather than
+    /// only in the tab bar (hidden for a single tab) or behind a right-click.
+    /// Mouse-only like the footer button; `Rect::default()` when the group is
+    /// not the active one, the sidebar is collapsed, or the row is too narrow
+    /// to give up two cells.
+    pub(crate) fn sidebar_group_new_tab_rect(&self, ws_idx: usize) -> Rect {
+        if !self.mouse_capture || self.sidebar_collapsed || self.active != Some(ws_idx) {
+            return Rect::default();
+        }
+        let cards = if self.view.workspace_card_areas.is_empty() {
+            crate::ui::compute_workspace_card_areas(self, self.view.sidebar_rect)
+        } else {
+            self.view.workspace_card_areas.clone()
+        };
+        let Some(card) = cards
+            .iter()
+            .find(|card| card.is_group() && card.ws_idx == ws_idx)
+        else {
+            return Rect::default();
+        };
+        if card.rect.width < GROUP_NEW_TAB_MIN_WIDTH || card.rect.height == 0 {
+            return Rect::default();
+        }
+        Rect::new(
+            card.rect.x + card.rect.width.saturating_sub(2),
+            card.rect.y,
+            2,
+            1,
+        )
+    }
+
+    /// The group whose row `+` is under `(col, row)`, if any.
+    pub(super) fn sidebar_new_tab_target_at(&self, col: u16, row: u16) -> Option<usize> {
+        let ws_idx = self.active?;
+        let rect = self.sidebar_group_new_tab_rect(ws_idx);
+        (rect.width > 0
+            && row >= rect.y
+            && row < rect.y + rect.height
+            && col >= rect.x
+            && col < rect.x + rect.width)
+            .then_some(ws_idx)
     }
 
     /// The `≡` on the sidebar's header row, or the phone's header switch.
@@ -1606,5 +1656,91 @@ mod tests {
         assert!(app.state.drag.is_none());
         let snapshot = capture_snapshot(&app.state);
         assert_eq!(snapshot.sidebar_width, Some(26));
+    }
+
+    /// The active group's row ends in a `+` that adds a tab to it: the one
+    /// add-a-pane button that stays on screen while the tab bar is hidden
+    /// for a single tab.
+    #[test]
+    fn active_group_row_carries_the_new_tab_plus() {
+        let mut app = app_for_mouse_test();
+        app.state.workspaces = vec![Workspace::test_new("repo"), Workspace::test_new("other")];
+        app.state.ensure_test_terminals();
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.mouse_capture = true;
+
+        let cards =
+            crate::ui::compute_workspace_card_areas(&app.state, app.state.view.sidebar_rect);
+        let row = cards
+            .iter()
+            .find(|card| card.is_group() && card.ws_idx == 0)
+            .expect("the active group has a row")
+            .rect;
+        assert_eq!(
+            app.state.sidebar_group_new_tab_rect(0),
+            Rect::new(row.x + row.width - 2, row.y, 2, 1)
+        );
+        assert_eq!(
+            app.state.sidebar_group_new_tab_rect(1),
+            Rect::default(),
+            "only the active group carries the button"
+        );
+
+        app.state.mouse_capture = false;
+        assert_eq!(
+            app.state.sidebar_group_new_tab_rect(0),
+            Rect::default(),
+            "a click target only, so it goes with the mouse"
+        );
+    }
+
+    #[test]
+    fn clicking_the_group_plus_opens_the_new_tab_dialog() {
+        let mut app = app_for_mouse_test();
+        app.state.workspaces = vec![Workspace::test_new("repo"), Workspace::test_new("other")];
+        app.state.ensure_test_terminals();
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.mouse_capture = true;
+        app.state.prompt_new_tab_name = true;
+        let plus = app.state.sidebar_group_new_tab_rect(0);
+        assert!(plus.width > 0);
+
+        app.handle_mouse(mouse(
+            MouseEventKind::Down(MouseButton::Left),
+            plus.x + plus.width - 1,
+            plus.y,
+        ));
+
+        assert_eq!(app.state.mode, Mode::RenameTab);
+        assert!(app.state.creating_new_tab);
+        assert!(
+            app.state.workspace_press.is_none(),
+            "the button is not a grab on the row"
+        );
+    }
+
+    #[test]
+    fn clicking_the_group_plus_requests_a_tab_when_names_are_not_prompted() {
+        let mut app = app_for_mouse_test();
+        app.state.workspaces = vec![Workspace::test_new("repo")];
+        app.state.ensure_test_terminals();
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.mouse_capture = true;
+        app.state.prompt_new_tab_name = false;
+        let plus = app.state.sidebar_group_new_tab_rect(0);
+        assert!(plus.width > 0);
+        assert!(!app.state.request_new_tab);
+
+        app.handle_mouse(mouse(
+            MouseEventKind::Down(MouseButton::Left),
+            plus.x,
+            plus.y,
+        ));
+
+        assert!(app.state.request_new_tab);
+        assert_eq!(app.state.mode, Mode::Terminal);
     }
 }

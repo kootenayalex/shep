@@ -442,10 +442,13 @@
 
 ### Fixed
 
-- With the tab bar hidden for a single tab there was no button left to start
-  a new tab in a group. The titlebar's `group › agent` breadcrumb now ends in
-  the tab bar's `+` while the bar is hidden; it opens a new tab in that group
-  (the `new_tab` binding, `prefix+c` by default, always did).
+- Adding a pane has buttons again, not just a chord. With the tab bar hidden
+  for a single tab there was no mouse target left to start a new tab in a
+  group. Now the titlebar's `group › agent` breadcrumb ends in the tab bar's
+  `+` while the bar is hidden, the active group's row in the sidebar ends in a
+  `+` that opens a new tab in that group, and every group's right-click menu
+  starts with `New tab`, beside the `Split right` / `Split down` the pane menu
+  already had (the `new_tab` binding, `prefix+c` by default, always worked).
 - The board's docket region and proposals, and the desktop pill's proposal
   count, no longer go stale on the server: the headless loop sampled host
   vitals for the board but never the docket rows or the overseer's files, so

@@ -1,4 +1,4 @@
-# navigator-mid 120x40 · 42 styles
+# navigator-mid 120x40 · 43 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
@@ -6,7 +6,7 @@
  ✦ overseer · workmayt's claude has been blocked 2m on a permission prompt.                                       07:08
  groups       grouped ≡ «│╭ claude · fix/s…  …ev/workmayt · ████▍   72% ─┬ claude · fix/s…  …t/apps/site · ██▌     41% ╮
                          ││                                              │                                             │
- ◉ workmayt ◆ ⇥2         ││                                              │                                             │
+ ◉ workmayt ◆ ⇥2        +││                                              │                                             │
    fix/╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮      │
    ◉ cl│ / search panes                                                                                       5 │      │
    ⠹ op│────────────────────────────────────────────────────────────────────────────────────────────────────────│      │
@@ -44,65 +44,66 @@
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-xbbbbxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxJJJJJJJJnnnAAAAAAxxsxxxxxxxxxxxvvvxxMMMxxfffxxhhhxxuuuuuuuuuCCCCCCGGCx
-yllllllllllqqqKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyqqqqqq
-ppppppp.......ppppppp.o.oFccddddddoookkkkkkccooooooooooooooorrrrreooooocccNooooooooojjjjjjNNooooooooooooooorrrOOOoooooNN
-.........................Fc..............................................c.............................................N
-zwzLLLLLLLLzmzHHzzzzzzzzzFc..............................................c.............................................N
-zzzmmmmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......N
-zzzwzLLannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna......N
-zzzPzDDaEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEa......N
-.......atttttttutuuuuuuuuuuuuttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttta......N
-.g.BBBBannnnnnnfIAAAAAAAAAAAAAIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIInnnnnnnnnnnnnnnnnnnnnnnnnnnna......N
-...ooooannnnnnnMIAAAAAAAAIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIInnnnnnnnnnnnnnnnnnnnnnnnnnnna......N
-...g.BBaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.N.BBBBaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-...ooooaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-...i.BBaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-...N.BBaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna......N
-.......abbbbbbnnnnnnnnnbnnnnnnnnnbbbbbbbbbnnnnnnnnnbbbbbbnnnnnnnbbbnnnnnnxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa......N
-.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......N
-.........................Fc..............................................c.............................................N
-.........................Fc..............................................c.............................................N
-oooooooooooo.............FccccccccccccccccccccccccccccccccccccccccccccccccNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
-xbbbbbbnnnnnnnnnbbbbbbbbbbnnnnnnnnbnnnnnnnbnnnnnnnxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ybbbbyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyKKKKKKKKnnnBBBBBByysyyyyyyyyyyywwwyyNNNyyfffyyhhhyyvvvvvvvvvDDDDDDHHDy
+zllllllllllqqqLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzqqqqqq
+ppppppp.......ppppppp.o.oGccddddddoookkkkkkccooooooooooooooorrrrreooooocccOooooooooojjjjjjOOooooooooooooooorrrPPPoooooOO
+.........................Gc..............................................c.............................................O
+AxAMMMMMMMMAmAIIAAAAAAAttGc..............................................c.............................................O
+AAAmmmmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......O
+AAAxAMMannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna......O
+AAAQAEEaFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFa......O
+.......auuuuuuuvuvvvvvvvvvvvvuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuua......O
+.g.CCCCannnnnnnfJBBBBBBBBBBBBBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJnnnnnnnnnnnnnnnnnnnnnnnnnnnna......O
+...ooooannnnnnnNJBBBBBBBBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJnnnnnnnnnnnnnnnnnnnnnnnnnnnna......O
+...g.CCayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.O.CCCCayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+...ooooayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+...i.CCayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+...O.CCayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......ayyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......annnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnna......O
+.......abbbbbbnnnnnnnnnbnnnnnnnnnbbbbbbbbbnnnnnnnnnbbbbbbnnnnnnnbbbnnnnnnyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyya......O
+.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa......O
+.........................Gc..............................................c.............................................O
+.........................Gc..............................................c.............................................O
+oooooooooooo.............GccccccccccccccccccccccccccccccccccccccccccccccccOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+ybbbbbbnnnnnnnnnbbbbbbbbbbnnnnnnnnbnnnnnnnbnnnnnnnyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 
 --- legend ---
 . = (unstyled)
-A = fg:subtext0 bg:panel_bg
-B = fg:subtext0 bg:reset
-C = fg:subtext0 bg:surface1
-D = fg:subtext0 bg:surface_dim
-E = fg:surface1 bg:panel_bg
-F = fg:surface_dim bg:reset
-G = fg:teal bg:surface1
-H = fg:teal bg:surface_dim
-I = fg:text bg:panel_bg
-J = fg:text bg:panel_bg bold
-K = fg:text bg:surface0
-L = fg:text bg:surface_dim bold
-M = fg:yellow bg:panel_bg
-N = fg:yellow bg:reset
-O = fg:yellow bg:surface1
-P = fg:yellow bg:surface_dim
+A = fg:reset bg:surface_dim
+B = fg:subtext0 bg:panel_bg
+C = fg:subtext0 bg:reset
+D = fg:subtext0 bg:surface1
+E = fg:subtext0 bg:surface_dim
+F = fg:surface1 bg:panel_bg
+G = fg:surface_dim bg:reset
+H = fg:teal bg:surface1
+I = fg:teal bg:surface_dim
+J = fg:text bg:panel_bg
+K = fg:text bg:panel_bg bold
+L = fg:text bg:surface0
+M = fg:text bg:surface_dim bold
+N = fg:yellow bg:panel_bg
+O = fg:yellow bg:reset
+P = fg:yellow bg:surface1
+Q = fg:yellow bg:surface_dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:reset
@@ -122,10 +123,10 @@ p = fg:overlay0 bg:reset bold
 q = fg:overlay0 bg:surface0
 r = fg:overlay0 bg:surface1
 s = fg:overlay1 bg:panel_bg
-t = fg:panel_bg bg:accent
-u = fg:panel_bg bg:accent bold
-v = fg:red bg:panel_bg bold
-w = fg:red bg:surface_dim
-x = fg:reset bg:panel_bg
-y = fg:reset bg:surface0
-z = fg:reset bg:surface_dim
+t = fg:overlay1 bg:surface_dim
+u = fg:panel_bg bg:accent
+v = fg:panel_bg bg:accent bold
+w = fg:red bg:panel_bg bold
+x = fg:red bg:surface_dim
+y = fg:reset bg:panel_bg
+z = fg:reset bg:surface0
