@@ -278,6 +278,23 @@
   upstream, so a client can draw "↑N not pushed" without a round-trip per
   workspace. Both are absent when the workspace has no upstream.
 
+- `shep mcp` serves the running session to an MCP client as tools over stdio
+  (newline-delimited JSON-RPC; nothing but protocol on stdout). Reading, the
+  docket, nudges, marks, paging and the overseer are each a capability group,
+  and the profile built out of those groups is the boundary: a tool outside it
+  is absent from `tools/list` and refused on call. Most tools are the socket
+  API under another name; `pane_todos`, `pane_transcript`, `memory_search`,
+  `memory_show` and `push_page` are answered locally the way the bridge answers
+  them, and `doctor` runs in-process. A profile can also narrow a tool instead
+  of removing it — without the `docket` group `docket_add` captures into the
+  inbox with its provenance intact and no due date, and without `send`
+  `agent_send` always queues. `--profile overseer|read|all`, `--allow`,
+  `--deny` and `--tools` compose on the command line; `[plugins.overseer]
+  tools = [...]` replaces the `overseer` set from the config file. `shep mcp
+  config` prints the `mcpServers` block a client needs and `shep mcp tools`
+  prints what a profile actually serves. No protocol bump and no new API
+  method: this is a second face on what the session already exposes.
+
 ### Changed
 
 - The overseer board's `chat` is a thread with the overseer's headless

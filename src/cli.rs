@@ -17,6 +17,7 @@ mod completion;
 mod docket;
 mod doctor;
 mod integration;
+mod mcp;
 mod memory;
 mod notification;
 mod overseer;
@@ -71,6 +72,7 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "status" => status::run_status_command(&args[2..])?,
         "completion" | "completions" => completion::run_completion_command(&args[2..])?,
         "config" => run_config_command(&args[2..])?,
+        "mcp" => mcp::run_mcp_command(&args[2..])?,
         "channel" => run_channel_command(&args[2..])?,
         "workspace" | "group" => workspace::run_workspace_command(&args[2..])?,
         "worktree" => worktree::run_worktree_command(&args[2..])?,

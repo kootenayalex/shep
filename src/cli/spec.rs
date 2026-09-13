@@ -43,6 +43,7 @@ pub(super) fn command() -> Command {
         .subcommand(plugin_command())
         .subcommand(docket_command())
         .subcommand(overseer_command())
+        .subcommand(mcp_command())
         .subcommand(doctor_command())
         .subcommand(runtime_command());
     disable_auto_help(command)
@@ -819,6 +820,51 @@ fn overseer_command() -> Command {
                         .help("Skip the tick when the situation is younger (default 60, 0 forces)"),
                 )
                 .arg(json_flag()),
+        )
+}
+
+fn mcp_command() -> Command {
+    let profile = || {
+        option("profile", "NAME")
+            .value_parser(["overseer", "read", "all"])
+            .help("Capability profile bounding the tool list")
+    };
+    let allow =
+        || option("allow", "LIST").help("Also serve these groups or tools (comma separated)");
+    let deny =
+        || option("deny", "LIST").help("Never serve these groups or tools (comma separated)");
+    let tools = || {
+        option("tools", "LIST").help("Serve exactly these groups or tools, replacing the profile")
+    };
+    Command::new("mcp")
+        .about("Serve the session to an MCP client over stdio, bounded by a capability profile")
+        .arg(path_option("socket", "PATH").help("Socket of the server to talk to"))
+        .arg(profile())
+        .arg(allow())
+        .arg(deny())
+        .arg(tools())
+        .subcommand(
+            Command::new("serve")
+                .about("Speak MCP on stdin and stdout until the client hangs up")
+                .arg(path_option("socket", "PATH").help("Socket of the server to talk to"))
+                .arg(profile())
+                .arg(allow())
+                .arg(deny())
+                .arg(tools()),
+        )
+        .subcommand(
+            Command::new("config")
+                .about("Print the mcpServers block that points a client at this shep")
+                .arg(profile())
+                .arg(path_option("output", "PATH").help("Write the config here instead")),
+        )
+        .subcommand(
+            Command::new("tools")
+                .about("Print the tool names a profile would serve, one per line")
+                .arg(profile())
+                .arg(allow())
+                .arg(deny())
+                .arg(tools()),
         )
 }
 

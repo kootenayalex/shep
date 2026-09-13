@@ -584,10 +584,13 @@ configure and reload with it:
 ```toml
 [plugins.overseer]
 runtime = "claude"
+tools = ["read", "docket-inbox", "push"]
 
 [plugins."example.layout"]
 preset = "wide"
 ```
+
+One key there is read by shep itself: `[plugins.overseer] tools` replaces the built-in `overseer` profile of `shep mcp` (see [CLI reference](/docs/cli-reference/#runtimes)). It takes capability-group names (`read`, `docket-inbox`, `docket`, `nudge`, `send`, `mark`, `seen`, `push`, `overseer`, `tick`) or individual tool names (`docket_add`, `agent_read`, …), and anything not listed is neither offered nor answered. `shep mcp tools` prints what a given setting actually serves.
 
 ## Environment variables
 

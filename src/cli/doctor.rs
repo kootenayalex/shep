@@ -140,7 +140,7 @@ const ERR_LOG_FRESH_WINDOW: Duration = Duration::from_secs(24 * 60 * 60);
 const DISK_WARN_GIB: u64 = 15;
 const LAUNCHD_JOBS: [&str; 2] = ["dev.shep.server", "dev.shep.bridge"];
 
-fn run_probes() -> Vec<Finding> {
+pub(crate) fn run_probes() -> Vec<Finding> {
     let config_dir = crate::config::config_dir();
     let state_dir = crate::config::state_dir();
     let mut findings = Vec::new();

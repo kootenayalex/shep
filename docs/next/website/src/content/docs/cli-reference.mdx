@@ -302,6 +302,18 @@ shep runtime ask <runtime> <prompt|-> [--timeout SECS] [--cwd PATH]
 
 `runtime ask` runs the runtime's `[headless]` recipe once with the prompt on stdin (or as the last argument, when the recipe says `prompt = "arg"`), streams the runtime's stdout and stderr through, and exits with the runtime's exit code. `-` reads the prompt from stdin. `--timeout` (default 120 seconds) kills the runtime and exits 124 when it does not answer in time. Exit code 2 means the runtime is unknown (`runtime_unknown`) or has no headless recipe (`runtime_not_launchable`). It runs locally, so it needs no server.
 
+```bash
+shep mcp [serve] [--socket PATH] [--profile NAME] [--allow a,b] [--deny a,b] [--tools a,b]
+shep mcp config [--profile NAME] [--output PATH]
+shep mcp tools [--profile NAME]
+```
+
+`shep mcp` serves the running session to an MCP client as tools over stdio: newline-delimited JSON-RPC on stdin and stdout, nothing else on stdout. `serve` is the default verb. Most tools go to the running server over its socket (`session_overview`, `agent_get`, `agent_read`, `docket_*`, `agent_send`, `overseer_*`); `pane_todos`, `pane_transcript`, `memory_search`, `memory_show` and `push_page` are answered locally the way the bridge answers them; `doctor` runs in the same process and returns the findings `shep doctor --json` prints.
+
+The **profile** is the boundary, not a prompt. `--profile overseer` (the default) serves reading, inbox capture and paging; `read` serves only the reading tools; `all` serves everything. A tool outside the profile is absent from `tools/list` and refused on call. A tool inside it can be narrower than its name: without the `docket` group `docket_add` forces `kind = "captured"` and `status = "inbox"` and drops `due`/`repeat` (keeping `source` and `notes`), and without the `send` group `agent_send` forces `queue = true`. `--allow` and `--deny` take comma-separated group or tool names and apply after the profile; `--tools` replaces the profile outright. `overseer_chat` and `overseer_tick` exist but are in no default profile — the overseer calling them would resume its own conversation or nest its own ticks.
+
+`shep mcp tools` prints the permitted tool names, one per line. `shep mcp config` prints the `mcpServers` block a client needs, naming this executable and the chosen profile (and `--socket` when `SHEP_SOCKET_PATH` is set); `--output PATH` writes it instead. Groups: `read`, `docket-inbox`, `docket`, `nudge`, `send`, `mark`, `seen`, `push`, `overseer`, `tick`.
+
 ## Direct terminal attach
 
 ```bash
