@@ -442,6 +442,11 @@
 
 ### Fixed
 
+- The board's docket region and proposals, and the desktop pill's proposal
+  count, no longer go stale on the server: the headless loop sampled host
+  vitals for the board but never the docket rows or the overseer's files, so
+  after a live handoff the inbox read empty until a docket verb refreshed it.
+  Both loops now share one `refresh_board_samples`.
 - A Claude session whose main turn ended while a background shell or agent it
   started is still running no longer reads as idle: the footer count under the
   prompt box (`· 1 shell ·`, `· 2 agents ·`) now detects as working, so input

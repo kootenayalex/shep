@@ -4107,11 +4107,11 @@ impl HeadlessServer {
             changed = true;
         }
 
-        // Only while the board is on screen: nothing else reads these, and
-        // they cost sysctls plus a sqlite read.
-        if self.app.state.mode == crate::app::state::Mode::Board
-            && self.app.state.dashboard_sample.refresh_if_stale(now)
-        {
+        // Host vitals, the docket rows and the overseer's files: the board and
+        // the desktop chrome read them, and this loop is the one that runs
+        // under a frame client. (Until 2026-09-13 only the vitals were sampled
+        // here; the docket and the overseer went stale after every handoff.)
+        if self.app.refresh_board_samples(now) {
             changed = true;
         }
 
@@ -6050,6 +6050,39 @@ next_tab = ""
                         } if custom_status.is_none()
                     )
             }));
+    }
+
+    #[test]
+    fn headless_scheduled_tasks_sample_the_docket_while_the_board_is_up() {
+        // Regression: the server loop sampled host vitals for the board but
+        // never the docket, so after a live handoff the board's inbox stayed
+        // empty until a docket verb happened to refresh it.
+        let mut server = test_headless_server();
+        let conn = crate::docket::open_store(&server.app.state.docket_db).expect("store");
+        crate::docket::add(
+            &conn,
+            crate::docket::NewItem {
+                title: "answer the auditor".into(),
+                kind: Some(crate::api::schema::DocketKind::Captured),
+                status: Some(crate::api::schema::DocketStatus::Inbox),
+                ..Default::default()
+            },
+        )
+        .expect("add");
+        assert!(server.app.state.docket_sample.rows.is_empty());
+
+        server.app.state.mode = crate::app::state::Mode::Board;
+        assert!(server.handle_scheduled_tasks_headless(Instant::now(), false));
+
+        let titles: Vec<&str> = server
+            .app
+            .state
+            .docket_sample
+            .rows
+            .iter()
+            .map(|row| row.title.as_str())
+            .collect();
+        assert_eq!(titles, vec!["answer the auditor"]);
     }
 
     #[test]

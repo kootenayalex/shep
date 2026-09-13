@@ -195,6 +195,41 @@ impl App {
         false
     }
 
+    /// The samples the board and the desktop chrome read: host vitals, the
+    /// docket rows and the overseer's files. Shared by the in-process loop
+    /// and the headless server's — the server is the one that actually runs
+    /// under a frame client, so anything sampled only here went stale there.
+    /// Returns whether anything changed.
+    pub(crate) fn refresh_board_samples(&mut self, now: Instant) -> bool {
+        let mut changed = false;
+
+        // Only while the board is on screen: nothing else reads these, and
+        // they cost sysctls plus a sqlite read.
+        if self.state.mode == crate::app::state::Mode::Board
+            && self.state.dashboard_sample.refresh_if_stale(now)
+        {
+            changed = true;
+        }
+
+        // The docket rows cost a sqlite read, so they are sampled only while
+        // something on screen counts them: the board (any of its screens),
+        // or the desktop chrome, whose pill counts the waiting proposals.
+        if self.state.docket_sample_wanted() && self.state.refresh_docket_if_stale(now) {
+            changed = true;
+        }
+
+        // The overseer's files: three stats every two seconds, a read only
+        // when one moved. The strip and the board are its readers.
+        if self.state.overseer_sample_wanted() && self.state.refresh_overseer_if_stale(now) {
+            // A headless tick that landed between polls reaches subscribers
+            // here, TUI attached or not.
+            self.emit_overseer_updated();
+            changed = true;
+        }
+
+        changed
+    }
+
     pub(crate) fn handle_scheduled_tasks(&mut self, now: Instant, geometry_dirty: bool) -> bool {
         let mut changed = false;
         let mut resized = false;
@@ -255,27 +290,7 @@ impl App {
             changed = true;
         }
 
-        // Only while the board is on screen: nothing else reads these, and
-        // they cost sysctls plus a sqlite read.
-        if self.state.mode == crate::app::state::Mode::Board
-            && self.state.dashboard_sample.refresh_if_stale(now)
-        {
-            changed = true;
-        }
-
-        // The docket rows cost a sqlite read, so they are sampled only while
-        // something on screen counts them: the board (any of its screens),
-        // or the desktop chrome, whose pill counts the waiting proposals.
-        if self.state.docket_sample_wanted() && self.state.refresh_docket_if_stale(now) {
-            changed = true;
-        }
-
-        // The overseer's files: three stats every two seconds, a read only
-        // when one moved. The strip and the board are its readers.
-        if self.state.overseer_sample_wanted() && self.state.refresh_overseer_if_stale(now) {
-            // A headless tick that landed between polls reaches subscribers
-            // here, TUI attached or not.
-            self.emit_overseer_updated();
+        if self.refresh_board_samples(now) {
             changed = true;
         }
 
