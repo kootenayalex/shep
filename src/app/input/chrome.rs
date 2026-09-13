@@ -9,7 +9,7 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use super::App;
 use crate::app::state::Mode;
-use crate::ui::chrome::{titlebar_pill_at, PillHalf};
+use crate::ui::chrome::{titlebar_new_tab_at, titlebar_pill_at, PillHalf};
 
 fn row_in(rect: ratatui::layout::Rect, row: u16) -> bool {
     rect.height > 0 && row >= rect.y && row < rect.y + rect.height
@@ -40,6 +40,15 @@ impl App {
         if let MouseEventKind::Down(MouseButton::Left) = mouse.kind {
             if on_strip {
                 self.open_board_live();
+            } else if titlebar_new_tab_at(&self.state, mouse.column, mouse.row) {
+                // The tab bar's `+`, living on the breadcrumb while the bar
+                // is hidden: same request the bar's button makes.
+                if self.state.prompt_new_tab_name {
+                    super::modal::open_new_tab_dialog(&mut self.state);
+                } else {
+                    self.state.request_new_tab = true;
+                    self.state.mode = Mode::Terminal;
+                }
             } else {
                 match titlebar_pill_at(&self.state, mouse.column, mouse.row) {
                     Some(PillHalf::Board) if self.state.mode != Mode::Board => {
@@ -112,6 +121,21 @@ mod tests {
         // Clicking the half that is already lit does nothing.
         let desktop = pill(&app).pill_desktop;
         assert!(app.handle_chrome_mouse(click(desktop.x, desktop.y)));
+        assert_eq!(app.state.mode, Mode::Terminal);
+    }
+
+    #[test]
+    fn clicking_the_breadcrumb_plus_requests_a_new_tab() {
+        let mut app = test_app();
+        app.state.mouse_capture = true;
+        app.state.hide_tab_bar_when_single_tab = true;
+        app.state.prompt_new_tab_name = false;
+        crate::ui::compute_view(&mut app.state, Rect::new(0, 0, 120, 40));
+        let plus = pill(&app).new_tab;
+        assert!(plus.width > 0, "the fixture's active group has one tab");
+        assert!(!app.state.request_new_tab);
+        assert!(app.handle_chrome_mouse(click(plus.x, plus.y)));
+        assert!(app.state.request_new_tab);
         assert_eq!(app.state.mode, Mode::Terminal);
     }
 

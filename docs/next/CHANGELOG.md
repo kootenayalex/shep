@@ -442,6 +442,10 @@
 
 ### Fixed
 
+- With the tab bar hidden for a single tab there was no button left to start
+  a new tab in a group. The titlebar's `group › agent` breadcrumb now ends in
+  the tab bar's `+` while the bar is hidden; it opens a new tab in that group
+  (the `new_tab` binding, `prefix+c` by default, always did).
 - The board's docket region and proposals, and the desktop pill's proposal
   count, no longer go stale on the server: the headless loop sampled host
   vitals for the board but never the docket rows or the overseer's files, so

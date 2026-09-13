@@ -97,6 +97,10 @@ pub(crate) struct TitlebarLayout {
     /// Zero-sized when the pill did not fit at all.
     pub pill_desktop: Rect,
     pub pill_board: Rect,
+    /// The `+` after `group › agent`: the tab bar's new-tab button, moved up
+    /// here while the tab bar is hidden for a single tab. Zero-sized when the
+    /// tab bar is showing (it has its own), on the board, or without a mouse.
+    pub new_tab: Rect,
 }
 
 /// One rung of the right slot's ladder: which facts it still shows. Walked
@@ -400,7 +404,7 @@ pub(crate) fn titlebar_layout(
     // The centre is fixed text; the right slot walks its ladder until both
     // fit — and, on a terminal too narrow for that, walks it again without
     // the centre rather than draw nothing on the right.
-    let center_line = center_line(app, terminal_runtimes);
+    let mut center_line = center_line(app, terminal_runtimes);
     let center_w = center_line
         .as_ref()
         .map(|line| u16::try_from(line.width()).unwrap_or(u16::MAX))
@@ -437,6 +441,26 @@ pub(crate) fn titlebar_layout(
     }
     let right_w = right.as_ref().map(|slot| slot.rect.width).unwrap_or(0);
 
+    // The tab bar's `+` has nowhere to be while the bar is hidden for a
+    // single tab, so the breadcrumb carries it: `group › agent  +`. It is
+    // the last thing to earn its columns — the rung was chosen for the bare
+    // breadcrumb, and the `+` joins only where it fits beside that rung,
+    // never by shortening the pill or the tally.
+    let mut plus_offset = None;
+    if breadcrumb_carries_new_tab(app) {
+        if let (Some(line), Some(bare_w)) = (center_line.as_mut(), center_w) {
+            let with_plus = bare_w + 3;
+            let cx = area.x + (area.width.saturating_sub(with_plus)) / 2;
+            if cx >= area.x + left_w + 2 && cx + with_plus + 2 <= area.x + area.width - right_w {
+                plus_offset = Some(bare_w);
+                line.spans.push(Span::raw("  "));
+                line.spans
+                    .push(Span::styled("+", Style::default().fg(p.overlay1)));
+            }
+        }
+    }
+    let center_w = center_w.map(|w| if plus_offset.is_some() { w + 3 } else { w });
+
     let center = center_line.and_then(|line| {
         let center_w = center_w?;
         let cx = area.x + (area.width - center_w) / 2;
@@ -446,13 +470,45 @@ pub(crate) fn titlebar_layout(
         })
     });
 
+    // The `+` and the blank before it are the hit target, so a click a
+    // column short still lands.
+    let new_tab = center
+        .as_ref()
+        .zip(plus_offset)
+        .map(|(slot, offset)| Rect::new(slot.rect.x + offset + 1, slot.rect.y, 2, 1))
+        .unwrap_or_default();
+
     TitlebarLayout {
         left,
         center,
         right,
         pill_desktop,
         pill_board,
+        new_tab,
     }
+}
+
+/// Whether the breadcrumb should end in the new-tab `+`: the tab bar is
+/// hidden for a single tab (so its own button is gone), the desktop is up,
+/// the active workspace is a group of one tab, and there is a mouse to click
+/// it. The keyboard's `new_tab` binding never depends on this.
+fn breadcrumb_carries_new_tab(app: &AppState) -> bool {
+    app.mouse_capture
+        && app.hide_tab_bar_when_single_tab
+        && !app.board_underlay()
+        && app
+            .active
+            .and_then(|idx| app.workspaces.get(idx))
+            .is_some_and(|ws| !ws.is_system() && ws.tabs.len() == 1)
+}
+
+/// Whether `(col, row)` is on the breadcrumb's new-tab `+`.
+pub(crate) fn titlebar_new_tab_at(app: &AppState, col: u16, row: u16) -> bool {
+    let area = app.view.titlebar_rect;
+    if area.height == 0 || !rect_contains(area, col, row) {
+        return false;
+    }
+    rect_contains(titlebar_layout(app, None, area).new_tab, col, row)
 }
 
 fn rect_contains(rect: Rect, col: u16, row: u16) -> bool {
@@ -877,6 +933,8 @@ mod tests {
     #[test]
     fn pill_lights_the_current_view() {
         let mut app = fixture();
+        // The breadcrumb `+` has its own test; keep the centre text bare here.
+        app.hide_tab_bar_when_single_tab = false;
         let area = Rect::new(0, 0, 200, 1);
         let layout = titlebar_layout(&app, None, area);
         let right = layout.right.expect("right slot");
@@ -1062,6 +1120,55 @@ mod tests {
         let bottom: String = (0..90).map(|x| buffer[(x, 23)].symbol()).collect();
         assert!(bottom.contains("! docket item 1"), "{bottom:?}");
         assert!(!bottom.contains("a overseer"), "{bottom:?}");
+    }
+
+    /// With the tab bar hidden for a single tab, its `+` moves up to the
+    /// breadcrumb; a second tab, the board, or no mouse take it away again.
+    #[test]
+    fn single_tab_breadcrumb_carries_the_new_tab_plus() {
+        let mut app = fixture();
+        app.mouse_capture = true;
+        app.hide_tab_bar_when_single_tab = true;
+        let area = Rect::new(0, 0, 200, 1);
+        let layout = titlebar_layout(&app, None, area);
+        let center = layout.center.expect("centre");
+        assert_eq!(text(&center.line), "workmayt › claude  +");
+        assert_eq!(layout.new_tab.height, 1);
+        assert!(layout.new_tab.x >= center.rect.x);
+        assert_eq!(
+            layout.new_tab.x + layout.new_tab.width,
+            center.rect.x + center.rect.width,
+            "the `+` is the breadcrumb's last column"
+        );
+        assert!(titlebar_new_tab_at_in(&mut app, area, layout.new_tab));
+
+        let active = app.active.expect("active workspace");
+        app.workspaces[active].test_add_tab(None);
+        let layout = titlebar_layout(&app, None, area);
+        assert_eq!(
+            text(&layout.center.expect("centre").line),
+            "workmayt › claude"
+        );
+        assert_eq!(layout.new_tab, Rect::default());
+        app.workspaces[active].tabs.pop();
+
+        app.hide_tab_bar_when_single_tab = false;
+        assert_eq!(titlebar_layout(&app, None, area).new_tab, Rect::default());
+        app.hide_tab_bar_when_single_tab = true;
+
+        app.mouse_capture = false;
+        assert_eq!(titlebar_layout(&app, None, area).new_tab, Rect::default());
+        app.mouse_capture = true;
+
+        app.mode = Mode::Board;
+        assert_eq!(titlebar_layout(&app, None, area).new_tab, Rect::default());
+    }
+
+    fn titlebar_new_tab_at_in(app: &mut AppState, area: Rect, plus: Rect) -> bool {
+        app.view.titlebar_rect = area;
+        titlebar_new_tab_at(app, plus.x, plus.y)
+            && titlebar_new_tab_at(app, plus.x + plus.width - 1, plus.y)
+            && !titlebar_new_tab_at(app, plus.x.saturating_sub(1), plus.y)
     }
 
     /// The board is a screen, not an overlay: nothing of the desktop shows
