@@ -714,6 +714,25 @@ mod tests {
     use crate::workspace::Workspace;
     use std::path::PathBuf;
 
+    #[tokio::test]
+    async fn a_test_built_app_never_reads_the_user_state_dirs() {
+        // Every `App::new` under `cfg(test)` samples the docket and the overseer
+        // from per-test temp paths, so a test that writes real rows cannot flip
+        // another test's `handle_scheduled_tasks` result.
+        let (app, _) = test_app_with_pane();
+        let tmp = std::env::temp_dir();
+        assert!(
+            app.state.docket_db.starts_with(&tmp),
+            "docket_db {:?} is not under the temp dir",
+            app.state.docket_db
+        );
+        assert!(
+            app.state.overseer.state_dir.starts_with(&tmp),
+            "overseer state dir {:?} is not under the temp dir",
+            app.state.overseer.state_dir
+        );
+    }
+
     fn test_app_with_pane() -> (super::super::App, crate::layout::PaneId) {
         let mut app = super::super::App::new(
             &crate::config::Config::default(),

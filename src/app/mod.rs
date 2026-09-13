@@ -678,10 +678,22 @@ impl App {
             host_terminal_theme: crate::terminal_theme::TerminalTheme::default(),
             dashboard_sample: crate::app::state::DashboardSample::default(),
             docket_sample: crate::app::state::DocketSample::default(),
+            // Unit tests build the real `App`, so the two samplers that read
+            // user state must not: a test that mutates the docket or the
+            // overseer's files would otherwise race every other test through
+            // `~/.local/state/shep-dev` (the resume-when-geometry-dirty test
+            // flaked exactly that way). `AppState::test_new` isolates the same
+            // two paths.
+            #[cfg(not(test))]
             docket_db: crate::docket::docket_db_path(),
+            #[cfg(test)]
+            docket_db: crate::app::state::test_docket_db_path(),
+            #[cfg(not(test))]
             overseer: overseer::OverseerState::new(crate::plugin_paths::plugin_state_dir(
                 "overseer",
             )),
+            #[cfg(test)]
+            overseer: overseer::OverseerState::new(overseer::test_state_dir()),
             session_dirty: false,
             terminal_runtime_shutdowns: Vec::new(),
         };
