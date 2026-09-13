@@ -356,57 +356,6 @@ def situation_markdown(facts: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def deterministic_board(facts: dict) -> str:
-    """What a stranger with no brain configured gets: a short read of the room.
-
-    The board is the header line followed by two or three plain sentences —
-    blocked agents first (they are the person's to answer), then what the
-    docket owes, then health. The TUI's overseer view draws the counts and
-    lists itself; the board is the narrative that sits above them.
-    """
-    overview = facts["overview"]
-    totals = overview.get("totals", {}) or {}
-    agents = overview.get("agents", []) or []
-    fails = [h for h in facts["health"] if h.get("level") == "fail"]
-    warns = [h for h in facts["health"] if h.get("level") == "warn"]
-    items = facts["docket"]["items"]
-    overdue = [i for i in items if i.get("overdue")]
-    due = [i for i in items if i.get("status") == "open" and i.get("due") and not i.get("overdue")]
-    inbox = [i for i in items if i.get("status") == "inbox"]
-    blocked = [a for a in agents if a.get("agent_status") == "blocked"]
-    working = totals.get("working", 0)
-
-    sentences: list[str] = []
-    if blocked:
-        names = ", ".join(a.get("display_name", a.get("pane_id", "?")) for a in blocked[:3])
-        more = f" and {len(blocked) - 3} more" if len(blocked) > 3 else ""
-        verb = "is" if len(blocked) == 1 else "are"
-        sentences.append(f"{names}{more} {verb} blocked and waiting on you.")
-    elif agents:
-        sentences.append(f"Nobody is blocked; {working} working, {totals.get('idle', 0)} idle.")
-    else:
-        code = f" ({facts['overview_error'].get('code')})" if facts.get("overview_error") else ""
-        sentences.append(f"No agents are running{code}.")
-
-    docket_bits = []
-    if overdue:
-        docket_bits.append(f"{len(overdue)} overdue")
-    if due:
-        docket_bits.append(f"{len(due)} due")
-    if inbox:
-        docket_bits.append(f"{len(inbox)} in the inbox")
-    if docket_bits:
-        sentences.append("The docket has " + ", ".join(docket_bits) + ".")
-
-    if fails:
-        sentences.append("Health fails on " + ", ".join(f.get("check", "?") for f in fails[:4]) + ".")
-    elif warns:
-        sentences.append("Health warns on " + ", ".join(w.get("check", "?") for w in warns[:4]) + ".")
-
-    lines = [f"OVERSEER · {facts['at']} · deterministic", *sentences[:3]]
-    return "\n".join(lines[:MAX_BOARD_LINES]) + "\n"
-
-
 # --- BRAIN -------------------------------------------------------------------
 
 BRAIN_PROMPT = """You are the overseer of a shep session: a personal assistant that narrates, never acts.
@@ -419,7 +368,7 @@ Hard rules you must respect in what you write:
 Given the situation below, answer with EXACTLY one fenced block and nothing else:
 
 ```board
-## <the agent's name exactly as the situation lists it, up to its state word>
+## <the agent's name only: the text before the first ` · ` on its situation line — never its state word or age>
 <one or two short sentences: what it is doing or last said, and — if it is blocked — the visible prompt, your suggested answer and why>
 ## <the next agent, the same way>
 ## room
@@ -486,6 +435,32 @@ def parse_brain_answer(answer: str) -> str | None:
     return None
 
 
+def normalize_brain_board(board: str, facts: dict) -> str:
+    """Make the brain's board wear the shape the readers seat: a header
+    line first, and each `## title` reduced to the agent's section name when
+    the brain padded it (`## Dev · done 7m` → `## Dev`), so the desktop and
+    the phone find the row it belongs under. Titles that name nothing known
+    are left alone; `## Room` is `## room`."""
+    agents = (facts.get("overview") or {}).get("agents") or []
+    names = [section_name(a, agents) for a in agents]
+    out: list[str] = []
+    for line in board.rstrip("\n").splitlines():
+        if line.startswith("## "):
+            title = line[3:].strip()
+            if title.lower() == "room":
+                title = "room"
+            elif title not in names:
+                for name in sorted(names, key=len, reverse=True):
+                    if title == name or title.startswith(name + " · "):
+                        title = name
+                        break
+            line = f"## {title}"
+        out.append(line)
+    if not out or not out[0].startswith("OVERSEER ·"):
+        out.insert(0, f"OVERSEER · {facts['at']} · brain")
+    return "\n".join(out[:MAX_BOARD_LINES]) + "\n"
+
+
 def brain_allowed(stamp: Path, now: float) -> bool:
     try:
         return now - stamp.stat().st_mtime >= BRAIN_INTERVAL_SECONDS
@@ -515,7 +490,7 @@ def main(argv: list[str]) -> int:
         stamp.touch()
         brain_board = parse_brain_answer(answer or "")
         if brain_board:
-            board = brain_board
+            board = normalize_brain_board(brain_board, facts)
             note = f"brain {runtime}"
             source = "brain"
     elif runtime and from_event and source_file.exists() and source_file.read_text().strip() == "brain":
