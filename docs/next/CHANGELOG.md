@@ -442,6 +442,13 @@
 
 ### Fixed
 
+- A new tab showed in the tab bar but not under its group in the sidebar
+  until an agent started in it: the tree listed agent panes only. Now a
+  group that holds more than one pane lists every pane, a plain shell as the
+  absent-tier `·` with its tab's name and no state word, so the tab can be
+  found and focused from the tree at once. A group with a single pane is
+  still just its group row, and the phone's switcher keeps listing agents
+  only (it has a tabs section of its own).
 - Adding a pane has buttons again, not just a chord. With the tab bar hidden
   for a single tab there was no mouse target left to start a new tab in a
   group. Now the titlebar's `group › agent` breadcrumb ends in the tab bar's

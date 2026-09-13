@@ -264,7 +264,11 @@ voice outside the board, and clicking anywhere on it opens the board.
 **The sidebar says who and how; the pane title says where and how full.**
 A group row is its glyph, name and badges, and under it the branch with
 `↑N`/`↓N` — the branch truncates, the two badges come off whole. An agent row
-is its glyph, name and state word. That is the whole fact set: the event age
+is its glyph, name and state word. A group with one pane *is* that pane and
+gets no second row; once it holds several, every pane is listed — a plain
+shell too, as the absent-tier `·`, its tab's name and no state word, so a tab
+opened beside an agent can be found and focused before anything starts in
+it. That is the whole fact set: the event age
 and `mem NN%` were host facts on a group row and live on the board, and the
 bare `72%` an agent row used to trail was a meter with no bar on the one
 surface that could least afford the columns. At twenty content columns and

@@ -22,6 +22,10 @@ pub struct PaneDetail {
     pub state_labels: HashMap<String, String>,
     pub context_percent: Option<u8>,
     pub manual_state: Option<crate::api::schema::PaneManualState>,
+    /// False for a plain shell: a pane no agent has claimed. It is listed so
+    /// the tree shows every pane of a group that holds several, but it has
+    /// no state to speak of and its row says the tab, not an agent.
+    pub is_agent: bool,
 }
 
 impl Tab {
@@ -45,11 +49,13 @@ impl Tab {
             .filter_map(|id| {
                 let pane = self.panes.get(id)?;
                 let terminal = terminals.get(&pane.attached_terminal_id)?;
+                let is_agent = terminal.is_agent_terminal();
                 let fallback_agent_label = terminal
                     .agent_name
                     .as_deref()
-                    .or_else(|| terminal.effective_agent_label())?
-                    .to_string();
+                    .or_else(|| terminal.effective_agent_label())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| if is_agent { "agent" } else { "shell" }.to_string());
                 let agent_label = terminal
                     .effective_display_agent()
                     .unwrap_or_else(|| fallback_agent_label.clone());
@@ -71,6 +77,7 @@ impl Tab {
                         .manual_state
                         .as_ref()
                         .map(crate::terminal::ManualStateOverride::as_pane_manual_state),
+                    is_agent,
                 })
             })
             .collect()
@@ -115,7 +122,13 @@ impl Workspace {
         self.tabs.iter().any(|tab| tab.has_working_pane(terminals))
     }
 
+    /// Every agent pane, plus every plain shell pane once the group holds
+    /// more than one pane. A group with a single pane *is* that pane, so a
+    /// lone shell adds nothing its group row does not already say; a second
+    /// tab or a split is a thing to find and focus whether or not an agent
+    /// has started in it yet.
     pub fn pane_details(&self, terminals: &HashMap<TerminalId, TerminalState>) -> Vec<PaneDetail> {
+        let several_panes = self.tabs.iter().map(|tab| tab.panes.len()).sum::<usize>() > 1;
         self.tabs
             .iter()
             .enumerate()
@@ -129,6 +142,7 @@ impl Workspace {
                 let multi_pane = tab.panes.len() > 1;
                 tab.pane_details(terminals, tab_idx, &tab_label)
                     .into_iter()
+                    .filter(move |detail| detail.is_agent || several_panes)
                     .map(move |mut detail| {
                         if multi_pane {
                             detail.label = format!("{}·{}", detail.tab_label, detail.agent_label);
@@ -338,5 +352,47 @@ mod tests {
 
         assert_eq!(ws.tabs[1].number, 3);
         assert_eq!(survivor.tab_idx, 1);
+    }
+
+    /// A group with one pane is that pane: a lone shell adds no row. A
+    /// second tab makes every pane a thing to find, agent or not.
+    #[test]
+    fn pane_details_list_a_shell_only_once_the_group_holds_several_panes() {
+        let mut ws = Workspace::test_new("test");
+        let root_pane = ws.tabs[0].root_pane;
+        let mut terminals = HashMap::new();
+        let root_terminal = terminal_for_pane(&ws, root_pane);
+        terminals.insert(root_terminal.id.clone(), root_terminal);
+        assert!(
+            ws.pane_details(&terminals).is_empty(),
+            "a lone shell is its group row"
+        );
+
+        let second_tab = ws.test_add_tab(Some("scratch"));
+        let scratch_pane = ws.tabs[second_tab].root_pane;
+        let scratch_terminal = terminal_for_pane(&ws, scratch_pane);
+        terminals.insert(scratch_terminal.id.clone(), scratch_terminal);
+
+        let details = ws.pane_details(&terminals);
+        assert_eq!(details.len(), 2);
+        assert!(details.iter().all(|detail| !detail.is_agent));
+        assert_eq!(details[1].pane_id, scratch_pane);
+        assert_eq!(details[1].tab_label, "scratch");
+        assert_eq!(details[1].agent_label, "shell");
+        assert_eq!(details[1].state, AgentState::Unknown);
+
+        // An agent in one of them keeps the shell listed beside it.
+        let root_terminal = terminals
+            .get_mut(ws.terminal_id(root_pane).unwrap())
+            .unwrap();
+        root_terminal.set_detected_state(Some(Agent::Claude), AgentState::Working);
+        let details = ws.pane_details(&terminals);
+        assert_eq!(
+            details
+                .iter()
+                .map(|d| (d.is_agent, d.label.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(true, "claude"), (false, "shell")]
+        );
     }
 }

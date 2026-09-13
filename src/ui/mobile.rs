@@ -8,7 +8,7 @@ use ratatui::{
 
 use super::glyphs;
 use super::sidebar::{
-    agent_panel_entries, agent_panel_entries_from, grouped_child_display_label,
+    agent_panel_agents, agent_panel_agents_from, grouped_child_display_label,
     next_entry_is_indented_workspace, workspace_list_entries_expanded, AgentPanelEntry,
     WorkspaceListEntry,
 };
@@ -99,7 +99,7 @@ pub(crate) fn mobile_switcher_max_scroll_for_height(app: &AppState, viewport_hei
 /// there are no agents so we don't show an empty header. The switcher leads with
 /// agents, so every section below it is offset by this.
 fn mobile_agents_block_height(app: &AppState) -> usize {
-    let count = agent_panel_entries(app).len();
+    let count = agent_panel_agents(app).len();
     if count == 0 {
         0
     } else {
@@ -145,7 +145,7 @@ pub(crate) fn mobile_switcher_target_at(
     // Agents lead the switcher: the primary job is switching between running
     // agents. Spaces/tabs/create actions follow for navigation and management.
     // The section is omitted entirely when there are no agents.
-    let agents = agent_panel_entries(app);
+    let agents = agent_panel_agents(app);
     if !agents.is_empty() {
         cursor += 1; // agents title
         let agents_end = cursor + agents.len() * 2;
@@ -498,7 +498,9 @@ fn render_mobile_switcher_content(
 
     let mut doc_y = 0usize;
 
-    let entries = agent_panel_entries_from(app, terminal_runtimes);
+    // The phone's switcher lists tabs on its own, so a plain shell pane
+    // stays out of its agents section.
+    let entries = agent_panel_agents_from(app, terminal_runtimes);
     if !entries.is_empty() {
         let focused_agent = app.active.and_then(|ws_idx| {
             let ws = app.workspaces.get(ws_idx)?;
@@ -986,7 +988,7 @@ impl GlobalAgentCounts {
 
 fn global_agent_counts(app: &AppState) -> GlobalAgentCounts {
     let mut counts = GlobalAgentCounts::default();
-    for entry in agent_panel_entries(app) {
+    for entry in agent_panel_agents(app) {
         match (entry.state, entry.seen) {
             (AgentState::Blocked, _) => counts.blocked += 1,
             (AgentState::Idle, false) => counts.done += 1,
@@ -1157,6 +1159,7 @@ fn draw_horizontal_rule(frame: &mut Frame, area: Rect, p: &Palette) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::sidebar::agent_panel_entries;
 
     fn agent_entry(primary_tab_label: Option<&str>, agent_label: Option<&str>) -> AgentPanelEntry {
         AgentPanelEntry {
@@ -1173,6 +1176,7 @@ mod tests {
             state_labels: std::collections::HashMap::new(),
             context_percent: None,
             manual_state: None,
+            is_agent: true,
         }
     }
 
@@ -1484,5 +1488,36 @@ mod tests {
             !row.contains("issue-264-nix-support"),
             "header row: {row:?}"
         );
+    }
+
+    /// The phone's switcher keeps listing agents only: it has a tabs section
+    /// of its own for the shell tab the desktop tree now shows.
+    #[test]
+    fn switcher_agents_skip_shell_panes_the_desktop_tree_lists() {
+        let mut app = crate::app::state::AppState::test_new();
+        let mut ws = crate::workspace::Workspace::test_new("repo");
+        let root = ws.tabs[0].root_pane;
+        ws.test_add_tab(Some("scratch"));
+        app.workspaces = vec![ws];
+        app.ensure_test_terminals();
+        app.active = Some(0);
+        app.selected = 0;
+        let terminal_id = app.workspaces[0].terminal_id(root).unwrap().clone();
+        app.terminals
+            .get_mut(&terminal_id)
+            .unwrap()
+            .set_detected_state(Some(crate::detect::Agent::Claude), AgentState::Working);
+
+        assert_eq!(
+            agent_panel_entries(&app).len(),
+            2,
+            "the desktop tree lists both"
+        );
+        assert_eq!(
+            agent_panel_agents(&app).len(),
+            1,
+            "the phone lists the agent"
+        );
+        assert_eq!(mobile_agents_block_height(&app), 1 + 2);
     }
 }

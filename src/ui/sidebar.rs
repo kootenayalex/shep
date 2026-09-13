@@ -68,6 +68,8 @@ pub(crate) struct AgentPanelEntry {
     pub state_labels: std::collections::HashMap<String, String>,
     pub context_percent: Option<u8>,
     pub manual_state: Option<crate::api::schema::PaneManualState>,
+    /// False for a plain shell pane (see `PaneDetail::is_agent`).
+    pub is_agent: bool,
 }
 
 /// The sidebar's content column — everything but the separator it keeps on its
@@ -156,6 +158,27 @@ pub(crate) fn agent_panel_entries_from(
     agent_panel_entries_with_runtimes(app, Some(terminal_runtimes))
 }
 
+/// The entries that hold an agent: `agent_panel_entries_from` without the
+/// plain shell panes. For a surface that lists tabs on its own (the phone's
+/// switcher) and so has nothing to gain from a shell row.
+pub(crate) fn agent_panel_agents_from(
+    app: &AppState,
+    terminal_runtimes: &TerminalRuntimeRegistry,
+) -> Vec<AgentPanelEntry> {
+    agent_panel_entries_from(app, terminal_runtimes)
+        .into_iter()
+        .filter(|entry| entry.is_agent)
+        .collect()
+}
+
+/// `agent_panel_agents_from` without a runtime registry.
+pub(crate) fn agent_panel_agents(app: &AppState) -> Vec<AgentPanelEntry> {
+    agent_panel_entries(app)
+        .into_iter()
+        .filter(|entry| entry.is_agent)
+        .collect()
+}
+
 fn agent_panel_entries_with_runtimes(
     app: &AppState,
     terminal_runtimes: Option<&TerminalRuntimeRegistry>,
@@ -197,6 +220,7 @@ fn agent_panel_entries_with_runtimes(
                     state_labels: detail.state_labels,
                     context_percent: detail.context_percent,
                     manual_state: detail.manual_state,
+                    is_agent: detail.is_agent,
                 })
         })
         .collect();
@@ -1309,7 +1333,9 @@ fn render_agent_row(
     // Trailing facts drop whole, cheapest first, until the name has room to
     // say which agent this is.
     let mut trailing: Vec<(String, Style)> = Vec::new();
-    if !narrow {
+    // A shell has no state to report: its row is the tab's name and the
+    // absent-tier dot, nothing else.
+    if !narrow && entry.is_agent {
         trailing.push((status.to_string(), Style::default().fg(status_color)));
         if let Some(custom_status) = &entry.custom_status {
             trailing.push((custom_status.clone(), muted));
@@ -1782,9 +1808,15 @@ mod tests {
         assert_eq!(entries[0].primary_label, "one");
         assert!(entries[0].primary_tab_label.is_none());
         assert_eq!(entries[0].agent_label.as_deref(), Some("pi"));
+        // `two` holds two tabs, so its first tab — a plain shell — is
+        // listed as well, under its tab's name.
         assert_eq!(entries[1].primary_label, "two");
-        assert_eq!(entries[1].primary_tab_label.as_deref(), Some("logs"));
-        assert_eq!(entries[1].agent_label.as_deref(), Some("claude"));
+        assert!(!entries[1].is_agent);
+        assert_eq!(entries[1].primary_tab_label.as_deref(), Some("1"));
+        assert_eq!(entries[2].primary_label, "two");
+        assert!(entries[2].is_agent);
+        assert_eq!(entries[2].primary_tab_label.as_deref(), Some("logs"));
+        assert_eq!(entries[2].agent_label.as_deref(), Some("claude"));
     }
 
     #[test]
@@ -2575,6 +2607,68 @@ mod tests {
         assert!(
             !row.ends_with(" +"),
             "an inactive group has no plus: {row:?}"
+        );
+    }
+
+    /// A tab opened beside an agent shows under the group at once, named
+    /// by its tab, with the absent-tier dot and no state word; it needs no
+    /// agent to have started to be findable.
+    #[test]
+    fn a_shell_tab_gets_a_row_under_its_group_without_a_state_word() {
+        let mut app = crate::app::state::AppState::test_new();
+        let mut ws = Workspace::test_new("repo");
+        let root = ws.tabs[0].root_pane;
+        let scratch_tab = ws.test_add_tab(Some("scratch"));
+        let scratch = ws.tabs[scratch_tab].root_pane;
+        app.workspaces = vec![ws];
+        app.ensure_test_terminals();
+        app.active = Some(0);
+        app.selected = 0;
+        app.mode = Mode::Terminal;
+        app.mouse_capture = false;
+        {
+            let terminal_id = app.workspaces[0].terminal_id(root).unwrap().clone();
+            let terminal = app.terminals.get_mut(&terminal_id).unwrap();
+            terminal.set_detected_state(Some(Agent::Claude), AgentState::Working);
+        }
+        let area = Rect::new(0, 0, 30, 8);
+        app.view.sidebar_rect = area;
+        app.view.workspace_card_areas = compute_workspace_card_areas(&app, area);
+        assert!(
+            app.view
+                .workspace_card_areas
+                .iter()
+                .any(|card| card.agent().is_some_and(|(_, _, pane)| pane == scratch)),
+            "the shell tab has a card"
+        );
+
+        let mut terminal = Terminal::new(TestBackend::new(30, 8)).expect("test terminal");
+        let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        terminal
+            .draw(|frame| {
+                render_workspace_list(&app, &runtimes, frame, workspace_list_rect(area), false)
+            })
+            .expect("workspace list should render");
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..8)
+            .map(|y| {
+                (0..30)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    .trim_end()
+                    .to_string()
+            })
+            .collect();
+        let shell_row = rows
+            .iter()
+            .find(|row| row.contains("scratch"))
+            .unwrap_or_else(|| panic!("shell row rendered: {rows:#?}"));
+        assert!(shell_row.trim_start().starts_with("·"), "{shell_row:?}");
+        assert!(!shell_row.contains("idle"), "no state word: {shell_row:?}");
+        assert!(
+            rows.iter()
+                .any(|row| row.contains("working") && !row.contains("scratch")),
+            "the agent row keeps its state word: {rows:#?}"
         );
     }
 }
