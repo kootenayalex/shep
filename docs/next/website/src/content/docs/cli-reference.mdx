@@ -444,6 +444,22 @@ new tab, or a zoomed pane. Native non-terminal plugin panes are a later surface.
 
 `--env KEY=VALUE` can be repeated on process-launching commands. It applies to the newly launched process only. Herdr-managed variables such as `HERDR_SOCKET_PATH`, `HERDR_BIN_PATH`, `HERDR_ENV`, `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, `HERDR_PANE_ID`, `HERDR_PLUGIN_ID`, `HERDR_PLUGIN_ROOT`, `HERDR_PLUGIN_CONFIG_DIR`, `HERDR_PLUGIN_STATE_DIR`, `HERDR_PLUGIN_ENTRYPOINT_ID`, and `HERDR_PLUGIN_CONTEXT_JSON` stay authoritative when they conflict with caller-provided env.
 
+The overseer plugin's own read of the room is on the same socket:
+
+```bash
+shep overseer sample [--chat N] [--json]
+shep overseer chat <text|-> [--wait [--timeout SECS]] [--json]
+shep overseer tick [--max-age SECS] [--json]
+```
+
+`overseer sample` prints one compact board: the `✦ read of the room` narrative, a `tick hh:mm · brain Nm ago · <runtime> headless` line, the health findings (`✓` ok, `⚠` warning, `◉` failure), the tail of the chat (`--chat N` trailing turns, default 20, `0` for none) and the shared session id. It says `plugin not linked`, `no runtime` and `session not started` plainly when that is the state, and it creates nothing — not the state dir, not the session id. The docket is deliberately not part of it; that is `shep docket list`.
+
+`overseer chat` puts one question to the overseer's headless runtime and prints the `you` turn it recorded. `-` reads the question from stdin. `--wait` subscribes to `overseer.chat_turn` before sending and then prints the answer alone, so it can be piped; it exits 1 on `--timeout` (default 120 seconds, matching the server). A second question while one is still out is refused with `overseer_chat_busy`.
+
+`overseer tick` asks the plugin for a fresh situation and prints `tick invoked (log <id>)`, `tick skipped: situation is Ns old`, or `tick already in flight`. `--max-age` (default 60 seconds) is the age below which the situation is still considered current; `0` ticks whatever its age.
+
+`--json` on any of the three prints the raw `result` object; an error prints the whole response on stderr and exits 1.
+
 ## Read sources
 
 | Source | Meaning |

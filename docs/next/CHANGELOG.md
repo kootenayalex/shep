@@ -4,6 +4,20 @@
 
 ### Added
 
+- `shep overseer sample|chat|tick` puts the overseer in a terminal. `sample`
+  prints one compact board — the `✦ read of the room`, a
+  `tick hh:mm · brain Nm ago · <runtime> headless` line, health findings, the
+  chat tail (`--chat N`, default 20) and the shared session id — and says
+  `plugin not linked`, `no runtime` or `session not started` plainly rather
+  than leaving a gap; it creates nothing, and the docket stays `shep docket
+  list`. `chat <text|->` asks one question (`-` reads it from stdin) and
+  prints the recorded `you` turn; `--wait` subscribes to `overseer.chat_turn`
+  *before* sending, so an answer that lands at once is not missed, and prints
+  the answer alone (`--timeout`, default 120s, matching the server). `tick`
+  reports `tick invoked (log <id>)`, `tick skipped: situation is Ns old` or
+  `tick already in flight`, with `--max-age 0` to force one. `--json` on any
+  of the three prints the raw `result`.
+
 - The overseer is on the wire: `overseer.sample` reports what the plugin last
   sensed and said (narrative and its source, tick time, situation and brain
   ages, health findings, the headless runtime, the chat tail and the shared

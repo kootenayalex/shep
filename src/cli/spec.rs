@@ -42,6 +42,7 @@ pub(super) fn command() -> Command {
         .subcommand(integration_command())
         .subcommand(plugin_command())
         .subcommand(docket_command())
+        .subcommand(overseer_command())
         .subcommand(doctor_command())
         .subcommand(runtime_command());
     disable_auto_help(command)
@@ -785,6 +786,42 @@ fn docket_command() -> Command {
         )
 }
 
+fn overseer_command() -> Command {
+    Command::new("overseer")
+        .about("The overseer's read of the room: what it sensed, what it said, and one question at a time")
+        .subcommand(
+            Command::new("sample")
+                .visible_alias("board")
+                .about("What the overseer last sensed and said, health and the chat tail")
+                .arg(
+                    option("chat", "N")
+                        .help("How many trailing chat turns to show (default 20, 0 for none)"),
+                )
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("chat")
+                .visible_alias("ask")
+                .about("Put one question to the overseer's headless runtime; `-` reads it from stdin")
+                .arg(required("text", "TEXT"))
+                .arg(flag("wait").help("Block until the overseer answers, and print the answer"))
+                .arg(
+                    option("timeout", "SECS")
+                        .help("How long --wait waits for the answer (default 120)"),
+                )
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("tick")
+                .about("Ask the overseer plugin for a fresh situation when the last has aged out")
+                .arg(
+                    option("max-age", "SECS")
+                        .help("Skip the tick when the situation is younger (default 60, 0 forces)"),
+                )
+                .arg(json_flag()),
+        )
+}
+
 fn doctor_command() -> Command {
     Command::new("doctor")
         .about("Check the server, socket, launchd, bridge, hooks, push and state in one pass")
@@ -1050,6 +1087,25 @@ mod tests {
         );
         assert!(has_option(list, "json"));
         assert!(has_option(command_path(docket, &["update"]), "title"));
+    }
+
+    #[test]
+    fn spec_includes_overseer_verbs() {
+        let cmd = super::command();
+        let overseer = command_path(&cmd, &["overseer"]);
+        for verb in ["sample", "chat", "tick"] {
+            command_path(overseer, &[verb]);
+        }
+        let sample = command_path(overseer, &["sample"]);
+        assert!(has_option(sample, "chat"));
+        assert!(has_option(sample, "json"));
+        let chat = command_path(overseer, &["chat"]);
+        assert!(has_option(chat, "wait"));
+        assert!(has_option(chat, "timeout"));
+        assert!(has_option(chat, "json"));
+        let tick = command_path(overseer, &["tick"]);
+        assert!(has_option(tick, "max-age"));
+        assert!(has_option(tick, "json"));
     }
 
     #[test]

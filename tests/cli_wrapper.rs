@@ -1053,6 +1053,7 @@ fn help_commands_exit_successfully() {
         &["session", "attach", "-h"],
         &["integration", "-h"],
         &["docket", "-h"],
+        &["overseer", "-h"],
     ];
 
     for args in help_cases {
@@ -2561,6 +2562,87 @@ fn docket_commands_work() {
         String::from_utf8_lossy(&open_only.stdout).trim(),
         "docket is empty"
     );
+
+    cleanup_spawned_shep(shep, base);
+}
+
+#[test]
+fn overseer_sample_cli_prints_json() {
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    let shep = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    let sampled = run_cli_json(&socket_path, &["overseer", "sample", "--json"]);
+    assert_eq!(sampled["type"], "overseer_sample");
+    assert_eq!(sampled["sample"]["plugin_linked"], false);
+    assert_eq!(sampled["sample"]["session"]["started"], false);
+    assert!(sampled["sample"]["session"]["id"].is_null());
+
+    // The human board says the same two things in words.
+    let human = run_cli(&socket_path, &["overseer", "sample"]);
+    assert!(human.status.success());
+    let board = String::from_utf8_lossy(&human.stdout);
+    assert!(board.contains("plugin not linked"), "{board}");
+    assert!(board.contains("session not started"), "{board}");
+
+    // Nothing is linked, so a forced tick is an error with a code.
+    let ticked = run_cli(&socket_path, &["overseer", "tick", "--max-age", "0"]);
+    assert_eq!(ticked.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&ticked.stderr).contains("overseer_tick_failed"),
+        "{}",
+        String::from_utf8_lossy(&ticked.stderr)
+    );
+
+    cleanup_spawned_shep(shep, base);
+}
+
+#[test]
+fn overseer_chat_without_a_runtime_answers_synchronously() {
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    let shep = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    // With no headless runtime the server answers on the spot, so --wait
+    // returns as fast as the subscription can carry the turn.
+    let answered = run_cli(
+        &socket_path,
+        &[
+            "overseer",
+            "chat",
+            "what needs me?",
+            "--wait",
+            "--timeout",
+            "10",
+        ],
+    );
+    assert_eq!(
+        answered.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&answered.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&answered.stdout).trim(),
+        "no headless runtime: set [plugins.overseer] runtime"
+    );
+
+    // Both turns are on the record afterwards.
+    let sampled = run_cli_json(
+        &socket_path,
+        &["overseer", "sample", "--json", "--chat", "2"],
+    );
+    assert_eq!(sampled["sample"]["chat_total"], 2);
+    assert_eq!(sampled["sample"]["chat"][0]["role"], "you");
+    assert_eq!(sampled["sample"]["chat"][1]["role"], "overseer");
 
     cleanup_spawned_shep(shep, base);
 }
