@@ -51,8 +51,8 @@ maestro --device <serial> test maestro/08-live-input.yaml     # …14
 # Docket tab (adds one inbox item — throwaway server only):
 maestro --device <serial> test maestro/15-docket.yaml
 
-# The board — the landing screen: regions, the desktop|board pill, keep on a
-# proposal, and a real question to the overseer. Needs the overseer plugin
+# The board — the landing screen: regions, the desktop|board pill, the read of
+# the room, and a real question to the overseer. Needs the overseer plugin
 # linked, a headless runtime and one tick already run; `just dev-stack up`
 # sets all three up on a throwaway server, and 16's header has the recipe:
 maestro --device <serial> test maestro/16-board.yaml
@@ -159,6 +159,6 @@ maestro --device <phone-serial> test \
   behind. Hence the one id in flow 16: the field's `overseer-composer`
   testTag (`testTagsAsResourceId` is on, so a testTag is an `id:` selector).
 - **A `LazyColumn` only has its visible rows in the hierarchy.** The board is
-  taller than the screen, so `health`, `✦ read of the room`, `proposals` and
+  taller than the screen, so `health`, `✦ read of the room` and
   `chat` need `scrollUntilVisible` before any assertion about them — a plain
   `assertVisible` fails on a region that simply has not been composed yet.

@@ -23,6 +23,7 @@ use super::modal::{leave_modal, open_keybind_help};
 
 impl AppState {
     /// The row the overseer view treats as selected.
+    #[cfg(test)]
     pub(crate) fn overseer_selection(&self) -> Option<OverseerRow> {
         overseer_model(self).effective_selection(self.board.overseer_selected)
     }
@@ -34,40 +35,6 @@ impl AppState {
         if let Some(next) = model.next(current, dir) {
             self.board.overseer_selected = Some(next);
         }
-    }
-
-    /// After a proposal is kept or dropped its card is gone: land on the one
-    /// that took its place, or the last proposal, or wherever the view puts
-    /// a selection that no longer resolves.
-    fn overseer_reseat_after_proposal(&mut self, was_at: usize) {
-        let model = overseer_model(self);
-        self.board.overseer_selected = model
-            .proposals
-            .get(was_at.min(model.proposals.len().saturating_sub(1)))
-            .map(|card| OverseerRow::Proposal(card.id))
-            .or_else(|| model.effective_selection(self.board.overseer_selected));
-    }
-
-    /// `a` on a proposal: promote it as slated, the docket's `p`.
-    pub(crate) fn overseer_keep_proposal(&mut self, id: i64) {
-        let at = self.proposal_index(id);
-        self.docket_promote_slated_id(id);
-        self.overseer_reseat_after_proposal(at);
-    }
-
-    /// `x` on a proposal: discard it.
-    pub(crate) fn overseer_drop_proposal(&mut self, id: i64) {
-        let at = self.proposal_index(id);
-        self.docket_discard_id(id);
-        self.overseer_reseat_after_proposal(at);
-    }
-
-    fn proposal_index(&self, id: i64) -> usize {
-        overseer_model(self)
-            .proposals
-            .iter()
-            .position(|card| card.id == id)
-            .unwrap_or(0)
     }
 }
 
@@ -84,15 +51,7 @@ impl App {
                 self.state.overseer_move_selection(BoardDir::Down)
             }
             KeyCode::Enter => self.overseer_enter(),
-            KeyCode::Char('a') => match self.state.overseer_selection() {
-                Some(OverseerRow::Proposal(id)) => self.state.overseer_keep_proposal(id),
-                _ => self.state.cycle_board_view(),
-            },
-            KeyCode::Char('x') => {
-                if let Some(OverseerRow::Proposal(id)) = self.state.overseer_selection() {
-                    self.state.overseer_drop_proposal(id);
-                }
-            }
+            KeyCode::Char('a') => self.state.cycle_board_view(),
             KeyCode::Char('?') => {
                 // Help over the board, and back to the board when it closes.
                 self.state.board.suspended = true;
@@ -156,7 +115,6 @@ impl App {
                 self.state.board.docket_selected = Some(id);
                 self.state.set_board_view(BoardView::DocketItem);
             }
-            OverseerRow::Proposal(id) => self.state.overseer_keep_proposal(id),
         }
     }
 }
@@ -251,15 +209,6 @@ pub(crate) mod tests {
         }
     }
 
-    fn status_of(app: &App, id: i64) -> Option<crate::api::schema::DocketStatus> {
-        app.state
-            .docket_sample
-            .rows
-            .iter()
-            .find(|row| row.id == id)
-            .map(|row| row.status)
-    }
-
     #[tokio::test]
     async fn enter_on_agent_focuses_and_leaves() {
         let (mut app, path, blocked) = overseer_app();
@@ -298,51 +247,6 @@ pub(crate) mod tests {
         // Esc from the item steps back to the docket lanes, as it always did.
         app.handle_board_key(key(KeyCode::Esc));
         assert_eq!(app.state.board.view, BoardView::Docket);
-        cleanup(&path);
-    }
-
-    #[tokio::test]
-    async fn keep_slates_and_drop_discards_a_proposal() {
-        let (mut app, path, _) = overseer_app();
-        let proposals = overseer_model(&app.state).proposals;
-        assert_eq!(proposals.len(), 1);
-        let id = proposals[0].id;
-        app.state.board.overseer_selected = Some(OverseerRow::Proposal(id));
-        app.handle_board_overseer_key(key(KeyCode::Char('a')));
-        assert_eq!(
-            status_of(&app, id),
-            Some(crate::api::schema::DocketStatus::Open)
-        );
-        assert!(app.state.board.docket_notice.is_none());
-        // No proposals left: the selection lands somewhere real.
-        let sel = app.state.overseer_selection().expect("a selection");
-        assert!(!matches!(sel, OverseerRow::Proposal(_)));
-
-        // A second proposal, dropped this time.
-        {
-            let conn = crate::docket::open_store(&path).expect("scratch docket");
-            crate::docket::add(
-                &conn,
-                crate::docket::NewItem {
-                    title: "another".into(),
-                    source: Some(serde_json::json!({"kind": "situation", "ref": "disk"})),
-                    ..Default::default()
-                },
-            )
-            .expect("proposal");
-        }
-        app.state.refresh_docket();
-        let id = overseer_model(&app.state).proposals[0].id;
-        app.state.board.overseer_selected = Some(OverseerRow::Proposal(id));
-        app.handle_board_overseer_key(key(KeyCode::Char('x')));
-        assert_eq!(
-            status_of(&app, id),
-            Some(crate::api::schema::DocketStatus::Discarded)
-        );
-        // `a` with nothing proposed selected goes round the views instead.
-        app.state.board.overseer_selected = None;
-        app.handle_board_overseer_key(key(KeyCode::Char('a')));
-        assert_eq!(app.state.board.view, BoardView::Columns);
         cleanup(&path);
     }
 

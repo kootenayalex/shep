@@ -226,12 +226,13 @@ the pill is clickable exactly where it is drawn.
 **The pill is the one place `accent` paints a background.** Its lit half —
 the view you are on — is accent behind panel-bg bold text; the unlit half is
 surface1 behind subtext. Focus tier, because the pill is a selection between
-two views and not a state. The unlit `board` half carries ` N` in teal (the
-queued tier: proposals waiting for you) when the overseer has captured any.
+two views and not a state, and it carries no count: what the board holds is
+the board's to say.
 
 - Companion: `ViewPill` in `ui/components/Chrome.kt`, and the same ground a
   selected `ShepChip` already paints — the pill is two halves of one chip, not
-  a second colour rule. It is also the phone's *only* way between the two
+  a second colour rule. `ReadOfTheRoom` in `screens/BoardScreen.kt` seats the
+  sections the same way, glyph and ink from `ShepSemantic.agent`. It is also the phone's *only* way between the two
   views: `board` is a hint-bar tab and `agents` is not.
 
 **The board is a screen, not a panel.** It takes the desktop's place under
@@ -239,9 +240,13 @@ the same titlebar and hint bar — no border, no title, no footer of its own —
 because a sibling of the desktop is not something drawn over it. Its regions
 are headings in bold text with a count beside them in overlay0 (`needs you 2`,
 `agents 5`, `docket  due 2 !1  ·  inbox 5`, `health`), and the overseer's own
-regions carry its mark: `✦ read of the room  ·  hh:mm` in mauve, then
-`proposals`, whose heading is teal — the queued tier, because a proposal is
-waiting for you and nothing has happened yet — and `chat`. Above 120 columns
+regions carry its mark: `✦ read of the room  ·  hh:mm` in mauve, then `chat`.
+Inside the room each agent's paragraph sits under its own name, wearing that
+agent's live glyph and ink (`◉ claude`, `● claude · emberline` when two share
+a name), its lines indented four; `✦ room` in mauve closes the read with what
+cuts across them, and a name no live row answers to wears the absent `·`. The
+narrative is structure, not a paragraph, so the eye lands on an agent, not on
+a wall. Above 120 columns
 the left column is 74 wide with a surface1 rule beside it; below, the right
 column stacks under the left. Each region is a prefix of its rows: when the
 height runs out a region shows its first N entries and the rest are simply

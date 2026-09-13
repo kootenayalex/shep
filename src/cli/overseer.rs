@@ -546,6 +546,7 @@ mod tests {
             plugin_linked: true,
             sampled: true,
             narrative: vec!["two agents are blocked on you".into()],
+            sections: Vec::new(),
             source: OverseerNarrativeSource::Brain,
             tick_at: Some("14:32".into()),
             situation_age_seconds: Some(12),

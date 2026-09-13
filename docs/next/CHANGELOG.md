@@ -16,14 +16,14 @@
   refuses every tool call. `shep runtime ask … --mcp-profile NAME` puts it on
   the command line, and the overseer's brain tick, board chat and session pane
   all mount the `overseer` profile, so its hard rules rest on the tool list
-  rather than on the prompt: read, capture into the inbox, page the phone, and
-  no tool that acts on an agent.
+  rather than on the prompt: read, page the phone, and no tool that acts on
+  an agent.
 - The Android companion lands on the board. A new `board` tab — where the app
   now opens, mirroring the desktop's `ui.open_on_board` — carries the same
   regions the desktop's does: what needs you (with `↑N not pushed` from the
   new `git_ahead`), the agents table, the docket's due lane and inbox, the
-  health findings, the overseer's `✦ read of the room`, its proposals with
-  keep and drop, and a chat with the headless overseer over `overseer.chat`,
+  health findings, the overseer's `✦ read of the room`, and a chat with the
+  headless overseer over `overseer.chat`,
   which is the same resumed conversation the desktop board and the session
   pane share. Chrome follows: the desktop's glyph tally and the
   `desktop | board` pill replace the old words-and-counts dashboard strip,
@@ -62,8 +62,8 @@
   (`overseer_chat_busy`) instead of starting a second run of the same
   conversation, reading the shared session id no longer mints one, and the
   in-flight tick is a server fact rather than the desktop board's. The five
-  mutating `docket.*` methods now repaint an attached desktop, so keeping or
-  dropping a proposal from a phone moves the board at once. The bridge relays
+  mutating `docket.*` methods now repaint an attached desktop, so promoting
+  or discarding an item from a phone moves the board at once. The bridge relays
   all three overseer methods. No protocol bump: this is additive.
 - The bridge answers two more methods locally: `push.send {title, message,
   kind?, state?, agent?, workspace?, pane_id?}` pages every registered device
@@ -142,16 +142,16 @@
   it with `shep plugin link plugins/overseer`). Its `pane.agent_status_changed`
   and `pane.exited` hooks run one tick: `shep doctor --json`,
   `session.overview` and `shep docket list --json` become `situation.md` in
-  the plugin's state dir and a `BOARD.md` of at most 40 lines — blocked agents
-  first, every agent with its state age, health fails and warns, docket due
-  and inbox — which its `board` pane redraws every five seconds and its `tick`
+  the plugin's state dir and a `BOARD.md` of at most 30 lines — a `## <agent>`
+  section per agent, blocked first, with its state age and what it last said,
+  then `## room` with the docket's due and inbox counts and health fails and
+  warns — which its `board` pane redraws every five seconds and its `tick`
   action refreshes by hand. Name a brain with `[plugins.overseer] runtime =
   "claude"` (or `SHEP_OVERSEER_RUNTIME`) and, at most once every ten minutes,
-  the tick hands the situation to `shep runtime ask <runtime>` for a board
-  and a list of proposed inbox items, adding each proposal whose `source` is
-  new with `shep docket add --kind captured`. It never sends keys or text to a
-  pane, never touches the server, never nudges, never promotes a docket item;
-  a test greps the script for the forbidden verbs.
+  the tick hands the situation to `shep runtime ask <runtime>` for a board of
+  the same shape. It never sends keys or text to a pane, never touches the
+  server, never nudges, never writes to the docket; a test greps the script
+  for the forbidden verbs.
 
 - `[plugins.<id>]` tables in `config.toml` reach the plugin: every plugin
   command and pane receives its own table as `SHEP_PLUGIN_CONFIG_JSON`
@@ -302,7 +302,8 @@
   them, and `doctor` runs in-process. A profile can also narrow a tool instead
   of removing it — without the `docket` group `docket_add` captures into the
   inbox with its provenance intact and no due date, and without `send`
-  `agent_send` always queues. `--profile overseer|read|all`, `--allow`,
+  `agent_send` always queues. The `overseer` profile is reading and paging;
+  the docket is not in it. `--profile overseer|read|all`, `--allow`,
   `--deny` and `--tools` compose on the command line; `[plugins.overseer]
   tools = [...]` replaces the `overseer` set from the config file. `shep mcp
   config` prints the `mcpServers` block a client needs and `shep mcp tools`
@@ -310,6 +311,19 @@
   method: this is a second face on what the session already exposes.
 
 ### Changed
+
+- The overseer's read of the room is structured, not a paragraph. The board
+  the tick writes — deterministic or from the brain — is one `## <agent>`
+  section per agent, blocked first (`## name · group` when two agents share a
+  name), then `## room` for what cuts across them; `overseer.sample` carries it
+  as `sections: [{title, lines}]` beside the flat `narrative`, and the desktop
+  board and the phone seat each section under its agent's row with that
+  agent's glyph and ink, `✦ room` closing the read. The overseer no longer
+  proposes docket items: the brain is asked for the board alone, the
+  `overseer` MCP profile is reading and paging (`read`, `push`) with no
+  `docket-inbox`, the board's `proposals` region and its keep/drop keys are
+  gone, and the `board` pill half carries no count. What is owed is said on
+  the board; the docket is the person's own list.
 
 - The overseer board's `chat` is a thread with the overseer's headless
   runtime. `tab` on the board hands the keys to the input line (`› ▮`);

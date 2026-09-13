@@ -55,12 +55,10 @@ import dev.shep.companion.firstSentence
 import dev.shep.companion.formatAge
 import dev.shep.companion.looksUnsupported
 import dev.shep.companion.nowLine
-import dev.shep.companion.parseDocket
 import dev.shep.companion.parseOverseerSample
 import dev.shep.companion.parseOverview
 import dev.shep.companion.parseSnapshot
 import dev.shep.companion.parseTree
-import dev.shep.companion.proposals
 import dev.shep.companion.repoName
 import dev.shep.companion.ManualState
 import dev.shep.companion.statusColor
@@ -298,13 +296,11 @@ fun ChannelsScreen(
     var confirming by remember { mutableStateOf<Confirm?>(null) }
     var settingState by remember { mutableStateOf<Channel?>(null) }
     var customStates by remember { mutableStateOf<List<ManualState>>(emptyList()) }
-    // The overseer's one row outside the board, and the count on the pill's
-    // unlit half. Both are read on the keepalive rather than on every refresh:
-    // a narrative changes once a tick, and a proposal is not urgent enough to
-    // pay for a round trip every time a pane blinks.
+    // The overseer's one row outside the board. Read on the keepalive rather
+    // than on every refresh: a narrative changes once a tick, and is not
+    // urgent enough to pay for a round trip every time a pane blinks.
     var overseerLine by remember { mutableStateOf<String?>(null) }
     var overseerTickAt by remember { mutableStateOf<String?>(null) }
-    var proposalCount by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     // One clock for the whole list rather than one per row: every age on the
@@ -405,8 +401,6 @@ fun ChannelsScreen(
                         if (looksUnsupported(it.message)) overseerSupported = false
                     }
             }
-            withContext(Dispatchers.IO) { runCatching { client.call("docket.list") } }
-                .onSuccess { proposalCount = proposals(parseDocket(it)).size }
         }
 
         refresh()
@@ -528,7 +522,6 @@ fun ChannelsScreen(
         notice?.let { Notice(it, onDismiss = { notice = null }) }
         ChromeRow(
             totals = totals,
-            proposals = proposalCount,
             current = PillHalf.Desktop,
             onSelect = { if (it == PillHalf.Board) onSelectTab(Tab.Board) },
         )

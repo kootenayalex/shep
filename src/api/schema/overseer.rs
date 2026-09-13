@@ -79,6 +79,20 @@ pub struct OverseerSampleParams {
     pub chat_turns: Option<u32>,
 }
 
+/// One section of the read of the room: an agent's paragraph under its
+/// name, the closing `room` paragraph, or — for a board written before the
+/// sections — untitled prose.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct OverseerNarrativeSection {
+    /// The `## ` heading: an agent's display name as `session.overview`
+    /// gives it, or `room`. Absent for prose that stood under no heading.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The non-empty lines under it, trimmed.
+    #[serde(default)]
+    pub lines: Vec<String>,
+}
+
 /// What the overseer knows right now, read from its state dir.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct OverseerSample {
@@ -86,9 +100,15 @@ pub struct OverseerSample {
     pub plugin_linked: bool,
     /// Whether the state dir has been looked at, whatever was found.
     pub sampled: bool,
-    /// `BOARD.md`, header dropped, one entry per non-empty line.
+    /// `BOARD.md`, header dropped, one entry per non-empty line; a section
+    /// heading contributes its bare title. `sections` is the same text with
+    /// its structure kept.
     #[serde(default)]
     pub narrative: Vec<String>,
+    /// The narrative by section: one per agent, then `room`. Empty when the
+    /// overseer has not spoken.
+    #[serde(default)]
+    pub sections: Vec<OverseerNarrativeSection>,
     pub source: OverseerNarrativeSource,
     /// `hh:mm` of the last tick, when the situation says.
     #[serde(default, skip_serializing_if = "Option::is_none")]

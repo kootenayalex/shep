@@ -32,14 +32,15 @@ session_cwd = "~/vault/agents/shep-overseer"   # both faces run here; default: t
 or `SHEP_OVERSEER_RUNTIME=claude` in the server's environment. With a brain,
 at most once every ten minutes the tick hands the situation to
 `shep runtime ask <runtime>` together with the hard rules below and asks for
-exactly two things: a board (≤ 10 lines of prose, no headings, no tables,
-no per-agent list) and a JSON list of proposed inbox
-items (`title`, `source`, `notes`). The board replaces the deterministic one;
-each proposal whose `source` is not already in the docket becomes
-`shep docket add … --kind captured` — inbox only, no date, no repeat, at most
-five per tick. Events inside the ten-minute window refresh the situation and
-leave the brain's board standing. A brain that fails or answers badly costs
-nothing: the deterministic board stands.
+exactly one thing: a board of at most 30 lines, one `## <agent>` section per
+agent (blocked first; an agent that shares its name with another is
+`## name · group`) with a sentence or two on what the state word cannot say,
+then `## room` for what cuts across them — the docket, health, where to look
+first. The board replaces the deterministic one, which has the same shape.
+The brain never writes to the docket: what is owed is said on the board, and
+the person keeps their own list. Events inside the ten-minute window refresh
+the situation and leave the brain's board standing. A brain that fails or
+answers badly costs nothing: the deterministic board stands.
 
 The prompt goes on stdin, so the runtime never sees it on argv. Point
 `runtime` at a local model behind a `[runtimes.<name>] headless_argv` if you
@@ -104,8 +105,8 @@ shep calls, so the forbidden-verb test covers it too.
 - Never answers for an agent: no keys, no text, nothing to any pane's input.
 - Never touches the server: no stop, no handoff, no reload, no signals.
 - Never nudges or queues prompts.
-- Never promotes, dates or repeats a docket item; capture proposes, you
-  dispose.
+- Never writes to the docket — no captured items, no promotion, no dates.
+  What is owed is said on the board; the docket is yours.
 
 `tests/plugin_overseer.rs` greps the script for the forbidden verbs, so the
 rules hold by construction, not by discipline.
@@ -124,5 +125,5 @@ rules hold by construction, not by discipline.
   session's `session-id` and `session-started` (written by the TUI).
 
 Alex's vault skill `/shep-overseer` is the richer, claude-only variant of the
-same charter (paging, nudging, memory-file capture); this plugin is the part
+same charter (paging, nudging, dispatch); this plugin is the part
 of it that is safe to hand to a stranger.

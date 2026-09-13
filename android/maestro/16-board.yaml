@@ -1,16 +1,12 @@
 # The board — the phone's landing screen, mirroring the desktop's
 # `ui.open_on_board`: the overseer's read of the room, its health findings, the
-# docket lanes, its proposals and the chat that resumes its own session.
+# docket lanes and the chat that resumes its own session.
 #
 # Needs a paired app (run 01 first) and, on the computer:
 #   - the overseer plugin linked, with a headless runtime to think with
 #     (`[plugins.overseer] runtime = "claude"` in the config dir),
 #   - one tick already run, so there is a narrative and there are findings,
 #   - at least one docket item.
-# The proposals block needs an inbox item the overseer captured itself
-# (`source.kind == "situation"`); a tick usually writes a few. It is gated on
-# the heading being visible, so the flow stays green without one.
-#
 # The throwaway stack that gives you all of that — never the launchd server:
 #   just dev-stack up
 #   S="env -u HERDR_SOCKET_PATH SHEP_SOCKET_PATH=/tmp/shep-dev/api.sock target/debug/shep"
@@ -90,23 +86,6 @@ env:
 - tapOn:
     id: "pill-board"
 - assertVisible: "· board"
-
-# ── proposals: inbox only, you dispose ──────────────────────────────────
-# Only when the overseer has actually proposed something. `keep` promotes the
-# first proposal to slated — check it from the shell with
-# `shep docket list --json`, not from here.
-- scrollUntilVisible:
-    element:
-      text: "chat"
-    direction: DOWN
-    timeout: 30000
-- runFlow:
-    when:
-      visible: "proposals"
-    commands:
-      - tapOn:
-          text: "keep"
-          index: 0
 
 # ── chat: the same conversation the desk is having ──────────────────────
 - scrollUntilVisible:

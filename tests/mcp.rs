@@ -4,8 +4,10 @@
 //!
 //! The point of the profile is proved twice here — `docket_promote` is absent
 //! and refused, and `docket_add`'s due date is dropped while its `source`
-//! survives — because that forcing is the whole reason the overseer can be
-//! handed tools at all.
+//! survives when the `docket-inbox` group is granted on top of the overseer
+//! profile — because that forcing is the whole reason a brain can be handed
+//! tools at all. The `overseer` profile itself no longer carries
+//! `docket-inbox` (2026-09-13: the docket is the person's own list).
 
 mod support;
 
@@ -129,11 +131,12 @@ struct McpClient {
 }
 
 impl McpClient {
-    fn spawn(config_home: &Path, socket_path: &Path, profile: &str) -> Self {
+    fn spawn(config_home: &Path, socket_path: &Path, profile: &str, extra: &[&str]) -> Self {
         let mut child = shep_cli(config_home, socket_path)
             .args(["mcp", "--socket"])
             .arg(socket_path)
             .args(["--profile", profile])
+            .args(extra)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -193,7 +196,14 @@ fn mcp_serves_the_overseer_profile_over_stdio() {
     let server = spawn_server(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(10));
 
-    let mut client = McpClient::spawn(&config_home, &socket_path, "overseer");
+    // The overseer profile plus the capture group, so the inbox forcing
+    // (`docket_add` without `docket`) is still exercised end to end.
+    let mut client = McpClient::spawn(
+        &config_home,
+        &socket_path,
+        "overseer",
+        &["--allow", "docket-inbox"],
+    );
 
     let initialize = client.request(
         1,

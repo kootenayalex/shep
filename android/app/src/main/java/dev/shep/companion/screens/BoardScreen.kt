@@ -39,8 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -70,11 +68,8 @@ import dev.shep.companion.looksUnsupported
 import dev.shep.companion.needsYou
 import dev.shep.companion.parseChatTurn
 import dev.shep.companion.parseDocket
-import dev.shep.companion.parseDocketItem
 import dev.shep.companion.parseOverseerSample
 import dev.shep.companion.parseOverview
-import dev.shep.companion.proposals
-import dev.shep.companion.ui.components.ActionText
 import dev.shep.companion.ui.components.ChromeRow
 import dev.shep.companion.ui.components.EmptyState
 import dev.shep.companion.ui.components.ExplainLine
@@ -109,6 +104,16 @@ private const val CHAT_TURNS = 40
 
 /** Skip the opening tick when the situation is younger than this; the desktop's `STALE_SITUATION_SECS`. */
 private const val STALE_SITUATION_SECONDS = 60
+
+/**
+ * The one section of the read of the room that is not an agent: what is owed,
+ * whether the machine is well, and anything else that crosses them all.
+ * `narrative_sections` (src/app/overseer.rs) titles it, and it is always last.
+ */
+private const val ROOM_SECTION = "room"
+
+/** No status at all, which `ShepSemantic.agent` renders as the absent tier. */
+private const val UNKNOWN_STATE = ""
 
 /**
  * What an `overseer.*` event said, parsed off one `events.subscribe` line.
@@ -176,13 +181,12 @@ fun overseerSupported(previous: Boolean, error: String?): Boolean = when {
  * The regions are stacked in the desktop's narrow order
  * (`overseer_layout`, src/ui/overseer.rs:932-938) — what needs you, then what
  * is running, then what is owed, then whether the machine is well, and then
- * the three regions that are the overseer's own voice: its read of the room,
- * what it proposes, and the chat. One column, because a phone is always the
- * narrow case.
+ * the two regions that are the overseer's own voice: its read of the room and
+ * the chat. One column, because a phone is always the narrow case.
  *
- * Everything here is read. The only two things this screen writes are a
- * proposal's fate and a question to the overseer — and the overseer never
- * types into a pane, so nothing on this board can act on an agent by accident.
+ * Everything here is read. The only thing this screen writes is a question to
+ * the overseer — and the overseer never types into a pane, so nothing on this
+ * board can act on an agent by accident.
  */
 @Composable
 fun BoardScreen(
@@ -205,8 +209,6 @@ fun BoardScreen(
     // session the only — place a dropped bridge can show itself.
     var status by remember { mutableStateOf("connecting") }
     val scope = rememberCoroutineScope()
-    val haptics = LocalHapticFeedback.current
-    val actions = remember(client, scope) { DocketActions(client, scope) }
     val refreshSignal = remember { CoChannel<Unit>(CoChannel.CONFLATED) }
     val nowElapsedMs by rememberSecondsTicker()
     var statedAtMs by remember { mutableStateOf(0L) }
@@ -347,8 +349,7 @@ fun BoardScreen(
 
     val read = sample
     val currentDocket = docket
-    val proposalRows = currentDocket?.let { proposals(it) }.orEmpty()
-    val boardRows = currentDocket?.let { boardDocket(it, proposalRows) }
+    val boardRows = currentDocket?.let { boardDocket(it) }
     val waiting = needsYou(rows)
     val sinceMs = nowElapsedMs - statedAtMs
     // Re-read off the wall clock once a second, driven by the same ticker the
@@ -359,7 +360,6 @@ fun BoardScreen(
         ScreenHeader("board") { ConnectionLine(status) }
         ChromeRow(
             totals = totals,
-            proposals = proposalRows.size,
             current = PillHalf.Board,
             onSelect = { if (it == PillHalf.Desktop) onSelectTab(Tab.Agents) },
         )
@@ -423,40 +423,7 @@ fun BoardScreen(
                         color = ShepSemantic.overseer.color,
                     )
                 }
-                item(key = "room-body") { ReadOfTheRoom(read) }
-
-                if (proposalRows.isNotEmpty()) {
-                    item(key = "proposals") {
-                        RegionHeading(
-                            "proposals",
-                            proposalRows.size.toString(),
-                            hint = "· inbox only, you dispose",
-                            color = ShepPalette.teal,
-                        )
-                    }
-                    items(proposalRows, key = { "proposal:" + it.id }) { item ->
-                        ProposalRow(
-                            item = item,
-                            onKeep = {
-                                actions.keep(
-                                    item.id,
-                                    onItem = { returned -> swapDocket(currentDocket, returned) { docket = it } },
-                                    onSuccess = { notice = it; scope.launch { refresh() } },
-                                    onFailure = { notice = it },
-                                )
-                            },
-                            onDrop = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                actions.drop(
-                                    item.id,
-                                    onItem = { returned -> swapDocket(currentDocket, returned) { docket = it } },
-                                    onSuccess = { notice = it; scope.launch { refresh() } },
-                                    onFailure = { notice = it },
-                                )
-                            },
-                        )
-                    }
-                }
+                item(key = "room-body") { ReadOfTheRoom(read, rows) }
 
                 item(key = "chat") {
                     RegionHeading(
@@ -496,13 +463,6 @@ fun BoardScreen(
             )
         }
     }
-}
-
-/** Swap one mutated docket row into the list so it moves lane before the next poll. */
-private fun swapDocket(current: Docket?, returned: JSONObject, onDocket: (Docket) -> Unit) {
-    current ?: return
-    val item = parseDocketItem(returned, current.today)
-    onDocket(current.copy(items = listOf(item) + current.items.filterNot { it.id == item.id }))
 }
 
 /**
@@ -557,9 +517,8 @@ private fun HeaderFacts(sample: OverseerSample?, host: SessionHost) {
  * hint after that.
  *
  * `docs/DESIGN-LANGUAGE.md:222` — headings in bold text with a count in
- * overlay0. The two regions that are the overseer's own voice carry its
- * colours: mauve for the read of the room, teal for proposals (the queued
- * tier, because a proposal is waiting on you and nothing has happened yet).
+ * overlay0. The region that is the overseer's own voice carries its colour:
+ * mauve for the read of the room.
  */
 @Composable
 private fun RegionHeading(
@@ -833,73 +792,75 @@ private fun HealthRow(findings: List<HealthFinding>, onFix: (String) -> Unit) {
 }
 
 /**
- * The narrative, as paragraphs.
+ * The narrative, one section per agent and a last one for the room.
  *
  * The one place on these screens that is prose rather than shep talking about
  * itself, so it is the one place in sans. A deterministic board — the tick's
  * own template, written when no brain answered — says so, because "the
  * overseer thinks" and "a template filled itself in" are different claims.
+ *
+ * A section's heading carries the state of the agent it is about, read off
+ * [rows] by display name, so the paragraph about a blocked agent is headed by
+ * the same `◉` in the same red the row above it draws — the desktop's
+ * `render_room` (src/ui/overseer.rs) over the same sections. An agent that is
+ * no longer in the overview gets the absent tier rather than a borrowed
+ * colour, and the `room` section gets the overseer's own mark. A titleless
+ * section is a board from a server that predates
+ * `narrative_sections` (src/app/overseer.rs) and renders as plain paragraphs.
  */
 @Composable
-private fun ReadOfTheRoom(sample: OverseerSample?) {
-    val lines = sample?.narrative.orEmpty()
-    if (lines.isEmpty()) {
+private fun ReadOfTheRoom(sample: OverseerSample?, rows: List<AgentRow>) {
+    val sections = sample?.sections.orEmpty()
+    if (sections.isEmpty()) {
         DimLine("the overseer has not spoken yet")
         return
     }
+    val tick by rememberSpinnerTick()
     Column(
         Modifier.padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
         verticalArrangement = Arrangement.spacedBy(ShepSpace.tight),
     ) {
-        lines.forEach { Text(it, style = ShepType.body) }
+        sections.forEach { section ->
+            section.title?.let { title ->
+                val look = if (title == ROOM_SECTION) {
+                    ShepSemantic.overseer
+                } else {
+                    rows.firstOrNull {
+                        val name = it.displayName ?: it.agent
+                        title == name || title == "$name · ${it.workspaceLabel}"
+                    }
+                        ?.let { ShepSemantic.agent(it.status, tick) }
+                        // No row by that name any more — the agent was closed
+                        // between the tick and this frame. An unknown status
+                        // is the absent tier, which is exactly the claim.
+                        ?: ShepSemantic.agent(UNKNOWN_STATE, tick)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(look.glyph, style = ShepType.stateGlyphSmall.copy(color = look.color))
+                    Spacer(Modifier.width(ShepSpace.small))
+                    Text(
+                        title,
+                        style = ShepType.body.copy(
+                            color = ShepPalette.text,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                }
+            }
+            section.lines.forEach { line ->
+                Text(
+                    line,
+                    style = ShepType.body,
+                    modifier = if (section.title == null) {
+                        Modifier
+                    } else {
+                        Modifier.padding(start = ShepSpace.screen)
+                    },
+                )
+            }
+        }
         if (sample?.source == "deterministic") {
             Text("no brain answered — this is the tick's own summary", style = ShepType.metaSmall)
-        }
-    }
-}
-
-/**
- * One proposal: what the overseer wants written down, and the two words that
- * dispose of it (`render_proposals`, src/ui/overseer.rs:1374).
- *
- * `keep` promotes it onto the slated lane; `drop` discards it. Nothing here
- * happens on its own — the overseer proposes into the inbox and you dispose,
- * which is the whole reason this is a region and not a notification.
- */
-@Composable
-private fun ProposalRow(item: DocketItem, onKeep: () -> Unit, onDrop: () -> Unit) {
-    val look = ShepSemantic.docket(DocketStatus.Inbox.wire)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(look.glyph, style = ShepType.stateGlyphSmall.copy(color = look.color))
-            Spacer(Modifier.width(ShepSpace.small))
-            Text("#${item.id} ", style = ShepType.metaSmall)
-            Text(
-                item.title,
-                style = ShepType.meta.copy(color = ShepPalette.text),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            ActionText(
-                "keep",
-                style = ShepType.action.copy(color = ShepPalette.green),
-                onClick = onKeep,
-            )
-            ActionText(
-                "drop",
-                style = ShepType.action.copy(color = ShepPalette.red),
-                onClick = onDrop,
-            )
-        }
-        val second = item.sourceLabel?.let { "from  $it" }
-            ?: item.notes?.lineSequence()?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
-        second?.let {
-            Text(it, style = ShepType.metaSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

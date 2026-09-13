@@ -667,7 +667,7 @@ impl Profile {
     /// tool list is the rule now and the prose was advisory.
     pub(crate) fn named(name: &str) -> Option<Self> {
         Some(match name {
-            "overseer" => Self::from_groups(&[Group::Read, Group::DocketInbox, Group::Push]),
+            "overseer" => Self::from_groups(&[Group::Read, Group::Push]),
             "read" => Self::from_groups(&[Group::Read]),
             "all" => Self::from_groups(Group::ALL),
             _ => return None,
@@ -914,11 +914,14 @@ mod tests {
     }
 
     #[test]
-    fn mcp_overseer_profile_reads_captures_and_pages_and_nothing_else() {
+    fn mcp_overseer_profile_reads_and_pages_and_nothing_else() {
         let profile = Profile::named("overseer").unwrap();
         let listed = names(&profile);
         assert!(listed.contains(&"session_overview"));
-        assert!(listed.contains(&"docket_add"));
+        assert!(
+            !listed.contains(&"docket_add"),
+            "the overseer stopped proposing on 2026-09-13: the docket is the person's"
+        );
         assert!(listed.contains(&"push_page"));
         assert!(listed.contains(&"doctor"));
         assert!(!listed.contains(&"docket_promote"));

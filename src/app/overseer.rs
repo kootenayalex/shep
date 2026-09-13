@@ -32,7 +32,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use serde::Deserialize;
 
-use super::state::{AppState, DocketSample, Mode};
+use super::state::{AppState, Mode};
 use super::App;
 use crate::events::AppEvent;
 use crate::workspace::SystemRole;
@@ -40,9 +40,6 @@ use crate::workspace::SystemRole;
 /// How stale the sample may get before the dir is stat'ed again. The
 /// dashboard's interval: the overseer ticks on agent events, not per frame.
 pub(crate) const OVERSEER_SAMPLE_INTERVAL: Duration = Duration::from_secs(2);
-
-/// The most proposals the board lists, newest first.
-pub(crate) const MAX_PROPOSALS: usize = 5;
 
 /// How old the overseer's situation may be before a caller that wants a
 /// current read of the room — the board opening, or an `overseer.tick` with
@@ -88,7 +85,7 @@ const SESSION_STARTED_FILE: &str = "session-started";
 pub(crate) use crate::api::schema::{
     OverseerChatRole as ChatRole, OverseerChatTurn as ChatTurn,
     OverseerHealthFinding as HealthFinding, OverseerHealthLevel as HealthLevel,
-    OverseerNarrativeSource as NarrativeSource,
+    OverseerNarrativeSection as NarrativeSection, OverseerNarrativeSource as NarrativeSource,
 };
 
 /// The overseer's files, mirrored. Every field is optional: a dir that does
@@ -141,6 +138,13 @@ fn clock_token(at: &str) -> Option<String> {
                 && bytes[3..].iter().all(u8::is_ascii_digit)
         })
         .map(str::to_string)
+}
+
+/// The title of a `## <title>` section heading, when `line` is one.
+pub(crate) fn section_title(line: &str) -> Option<&str> {
+    line.strip_prefix("## ")
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
 }
 
 impl OverseerSample {
@@ -219,10 +223,10 @@ impl OverseerSample {
         };
     }
 
-    /// The narrative as the board reads it: every non-empty line of
-    /// `BOARD.md` after the header the tick writes (`OVERSEER · <at> ·
-    /// <source>`, or the older `# BOARD — …`), trimmed.
-    pub fn narrative_lines(&self) -> Vec<String> {
+    /// The body of `BOARD.md`: every non-empty line after the header the
+    /// tick writes (`OVERSEER · <at> · <source>`, or the older `# BOARD — …`),
+    /// trimmed, with section headings still carrying their `## `.
+    fn body_lines(&self) -> Vec<&str> {
         let Some(text) = self.narrative.as_deref() else {
             return Vec::new();
         };
@@ -237,20 +241,53 @@ impl OverseerSample {
         {
             lines.next();
         }
-        lines.map(str::to_string).collect()
+        lines.collect()
+    }
+
+    /// The narrative as a flat list: every non-empty line of `BOARD.md`
+    /// after the header, a section heading reduced to its bare title.
+    pub fn narrative_lines(&self) -> Vec<String> {
+        self.body_lines()
+            .into_iter()
+            .map(|line| section_title(line).unwrap_or(line).to_string())
+            .collect()
+    }
+
+    /// The narrative by section: the tick writes `## <agent>` over each
+    /// agent's paragraph and `## room` over what cuts across them. Prose
+    /// before the first heading — the whole board, for one written before
+    /// the sections — is a section with no title.
+    pub fn narrative_sections(&self) -> Vec<NarrativeSection> {
+        let mut sections: Vec<NarrativeSection> = Vec::new();
+        for line in self.body_lines() {
+            if let Some(title) = section_title(line) {
+                sections.push(NarrativeSection {
+                    title: Some(title.to_string()),
+                    lines: Vec::new(),
+                });
+                continue;
+            }
+            if sections.is_empty() {
+                sections.push(NarrativeSection::default());
+            }
+            sections
+                .last_mut()
+                .expect("a section was just pushed")
+                .lines
+                .push(line.to_string());
+        }
+        sections
     }
 
     /// The narrative's opening sentence — what the strip has room for.
     ///
-    /// Skips a header line (`# BOARD — …` from the tick's template, or
-    /// `OVERSEER · …`) and stops at the first sentence end or line break.
+    /// Skips the header and any section heading, and stops at the first
+    /// sentence end or line break.
     pub fn first_sentence(&self) -> Option<String> {
-        let text = self.narrative.as_deref()?;
-        let mut lines = text.lines().map(str::trim).filter(|line| !line.is_empty());
-        let mut line = lines.next()?;
-        if line.starts_with("OVERSEER ·") || line.starts_with("# ") {
-            line = lines.next()?;
-        }
+        let line = self
+            .body_lines()
+            .into_iter()
+            .find(|line| section_title(line).is_none())?;
         let end = [". ", "! ", "? "]
             .iter()
             .filter_map(|mark| line.find(mark))
@@ -296,8 +333,14 @@ impl OverseerSample {
         }
         Self {
             narrative: Some(
-                "workmayt's claude has been blocked 2m on a permission prompt. \
-                 emberline is done and unseen; two proposals on the board."
+                "OVERSEER · 07:08 · brain\n\
+                 ## claude · workmayt\n\
+                 workmayt's claude has been blocked 2m on a permission prompt. \
+                 Say yes: it is the push it was asked for.\n\
+                 ## claude · emberline\n\
+                 done and unseen; its push is waiting.\n\
+                 ## room\n\
+                 nothing owed; disk is low."
                     .to_string(),
             ),
             source: NarrativeSource::Brain,
@@ -343,7 +386,7 @@ Hard rules you must respect in what you write:
 1. You never answer for an agent. A blocked agent is the person's to answer; you may draft a suggested answer with a reason.
 2. You never touch the server, restart anything, or kill anything.
 3. You never nudge or queue prompts.
-4. Capture proposes, the person disposes: proposals are inbox items only, no dates, no repeats, and only for genuinely owed things visible in the situation.";
+4. You never write to the docket: what is owed is said on the board, and the person keeps their own list.";
 
 /// What the chat asks of the runtime, after the rules.
 const CHAT_TASK: &str = "You are the overseer of this shep session; answer in at most 6 short lines, plain prose, no markdown headings.";
@@ -991,6 +1034,7 @@ impl App {
                 .contains_key(OVERSEER_PLUGIN_ID),
             sampled: overseer.sample.sampled,
             narrative: overseer.sample.narrative_lines(),
+            sections: overseer.sample.narrative_sections(),
             source: overseer.sample.source,
             tick_at: overseer.sample.tick_at.clone(),
             situation_age_seconds: overseer.sample.situation_age(now).map(|age| age.as_secs()),
@@ -1140,60 +1184,6 @@ pub(crate) const SESSION_GROUP_NAME: &str = "overseer";
 pub(crate) const SESSION_NEEDS_PLUGIN: &str =
     "link the overseer plugin: shep plugin link plugins/overseer";
 
-/// One inbox item the overseer proposed, as the board lists it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ProposalCard {
-    pub id: i64,
-    pub title: String,
-    /// The first line of the notes, when there are any.
-    pub notes_line: Option<String>,
-    /// What the proposal points at (`source.ref`), when it says.
-    pub reference: Option<String>,
-    /// ISO 8601 UTC, as the store returns it.
-    pub updated: String,
-}
-
-fn is_situation_sourced(source: Option<&serde_json::Value>) -> bool {
-    source
-        .and_then(|value| value.get("kind"))
-        .and_then(serde_json::Value::as_str)
-        == Some("situation")
-}
-
-/// The proposals waiting on the board: inbox items the overseer captured
-/// (`source.kind == "situation"`), newest first, at most [`MAX_PROPOSALS`].
-pub(crate) fn proposals(sample: &DocketSample) -> Vec<ProposalCard> {
-    use crate::api::schema::DocketStatus;
-    let mut cards: Vec<ProposalCard> = sample
-        .rows
-        .iter()
-        .filter(|row| {
-            row.status == DocketStatus::Inbox && is_situation_sourced(row.source.as_ref())
-        })
-        .map(|row| ProposalCard {
-            id: row.id,
-            title: row.title.clone(),
-            notes_line: row
-                .notes
-                .as_deref()
-                .and_then(|notes| notes.lines().next())
-                .map(str::trim)
-                .filter(|line| !line.is_empty())
-                .map(str::to_string),
-            reference: row
-                .source
-                .as_ref()
-                .and_then(|value| value.get("ref"))
-                .and_then(serde_json::Value::as_str)
-                .map(str::to_string),
-            updated: row.updated.clone(),
-        })
-        .collect();
-    cards.sort_by(|a, b| b.updated.cmp(&a.updated).then(b.id.cmp(&a.id)));
-    cards.truncate(MAX_PROPOSALS);
-    cards
-}
-
 /// A state dir no test shares with another or with the real one. Nothing is
 /// created until a test writes into it.
 #[cfg(test)]
@@ -1213,7 +1203,6 @@ pub(crate) fn test_state_dir() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::schema::{DocketItem, DocketKind, DocketStatus};
 
     fn write(dir: &Path, name: &str, text: &str) {
         std::fs::create_dir_all(dir).expect("scratch dir");
@@ -1330,6 +1319,11 @@ mod tests {
                 Some("one sentence with no stop"),
             ),
             ("# only a header", None),
+            (
+                "OVERSEER · 07:08\n## claude\nblocked 2m. say yes.\n## room",
+                Some("blocked 2m."),
+            ),
+            ("## room", None),
             ("", None),
         ] {
             sample.narrative = (!text.is_empty()).then(|| text.to_string());
@@ -1348,8 +1342,63 @@ mod tests {
         assert_eq!(sample.narrative_lines(), vec!["only."]);
         sample.narrative = Some("no header".into());
         assert_eq!(sample.narrative_lines(), vec!["no header"]);
+        sample.narrative = Some("## claude\nblocked.\n## room\nquiet.".into());
+        assert_eq!(
+            sample.narrative_lines(),
+            vec!["claude", "blocked.", "room", "quiet."],
+            "a heading is its bare title"
+        );
         sample.narrative = None;
         assert!(sample.narrative_lines().is_empty());
+    }
+
+    #[test]
+    fn narrative_sections_split_on_headings_and_keep_untitled_prose() {
+        let section = |title: Option<&str>, lines: &[&str]| NarrativeSection {
+            title: title.map(str::to_string),
+            lines: lines.iter().map(|l| l.to_string()).collect(),
+        };
+        let sample = OverseerSample::test_fixture();
+        assert_eq!(
+            sample.narrative_sections(),
+            vec![
+                section(
+                    Some("claude · workmayt"),
+                    &["workmayt's claude has been blocked 2m on a permission prompt. Say yes: it is the push it was asked for."]
+                ),
+                section(Some("claude · emberline"), &["done and unseen; its push is waiting."]),
+                section(Some("room"), &["nothing owed; disk is low."]),
+            ]
+        );
+        assert_eq!(
+            sample.first_sentence().as_deref(),
+            Some("workmayt's claude has been blocked 2m on a permission prompt."),
+            "the strip skips the heading"
+        );
+
+        // A board from before the sections: one untitled section, whole.
+        let old = OverseerSample {
+            narrative: Some("OVERSEER · 07:08 · brain\nall quiet.\nnothing owed.".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            old.narrative_sections(),
+            vec![section(None, &["all quiet.", "nothing owed."])]
+        );
+        // Prose before the first heading keeps its own untitled section; an
+        // empty heading (`## `) is prose, not a section.
+        let mixed = OverseerSample {
+            narrative: Some("lead.\n## \n## codex\nworking.".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            mixed.narrative_sections(),
+            vec![
+                section(None, &["lead.", "##"]),
+                section(Some("codex"), &["working."])
+            ]
+        );
+        assert!(OverseerSample::default().narrative_sections().is_empty());
     }
 
     #[test]
@@ -1361,58 +1410,6 @@ mod tests {
         assert_eq!(clock_token("07:08").as_deref(), Some("07:08"));
         assert_eq!(clock_token("2026-09-12T07:08:09Z"), None);
         assert_eq!(clock_token(""), None);
-    }
-
-    fn inbox(id: i64, updated: &str, source: Option<serde_json::Value>) -> DocketItem {
-        DocketItem {
-            id,
-            title: format!("item {id}"),
-            kind: DocketKind::Captured,
-            status: DocketStatus::Inbox,
-            due: None,
-            repeat: None,
-            source,
-            notes: Some(format!("note {id}\nmore")),
-            created: updated.to_string(),
-            updated: updated.to_string(),
-            last_fired: None,
-            overdue: false,
-        }
-    }
-
-    #[test]
-    fn proposals_are_situation_sourced_newest_first_max_five() {
-        let situation = |r: &str| Some(serde_json::json!({"kind": "situation", "ref": r}));
-        let mut rows = vec![
-            inbox(1, "2026-09-10T10:00:00Z", situation("pane p1")),
-            inbox(2, "2026-09-12T10:00:00Z", situation("pane p2")),
-            inbox(
-                3,
-                "2026-09-11T10:00:00Z",
-                Some(serde_json::json!({"pane": "p3"})),
-            ),
-            inbox(4, "2026-09-11T10:00:00Z", None),
-            inbox(5, "2026-09-11T12:00:00Z", situation("pane p5")),
-            inbox(6, "2026-09-11T11:00:00Z", situation("pane p6")),
-            inbox(7, "2026-09-11T09:00:00Z", situation("pane p7")),
-            inbox(8, "2026-09-11T08:00:00Z", situation("pane p8")),
-        ];
-        let mut done = inbox(9, "2026-09-13T00:00:00Z", situation("pane p9"));
-        done.status = DocketStatus::Done;
-        rows.push(done);
-        let sample = DocketSample {
-            rows,
-            today: None,
-            sampled: true,
-            sampled_at: None,
-        };
-        let cards = proposals(&sample);
-        assert_eq!(
-            cards.iter().map(|c| c.id).collect::<Vec<_>>(),
-            vec![2, 5, 6, 7, 8]
-        );
-        assert_eq!(cards[0].reference.as_deref(), Some("pane p2"));
-        assert_eq!(cards[0].notes_line.as_deref(), Some("note 2"));
     }
 
     #[test]

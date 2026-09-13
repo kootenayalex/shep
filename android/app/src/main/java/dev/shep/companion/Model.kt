@@ -775,9 +775,11 @@ data class DocketItem(
     val repeat: String?,
     val sourceLabel: String?,
     /**
-     * The raw `source.kind`, unlabelled. `proposals` filters on it: an inbox
-     * item the overseer captured says `situation`, and that is what tells a
-     * proposal apart from something you wrote down yourself.
+     * The raw `source.kind`, unlabelled — `situation` for a row the overseer
+     * captured off a tick, absent for one you wrote down yourself. The label
+     * is for reading; this is the machine-readable half, kept because the
+     * wire sends it and a caller that wants to tell the two apart should not
+     * have to parse [sourceLabel] back out.
      */
     val sourceKind: String?,
     val notes: String?,
@@ -956,6 +958,20 @@ enum class ChatRole(val wire: String) {
 data class ChatTurn(val at: Long, val role: ChatRole, val text: String)
 
 /**
+ * One section of the read of the room.
+ *
+ * [title] is an agent's display name — the same string `session.overview`
+ * sends as `display_name`, so a section can be matched to the row it is about
+ * — or `room` for the cross-cutting facts (what is owed, whether the machine
+ * is well). A null title is plain prose: that is what a board written by an
+ * older tick, which had no sections at all, degrades to.
+ *
+ * Wire: the `sections` entries on `OverseerSample` (src/api/schema/overseer.rs),
+ * built by `narrative_sections` in src/app/overseer.rs.
+ */
+data class NarrativeSection(val title: String?, val lines: List<String>)
+
+/**
  * What the overseer knows right now. Wire: `OverseerSample` in
  * src/api/schema/overseer.rs, built by `App::overseer_sample_info`
  * (src/app/overseer.rs).
@@ -969,6 +985,17 @@ data class OverseerSample(
     val sampled: Boolean,
     /** `BOARD.md`, header dropped, one entry per non-empty line. */
     val narrative: List<String>,
+    /**
+     * The same read of the room, cut into its sections: one per agent, then
+     * `room` for what is cross-cutting. Wire: `sections` on `OverseerSample`,
+     * built by `narrative_sections` in src/app/overseer.rs and drawn by
+     * `render_room` in src/ui/overseer.rs.
+     *
+     * A server too old to send them leaves this as one titleless section
+     * holding [narrative] whole, so the board keeps rendering prose rather
+     * than going blank on a board that is still perfectly readable.
+     */
+    val sections: List<NarrativeSection>,
     /** `brain` or `deterministic` — who wrote the narrative. */
     val source: String,
     /** `hh:mm` of the last tick, when the situation says. */
@@ -1003,6 +1030,28 @@ private fun parseHealthFinding(obj: JSONObject): HealthFinding = HealthFinding(
 )
 
 /**
+ * The sample's `sections`, or the one section an older server implies.
+ *
+ * The fallback is the whole narrative under no title, which is exactly what
+ * the board drew before sections existed — so a phone talking to a server that
+ * predates them loses the headings and nothing else.
+ */
+private fun parseNarrativeSections(
+    array: JSONArray?,
+    narrative: List<String>,
+): List<NarrativeSection> {
+    if (array == null) {
+        return if (narrative.isEmpty()) emptyList() else listOf(NarrativeSection(null, narrative))
+    }
+    return (0 until array.length()).mapNotNull { array.optJSONObject(it) }.map { obj ->
+        NarrativeSection(
+            title = obj.optStringOrNull("title"),
+            lines = obj.optStringList("lines"),
+        )
+    }
+}
+
+/**
  * Parse an `overseer.sample` result (`{sample: {…}}`).
  *
  * A payload that is not one — or nothing at all — parses to the same shape
@@ -1014,10 +1063,12 @@ fun parseOverseerSample(result: JSONObject): OverseerSample {
     val healthArr = s.optJSONArray("health") ?: JSONArray()
     val chatArr = s.optJSONArray("chat") ?: JSONArray()
     val session = s.optJSONObject("session") ?: JSONObject()
+    val narrative = s.optStringList("narrative")
     return OverseerSample(
         pluginLinked = s.optBoolean("plugin_linked", false),
         sampled = s.optBoolean("sampled", false),
-        narrative = s.optStringList("narrative"),
+        narrative = narrative,
+        sections = parseNarrativeSections(s.optJSONArray("sections"), narrative),
         source = s.optStringOrNull("source") ?: "deterministic",
         tickAt = s.optStringOrNull("tick_at"),
         situationAgeSeconds = s.optLongOrNull("situation_age_seconds"),
@@ -1058,30 +1109,14 @@ fun firstSentence(narrative: List<String>): String? {
     return line.take(end).trim().takeIf { it.isNotEmpty() }
 }
 
-/** How many proposals the board shows at once; the desktop's `MAX_PROPOSALS`. */
-const val MAX_PROPOSALS = 5
-
 /**
- * The proposals waiting on the board: inbox items the overseer captured
- * (`source.kind == "situation"`), newest first, at most [MAX_PROPOSALS].
- *
- * The desktop's `app::overseer::proposals` (src/app/overseer.rs:1113) over the
- * same rows. Anything you wrote down yourself stays in the docket region: the
- * point of the split is that these are somebody else's suggestions and you
- * have not agreed to them yet.
- */
-fun proposals(docket: Docket): List<DocketItem> = docket.items
-    .filter { it.status == DocketStatus.Inbox && it.sourceKind == "situation" }
-    .sortedWith(compareByDescending<DocketItem> { it.updated }.thenByDescending { it.id })
-    .take(MAX_PROPOSALS)
-
-/**
- * The docket region of the board: the due lane whole, then the inbox items not
- * already showing as proposals, with the heading's three counts.
+ * The docket region of the board: the due lane whole, then the inbox, with the
+ * heading's three counts.
  *
  * Mirrors `overseer_model` in src/ui/overseer.rs:218-239 — same lanes, same
- * subtraction, same counts — so the heading on the phone reads what the
- * heading at the desk reads.
+ * counts — so the heading on the phone reads what the heading at the desk
+ * reads. Every inbox row is listed: the board no longer offers anything of its
+ * own, so nothing is held back for a region of its own.
  */
 data class BoardDocket(
     val rows: List<DocketItem>,
@@ -1090,13 +1125,12 @@ data class BoardDocket(
     val inbox: Int,
 )
 
-fun boardDocket(docket: Docket, proposals: List<DocketItem>): BoardDocket {
+fun boardDocket(docket: Docket): BoardDocket {
     val lanes = docketLanes(docket).toMap()
     val due = lanes[DocketLane.Due].orEmpty()
     val inbox = lanes[DocketLane.Inbox].orEmpty()
-    val proposed = proposals.map { it.id }.toSet()
     return BoardDocket(
-        rows = due + inbox.filterNot { it.id in proposed },
+        rows = due + inbox,
         due = due.size,
         overdue = due.count { it.overdue },
         inbox = inbox.size,

@@ -1232,7 +1232,11 @@ fn overseer_requests_and_responses_round_trip() {
             sample: Box::new(OverseerSample {
                 plugin_linked: true,
                 sampled: true,
-                narrative: vec!["claude is blocked.".into()],
+                narrative: vec!["claude".into(), "claude is blocked.".into()],
+                sections: vec![OverseerNarrativeSection {
+                    title: Some("claude".into()),
+                    lines: vec!["claude is blocked.".into()],
+                }],
                 source: OverseerNarrativeSource::Brain,
                 tick_at: Some("10:22".into()),
                 situation_age_seconds: Some(12),

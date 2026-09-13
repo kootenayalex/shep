@@ -111,19 +111,14 @@ enum class PillHalf(val label: String) {
  * paints its selected state in accent (`Interactive.kt:143`), and the pill
  * differs only in being a single stadium cut in two so the pair reads as one
  * control rather than as two buttons that happen to be adjacent.
- *
- * [proposals] rides on the unlit `board` half as ` N` in teal — the queued
- * tier, because a proposal is waiting for you and nothing has happened yet.
  */
 @Composable
-fun ViewPill(current: PillHalf, proposals: Int, onSelect: (PillHalf) -> Unit) {
+fun ViewPill(current: PillHalf, onSelect: (PillHalf) -> Unit) {
     Row(Modifier.clip(ShepShape.pill), verticalAlignment = Alignment.CenterVertically) {
         PillHalf.entries.forEach { half ->
-            val lit = half == current
             PillHalfBox(
                 half = half,
-                lit = lit,
-                proposals = if (!lit && half == PillHalf.Board) proposals else 0,
+                lit = half == current,
                 onClick = { onSelect(half) },
             )
         }
@@ -131,7 +126,7 @@ fun ViewPill(current: PillHalf, proposals: Int, onSelect: (PillHalf) -> Unit) {
 }
 
 @Composable
-private fun PillHalfBox(half: PillHalf, lit: Boolean, proposals: Int, onClick: () -> Unit) {
+private fun PillHalfBox(half: PillHalf, lit: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             // `board` is also a hint-bar label and `desktop` is only unique by
@@ -151,12 +146,6 @@ private fun PillHalfBox(half: PillHalf, lit: Boolean, proposals: Int, onClick: (
                 fontWeight = if (lit) FontWeight.Bold else FontWeight.Normal,
             ),
         )
-        if (proposals > 0) {
-            Text(
-                " $proposals",
-                style = ShepType.badge.copy(color = ShepPalette.teal),
-            )
-        }
     }
 }
 
@@ -169,7 +158,6 @@ private fun PillHalfBox(half: PillHalf, lit: Boolean, proposals: Int, onClick: (
 @Composable
 fun ChromeRow(
     totals: SessionTotals,
-    proposals: Int,
     current: PillHalf,
     onSelect: (PillHalf) -> Unit,
 ) {
@@ -184,7 +172,7 @@ fun ChromeRow(
     ) {
         StateTally(totals, tick)
         Spacer(Modifier.weight(1f))
-        ViewPill(current, proposals, onSelect)
+        ViewPill(current, onSelect)
     }
 }
 

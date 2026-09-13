@@ -893,7 +893,7 @@ pub(crate) struct BoardState {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum BoardView {
     /// The overseer's screen: who needs you, the agents table, the docket's
-    /// due lane, health, the narrative, proposals and chat. What the board
+    /// due lane, health, the narrative and chat. What the board
     /// opens on unless `[ui] board_view` says otherwise.
     #[default]
     Overseer,
@@ -1067,16 +1067,11 @@ impl AppState {
             || (self.view.layout == ViewLayout::Desktop && (self.titlebar || self.overseer_strip))
     }
 
-    /// Whether the docket rows are worth their sqlite read right now: the
-    /// board is up (any of its screens counts them), or the desktop titlebar
-    /// is — its pill counts the overseer's proposals, which only exist once
-    /// the overseer has spoken, so a session without one never opens the
-    /// store from the desktop.
+    /// Whether the docket rows are worth their sqlite read right now: only
+    /// while the board is up (any of its screens counts them). The desktop
+    /// chrome shows nothing from the docket, so it never opens the store.
     pub(crate) fn docket_sample_wanted(&self) -> bool {
         self.board_underlay()
-            || (self.view.layout == ViewLayout::Desktop
-                && self.titlebar
-                && self.overseer.sample.narrative.is_some())
     }
 
     /// Re-read every agent's own session file whose sample has aged out.
@@ -1248,43 +1243,6 @@ impl DocketSample {
             sampled: true,
             sampled_at: Some(std::time::Instant::now()),
         }
-    }
-
-    /// [`Self::test_fixture`] plus two inbox items the overseer captured
-    /// (`source.kind == "situation"`): what the titlebar pill counts and the
-    /// board's proposals region lists.
-    #[cfg(test)]
-    pub(crate) fn test_fixture_with_proposals() -> Self {
-        use crate::api::schema::{DocketItem, DocketKind, DocketStatus};
-        let mut sample = Self::test_fixture();
-        for (id, title, updated) in [
-            (
-                12,
-                "ask claude about the stripe retry budget",
-                "2026-09-11T07:05:00Z",
-            ),
-            (
-                13,
-                "emberline's push is unseen — look",
-                "2026-09-11T07:08:00Z",
-            ),
-        ] {
-            sample.rows.push(DocketItem {
-                id,
-                title: title.to_string(),
-                kind: DocketKind::Captured,
-                status: DocketStatus::Inbox,
-                due: None,
-                repeat: None,
-                source: Some(serde_json::json!({"kind": "situation", "ref": "pane p5"})),
-                notes: None,
-                created: updated.to_string(),
-                updated: updated.to_string(),
-                last_fired: None,
-                overdue: false,
-            });
-        }
-        sample
     }
 }
 

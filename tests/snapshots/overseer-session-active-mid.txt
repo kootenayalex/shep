@@ -1,8 +1,8 @@
-# overseer-session-active-mid 120x40 · 27 styles
+# overseer-session-active-mid 120x40 · 26 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                                             ✦ overseer › session           ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board 2
+ shep                                             ✦ overseer › session             ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board
  ✦ overseer · workmayt's claude has been blocked 2m on a permission prompt.                                       07:08
  groups       grouped ≡ «│
                          │
@@ -44,23 +44,23 @@
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-qaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqffffffffffiiisssssssqqqqqqqqqqqoooqqzzzqqbbbqqdddqqmmmmmmmmmuuuuuuxxuq
-rhhhhhhhhhhlllyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrllllll
+qaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqffffffffffiiisssssssqqqqqqqqqqqqqoooqqyyyqqbbbqqdddqqmmmmmmmmmuuuuuuuq
+rhhhhhhhhhhlllxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrllllll
 kkkkkkk.......kkkkkkk.j.jv
 .........................v
 .p.tttttttt.g.ww.........v
 ...jjjjjjjjjjjjjjj.ee.nn.v
 ...p.tttttt......ppppppp.v
-...A.tttttttt....AAAAAAA.v
+...z.tttttttt....zzzzzzz.v
 .........................v
 .c.ttttttttt.............v
 ...jjjjjj................v
 ...c.tttttt.........cccc.v
 .........................v
-.A.tttt..................v
+.z.tttt..................v
 ...jjjjjjjjjjjjjjjj.nn...v
 ...e.tttttt.........eeee.v
-...A.ttttt.......AAAAAAA.v
+...z.ttttt.......zzzzzzz.v
 .........................v
 .........................v
 .........................v
@@ -87,7 +87,6 @@ qaaaaaaiiiiiiiiiaaaaaaaaaaiiiiiiiiaiiiiiiiaiiiiiiiqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
 
 --- legend ---
 . = (unstyled)
-A = fg:yellow bg:reset
 a = fg:accent bg:panel_bg bold
 b = fg:blue bg:panel_bg
 c = fg:blue bg:reset
@@ -111,6 +110,6 @@ t = fg:subtext0 bg:reset
 u = fg:subtext0 bg:surface1
 v = fg:surface_dim bg:reset
 w = fg:teal bg:reset
-x = fg:teal bg:surface1
-y = fg:text bg:surface0
-z = fg:yellow bg:panel_bg
+x = fg:text bg:surface0
+y = fg:yellow bg:panel_bg
+z = fg:yellow bg:reset

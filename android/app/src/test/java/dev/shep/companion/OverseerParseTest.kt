@@ -8,9 +8,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pins the `overseer.sample` payload and the four model functions the board is
- * built out of, against the Rust side (`OverseerSample` in
- * src/api/schema/overseer.rs, `first_sentence` and `proposals` in
+ * Pins the `overseer.sample` payload and the model functions the board is built
+ * out of, against the Rust side (`OverseerSample` in
+ * src/api/schema/overseer.rs, `first_sentence` and `narrative_sections` in
  * src/app/overseer.rs, `overseer_model` in src/ui/overseer.rs).
  *
  * Drift here is silent in the worst way: the board still renders, just with an
@@ -22,7 +22,13 @@ class OverseerParseTest {
     private val full = """
     {"sample":{
       "plugin_linked":true,"sampled":true,
-      "narrative":["claude is blocked on a permission prompt.","two proposals on the board"],
+      "narrative":["claude","is blocked on a permission prompt.","codex","shipped the parser.",
+                   "room","one item due today."],
+      "sections":[
+        {"title":"claude","lines":["is blocked on a permission prompt."]},
+        {"title":"codex","lines":["shipped the parser."]},
+        {"title":"room","lines":["one item due today."]}
+      ],
       "source":"brain","tick_at":"07:08","situation_age_seconds":42,
       "brain_age_seconds":180,"runtime":"claude","tick_in_flight":false,
       "health":[
@@ -43,7 +49,7 @@ class OverseerParseTest {
         val sample = parseOverseerSample(JSONObject(full))
         assertTrue(sample.pluginLinked)
         assertTrue(sample.sampled)
-        assertEquals(2, sample.narrative.size)
+        assertEquals(6, sample.narrative.size)
         assertEquals("brain", sample.source)
         assertEquals("07:08", sample.tickAt)
         assertEquals(42L, sample.situationAgeSeconds)
@@ -74,6 +80,7 @@ class OverseerParseTest {
         assertFalse(sample.pluginLinked)
         assertFalse(sample.sampled)
         assertEquals(emptyList<String>(), sample.narrative)
+        assertEquals(emptyList<NarrativeSection>(), sample.sections)
         assertEquals("deterministic", sample.source)
         assertNull(sample.tickAt)
         assertNull(sample.runtime)
@@ -112,7 +119,47 @@ class OverseerParseTest {
         assertEquals("why is it blocked?", firstSentence(listOf("why is it blocked? because.")))
     }
 
-    // ── proposals ───────────────────────────────────────────────────────────
+    // ── sections ────────────────────────────────────────────────────────────
+
+    /**
+     * The read of the room arrives cut into sections — one per agent, titled
+     * with the same `display_name` `session.overview` sends, then `room` last
+     * — and an older server that sends none degrades to one titleless section
+     * holding the whole narrative rather than to a blank region.
+     */
+    @Test
+    fun `sections parse with titles and fall back to one prose section when absent`() {
+        val sections = parseOverseerSample(JSONObject(full)).sections
+        assertEquals(listOf("claude", "codex", "room"), sections.map { it.title })
+        assertEquals(listOf("is blocked on a permission prompt."), sections[0].lines)
+        assertEquals(listOf("one item due today."), sections[2].lines)
+
+        val older = parseOverseerSample(
+            JSONObject("""{"sample":{"sampled":true,"narrative":["all quiet.","nothing owed."]}}"""),
+        )
+        assertEquals(listOf(NarrativeSection(null, older.narrative)), older.sections)
+        assertNull(older.sections.single().title)
+
+        // A board with nothing on it implies no sections at all, so the region
+        // says "the overseer has not spoken yet" instead of drawing an empty one.
+        val blank = parseOverseerSample(JSONObject("""{"sample":{"sampled":true}}"""))
+        assertEquals(emptyList<NarrativeSection>(), blank.sections)
+    }
+
+    /** A section with no title is prose; one with no lines is a heading and nothing else. */
+    @Test
+    fun `a titleless section and an empty one both survive the parse`() {
+        val sample = parseOverseerSample(
+            JSONObject(
+                """{"sample":{"sampled":true,"narrative":["a"],
+                   "sections":[{"title":null,"lines":["a"]},{"title":"room","lines":[]}]}}""",
+            ),
+        )
+        assertEquals(listOf(null, "room"), sample.sections.map { it.title })
+        assertEquals(emptyList<String>(), sample.sections[1].lines)
+    }
+
+    // ── the docket region ───────────────────────────────────────────────────
 
     private fun item(
         id: Long,
@@ -135,43 +182,12 @@ class OverseerParseTest {
     )
 
     /**
-     * The desktop's `proposals_are_situation_sourced_newest_first_max_five`
-     * (src/app/overseer.rs:1332), rebuilt on the phone's own types.
+     * The board's docket is the due lane whole plus the inbox whole. Nothing is
+     * held back: the board offers nothing of its own any more, so every inbox
+     * row it counts is a row it also lists.
      */
     @Test
-    fun `proposals are situation-sourced, newest first, at most five`() {
-        val docket = Docket(
-            today = "2026-09-12",
-            items = listOf(
-                item(1, "2026-09-10T10:00:00Z", "situation"),
-                item(2, "2026-09-12T10:00:00Z", "situation"),
-                item(3, "2026-09-11T10:00:00Z", null), // a pane source, not the overseer
-                item(4, "2026-09-11T10:00:00Z", null),
-                item(5, "2026-09-11T12:00:00Z", "situation"),
-                item(6, "2026-09-11T11:00:00Z", "situation"),
-                item(7, "2026-09-11T09:00:00Z", "situation"),
-                item(8, "2026-09-11T08:00:00Z", "situation"),
-                item(9, "2026-09-13T00:00:00Z", "situation", status = DocketStatus.Done),
-            ),
-        )
-        assertEquals(listOf(2L, 5L, 6L, 7L, 8L), proposals(docket).map { it.id })
-        assertEquals(MAX_PROPOSALS, proposals(docket).size)
-    }
-
-    @Test
-    fun `a docket with nothing captured proposes nothing`() {
-        val docket = Docket("2026-09-12", listOf(item(1, "u", null)))
-        assertEquals(emptyList<DocketItem>(), proposals(docket))
-    }
-
-    // ── the docket region ───────────────────────────────────────────────────
-
-    /**
-     * The board's docket is the due lane whole plus the inbox minus the
-     * proposals — a captured item is not listed twice on one screen.
-     */
-    @Test
-    fun `the board's docket counts the lanes and subtracts the proposals`() {
+    fun `the board's docket counts the lanes and lists them both`() {
         val due = DocketItem(
             id = 10, title = "rotate the key", kind = DocketKind.Slated,
             status = DocketStatus.Open, due = "2026-09-08", repeat = null,
@@ -186,15 +202,11 @@ class OverseerParseTest {
                 item(2, "2026-09-11T10:00:00Z", null),
             ),
         )
-        val cards = proposals(docket)
-        val board = boardDocket(docket, cards)
-        assertEquals(listOf(1L), cards.map { it.id })
+        val board = boardDocket(docket)
         assertEquals(1, board.due)
         assertEquals(1, board.overdue)
         assertEquals(2, board.inbox)
-        // The due item and the inbox item that is not a proposal; #1 is not
-        // listed here because it has a region of its own.
-        assertEquals(listOf(10L, 2L), board.rows.map { it.id })
+        assertEquals(listOf(10L, 1L, 2L), board.rows.map { it.id })
     }
 
     // ── needs you ───────────────────────────────────────────────────────────

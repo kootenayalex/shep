@@ -2,7 +2,7 @@
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
+ shep                         workmayt › claude  +   ◉ 1  ⠹ 2   desktop  board
  ✦ workmayt's claude has been blocked 2m on a permission prompt.          07:08
  groups       grouped ≡ «│╭ claude ──── ████▍   72% ─┬ claude ──── ██▌     41% ╮
                          ││                          │                         │
@@ -28,36 +28,36 @@
  NAVIGATE  esc back  up / down ws  ⇥ pane  g navigator  c new tab  v split│  - s
 
 --- styles ---
-vaaaavvvvvvvvvvvvvvvvvvvvvvvvvvDDDDDDDDkkkxxxxxxvvvtttvvGGGvvqqqqqqqqqAAAAAACCAv
-wjwEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEwwwwwwwwwwnnnnnn
+waaaawwwwwwwwwwwwwwwwwwwwwwwwwDDDDDDDDkkkyyyyyywwpwwwuuuwwGGGwwrrrrrrrrrBBBBBBBw
+xjxEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEExxxxxxxxxxnnnnnn
 mmmmmmm.......mmmmmmm.l.lbbbccccccbbbbbboooooelllllbbbHllllllHHHHHHoooJJJlllllHH
 .........................bb..........................b.........................H
-duwFFFFFFFFwiwBBwwwwwwwppbb..........................b.........................H
-wwwiiiiiiiiiiiiiiiwhhwsswbb..........................b.........................H
-wwwuwFFFFFFwwwwwwuuuuuuuwbb..........................b.........................H
-wwwIwzzzzzzzzwwwwIIIIIIIwbb..........................b.........................H
+dvxFFFFFFFFxixCCxxxxxxxqqbb..........................b.........................H
+xxxiiiiiiiiiiiiiiixhhxttxbb..........................b.........................H
+xxxvxFFFFFFxxxxxxvvvvvvvxbb..........................b.........................H
+xxxIxAAAAAAAAxxxxIIIIIIIxbb..........................b.........................H
 .........................bb..........................b.........................H
-.f.yyyyyyyyy.............bb..........................b.........................H
+.f.zzzzzzzzz.............bb..........................b.........................H
 ...llllll................bb..........................b.........................H
-...f.yyyyyy.........ffff.bb..........................b.........................H
+...f.zzzzzz.........ffff.bb..........................b.........................H
 .........................bb..........................b.........................H
-.H.yyyy..................bb..........................b.........................H
-...llllllllllllllll.rr...bb..........................b.........................H
-...g.yyyyyy.........gggg.bb..........................b.........................H
-...H.yyyyy.......HHHHHHH.bb..........................b.........................H
+.H.zzzz..................bb..........................b.........................H
+...llllllllllllllll.ss...bb..........................b.........................H
+...g.zzzzzz.........gggg.bb..........................b.........................H
+...H.zzzzz.......HHHHHHH.bb..........................b.........................H
 .........................bb..........................b.........................H
 .........................bb..........................b.........................H
 .........................bb..........................b.........................H
 .........................bb..........................b.........................H
 .........................bb..........................b.........................H
 llllllllllll.............bbbbbbbbbbbbbbbbbbbbbbbbbbbbbHHHHHHHHHHHHHHHHHHHHHHHHHH
-qqqqqqqqqqvaaakkkkkkkaaaaaaaaakkkkkakkkkkkkakkkkkkkkkkkkakkkkkkkkkkakkkkkkkkkakk
+rrrrrrrrrrwaaakkkkkkkaaaaaaaaakkkkkakkkkkkkakkkkkkkkkkkkakkkkkkkkkkakkkkkkkkkakk
 
 --- legend ---
 . = (unstyled)
-A = fg:subtext0 bg:surface1
-B = fg:teal bg:surface0
-C = fg:teal bg:surface1
+A = fg:subtext0 bg:surface0
+B = fg:subtext0 bg:surface1
+C = fg:teal bg:surface0
 D = fg:text bg:panel_bg bold
 E = fg:text bg:surface0
 F = fg:text bg:surface0 bold
@@ -80,14 +80,14 @@ l = fg:overlay0 bg:reset
 m = fg:overlay0 bg:reset bold
 n = fg:overlay0 bg:surface0
 o = fg:overlay0 bg:surface1
-p = fg:overlay1 bg:surface0
-q = fg:panel_bg bg:accent bold
-r = fg:peach bg:reset
-s = fg:peach bg:surface0
-t = fg:red bg:panel_bg bold
-u = fg:red bg:surface0
-v = fg:reset bg:panel_bg
-w = fg:reset bg:surface0
-x = fg:subtext0 bg:panel_bg
-y = fg:subtext0 bg:reset
-z = fg:subtext0 bg:surface0
+p = fg:overlay1 bg:panel_bg
+q = fg:overlay1 bg:surface0
+r = fg:panel_bg bg:accent bold
+s = fg:peach bg:reset
+t = fg:peach bg:surface0
+u = fg:red bg:panel_bg bold
+v = fg:red bg:surface0
+w = fg:reset bg:panel_bg
+x = fg:reset bg:surface0
+y = fg:subtext0 bg:panel_bg
+z = fg:subtext0 bg:reset

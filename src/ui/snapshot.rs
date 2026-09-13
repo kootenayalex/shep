@@ -528,11 +528,12 @@ pub(crate) mod fixture {
         };
         state.dashboard_sample.sampled_at = Some(Instant::now());
 
-        // The overseer has spoken: the strip has a sentence, the pill has
-        // proposals to count, and the health list has two warnings.
+        // The overseer has spoken: the strip has a sentence, the read of
+        // the room has a section per agent, and the health list has two
+        // warnings.
         state.overseer.sample = crate::app::overseer::OverseerSample::test_fixture();
         state.overseer_strip = true;
-        state.docket_sample = crate::app::state::DocketSample::test_fixture_with_proposals();
+        state.docket_sample = crate::app::state::DocketSample::test_fixture();
 
         state
     }
@@ -551,12 +552,11 @@ const MID: (u16, u16) = (120, 40);
 const SMALL: (u16, u16) = (80, 24);
 
 /// The overseer view — what the board opens on — with a proposal selected,
-/// a brain three minutes old, a named runtime, and the proposals fixture.
+/// a brain three minutes old and a named runtime.
 fn overseer_at(name: &str, size: (u16, u16)) {
     let mut state = fixture::session();
     state.mode = Mode::Board;
     state.board.view = BoardView::Overseer;
-    state.board.overseer_selected = Some(crate::ui::overseer::OverseerRow::Proposal(12));
     state.overseer.sample.brain_mtime =
         Some(std::time::SystemTime::now() - Duration::from_secs(190));
     state.plugins_config.insert(

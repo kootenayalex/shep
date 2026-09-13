@@ -1,8 +1,8 @@
-# keybind-help-no-mouse 80x24 · 28 styles
+# keybind-help-no-mouse 80x24 · 27 styles
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
+ shep                          workmayt › claude     ◉ 1  ⠹ 2   desktop  board
  ✦╭──────────────────────────────────────────────────────────────────────────╮8
  g│keybinds                                                        esc close │ ╮
   │ available commands and configured shortcuts                              │ │
@@ -28,35 +28,34 @@
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-qccccqqqqqqqqqqqqqqqqqqqqqqqqqqzzzzzzzzhhhuuuuuuqqqnnnqqAAAqqmmmmmmmmmvvvvvvwwvq
+qccccqqqqqqqqqqqqqqqqqqqqqqqqqqyyyyyyyyhhhuuuuuuqqqqqnnnqqzzzqqmmmmmmmmmvvvvvvvq
 sfaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaajj
-iiayyyyyyyyppppppppppppppppppppppppppppppppppppppppppppppppppppppplllllllllllaBB
-rrakkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkarB
-toapppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppparB
-ttabbbbbbbppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppkarB
-ttaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxxppppppppppppppppppppppppppppppppkarB
-ttaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxpppppppppppppppppppppppppppppppppppkarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxpppppppppppppppppppppppppppppppppppkarB
-rdaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxpppppppppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxxxxppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxxxxxxxxxxxxxxxpppppppppppppppppppgarB
-rrapppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppgarB
-rBabbbbbbbbbbbppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxpppppppppppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxpppppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxpppppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxpppppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxpppppppppppppppppppppppppppppppppgarB
-rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeexxxxxxxxxxxxpppppppppppppppppppppppppppppppgarB
-rrapppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppparB
-rraggggggggxxxxxgggggggggxxxxxxxxxxxxggggggggggxxxxxxxxxxxxxppppppppppppppppparB
-rraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaBB
+iiaxxxxxxxxppppppppppppppppppppppppppppppppppppppppppppppppppppppplllllllllllaAA
+rrakkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkarA
+toapppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppparA
+ttabbbbbbbppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppkarA
+ttaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwwppppppppppppppppppppppppppppppppkarA
+ttaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwpppppppppppppppppppppppppppppppppppkarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwpppppppppppppppppppppppppppppppppppkarA
+rdaeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwpppppppppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwwwwppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwwwwwwwwwwwwwwwpppppppppppppppppppgarA
+rrapppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppgarA
+rAabbbbbbbbbbbppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwpppppppppppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwpppppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwpppppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwpppppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwpppppppppppppppppppppppppppppppppgarA
+rraeeeeeeeeeeeeeeeeeeeeeeeeeeeeeewwwwwwwwwwwwpppppppppppppppppppppppppppppppgarA
+rrapppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppparA
+rraggggggggwwwwwgggggggggwwwwwwwwwwwwggggggggggwwwwwwwwwwwwwppppppppppppppppparA
+rraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaAA
 qcccccchhhhhhhhhcccccccccchhhhhhhhchhhhhhhchhhhhhhqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
 
 --- legend ---
 . = (unstyled)
-A = fg:yellow bg:panel_bg dim
-B = fg:yellow bg:reset dim
+A = fg:yellow bg:reset dim
 a = fg:accent bg:panel_bg
 b = fg:accent bg:panel_bg bold
 c = fg:accent bg:panel_bg bold+dim
@@ -79,7 +78,7 @@ s = fg:reset bg:surface0 dim
 t = fg:reset bg:surface_dim dim
 u = fg:subtext0 bg:panel_bg dim
 v = fg:subtext0 bg:surface1 dim
-w = fg:teal bg:surface1 dim
-x = fg:text bg:panel_bg
-y = fg:text bg:panel_bg bold
-z = fg:text bg:panel_bg bold+dim
+w = fg:text bg:panel_bg
+x = fg:text bg:panel_bg bold
+y = fg:text bg:panel_bg bold+dim
+z = fg:yellow bg:panel_bg dim

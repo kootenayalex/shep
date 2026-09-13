@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One overseer tick: sense the session, write the board, propose docket items.
+"""One overseer tick: sense the session, write the board.
 
 Runs as a shep plugin command (event hook or the `tick` action), so shep hands
 it SHEP_BIN_PATH, SHEP_SOCKET_PATH, SHEP_PLUGIN_STATE_DIR and, when
@@ -13,21 +13,24 @@ for the verbs they forbid, so they are enforced by absence, not by discipline):
      board may only carry a drafted suggestion.
   2. Never touch the server process. No stopping, no handing off, no
      reloading, no signalling any pid. The only calls made are read-only
-     (`doctor`, `session.overview`, `docket list`) plus `docket add` and
-     `runtime ask`.
+     (`doctor`, `session.overview`, `docket list`) plus `runtime ask`.
   3. Never nudge. This script does not queue prompts either; nudging belongs
      to a person or to the richer vault skill.
-  4. Capture proposes, the person disposes. Every docket item this script
-     creates is `--kind captured`, landing in the inbox with no due date and
-     no repeat, at most five per tick, deduplicated by `source`.
+  4. Never write to the docket. It is the person's own list (since 2026-09-13
+     it is not even fed from here: what is owed is said on the board, and the
+     person keeps their own list). This script reads it and nothing more.
+
+The board is sectioned, one `## <agent display name>` per agent with one or
+two lines under it, then `## room` for what cuts across them (the docket,
+health). The TUI and the phone draw each section under its agent.
 
 Two modes:
   deterministic (default): the board is built from the facts alone.
   brain: with a runtime configured (SHEP_OVERSEER_RUNTIME, or `runtime` in
      `[plugins.overseer]`), the facts are handed to `shep runtime ask <runtime>`
-     at most once per ten minutes; the answer replaces the board and its
-     proposals go to the docket. An event hook inside the window only
-     refreshes the situation files and leaves the brain's board standing.
+     at most once per ten minutes; the answer replaces the board. An event
+     hook inside the window only refreshes the situation files and leaves
+     the brain's board standing.
 """
 
 from __future__ import annotations
@@ -43,8 +46,7 @@ from pathlib import Path
 
 BRAIN_INTERVAL_SECONDS = 10 * 60
 BRAIN_TIMEOUT_SECONDS = 120
-MAX_BOARD_LINES = 10
-MAX_PROPOSALS_PER_TICK = 5
+MAX_BOARD_LINES = 30
 SHEP_CALL_TIMEOUT_SECONDS = 30
 
 
@@ -173,8 +175,20 @@ def age(seconds) -> str:
     return f"{seconds // 86400}d"
 
 
-def agent_line(agent: dict) -> str:
+def section_name(agent: dict, agents: list[dict]) -> str:
+    """The name an agent's board section wears: its display name, joined to
+    its group with ` · ` only when another agent shares the name, so two
+    `claude`s in different groups get two sections and the desktop can seat
+    each under its own row."""
     name = agent.get("display_name") or agent.get("name") or agent.get("pane_id", "?")
+    twins = [a for a in agents if (a.get("display_name") or a.get("name") or a.get("pane_id", "?")) == name]
+    if len(twins) > 1 and agent.get("workspace_label"):
+        return f"{name} · {agent['workspace_label']}"
+    return name
+
+
+def agent_line(agent: dict, agents: list[dict]) -> str:
+    name = section_name(agent, agents)
     status = agent.get("agent_status", "?")
     manual = agent.get("manual_state") or {}
     if isinstance(manual, dict) and manual.get("name"):
@@ -214,7 +228,111 @@ def situation_markdown(facts: dict) -> str:
     lines.append("## agents")
     if agents:
         for agent in sorted(agents, key=lambda a: (a.get("agent_status") != "blocked", a.get("display_name", ""))):
-            lines.append("- " + agent_line(agent))
+            lines.append("- " + agent_line(agent, agents))
+    else:
+        lines.append("- none")
+    lines.append("")
+    lines.append("## docket")
+    items = facts["docket"]["items"]
+    dated = [i for i in items if i.get("status") == "open" and i.get("due")]
+    inbox = [i for i in items if i.get("status") == "inbox"]
+    for item in dated:
+        mark = "!" if item.get("overdue") else " "
+        lines.append(f"- {mark} #{item['id']} {item.get('kind', '')} due {item['due']} {item['title']}")
+    lines.append(f"- inbox ({len(inbox)}): " + ", ".join(f"#{i['id']} {i['title'][:40]}" for i in inbox[:8]))
+    lines.append("")
+    lines.append("## health")
+    notable = [h for h in facts["health"] if h.get("level") in ("warn", "fail")]
+    if notable:
+        for finding in notable:
+            fix = f" → {finding['fix']}" if finding.get("fix") else ""
+            lines.append(f"- {finding.get('level')} {finding.get('check')}: {finding.get('detail', '')}{fix}")
+    else:
+        lines.append("- ok" if facts["health"] else "- doctor unavailable")
+    return "\n".join(lines) + "\n"
+
+
+def deterministic_board(facts: dict) -> str:
+    """What a stranger with no brain configured gets: a sectioned read of the room.
+
+    The header line, then one `## <agent>` section per agent — blocked first,
+    since they are the person's to answer — each with a single line saying the
+    state, its age and what the screen last said, then `## room` for what the
+    docket owes and what health says. The TUI's overseer view draws the counts
+    and lists itself; the board is the narrative that sits beside them.
+    """
+    overview = facts["overview"]
+    agents = overview.get("agents", []) or []
+    fails = [h for h in facts["health"] if h.get("level") == "fail"]
+    warns = [h for h in facts["health"] if h.get("level") == "warn"]
+    items = facts["docket"]["items"]
+    overdue = [i for i in items if i.get("overdue")]
+    due = [i for i in items if i.get("status") == "open" and i.get("due") and not i.get("overdue")]
+    inbox = [i for i in items if i.get("status") == "inbox"]
+
+    lines = [f"OVERSEER · {facts['at']} · deterministic"]
+    ordered = sorted(agents, key=lambda a: (a.get("agent_status") != "blocked", a.get("display_name", "")))
+    for agent in ordered:
+        name = section_name(agent, agents)
+        status = agent.get("agent_status", "?")
+        said = (agent.get("activity_line") or agent.get("summary") or "").strip()
+        line = f"{status} {age(agent.get('state_age_seconds'))}"
+        if status == "blocked":
+            line += " and waiting on you"
+        if said:
+            line += f" · {said[:80]}"
+        lines.append(f"## {name}")
+        lines.append(line + ".")
+
+    room: list[str] = []
+    if not agents:
+        code = f" ({facts['overview_error'].get('code')})" if facts.get("overview_error") else ""
+        room.append(f"No agents are running{code}.")
+    docket_bits = []
+    if overdue:
+        docket_bits.append(f"{len(overdue)} overdue")
+    if due:
+        docket_bits.append(f"{len(due)} due")
+    if inbox:
+        docket_bits.append(f"{len(inbox)} in the inbox")
+    if docket_bits:
+        room.append("The docket has " + ", ".join(docket_bits) + ".")
+    if fails:
+        room.append("Health fails on " + ", ".join(f.get("check", "?") for f in fails[:4]) + ".")
+    elif warns:
+        room.append("Health warns on " + ", ".join(w.get("check", "?") for w in warns[:4]) + ".")
+    if not room:
+        room.append("Nothing owed; health ok.")
+    lines.append("## room")
+    lines.extend(room)
+    return "\n".join(lines[:MAX_BOARD_LINES]) + "\n"
+
+
+def situation_markdown(facts: dict) -> str:
+    """The compact human-readable situation the brain reads (and a person can)."""
+    overview = facts["overview"]
+    totals = overview.get("totals", {}) or {}
+    agents = overview.get("agents", []) or []
+    lines = [f"# situation {facts['at']}"]
+    if facts.get("event"):
+        lines.append(f"trigger: {facts['event']}")
+    if facts.get("overview_error"):
+        lines.append(f"session.overview failed: {facts['overview_error'].get('message', '?')}")
+    lines.append(
+        "totals: agents {agents} · blocked {blocked} · working {working} · idle {idle} · done {done} · attention {attention}".format(
+            **{k: totals.get(k, 0) for k in ("agents", "blocked", "working", "idle", "done", "attention")}
+        )
+    )
+    host = overview.get("host") or {}
+    if isinstance(host, dict) and host:
+        host_bits = [f"{k} {v}" for k, v in host.items() if v not in (None, "", [])]
+        if host_bits:
+            lines.append("host: " + " · ".join(str(bit) for bit in host_bits[:6]))
+    lines.append("")
+    lines.append("## agents")
+    if agents:
+        for agent in sorted(agents, key=lambda a: (a.get("agent_status") != "blocked", a.get("display_name", ""))):
+            lines.append("- " + agent_line(agent, agents))
     else:
         lines.append("- none")
     lines.append("")
@@ -296,36 +414,33 @@ Hard rules you must respect in what you write:
 1. You never answer for an agent. A blocked agent is the person's to answer; you may draft a suggested answer with a reason.
 2. You never touch the server, restart anything, or kill anything.
 3. You never nudge or queue prompts.
-4. Capture proposes, the person disposes: proposals are inbox items only, no dates, no repeats, at most {max_proposals}, and only for genuinely owed things visible in the situation.
+4. You never write to the docket: what is owed is said on the board, and the person keeps their own list.
 
-Given the situation below, answer with EXACTLY two fenced blocks and nothing else:
+Given the situation below, answer with EXACTLY one fenced block and nothing else:
 
 ```board
-<your read of the room in at most {max_board} lines of plain prose: what needs the person first (a blocked agent and its visible prompt, with your suggested answer and why), then what the docket owes, then health. Short sentences, no headings, no tables, no per-agent list — the screen already shows every agent and every docket item.>
+## <the agent's name exactly as the situation lists it, up to its state word>
+<one or two short sentences: what it is doing or last said, and — if it is blocked — the visible prompt, your suggested answer and why>
+## <the next agent, the same way>
+## room
+<one to three short sentences on what cuts across the agents: what the docket owes, what health says, what you would look at first>
 ```
 
-```json
-[{{"title": "<= 80 chars", "source": {{"kind": "situation", "ref": "<pane id or check name>"}}, "notes": "one line of why"}}]
-```
+One `##` section per agent in the situation, blocked agents first; `## room` last, always present; at most {max_board} lines in all. Plain prose inside a section — no tables, no bullets, no nested headings. The screen already shows every agent's state word and every docket item, so say what the state word cannot.
 
-The json list may be empty. Do not propose an item whose source already appears in the docket.
-
-The situation below is already sensed for you: read it first and answer from it, because that is the fast path and usually the whole answer. You also have shep's own tools as `mcp__shep__*`, bounded to looking and to capture: use `agent_read` only when a blocked agent's exact screen decides what you would write and the situation does not show it, `docket_add` to record something owed (it lands in the inbox for the person to dispose of, which is rule 4 by another name), and `push_page` to page the phone when something genuinely cannot wait. No tool acts on an agent; there is no tool that types, queues, restarts or kills, and an unlisted tool is a forbidden one.
+The situation below is already sensed for you: read it first and answer from it, because that is the fast path and usually the whole answer. You also have shep's own tools as `mcp__shep__*`, bounded to looking and paging: use `agent_read` only when a blocked agent's exact screen decides what you would write and the situation does not show it, and `push_page` to page the phone when something genuinely cannot wait. No tool acts on an agent or on the docket; there is no tool that types, queues, restarts, kills or files, and an unlisted tool is a forbidden one.
 
 {situation}
 """
 
 
-# The `shep mcp` profile the brain is asked with: read, inbox capture and
-# paging. `[plugins.overseer] tools` narrows or widens it; the tool list, not
+# The `shep mcp` profile the brain is asked with: read and paging. `[plugins.overseer] tools` narrows or widens it; the tool list, not
 # this prompt, is what the rules above actually rest on.
 MCP_PROFILE = "overseer"
 
 
 def ask_brain(runtime: str, situation: str) -> str | None:
-    prompt = BRAIN_PROMPT.format(
-        max_proposals=MAX_PROPOSALS_PER_TICK, max_board=MAX_BOARD_LINES, situation=situation
-    )
+    prompt = BRAIN_PROMPT.format(max_board=MAX_BOARD_LINES, situation=situation)
     try:
         proc = subprocess.run(
             [
@@ -354,65 +469,21 @@ def ask_brain(runtime: str, situation: str) -> str | None:
     return proc.stdout
 
 
-FENCE_RE = re.compile(r"```(board|json)\s*\n(.*?)```", re.DOTALL)
+FENCE_RE = re.compile(r"```board\s*\n(.*?)```", re.DOTALL)
 
 
-def parse_brain_answer(answer: str) -> tuple[str | None, list[dict]]:
-    """Pull the board and the proposal list out of the brain's reply.
+def parse_brain_answer(answer: str) -> str | None:
+    """Pull the board out of the brain's reply.
 
-    Anything malformed degrades to "no board, no proposals" rather than to a
-    half-applied answer; the deterministic board then stands.
+    Anything malformed degrades to "no board" rather than to a half-applied
+    answer; the deterministic board then stands. A brain that still answers
+    with a second fenced block (an older prompt's habit) loses nothing but
+    that block: the board is the first `board` fence and nothing else is
+    read, so nothing it says can reach the docket.
     """
-    board = None
-    proposals: list[dict] = []
-    for kind, body in FENCE_RE.findall(answer or ""):
-        if kind == "board" and board is None:
-            board = "\n".join(body.rstrip("\n").splitlines()[:MAX_BOARD_LINES]) + "\n"
-        elif kind == "json":
-            try:
-                value = json.loads(body)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, list):
-                proposals = [
-                    p
-                    for p in value
-                    if isinstance(p, dict) and isinstance(p.get("title"), str) and p["title"].strip()
-                ]
-    return board, proposals[:MAX_PROPOSALS_PER_TICK]
-
-
-def canonical(value) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"))
-
-
-def new_proposals(proposals: list[dict], existing_items: list[dict]) -> list[dict]:
-    """Rule 4: dedupe by source against everything already in the docket."""
-    seen = {canonical(item.get("source")) for item in existing_items if item.get("source") is not None}
-    fresh = []
-    for proposal in proposals:
-        source = proposal.get("source")
-        key = canonical(source) if source is not None else None
-        if key is not None and key in seen:
-            continue
-        if key is not None:
-            seen.add(key)
-        fresh.append(proposal)
-    return fresh
-
-
-def capture(proposals: list[dict]) -> int:
-    added = 0
-    for proposal in proposals:
-        args = ["docket", "add", proposal["title"].strip()[:80], "--kind", "captured"]
-        if proposal.get("source") is not None:
-            args += ["--source", canonical(proposal["source"])]
-        if isinstance(proposal.get("notes"), str) and proposal["notes"].strip():
-            args += ["--notes", proposal["notes"].strip()[:400]]
-        code, _ = run_shep(args)
-        if code == 0:
-            added += 1
-    return added
+    for body in FENCE_RE.findall(answer or ""):
+        return "\n".join(body.rstrip("\n").splitlines()[:MAX_BOARD_LINES]) + "\n"
+    return None
 
 
 def brain_allowed(stamp: Path, now: float) -> bool:
@@ -442,14 +513,11 @@ def main(argv: list[str]) -> int:
     if runtime and brain_allowed(stamp, time.time()):
         answer = ask_brain(runtime, situation)
         stamp.touch()
-        brain_board, proposals = parse_brain_answer(answer or "")
+        brain_board = parse_brain_answer(answer or "")
         if brain_board:
             board = brain_board
             note = f"brain {runtime}"
             source = "brain"
-        added = capture(new_proposals(proposals, facts["docket"]["items"]))
-        if added:
-            note += f" · {added} captured"
     elif runtime and from_event and source_file.exists() and source_file.read_text().strip() == "brain":
         # Inside the window an event only refreshes the situation; the
         # brain's narrative stays on the board until its next turn.

@@ -187,7 +187,6 @@ const LADDER: [Rung; 7] = [
 struct RightFacts {
     update_ready: bool,
     tally: StateTally,
-    proposals: usize,
     lit: PillHalf,
     spinner: &'static str,
 }
@@ -276,7 +275,6 @@ fn right_run(facts: &RightFacts, rung: Rung, p: &Palette) -> RightRun {
         .bg(p.accent)
         .add_modifier(Modifier::BOLD);
     let unlit = Style::default().fg(p.subtext0).bg(p.surface1);
-    let count = Style::default().fg(p.teal).bg(p.surface1);
     let desktop_word = if rung.long_pill { "desktop" } else { "desk" };
     let desktop_start = width_u16(&spans);
     let desktop_style = if facts.lit == PillHalf::Desktop {
@@ -289,11 +287,7 @@ fn right_run(facts: &RightFacts, rung: Rung, p: &Palette) -> RightRun {
     if facts.lit == PillHalf::Board {
         spans.push(Span::styled(" board ", lit));
     } else {
-        spans.push(Span::styled(" board", unlit));
-        if facts.proposals > 0 {
-            spans.push(Span::styled(format!(" {}", facts.proposals), count));
-        }
-        spans.push(Span::styled(" ", unlit));
+        spans.push(Span::styled(" board ", unlit));
     }
     let board_end = width_u16(&spans);
     spans.push(Span::raw(" "));
@@ -393,7 +387,6 @@ pub(crate) fn titlebar_layout(
     let facts = RightFacts {
         update_ready: app.update_available.is_some(),
         tally: agent_tally(app),
-        proposals: crate::app::overseer::proposals(&app.docket_sample).len(),
         lit: if app.board_underlay() {
             PillHalf::Board
         } else {
@@ -813,7 +806,7 @@ mod tests {
             }
         );
         let right = right_text(&app, 200);
-        assert_eq!(right, "◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board 2  ");
+        assert_eq!(right, "◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board  ");
     }
 
     #[test]
@@ -822,12 +815,12 @@ mod tests {
         // No active group, so no centre: only `left + right + 2` gates and
         // the table below is the ladder itself.
         app.active = None;
-        let full = "◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board 2  ";
-        let no_idle = "◉ 1  ⠹ 2  ● 1   desktop  board 2  ";
-        let no_done = "◉ 1  ⠹ 2   desktop  board 2  ";
-        let short = "◉ 1  ⠹ 2   desk  board 2  ";
-        let no_working = "◉ 1   desk  board 2  ";
-        let no_blocked = " desk  board 2  ";
+        let full = "◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board  ";
+        let no_idle = "◉ 1  ⠹ 2  ● 1   desktop  board  ";
+        let no_done = "◉ 1  ⠹ 2   desktop  board  ";
+        let short = "◉ 1  ⠹ 2   desk  board  ";
+        let no_working = "◉ 1   desk  board  ";
+        let no_blocked = " desk  board  ";
         let full_w = display_width(full) as u16 + 7;
         let cases = [
             (full_w, full),
@@ -853,11 +846,11 @@ mod tests {
         let layout = titlebar_layout(&app, None, Rect::new(0, 0, 80, 1));
         assert_eq!(
             text(&layout.center.expect("centre").line),
-            "workmayt › claude"
+            "workmayt › claude  +"
         );
         assert_eq!(
             text(&layout.right.expect("right").line),
-            "◉ 1  ⠹ 2   desktop  board 2  "
+            "◉ 1  ⠹ 2   desktop  board  "
         );
         // Too narrow for both: the centre goes, the right slot stays and
         // keeps walking its own ladder.
@@ -865,12 +858,12 @@ mod tests {
         assert_eq!(layout.center, None);
         assert_eq!(
             text(&layout.right.expect("right").line),
-            "◉ 1  ⠹ 2   desktop  board 2  "
+            "◉ 1  ⠹ 2  ● 1   desktop  board  "
         );
-        let layout = titlebar_layout(&app, None, Rect::new(0, 0, 35, 1));
+        let layout = titlebar_layout(&app, None, Rect::new(0, 0, 33, 1));
         assert_eq!(
             text(&layout.right.expect("right").line),
-            "◉ 1  ⠹ 2   desk  board 2  "
+            "◉ 1  ⠹ 2   desk  board  "
         );
     }
 
@@ -924,10 +917,10 @@ mod tests {
         assert!(right.starts_with("update ready  ◉ 1"), "{right:?}");
         // Narrow enough to lose every fact but the pill, and the pill wins
         // over the update: the last rung is the pill alone.
-        let right = right_text(&app, 24);
-        assert_eq!(right, " desk  board 2  ");
+        let right = right_text(&app, 22);
+        assert_eq!(right, " desk  board  ");
         // One column narrower than the pill alone and the slot is empty.
-        assert_eq!(right_text(&app, 22), "");
+        assert_eq!(right_text(&app, 20), "");
     }
 
     #[test]
@@ -986,26 +979,6 @@ mod tests {
         app.switch_workspace(0);
         let layout = titlebar_layout(&app, None, area);
         assert_eq!(text(&layout.center.expect("centre").line), "alpha › claude");
-    }
-
-    #[test]
-    fn board_half_counts_waiting_proposals() {
-        let mut app = fixture();
-        let layout = titlebar_layout(&app, None, Rect::new(0, 0, 200, 1));
-        let right = layout.right.expect("right slot");
-        let count = right
-            .line
-            .spans
-            .iter()
-            .find(|s| s.content == " 2")
-            .expect("count span");
-        assert_eq!(count.style.fg, Some(app.palette.teal));
-
-        app.docket_sample.rows.clear();
-        assert_eq!(
-            right_text(&app, 200),
-            "◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board  "
-        );
     }
 
     #[test]

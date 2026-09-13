@@ -2,7 +2,7 @@
 # glyphs pin layout, styles pin meaning
 
 --- screen ---
- shep                          workmayt › claude   ◉ 1  ⠹ 2   desktop  board 2
+ shep                         workmayt › claude  +   ◉ 1  ⠹ 2   desktop  board
  ✦ workmayt's claude has been blocked 2m on a permission prompt.          07:08
  groups       grouped ≡ «│╭ claude ──── ████▍   72% ─┬ claude ──── ██▌     41% ╮
                          ││                          │                         │
@@ -28,36 +28,36 @@
  ctrl+b prefix  ctrl+alt+b board  ? keys  q detach
 
 --- styles ---
-uaaaauuuuuuuuuuuuuuuuuuuuuuuuuuEEEEEEEEjjjxxxxxxuuusssuuHHHuupppppppppzzzzzzCCzu
-vhvFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFvvvvvvvvvvmmmmmm
-lllllll.......lllllll.k.kBbbccccccbbbbbbnnnnndkkkkkbbbIkkkkkkIIIIIInnnJJJkkkkkII
-.........................Bb..........................b.........................I
-wtwGGGGGGGGwiwDDwwwwwwwooBb..........................b.........................I
-wwwiiiiiiiiiiiiiiiwggwrrwBb..........................b.........................I
-wwwtwGGGGGGwwwwwwtttttttwBb..........................b.........................I
-wwwKwAAAAAAAAwwwwKKKKKKKwBb..........................b.........................I
-.........................Bb..........................b.........................I
-.e.yyyyyyyyy.............Bb..........................b.........................I
-...kkkkkk................Bb..........................b.........................I
-...e.yyyyyy.........eeee.Bb..........................b.........................I
-.........................Bb..........................b.........................I
-.I.yyyy..................Bb..........................b.........................I
-...kkkkkkkkkkkkkkkk.qq...Bb..........................b.........................I
-...f.yyyyyy.........ffff.Bb..........................b.........................I
-...I.yyyyy.......IIIIIII.Bb..........................b.........................I
-.........................Bb..........................b.........................I
-.........................Bb..........................b.........................I
-.........................Bb..........................b.........................I
-.........................Bb..........................b.........................I
-.........................Bb..........................b.........................I
-kkkkkkkkkkkk.............BbbbbbbbbbbbbbbbbbbbbbbbbbbbbIIIIIIIIIIIIIIIIIIIIIIIIII
-uaaaaaajjjjjjjjjaaaaaaaaaajjjjjjjjajjjjjjjajjjjjjjuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+vaaaavvvvvvvvvvvvvvvvvvvvvvvvvEEEEEEEEjjjyyyyyyvvovvvtttvvHHHvvqqqqqqqqqAAAAAAAv
+whwFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFwwwwwwwwwwmmmmmm
+lllllll.......lllllll.k.kCbbccccccbbbbbbnnnnndkkkkkbbbIkkkkkkIIIIIInnnJJJkkkkkII
+.........................Cb..........................b.........................I
+xuxGGGGGGGGxixDDxxxxxxxppCb..........................b.........................I
+xxxiiiiiiiiiiiiiiixggxssxCb..........................b.........................I
+xxxuxGGGGGGxxxxxxuuuuuuuxCb..........................b.........................I
+xxxKxBBBBBBBBxxxxKKKKKKKxCb..........................b.........................I
+.........................Cb..........................b.........................I
+.e.zzzzzzzzz.............Cb..........................b.........................I
+...kkkkkk................Cb..........................b.........................I
+...e.zzzzzz.........eeee.Cb..........................b.........................I
+.........................Cb..........................b.........................I
+.I.zzzz..................Cb..........................b.........................I
+...kkkkkkkkkkkkkkkk.rr...Cb..........................b.........................I
+...f.zzzzzz.........ffff.Cb..........................b.........................I
+...I.zzzzz.......IIIIIII.Cb..........................b.........................I
+.........................Cb..........................b.........................I
+.........................Cb..........................b.........................I
+.........................Cb..........................b.........................I
+.........................Cb..........................b.........................I
+.........................Cb..........................b.........................I
+kkkkkkkkkkkk.............CbbbbbbbbbbbbbbbbbbbbbbbbbbbbIIIIIIIIIIIIIIIIIIIIIIIIII
+vaaaaaajjjjjjjjjaaaaaaaaaajjjjjjjjajjjjjjjajjjjjjjvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
 --- legend ---
 . = (unstyled)
-A = fg:subtext0 bg:surface_dim
-B = fg:surface_dim bg:reset
-C = fg:teal bg:surface1
+A = fg:subtext0 bg:surface1
+B = fg:subtext0 bg:surface_dim
+C = fg:surface_dim bg:reset
 D = fg:teal bg:surface_dim
 E = fg:text bg:panel_bg bold
 F = fg:text bg:surface0
@@ -80,15 +80,15 @@ k = fg:overlay0 bg:reset
 l = fg:overlay0 bg:reset bold
 m = fg:overlay0 bg:surface0
 n = fg:overlay0 bg:surface1
-o = fg:overlay1 bg:surface_dim
-p = fg:panel_bg bg:accent bold
-q = fg:peach bg:reset
-r = fg:peach bg:surface_dim
-s = fg:red bg:panel_bg bold
-t = fg:red bg:surface_dim
-u = fg:reset bg:panel_bg
-v = fg:reset bg:surface0
-w = fg:reset bg:surface_dim
-x = fg:subtext0 bg:panel_bg
-y = fg:subtext0 bg:reset
-z = fg:subtext0 bg:surface1
+o = fg:overlay1 bg:panel_bg
+p = fg:overlay1 bg:surface_dim
+q = fg:panel_bg bg:accent bold
+r = fg:peach bg:reset
+s = fg:peach bg:surface_dim
+t = fg:red bg:panel_bg bold
+u = fg:red bg:surface_dim
+v = fg:reset bg:panel_bg
+w = fg:reset bg:surface0
+x = fg:reset bg:surface_dim
+y = fg:subtext0 bg:panel_bg
+z = fg:subtext0 bg:reset

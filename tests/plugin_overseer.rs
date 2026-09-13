@@ -2,7 +2,7 @@
 //! agent state change fire its hook, and check that the deterministic
 //! situation and board appear in the plugin's state dir. A second pass drives
 //! the brain path through a fake runtime (`sh`, never a real CLI) and checks
-//! that its proposals land in the docket exactly once. The forbidden-verb
+//! that its board is taken and nothing reaches the docket. The forbidden-verb
 //! test pins the charter's hard rules to the script text itself.
 
 mod support;
@@ -738,17 +738,19 @@ fn agent_status_change_makes_the_overseer_write_a_deterministic_board() {
 }
 
 #[test]
-fn a_configured_brain_rewrites_the_board_and_captures_proposals_once() {
+fn a_configured_brain_rewrites_the_board_and_never_writes_the_docket() {
     // The "brain" is a shell script that ignores its prompt and answers with
-    // a fixed board plus two proposals; `[plugins.overseer] runtime` names it
-    // and `[runtimes.fake-brain]` says how to run it headlessly.
+    // a fixed, sectioned board — and, the way an older prompt's habit would,
+    // a second fenced block of proposals. `[plugins.overseer] runtime` names
+    // it and `[runtimes.fake-brain]` says how to run it headlessly. The
+    // board is taken; the proposals reach nothing.
     let brain = unique_test_dir().join("brain.sh");
     fs::create_dir_all(brain.parent().unwrap()).unwrap();
     fs::write(
         &brain,
         r#"#!/bin/sh
 cat >/dev/null
-printf '%s\n' '```board' 'OVERSEER · brain' 'all quiet' '```' '```json' '[{"title":"rotate the xai key","source":{"kind":"situation","ref":"memory:12"},"notes":"owed since august"},{"title":"same source again","source":{"kind":"situation","ref":"memory:12"}}]' '```'
+printf '%s\n' '```board' 'OVERSEER · brain' '## claude' 'working on the thing.' '## room' 'all quiet' '```' '```json' '[{"title":"rotate the xai key","source":{"kind":"situation","ref":"memory:12"},"notes":"owed since august"}]' '```'
 "#,
     )
     .unwrap();
@@ -767,22 +769,22 @@ printf '%s\n' '```board' 'OVERSEER · brain' 'all quiet' '```' '```json' '[{"tit
 
     let state_dir = server.overseer_state_dir();
     let board = server.wait_for_file(&state_dir.join("BOARD.md"), Duration::from_secs(60));
-    assert_eq!(board, "OVERSEER · brain\nall quiet\n");
+    assert_eq!(
+        board,
+        "OVERSEER · brain\n## claude\nworking on the thing.\n## room\nall quiet\n"
+    );
     assert!(state_dir.join("last-brain").exists());
 
     let listed = server.cli(&["docket", "list", "--json"]);
     let docket: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
     let items = docket["result"]["items"].as_array().unwrap();
-    assert_eq!(items.len(), 1, "dedupe by source failed: {items:?}");
-    assert_eq!(items[0]["title"], "rotate the xai key");
-    assert_eq!(items[0]["status"], "inbox");
-    assert_eq!(items[0]["kind"], "captured");
-    assert_eq!(items[0]["source"]["ref"], "memory:12");
-    assert!(items[0]["due"].is_null());
+    assert!(
+        items.is_empty(),
+        "the overseer proposes nothing into the docket: {items:?}"
+    );
 
     // A second event inside the ten-minute window refreshes the situation
-    // but does not consult the brain again: the docket stays at one item and
-    // the board stays the brain's.
+    // but does not consult the brain again: the board stays the brain's.
     let before = fs::read_to_string(state_dir.join("situation.md")).unwrap();
     server.report_agent(&pane_id, "idle");
     let deadline = Instant::now() + Duration::from_secs(60);
@@ -794,18 +796,13 @@ printf '%s\n' '```board' 'OVERSEER · brain' 'all quiet' '```' '```json' '[{"tit
         assert!(Instant::now() < deadline, "situation.md was not refreshed");
         thread::sleep(Duration::from_millis(50));
     }
-    let listed = server.cli(&["docket", "list", "--json"]);
-    let docket: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
-    assert_eq!(docket["result"]["items"].as_array().unwrap().len(), 1);
     assert_eq!(
         fs::read_to_string(state_dir.join("BOARD.md")).unwrap(),
-        "OVERSEER · brain\nall quiet\n"
+        "OVERSEER · brain\n## claude\nworking on the thing.\n## room\nall quiet\n"
     );
     let journal = fs::read_to_string(state_dir.join("journal.log")).unwrap();
-    assert!(
-        journal.contains("brain fake-brain · 1 captured"),
-        "{journal}"
-    );
+    assert!(journal.contains("brain fake-brain"), "{journal}");
+    assert!(!journal.contains("captured"), "{journal}");
     assert!(journal.contains("within its 10 min window"), "{journal}");
 
     server.finish();

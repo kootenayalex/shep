@@ -321,7 +321,8 @@ mod tests {
             .map(|tool| tool["name"].as_str().unwrap().to_string())
             .collect();
         assert!(listed.contains(&"session_overview".to_string()));
-        assert!(listed.contains(&"docket_add".to_string()));
+        assert!(listed.contains(&"push_page".to_string()));
+        assert!(!listed.contains(&"docket_add".to_string()));
         assert!(!listed.contains(&"docket_promote".to_string()));
         assert!(!listed.contains(&"agent_send".to_string()));
         for tool in out[0]["result"]["tools"].as_array().unwrap() {
@@ -386,7 +387,7 @@ mod tests {
             request(
                 json!(3),
                 "tools/call",
-                json!({"name": "docket_add", "arguments": {}})
+                json!({"name": "push_page", "arguments": {}})
             ),
         );
         let out = pipe(&input, Profile::named("overseer").unwrap(), &backend);

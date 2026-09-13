@@ -26,7 +26,7 @@ usage: shep mcp [serve] [--socket PATH] [--profile NAME] [--allow a,b] [--deny a
        shep mcp config [--profile NAME] [--output PATH]
        shep mcp tools [--profile NAME] [--allow a,b] [--deny a,b] [--tools a,b]
 
-profiles: overseer (read + inbox capture + paging), read, all";
+profiles: overseer (read + paging), read, all";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Verb {

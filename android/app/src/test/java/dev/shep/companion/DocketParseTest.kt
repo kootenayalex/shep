@@ -144,9 +144,9 @@ class DocketParseTest {
 
     /**
      * The raw `source.kind` rides along beside the label, because the label is
-     * for reading and the kind is what `proposals` filters on: an inbox item
-     * the overseer captured says `situation`, and that is the whole difference
-     * between a proposal and something you wrote down yourself.
+     * for reading and the kind is the machine-readable half: an inbox item the
+     * overseer captured off a tick says `situation`, and one you wrote down
+     * yourself says nothing at all.
      */
     @Test
     fun `the raw source kind survives beside its label`() {

@@ -79,9 +79,9 @@ private sealed interface DocketSheet {
 
 /**
  * Docket tab: the personal assistant's list, in the desktop board's lanes —
- * inbox, due, slated, recurring, done — with the board's verbs. The overseer
- * proposes into the inbox; this is where those proposals get promoted or
- * discarded from the sofa instead of the desk.
+ * inbox, due, slated, recurring, done — with the board's verbs. Whatever lands
+ * in the inbox gets promoted, edited or discarded here, from the sofa instead
+ * of the desk.
  *
  * Backed by `docket.list/add/update/promote/complete/discard` over the relay.
  * There are no docket events, so the list polls every five seconds while it is
@@ -133,9 +133,9 @@ fun DocketScreen(client: BridgeClient) {
      * once so the row moves lanes before the next poll lands, then the list is
      * re-read so the store's ordering (and any overseer additions) win.
      *
-     * The call itself lives in [DocketActions] because the board disposes of
-     * the same rows from its proposals region; what stays here is what only
-     * this screen does with the answer — swap the row, close the sheet.
+     * The call itself lives in [DocketActions], off the main thread and with
+     * its failures shown; what stays here is what only this screen does with
+     * the answer — swap the row, close the sheet.
      */
     fun mutate(method: String, params: JSONObject, label: String) {
         actions.mutate(

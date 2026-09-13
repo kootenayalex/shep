@@ -212,8 +212,7 @@ impl App {
         }
 
         // The docket rows cost a sqlite read, so they are sampled only while
-        // something on screen counts them: the board (any of its screens),
-        // or the desktop chrome, whose pill counts the waiting proposals.
+        // something on screen counts them: the board, any of its screens.
         if self.state.docket_sample_wanted() && self.state.refresh_docket_if_stale(now) {
             changed = true;
         }

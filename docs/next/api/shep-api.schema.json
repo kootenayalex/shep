@@ -7435,6 +7435,27 @@
           ],
           "type": "string"
         },
+        "OverseerNarrativeSection": {
+          "description": "One section of the read of the room: an agent's paragraph under its\nname, the closing `room` paragraph, or — for a board written before the\nsections — untitled prose.",
+          "properties": {
+            "lines": {
+              "default": [],
+              "description": "The non-empty lines under it, trimmed.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": {
+              "description": "The `## ` heading: an agent's display name as `session.overview`\ngives it, or `room`. Absent for prose that stood under no heading.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
         "OverseerNarrativeSource": {
           "description": "Who wrote the narrative: a brain runtime, or the tick's own template.",
           "enum": [
@@ -7482,7 +7503,7 @@
             },
             "narrative": {
               "default": [],
-              "description": "`BOARD.md`, header dropped, one entry per non-empty line.",
+              "description": "`BOARD.md`, header dropped, one entry per non-empty line; a section\nheading contributes its bare title. `sections` is the same text with\nits structure kept.",
               "items": {
                 "type": "string"
               },
@@ -7502,6 +7523,14 @@
             "sampled": {
               "description": "Whether the state dir has been looked at, whatever was found.",
               "type": "boolean"
+            },
+            "sections": {
+              "default": [],
+              "description": "The narrative by section: one per agent, then `room`. Empty when the\noverseer has not spoken.",
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/OverseerNarrativeSection"
+              },
+              "type": "array"
             },
             "session": {
               "$ref": "#/schemas/success_response/$defs/OverseerSessionInfo"
