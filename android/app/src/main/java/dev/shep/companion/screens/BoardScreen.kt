@@ -200,6 +200,10 @@ fun BoardScreen(
     var composer by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf<String?>(null) }
     var supported by remember { mutableStateOf(true) }
+    // The same word the agents header carries, read off the same call. The
+    // board is where the phone lands, so this is the first — and on a quiet
+    // session the only — place a dropped bridge can show itself.
+    var status by remember { mutableStateOf("connecting") }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val actions = remember(client, scope) { DocketActions(client, scope) }
@@ -242,11 +246,25 @@ fun BoardScreen(
             .onSuccess { docket = parseDocket(it) }
         withContext(Dispatchers.IO) { runCatching { client.call("session.overview") } }
             .onSuccess { result ->
-                parseOverview(result)?.let {
-                    rows = it.agents
-                    totals = it.totals
-                    host = it.host
+                val overview = parseOverview(result)
+                if (overview == null) {
+                    status = RECONNECTING
+                } else {
+                    rows = overview.agents
+                    totals = overview.totals
+                    host = overview.host
                     statedAtMs = android.os.SystemClock.elapsedRealtime()
+                    status = "live · shep ${overview.host.version ?: ""}".trim()
+                }
+            }
+            .onFailure {
+                // A server too old to answer `session.overview` is still a
+                // server that is answering; only a transport failure is a
+                // dropped connection. `ChannelsScreen` draws the same line.
+                status = if (looksUnsupported(it.message)) {
+                    "live · shep ${client.serverVersion ?: ""}".trim()
+                } else {
+                    RECONNECTING
                 }
             }
     }
@@ -338,7 +356,7 @@ fun BoardScreen(
     val nowSeconds = remember(nowElapsedMs) { System.currentTimeMillis() / 1000L }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("board")
+        ScreenHeader("board") { ConnectionLine(status) }
         ChromeRow(
             totals = totals,
             proposals = proposalRows.size,

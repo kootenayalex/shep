@@ -153,6 +153,19 @@ fun connectionLine(status: String): AnnotatedString = buildAnnotatedString {
 }
 
 /**
+ * That line as a [ScreenHeader] action, so the two views the `desktop | board`
+ * pill switches between say the same thing about the socket.
+ *
+ * The board opened without one for a release: the header read `shep · board`
+ * and nothing else, so a phone whose bridge had dropped looked exactly like a
+ * phone whose session was quiet — and flow 01, which asserts the connection
+ * line after pairing, failed on any device that already had a pairing and so
+ * landed on the board rather than on agents.
+ */
+@Composable
+fun ConnectionLine(status: String): Unit = Text(connectionLine(status), style = ShepType.meta)
+
+/**
  * One row: a pane, with whatever is known about it.
  *
  * [row] is the board's fact sheet and is absent for a plain shell, because
@@ -499,7 +512,7 @@ fun ChannelsScreen(
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("agents") {
-            Text(connectionLine(status), style = ShepType.meta)
+            ConnectionLine(status)
             Spacer(Modifier.width(ShepSpace.small))
             ActionText("+ new", style = ShepType.actionStrong) { showNew = true }
             ActionText("unpair", style = ShepType.meta, onClick = onUnpair)

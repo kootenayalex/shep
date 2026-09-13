@@ -2,9 +2,19 @@
 appId: dev.shep.companion
 ---
 - launchApp
-- tapOn: "memory"
+# The app lands on the board; the hint bar's entries carry ids because their
+# labels double as the board's region headings.
+- tapOn:
+    id: "hint-memory"
 - assertVisible: "\\+ add"
 - tapOn: "\\+ add"
 - assertVisible: "add entry"
 - back
-- assertVisible: "agents"
+- assertVisible: "· memory"
+# Back to the agents list the long way, which is now the only way from a tab:
+# the bar has no `agents` entry, so it is board (bar) then desktop (pill).
+- tapOn:
+    id: "hint-board"
+- tapOn:
+    id: "pill-desktop"
+- assertVisible: "· agents"

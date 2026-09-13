@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -133,6 +134,10 @@ fun ViewPill(current: PillHalf, proposals: Int, onSelect: (PillHalf) -> Unit) {
 private fun PillHalfBox(half: PillHalf, lit: Boolean, proposals: Int, onClick: () -> Unit) {
     Row(
         Modifier
+            // `board` is also a hint-bar label and `desktop` is only unique by
+            // luck, so the pill's halves carry ids rather than leaving the
+            // flows to disambiguate two words by position.
+            .testTag("pill-${half.label}")
             .minimumInteractiveComponentSize()
             .background(if (lit) ShepPalette.accent else ShepPalette.surface1)
             .clickable(onClick = onClick)
@@ -196,6 +201,7 @@ fun ChromeRow(
 fun OverseerStrip(firstSentence: String, tickAt: String?, onOpen: () -> Unit) {
     Row(
         Modifier
+            .testTag("overseer-strip")
             .fillMaxWidth()
             .background(ShepPalette.surface0)
             .minimumInteractiveComponentSize()

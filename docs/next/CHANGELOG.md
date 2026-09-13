@@ -442,6 +442,16 @@
 
 ### Fixed
 
+- The companion's board keeps the connection line, and the end-to-end flows
+  navigate by test id. The board landed without the `live · shep <version>` /
+  `reconnect` status the agents header carries, so the screen the phone now
+  opens on could not say its bridge had dropped — the two headers share one
+  `ConnectionLine` composable again. The navigation chrome grew the ids the
+  flows were missing (`hint-<label>` per hint-bar entry, `pill-desktop` /
+  `pill-board`, `overseer-strip`): the board's region headings are the same
+  words the bar and the pill use, so `tapOn: "docket"` was taking the board's
+  heading and `tapOn: "agents"` a heading that does nothing at all.
+
 - A live handoff keeps every linked plugin. The handoff constructor built the app the way an ephemeral `--no-session` run does and so skipped `plugins.json`; the links were on disk all along, but their event hooks went quiet after the first handoff.
 
 - An agent in a pane that was moved to another group keeps reporting to shep

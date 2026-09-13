@@ -5,6 +5,9 @@ tags:
   - tablet
 ---
 - launchApp
-- assertVisible: "agents"
+# The app opens on the board; the pill is the one switch to the session view.
+- tapOn:
+    id: "pill-desktop"
+- assertVisible: "· agents"
 - assertVisible: "select an agent"
 - assertVisible: "live.*"

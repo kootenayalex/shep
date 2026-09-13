@@ -10,7 +10,16 @@ appId: dev.shep.companion
 - evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
 - evalScript: "${output.mark = typeof MARK === 'undefined' ? 'maestro' : MARK}"
 - launchApp
-- tapOn: "agents"
+# The app lands on the board; the pill is the switch to the session view.
+- tapOn:
+    id: "pill-desktop"
+# The list is as long as the session, and flow 12 parks this agent in a
+# group of its own at the end of it, so the row is often below the fold.
+- scrollUntilVisible:
+    element:
+      text: "agent ${output.agent}"
+    direction: DOWN
+    timeout: 30000
 - tapOn: "agent ${output.agent}"
 # Live output pairs with the key bar.
 - assertVisible: "esc"

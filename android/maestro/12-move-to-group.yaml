@@ -6,10 +6,25 @@ appId: dev.shep.companion
 # -e AGENT=… / -e MARK=… override these; a flow-level `env:` would win over -e.
 - evalScript: "${output.agent = typeof AGENT === 'undefined' ? 'shell' : AGENT}"
 - launchApp
-- tapOn: "agents"
+# The app lands on the board; the pill is the switch to the session view.
+- tapOn:
+    id: "pill-desktop"
+# The list is as long as the session, and flow 12 parks this agent in a
+# group of its own at the end of it, so the row is often below the fold.
+- scrollUntilVisible:
+    element:
+      text: "agent ${output.agent}"
+    direction: DOWN
+    timeout: 30000
 - longPressOn: "agent ${output.agent}"
 - assertVisible: "move to group"
 - tapOn: "move to group"
 - assertVisible: "move ${output.agent} to"
 - tapOn: "new group"
+# The new group lands at the end of the list.
+- scrollUntilVisible:
+    element:
+      text: "agent ${output.agent}"
+    direction: DOWN
+    timeout: 30000
 - assertVisible: "agent ${output.agent}"

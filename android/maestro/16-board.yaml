@@ -19,11 +19,13 @@
 #   $S overseer tick --max-age 0        # a real brain call, 20–40 s
 #   maestro --device emulator-5554 test android/maestro/16-board.yaml
 #
-# Text anchors only (no ids) per device-testing conventions — with one
-# exception, the chat composer: its `ask the overseer` placeholder is painted
-# *under* the text field, so Maestro's bounds filter drops it from the
-# hierarchy even though it is on screen. The field's `overseer-composer`
-# testTag is the only handle on it.
+# Text anchors for content, ids for the navigation chrome. The board's region
+# headings are the same words the hint bar and the pill use — `agents`,
+# `docket`, `board` — so a text anchor on a *control* takes whichever of the
+# two the hierarchy lists first. The chrome therefore carries test ids
+# (`pill-desktop`, `pill-board`, `hint-<label>`, `overseer-strip`), and so does
+# the chat composer, whose `ask the overseer` placeholder is painted *under*
+# the text field and is dropped from the hierarchy by Maestro's bounds filter.
 appId: dev.shep.companion
 env:
   QUESTION: "one line: what needs me?"
@@ -35,7 +37,9 @@ env:
 # ── the board is where the phone lands ──────────────────────────────────
 # Header, then the pill, then one anchor per region on the first screenful.
 - assertVisible: "· board"
-- assertVisible: "desktop"
+- assertVisible:
+    id: "pill-desktop"
+# A region heading, not a tab: `agents` came out of the hint bar in A1.
 - assertVisible: "agents"
 # The docket heading is five separate text nodes — `docket`, `  due `, the
 # count, ` !N`, `  ·  inbox ` — so the desktop's `docket  due 2 !1` is not one
@@ -59,16 +63,19 @@ env:
     timeout: 30000
 
 # ── the pill is the one switch between the two views ────────────────────
-# `desktop` is unique; the pill's `board` half is not (the hint bar has a
-# `board` tab too), so it is taken as the half to the right of `desktop`.
-- tapOn: "desktop"
+# Both halves by id: `board` is also a hint-bar label, and `desktop` is unique
+# only by luck.
+- tapOn:
+    id: "pill-desktop"
 - assertVisible: "· agents"
 # The overseer's one row outside the board: `✦ overseer · <first sentence>`.
-- assertVisible: ".*overseer.*"
+- assertVisible:
+    id: "overseer-strip"
 
 # Tapping the strip opens the board at its top; the read of the room is a
 # scroll down from there, as it is on a fresh launch.
-- tapOn: ".*overseer.*"
+- tapOn:
+    id: "overseer-strip"
 - assertVisible: "· board"
 - scrollUntilVisible:
     element:
@@ -77,12 +84,11 @@ env:
     timeout: 30000
 
 # And back the other way, this time on the pill rather than the strip.
-- tapOn: "desktop"
+- tapOn:
+    id: "pill-desktop"
 - assertVisible: "· agents"
 - tapOn:
-    text: "board"
-    rightOf:
-      text: "desktop"
+    id: "pill-board"
 - assertVisible: "· board"
 
 # ── proposals: inbox only, you dispose ──────────────────────────────────

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import dev.shep.companion.Tab
 import dev.shep.companion.ui.theme.ShepPalette
 import dev.shep.companion.ui.theme.ShepShape
@@ -36,6 +37,11 @@ fun HintBar(selected: Tab, onSelect: (Tab) -> Unit) {
         Tab.entries.filter { it.inHintBar }.forEach { tab ->
             Row(
                 Modifier
+                    // The bar's one stable handle: the labels are words the
+                    // board also uses as region headings (`docket`, `agents`),
+                    // so a text anchor in an end-to-end flow takes whichever
+                    // of the two the hierarchy happens to list first.
+                    .testTag("hint-${tab.label}")
                     .minimumInteractiveComponentSize()
                     .clip(ShepShape.button)
                     .background(if (tab == selected) ShepPalette.accentDim else ShepPalette.surface0)

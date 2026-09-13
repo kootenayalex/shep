@@ -1,7 +1,8 @@
 # Maestro E2E — shep companion
 
-Text-anchor flows (no ids) per Alex's device-testing conventions. Every flow
-runs against the real bridge, never a mock.
+Text anchors for content, per Alex's device-testing conventions; test ids for
+the navigation chrome, whose labels the board reuses as region headings (see
+"the board", below). Every flow runs against the real bridge, never a mock.
 
 ## Setup
 
@@ -31,6 +32,9 @@ maestro --device <serial> test \
   -e SHEP_TOKEN=$(cat ~/.config/shep/bridge-token) \
   -e SHEP_BRIDGE_URL=ws://10.0.2.2:7432/ \
   maestro/01-pair-and-home.yaml
+
+# Against the throwaway dev stack the token is in the debug config dir:
+#   -e SHEP_TOKEN=$(cat ~/.config/shep-dev/bridge-token)
 
 # Then, in any order:
 maestro --device <serial> test maestro/03-memory.yaml
@@ -116,11 +120,35 @@ maestro --device <phone-serial> test \
 - **The board is now the landing screen**, and its region headings are words
   the hint bar also uses. `docket` matches the board's docket heading *and*
   the `d docket` tab, `board` matches the pill's half *and* the `b board` tab —
-  a plain `tapOn:` takes the first one, which is the wrong one. Pin the pill
-  half with `rightOf: {text: "desktop"}` and reach a tab by a word only that
-  tab has. `agents` is no longer a tab at all: the `desktop | board` pill is
-  the switch, and `agents` on the board is a region heading that does nothing
-  when tapped.
+  a plain `tapOn:` takes the first one, which is the wrong one. `agents` is no
+  longer a tab at all: the `desktop | board` pill is the switch, and `agents`
+  on the board is a region heading that does nothing when tapped.
+- **So the navigation chrome carries test ids, and the flows use them.** Text
+  anchors are still the rule for *content*; a control whose label the board
+  also uses as a heading is not content. `testTagsAsResourceId` is on, so a
+  testTag is an `id:` selector:
+  - `hint-<label>` — one per hint-bar entry: `hint-board`, `hint-docket`,
+    `hint-memory`, `hint-shep`.
+  - `pill-desktop` / `pill-board` — the two halves of the `desktop | board`
+    pill. (This replaced flow 16's `rightOf: {text: "desktop"}` trick.)
+  - `overseer-strip` — the overseer's one row on the agents screen.
+  A flow that wants the agents list opens with `tapOn: {id: "pill-desktop"}`,
+  because that is where the app now lands. Coming back to it **from another
+  tab** is two taps, not one — the bar has no `agents` entry — so it is
+  `hint-board` then `pill-desktop` (flow 03).
+- **`shep · agents` is two text nodes**, so `assertVisible: "agents"` does not
+  match the agents header; it matches the *board's* region heading instead.
+  Assert `"· agents"` / `"· board"` for "which screen am I on". Flow 01 asserts
+  neither: a fresh pairing ends on agents and a saved one on the board, so it
+  pins the two things both carry — the pill and the connection line.
+- **The board's header carries the connection line too** (`live · shep
+  <version>`, or `reconnect`), shared with the agents header as
+  `ConnectionLine` in `ChannelsScreen.kt`. It shipped missing for one commit,
+  which is what made flow 01 fail on an already-paired device.
+- **The agents list is as long as the session.** Anything that reaches a
+  particular agent by name wants `scrollUntilVisible` first — flow 12 parks
+  its agent in a group of its own at the *end* of the list, so 13 could not
+  find it afterwards.
 - **A region's heading is several text nodes, not one.** The desktop's
   `docket  due 2 !1 · inbox 5` is `docket`, `  due `, `2`, ` !1`,
   `  ·  inbox `, `5` — six nodes, so that whole line is not a string to match.

@@ -2,7 +2,8 @@
 # Needs SHEP_TOKEN and SHEP_BRIDGE_URL as the DEVICE sees the bridge:
 #   AVD:    -e SHEP_BRIDGE_URL=ws://10.0.2.2:7432/
 #   phone:  -e SHEP_BRIDGE_URL=ws://100.83.179.75:7431/   (tailnet)
-# Text anchors only (no ids) per device-testing conventions.
+# Text anchors for content, ids for the navigation chrome (the hint bar and
+# the `desktop | board` pill share their labels with the board's headings).
 # IDEMPOTENT: no clearState (OxygenOS/ColorOS block `pm clear` for shell);
 # the pairing block only runs when the pairing screen is showing, so the same
 # flow works on a fresh install and on an already-paired device.
@@ -44,8 +45,16 @@ appId: dev.shep.companion
             visible: "Allow"
           commands:
             - tapOn: "Allow"
-# Board: header and live status. There is no filter row to assert on; the
-# connection line reads "live · shep <version>", so it needs the wildcard.
-# (Maestro plain strings are full-text regexes, not substrings.)
-- assertVisible: "agents"
+# Landed — on either view. A fresh pairing ends on "go to agents"; a device
+# that was already paired lands on the board, which is where the app now opens.
+# What both carry is the `desktop | board` pill and the connection line, so
+# those are what this asserts: `agents` is no longer a word on the agents
+# screen at all (the header reads `shep · agents` as separate nodes) and it IS
+# a word on the board (a region heading), which is the wrong way round.
+# The connection line reads "live · shep <version>" — a plain Maestro string is
+# a full-text regex, not a substring, so it needs the wildcard.
+- assertVisible:
+    id: "pill-desktop"
+- assertVisible:
+    id: "pill-board"
 - assertVisible: "live.*"

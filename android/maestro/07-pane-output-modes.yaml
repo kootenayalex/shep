@@ -1,13 +1,16 @@
 # A pane has two outputs and two inputs, and they pair up.
 # Needs a paired app (run 01 first) against a bridge with at least one agent.
-# Text anchors only (no ids) per device-testing conventions.
+# Text anchors for content, ids for the navigation chrome (the hint bar and
+# the `desktop | board` pill share their labels with the board's headings).
 #
 # Deliberately types nothing: this runs against Alex's real agents, and a flow
 # that sends keystrokes into a live claude pane is not one you can run twice.
 appId: dev.shep.companion
 ---
 - launchApp
-- tapOn: "agents"
+# The app lands on the board; the pill is the switch to the session view.
+- tapOn:
+    id: "pill-desktop"
 # The list is unfiltered, so every agent is already on it — this used to have
 # to tap the "all" chip first to escape the "attention" default.
 # Any agent row will do; the accessible label ("agent <name>") is stable

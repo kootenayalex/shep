@@ -1,6 +1,7 @@
 # The docket tab: the desktop board's lanes and verbs on the phone.
-# Needs a paired app (run 01 first). Text anchors only (no ids) per
-# device-testing conventions.
+# Needs a paired app (run 01 first). Text anchors for content, ids for the
+# navigation chrome (the bar's `docket` and the board's `docket` heading are
+# the same word).
 #
 # Adds one item so it can see the list render; run it against a throwaway
 # server, not the one that owns your docket — `+ add` writes to docket.db.
@@ -9,7 +10,11 @@ env:
   TITLE: "maestro docket probe"
 ---
 - launchApp
-- tapOn: "docket"
+# `docket` is both a hint-bar entry and the board's docket region heading, and
+# the board is what the app opens on — a plain `tapOn: "docket"` took the
+# heading, which does nothing. The bar's entries carry ids for exactly this.
+- tapOn:
+    id: "hint-docket"
 - assertVisible: "\\+ add"
 
 # Empty or not, the screen says so; the add sheet is the same either way.
