@@ -95,8 +95,60 @@ impl App {
                 self.state.set_board_view(BoardView::Agent)
             }
             KeyCode::Char('t') => self.state.set_board_view(BoardView::Tasks),
+            // Rearrange the lanes. Shifted, so plain h/l keeps moving the
+            // selection: moving a whole group is the rarer, heavier action and
+            // should take the heavier key.
+            KeyCode::Char('H') => self.move_selected_lane(BoardDir::Left),
+            KeyCode::Char('L') => self.move_selected_lane(BoardDir::Right),
             _ => {}
         }
+    }
+
+    /// Move the lane holding the selection one place in `dir`.
+    ///
+    /// Goes through `workspace.move` rather than reordering the board's own
+    /// view, because lane order *is* group order: it is a shared session fact,
+    /// it is what the sidebar and the phone show too, and it has to survive a
+    /// handoff. A board that could rearrange itself privately would be a fourth
+    /// opinion about what order the groups are in.
+    fn move_selected_lane(&mut self, dir: BoardDir) {
+        let model = board::board_model(&self.state);
+        let Some(selected) = self.state.board.selected else {
+            return;
+        };
+        let Some(from) = model.lane_of(selected) else {
+            return;
+        };
+        let to = match dir {
+            BoardDir::Left => from.checked_sub(1),
+            BoardDir::Right => (from + 1 < model.lane_count()).then_some(from + 1),
+            BoardDir::Up | BoardDir::Down => None,
+        };
+        let Some(to) = to else {
+            return;
+        };
+        let Some(lane) = model.lanes.get(from) else {
+            return;
+        };
+        // `.get()`, never an index: the model is rebuilt from live state and a
+        // workspace can close between building it and acting on it. Indexing
+        // after resolving a workspace is how a client-triggerable panic got
+        // into `workspace.diff` once already.
+        let Some(workspace_id) = self
+            .state
+            .workspaces
+            .get(lane.ws_idx)
+            .map(|ws| ws.id.clone())
+        else {
+            return;
+        };
+        self.runtime_workspace_move(
+            "tui.workspace.move",
+            crate::api::schema::WorkspaceMoveParams {
+                workspace_id,
+                insert_index: to,
+            },
+        );
     }
 
     /// Agent detail. Esc steps back to the columns rather than closing the
@@ -190,7 +242,11 @@ mod tests {
         state.open_board();
         // Start on the focused working pane.
         state.board.selected = Some(root);
-        // Left jumps to the blocked column (leftmost non-empty).
+        // Both agents are in the same group, so travel is up the lane, and
+        // attention sorting puts the blocked one above the working one.
+        state.board_move_selection(BoardDir::Up, false);
+        assert_eq!(state.board.selected, Some(second));
+        // One group means left and right have nowhere to go.
         state.board_move_selection(BoardDir::Left, false);
         assert_eq!(state.board.selected, Some(second));
     }

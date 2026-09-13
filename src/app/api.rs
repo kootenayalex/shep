@@ -871,6 +871,10 @@ impl App {
             }
             Method::ServerReloadAgentManifests(_) => {
                 let summaries = crate::detect::manifest::reload_manifests();
+                // A local session-facts override lives beside the detection one and
+                // reloads with it, so `reload-agent-manifests` means the same thing on
+                // both registries.
+                crate::session_facts::reload_manifests();
                 self.state.agent_manifest_summaries = summaries.clone();
                 let update_status = crate::detect::manifest_update::load_status();
                 self.reset_all_agent_detection_runtimes();

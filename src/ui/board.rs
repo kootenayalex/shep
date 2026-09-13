@@ -1,12 +1,24 @@
-//! Session board overlay (M1b): a full-screen kanban-style overview answering
-//! "what are all my agents doing right now". Columns are agent state, blocked
-//! leftmost (Blocked | Done | Working | Idle); one card per agent pane. On
-//! narrow terminals it collapses to a single stacked list grouped by state,
-//! blocked group first.
+//! Session board overlay (M1b): a full-screen overview answering "what are all
+//! my agents doing right now". One lane per group, in the order the groups are
+//! in; one card per agent. On narrow terminals it collapses to a single stacked
+//! list, still grouped, still in that order.
+//!
+//! **Lanes are groups, not states.** They used to be the four agent states, and
+//! that was two mistakes in one. It spent the widest axis on a fact that one
+//! coloured glyph already carries — so the same information was drawn twice,
+//! once expensively — and it left the axis a person actually thinks along
+//! (which project is this?) with no representation at all. Worse, the lanes
+//! were a layout nobody could arrange: an agent moved between them on its own,
+//! whenever it changed state, so a card was never twice in the same place.
+//!
+//! State now lives where the design language already put it — the glyph, its
+//! colour, and the order within a lane (`attention_priority`, blocked first) —
+//! and the lanes are yours to arrange, through `workspace.move`, which is a
+//! session fact and survives a handoff.
 //!
 //! Everything here is pure TUI presentation: the model, geometry, selection
 //! traversal, and enter-focus resolution are computed from `&AppState` so they
-//! are unit-testable, and `render` only draws (no state mutation). Board
+//! are unit-testable, and `render` only draws (no state mutation). Card
 //! ordering reuses `agent_panel_entries` and `crate::workspace::attention_priority`
 //! so it agrees with the sidebar.
 
@@ -27,9 +39,6 @@ use crate::app::state::{AppState, BoardView, Palette, TaskQueueRow};
 use crate::detect::AgentState;
 use crate::layout::PaneId;
 
-/// Number of state columns (blocked, done, working, idle).
-pub(crate) const BOARD_COLUMNS: usize = 4;
-
 /// Visible rows per card: agent line, workspace/branch/age line, status line,
 /// activity line, then repo path + context gauge.
 const CARD_ROWS: u16 = 5;
@@ -42,6 +51,15 @@ const CARD_STRIDE: u16 = CARD_ROWS + 1;
 /// two, which aligned them with the gap between the glyph and the name —
 /// under nothing at all.
 const CARD_INDENT: usize = 3;
+
+/// The most lanes the board will draw side by side.
+///
+/// Not a layout limit so much as a legibility one: past this, lanes are thinner
+/// than [`MIN_CARD_WIDTH`] on any terminal anyone has, so the board would
+/// collapse to the stacked list anyway. Groups beyond it stack instead of being
+/// hidden — a group that vanished because it was seventh would be a much worse
+/// answer than one you scroll to.
+pub(crate) const MAX_LANES: usize = 6;
 
 /// Columns of air at a card's right edge.
 ///
@@ -56,32 +74,6 @@ pub(crate) enum BoardDir {
     Down,
     Left,
     Right,
-}
-
-/// Column index for an agent state, blocked leftmost. `done` is idle+unseen,
-/// `idle` is idle+seen. Unknown-state agents fold into the idle column (least
-/// attention) so no agent silently disappears from the board.
-///
-/// Column order is the descending `attention_priority` order so the board and
-/// the sidebar agree on what needs the user first: a finished (done) agent
-/// needs eyes before a working one does.
-pub(crate) fn board_column_index(state: AgentState, seen: bool) -> usize {
-    match (state, seen) {
-        (AgentState::Blocked, _) => 0,
-        (AgentState::Idle, false) => 1,
-        (AgentState::Working, _) => 2,
-        (AgentState::Idle, true) => 3,
-        (AgentState::Unknown, _) => 3,
-    }
-}
-
-fn board_column_title(col: usize) -> &'static str {
-    match col {
-        0 => "blocked",
-        1 => "done",
-        2 => "working",
-        _ => "idle",
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -113,28 +105,67 @@ pub(crate) struct BoardCard {
     pub activity: Option<String>,
     /// The last few of them, in reading order, for a surface with the room.
     pub activity_lines: Vec<String>,
+    /// What the agent says about its own session — its title, its permission
+    /// mode, what it has cost. Empty for an agent shep has no session-facts
+    /// manifest for, which is every agent but claude today.
+    pub session_facts: crate::session_facts::SessionFacts,
+    /// Whether `agent_label` is a name somebody chose, rather than what shep
+    /// detected the agent to be. `claude` is a detection; `board-lanes` is a
+    /// name, and a name is never decorated to make it unique.
+    pub named: bool,
     sort_seq: Option<u64>,
+}
+
+/// One lane: a group, and the agents in it.
+///
+/// The `ws_idx` is kept because moving a lane is `workspace.move` on that
+/// workspace — the lane is not a view of a group, it *is* the group.
+#[derive(Debug, Clone)]
+pub(crate) struct BoardLane {
+    pub ws_idx: usize,
+    pub title: String,
+    pub cards: Vec<BoardCard>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct BoardModel {
-    pub columns: [Vec<BoardCard>; BOARD_COLUMNS],
+    pub lanes: Vec<BoardLane>,
 }
 
 impl BoardModel {
-    /// Flattened card order for narrow/stacked traversal and rendering: column
-    /// order (blocked, done, working, idle), each column already sorted.
+    /// Flattened card order for narrow/stacked traversal and rendering: lane
+    /// order, each lane already sorted by attention.
     pub(crate) fn flattened(&self) -> Vec<&BoardCard> {
-        self.columns.iter().flatten().collect()
+        self.lanes.iter().flat_map(|lane| &lane.cards).collect()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.columns.iter().all(|cards| cards.is_empty())
+        self.lanes.iter().all(|lane| lane.cards.is_empty())
+    }
+
+    pub(crate) fn lane_count(&self) -> usize {
+        self.lanes.len()
+    }
+
+    /// The cards in lane `idx`, or nothing for a lane that is not there. Every
+    /// caller here indexes lanes that came out of this same model, but a board
+    /// is rebuilt from live state on each frame and an index can outlive the
+    /// lane it named.
+    pub(crate) fn cards_in(&self, idx: usize) -> &[BoardCard] {
+        self.lanes
+            .get(idx)
+            .map(|lane| lane.cards.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// The lane a pane's card is in.
+    pub(crate) fn lane_of(&self, pane_id: PaneId) -> Option<usize> {
+        self.locate(pane_id).map(|(col, _)| col)
     }
 
     fn locate(&self, pane_id: PaneId) -> Option<(usize, usize)> {
-        for (col, cards) in self.columns.iter().enumerate() {
-            if let Some(row) = cards.iter().position(|card| card.pane_id == pane_id) {
+        for (col, lane) in self.lanes.iter().enumerate() {
+            if let Some(row) = lane.cards.iter().position(|card| card.pane_id == pane_id) {
                 return Some((col, row));
             }
         }
@@ -246,7 +277,6 @@ fn location_label(
     ws_idx: usize,
     tab_idx: usize,
     pane_number: Option<usize>,
-    multi_tab: bool,
 ) -> String {
     let Some(ws) = app.workspaces.get(ws_idx) else {
         return String::new();
@@ -257,7 +287,6 @@ fn location_label(
         .and_then(|tab| tab.custom_name.as_deref());
     // A tab is one agent, so its number says nothing the agent name does
     // not; only a deliberately named tab earns the width.
-    let _ = multi_tab;
     let tab_part = named.map(str::to_string);
     let multi_pane = ws
         .tabs
@@ -273,19 +302,37 @@ fn location_label(
     }
 }
 
-/// Build the board model from the same agent panel entries the sidebar uses,
-/// bucketed into state columns and sorted within each column by attention
-/// priority (then most-recent state change), so ordering agrees with the
-/// sidebar's priority sort.
+/// Build the board model from the same agent panel entries the sidebar uses:
+/// one lane per group in the groups' own order, cards inside a lane sorted by
+/// attention priority (then most-recent state change), so ordering agrees with
+/// the sidebar's priority sort.
+///
+/// Empty groups get a lane. A group you have just made, or have just cleared,
+/// is exactly the one you are about to put something in — and a lane that
+/// disappeared when its last agent exited would move every lane beside it,
+/// which is the instability the state columns were guilty of.
 pub(crate) fn board_model(app: &AppState) -> BoardModel {
-    let mut model = BoardModel::default();
+    // The same empty registry `agent_panel_entries` falls back to, so a lane's
+    // title is the string the entries in it already carry as `primary_label`.
+    // Deriving it any other way would let a lane disagree with its own cards.
+    let runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+    let mut model = BoardModel {
+        lanes: app
+            .workspaces
+            .iter()
+            .enumerate()
+            .map(|(ws_idx, ws)| BoardLane {
+                ws_idx,
+                title: ws.display_name_from(&app.terminals, &runtimes),
+                cards: Vec::new(),
+            })
+            .collect(),
+    };
     for entry in agent_panel_entries(app) {
-        let col = board_column_index(entry.state, entry.seen);
         let ws = app.workspaces.get(entry.ws_idx);
         let branch = ws.and_then(|ws| ws.branch());
         let pane_number = ws.and_then(|ws| ws.public_pane_number(entry.pane_id));
-        let multi_tab = ws.map(|ws| ws.tabs.len() > 1).unwrap_or(false);
-        let location = location_label(app, entry.ws_idx, entry.tab_idx, pane_number, multi_tab);
+        let location = location_label(app, entry.ws_idx, entry.tab_idx, pane_number);
         let terminal = ws
             .and_then(|ws| ws.terminal_id(entry.pane_id))
             .and_then(|id| app.terminals.get(id));
@@ -299,9 +346,25 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
         let activity_lines = terminal
             .map(|terminal| terminal.activity_lines.clone())
             .unwrap_or_default();
-        let activity = activity_lines.last().cloned();
+        let session_facts = terminal
+            .map(|terminal| terminal.session_facts.clone())
+            .unwrap_or_default();
+        // What the agent says about itself beats what shep read off its screen.
+        // The scraped line is the last resort, not the first answer: it is the
+        // bottom of somebody else's TUI and reads like it.
+        let activity = session_facts
+            .title
+            .clone()
+            .or_else(|| activity_lines.last().cloned());
         let agent_label = entry.agent_label.unwrap_or_else(|| "agent".to_string());
-        model.columns[col].push(BoardCard {
+        let Some(lane) = model
+            .lanes
+            .iter_mut()
+            .find(|lane| lane.ws_idx == entry.ws_idx)
+        else {
+            continue;
+        };
+        lane.cards.push(BoardCard {
             ws_idx: entry.ws_idx,
             pane_id: entry.pane_id,
             display_name: agent_label.clone(),
@@ -318,11 +381,13 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
             model: agent_model,
             activity,
             activity_lines,
+            named: terminal.is_some_and(|terminal| terminal.agent_name.is_some()),
+            session_facts,
             sort_seq: entry.last_agent_state_change_seq,
         });
     }
-    for cards in &mut model.columns {
-        cards.sort_by_key(|card| {
+    for lane in &mut model.lanes {
+        lane.cards.sort_by_key(|card| {
             (
                 std::cmp::Reverse(crate::workspace::attention_priority(card.state, card.seen)),
                 std::cmp::Reverse(card.sort_seq),
@@ -333,67 +398,77 @@ pub(crate) fn board_model(app: &AppState) -> BoardModel {
     model
 }
 
-/// Give every card the shortest name no other card answers to.
+/// Give every card the shortest name no other card in its lane answers to.
 ///
-/// Five claude sessions in the same repo are all "claude" — true, and useless
-/// for telling them apart. Spending detail everywhere is no better: a board
-/// where every card reads `claude · shep · master · docs` has the same problem
-/// in a longer form. So detail is spent only where it buys a distinction. An
-/// agent that is already the only "claude" stays "claude", and only the ones
-/// that collide grow a workspace, then a branch, then a location.
+/// Several claude sessions in one repo are all "claude" — true, and useless for
+/// telling them apart. Spending detail everywhere is no better: a lane where
+/// every card reads `claude · shep · master · docs` has the same problem in a
+/// longer form. So detail is spent only where it buys a distinction. An agent
+/// that is already the only "claude" in its lane stays "claude", and only the
+/// ones that collide grow a branch, then a location.
 ///
-/// This lives here, on the shared board model, rather than in any one client:
-/// the desktop board and the companion both render whatever this produces, so
-/// the two cannot drift into calling the same agent different things.
+/// **Per lane, not per board**, and the group is not one of the things a name
+/// can grow by — because the lane header is already the group's name, so adding
+/// it to the card would print it twice. That is the same fix `strip_workspace_prefix`
+/// makes in the sidebar. Two agents in different groups may now share a name,
+/// and that is correct: they are not ambiguous, they are in different places,
+/// and the place is on screen.
 fn assign_distinct_names(model: &mut BoardModel) {
-    let candidates: Vec<(PaneId, Vec<String>)> = model
-        .flattened()
-        .iter()
-        .map(|card| (card.pane_id, name_candidates(card)))
-        .collect();
-    let depth = candidates
-        .iter()
-        .map(|(_, names)| names.len())
-        .max()
-        .unwrap_or(0);
+    for lane in &mut model.lanes {
+        // A name somebody chose is left alone entirely — it is not grown, and
+        // it does not get a pane-id suffix even when two agents share it.
+        // Deciding that two agents called `docs` are "ambiguous" and renaming
+        // one of them `docs · 3` is shep overruling a person about what their
+        // own agent is called. The fallback exists for agents nobody named.
+        let candidates: Vec<(PaneId, Vec<String>)> = lane
+            .cards
+            .iter()
+            .filter(|card| !card.named)
+            .map(|card| (card.pane_id, name_candidates(card)))
+            .collect();
+        let depth = candidates
+            .iter()
+            .map(|(_, names)| names.len())
+            .max()
+            .unwrap_or(0);
 
-    let mut resolved: std::collections::HashMap<PaneId, String> = std::collections::HashMap::new();
-    for level in 0..depth {
-        // At this level, every still-ambiguous card proposes its name; the ones
-        // whose proposal is unique keep it and stop growing.
-        let mut proposals: Vec<(PaneId, String)> = Vec::new();
+        let mut resolved: std::collections::HashMap<PaneId, String> =
+            std::collections::HashMap::new();
+        for level in 0..depth {
+            // At this level, every still-ambiguous card proposes its name; the
+            // ones whose proposal is unique keep it and stop growing.
+            let mut proposals: Vec<(PaneId, String)> = Vec::new();
+            for (pane_id, names) in &candidates {
+                if resolved.contains_key(pane_id) {
+                    continue;
+                }
+                let name = names.get(level).or_else(|| names.last());
+                if let Some(name) = name {
+                    proposals.push((*pane_id, name.clone()));
+                }
+            }
+            for (pane_id, name) in &proposals {
+                let unique = proposals.iter().filter(|(_, other)| other == name).count() == 1;
+                if unique {
+                    resolved.insert(*pane_id, name.clone());
+                }
+            }
+        }
+
         for (pane_id, names) in &candidates {
-            if resolved.contains_key(pane_id) {
-                continue;
-            }
-            let name = names.get(level).or_else(|| names.last());
-            if let Some(name) = name {
-                proposals.push((*pane_id, name.clone()));
-            }
-        }
-        for (pane_id, name) in &proposals {
-            let unique = proposals.iter().filter(|(_, other)| other == name).count() == 1;
-            if unique {
-                resolved.insert(*pane_id, name.clone());
+            if !resolved.contains_key(pane_id) {
+                // Nothing about placement separated these two. The pane id
+                // always does, and is the last resort precisely because `w2:p1`
+                // is the unreadable thing this exists to avoid.
+                let fallback = names.last().cloned().unwrap_or_default();
+                resolved.insert(
+                    *pane_id,
+                    format!("{fallback} {} {}", glyphs::SEP, pane_id.raw()),
+                );
             }
         }
-    }
 
-    for (pane_id, names) in &candidates {
-        if !resolved.contains_key(pane_id) {
-            // Nothing about placement separated these two. The pane id always
-            // does, and is the last resort precisely because `w2:p1` is the
-            // unreadable thing this exists to avoid.
-            let fallback = names.last().cloned().unwrap_or_default();
-            resolved.insert(
-                *pane_id,
-                format!("{fallback} {} {}", glyphs::SEP, pane_id.raw()),
-            );
-        }
-    }
-
-    for cards in &mut model.columns {
-        for card in cards.iter_mut() {
+        for card in &mut lane.cards {
             if let Some(name) = resolved.get(&card.pane_id) {
                 card.display_name = name.clone();
             }
@@ -401,12 +476,16 @@ fn assign_distinct_names(model: &mut BoardModel) {
     }
 }
 
-/// Increasingly specific names for one card, shortest first.
+/// Increasingly specific names for one unnamed card, shortest first.
+///
+/// Only ever called for a card whose label is a *detection* (`claude`).
+/// Decorating a given name into `board-lanes · master` would answer a question
+/// nobody asked: the point of naming an agent is that the name is the answer.
 fn name_candidates(card: &BoardCard) -> Vec<String> {
     let mut names = vec![card.agent_label.clone()];
     let mut accumulated = card.agent_label.clone();
+    // The group is deliberately absent: it is the lane header.
     let extras = [
-        Some(card.workspace_label.clone()).filter(|l| !l.is_empty()),
         card.branch.clone(),
         Some(card.location.clone()).filter(|l| !l.is_empty()),
     ];
@@ -471,33 +550,36 @@ pub(crate) fn next_selection(
     let (col, row) = model.locate(current)?;
     match dir {
         BoardDir::Up | BoardDir::Down => {
-            let len = model.columns[col].len();
-            if len == 0 {
+            let cards = model.cards_in(col);
+            if cards.is_empty() {
                 return Some(current);
             }
             let next_row = match dir {
-                BoardDir::Up => (row + len - 1) % len,
-                _ => (row + 1) % len,
+                BoardDir::Up => (row + cards.len() - 1) % cards.len(),
+                _ => (row + 1) % cards.len(),
             };
-            model.columns[col].get(next_row).map(|card| card.pane_id)
+            cards.get(next_row).map(|card| card.pane_id)
         }
         BoardDir::Left | BoardDir::Right => {
-            let Some(target_col) = nearest_nonempty_column(&model, col, dir) else {
+            let Some(target_col) = nearest_nonempty_lane(&model, col, dir) else {
                 return Some(current);
             };
-            let len = model.columns[target_col].len();
-            let clamped = row.min(len.saturating_sub(1));
-            model.columns[target_col]
-                .get(clamped)
-                .map(|card| card.pane_id)
+            let cards = model.cards_in(target_col);
+            let clamped = row.min(cards.len().saturating_sub(1));
+            cards.get(clamped).map(|card| card.pane_id)
         }
     }
 }
 
-fn nearest_nonempty_column(model: &BoardModel, col: usize, dir: BoardDir) -> Option<usize> {
+/// The nearest lane in `dir` that has a card in it.
+///
+/// Empty lanes are skipped rather than selected: a lane is drawn even when
+/// empty, but there is nothing in it to select, and stopping on one would make
+/// left/right feel like it had failed.
+fn nearest_nonempty_lane(model: &BoardModel, col: usize, dir: BoardDir) -> Option<usize> {
     match dir {
-        BoardDir::Left => (0..col).rev().find(|c| !model.columns[*c].is_empty()),
-        BoardDir::Right => ((col + 1)..BOARD_COLUMNS).find(|c| !model.columns[*c].is_empty()),
+        BoardDir::Left => (0..col).rev().find(|c| !model.cards_in(*c).is_empty()),
+        BoardDir::Right => ((col + 1)..model.lane_count()).find(|c| !model.cards_in(*c).is_empty()),
         BoardDir::Up | BoardDir::Down => None,
     }
 }
@@ -507,7 +589,7 @@ pub(crate) fn enter_target(app: &AppState, selected: Option<PaneId>) -> Option<(
     let model = board_model(app);
     let pane = selected?;
     let (col, row) = model.locate(pane)?;
-    let card = model.columns[col].get(row)?;
+    let card = model.cards_in(col).get(row)?;
     Some((card.ws_idx, card.pane_id))
 }
 
@@ -528,22 +610,34 @@ pub(crate) fn board_area(app: &AppState) -> Rect {
 /// and every card read `◉ claude · … ⇥2 p1`.
 const MIN_CARD_WIDTH: u16 = 24;
 
-/// Whether the board should collapse to a stacked single-column layout.
+/// Whether the board should collapse to a stacked single-lane layout.
 ///
-/// Two conditions, because the board is four columns wide where the rest of the
-/// app is one: it stacks when the terminal is phone-narrow *or* when splitting
-/// it four ways would leave lanes too thin to read. Using only the mobile
-/// threshold meant a four-column board on an 80-column terminal, which is
-/// exactly where stacking helps most — the same cards, at full width, one at a
-/// time.
+/// Two conditions: the terminal is phone-narrow, *or* splitting it across the
+/// lanes there are would leave them too thin to read. The threshold is the
+/// board's own — it is several columns wide where the rest of the app is one —
+/// and it now moves with the number of groups, because that is what decides how
+/// thin a lane gets. Two groups stay side by side on a terminal where five
+/// could not.
 pub(crate) fn is_narrow(app: &AppState) -> bool {
+    is_narrow_for_lanes(app, drawn_lane_count(&board_model(app)))
+}
+
+/// The [`is_narrow`] test, given a lane count already in hand — so a caller
+/// that has built the model does not build it again.
+fn is_narrow_for_lanes(app: &AppState, lanes: usize) -> bool {
     let area = board_area(app);
     if let Some(inner) = inner_area(area) {
-        if inner.width / (BOARD_COLUMNS as u16) < MIN_CARD_WIDTH {
+        if lanes > 0 && inner.width / (lanes as u16) < MIN_CARD_WIDTH {
             return true;
         }
     }
     super::mobile::is_mobile_width(area, app.mobile_width_threshold)
+}
+
+/// How many lanes get their own column. Beyond [`MAX_LANES`] the board is
+/// stacked anyway, so this is what the width is divided by.
+fn drawn_lane_count(model: &BoardModel) -> usize {
+    model.lane_count().min(MAX_LANES)
 }
 
 fn inner_area(area: Rect) -> Option<Rect> {
@@ -610,15 +704,20 @@ fn dashboard_rows(inner: Rect) -> u16 {
     }
 }
 
-fn column_rects(body: Rect) -> [Rect; BOARD_COLUMNS] {
-    let cols = BOARD_COLUMNS as u16;
+/// Divide the body into one rect per lane, spreading the remainder over the
+/// leftmost lanes so no column of pixels is left unused.
+fn lane_rects(body: Rect, lanes: usize) -> Vec<Rect> {
+    if lanes == 0 {
+        return Vec::new();
+    }
+    let cols = lanes as u16;
     let base = body.width / cols;
     let extra = body.width % cols;
-    let mut rects = [Rect::default(); BOARD_COLUMNS];
+    let mut rects = Vec::with_capacity(lanes);
     let mut x = body.x;
-    for (i, rect) in rects.iter_mut().enumerate() {
+    for i in 0..lanes {
         let w = base + if (i as u16) < extra { 1 } else { 0 };
-        *rect = Rect::new(x, body.y, w, body.height);
+        rects.push(Rect::new(x, body.y, w, body.height));
         x = x.saturating_add(w);
     }
     rects
@@ -632,14 +731,14 @@ struct CardSlot {
 }
 
 fn wide_slots(model: &BoardModel, body: Rect) -> Vec<CardSlot> {
-    let cols = column_rects(body);
+    let cols = lane_rects(body, drawn_lane_count(model));
     let mut slots = Vec::new();
     for (col, col_rect) in cols.iter().enumerate() {
         // One header row + one gap row before the first card.
         let body_y = col_rect.y.saturating_add(2);
         let avail = col_rect.height.saturating_sub(2);
         let max_cards = (avail / CARD_STRIDE) as usize;
-        for row in 0..model.columns[col].len().min(max_cards) {
+        for row in 0..model.cards_in(col).len().min(max_cards) {
             let y = body_y + (row as u16) * CARD_STRIDE;
             slots.push(CardSlot {
                 rect: Rect::new(col_rect.x, y, col_rect.width, CARD_ROWS),
@@ -657,13 +756,16 @@ fn narrow_slots(model: &BoardModel, body: Rect) -> (Vec<CardSlot>, Vec<(u16, usi
     let mut headers = Vec::new();
     let bottom = body.y + body.height;
     let mut y = body.y;
-    for col in 0..BOARD_COLUMNS {
-        if model.columns[col].is_empty() || y >= bottom {
+    for col in 0..model.lane_count() {
+        // An empty lane is drawn in the wide layout, where it holds a column
+        // open. Stacked, it would be a header with nothing under it and would
+        // push real cards off the bottom, so here it is skipped.
+        if model.cards_in(col).is_empty() || y >= bottom {
             continue;
         }
         headers.push((y, col));
         y = y.saturating_add(1);
-        for row in 0..model.columns[col].len() {
+        for row in 0..model.cards_in(col).len() {
             if y.saturating_add(CARD_ROWS) > bottom {
                 break;
             }
@@ -701,7 +803,7 @@ pub(crate) fn card_at(app: &AppState, col: u16, row: u16) -> Option<(usize, Pane
     let slot = slots
         .into_iter()
         .find(|slot| rect_contains(slot.rect, col, row))?;
-    let card = model.columns[slot.col].get(slot.row)?;
+    let card = model.cards_in(slot.col).get(slot.row)?;
     Some((card.ws_idx, card.pane_id))
 }
 
@@ -746,21 +848,33 @@ impl BoardSummary {
 }
 
 pub(crate) fn board_summary(app: &AppState, model: &BoardModel) -> BoardSummary {
-    let counts = [
-        model.columns[0].len(),
-        model.columns[1].len(),
-        model.columns[2].len(),
-        model.columns[3].len(),
-    ];
+    // Counted off the cards' own states. This used to read the four lane
+    // lengths, which was the same number by construction — until the lanes
+    // stopped being states.
+    let mut blocked = 0usize;
+    let mut done = 0usize;
+    let mut working = 0usize;
+    let mut idle = 0usize;
+    for card in model.flattened() {
+        match (card.state, card.seen) {
+            (AgentState::Blocked, _) => blocked += 1,
+            (AgentState::Working, _) => working += 1,
+            (AgentState::Idle, false) => done += 1,
+            // An agent whose state shep does not know counts as settled: it is
+            // the state that asks least of you, which is the honest place to
+            // put "no idea".
+            (AgentState::Idle, true) | (AgentState::Unknown, _) => idle += 1,
+        }
+    }
     BoardSummary {
-        blocked: counts[0],
-        done: counts[1],
-        working: counts[2],
-        idle: counts[3],
+        blocked,
+        done,
+        working,
+        idle,
         // Blocked agents are stuck and done-but-unseen agents are finished
         // without anyone looking: both are waiting on the user, and together
         // they are the only number on this strip worth reacting to.
-        attention: counts[0] + counts[1],
+        attention: blocked + done,
         workspaces: app.workspaces.len(),
         tabs: app.workspaces.iter().map(|ws| ws.tabs.len()).sum(),
         panes: app
@@ -1035,6 +1149,7 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
             ("enter", " focus  "),
             ("i", " inspect  "),
             (glyphs::KEYS_ARROWS, " move  "),
+            ("HL", " reorder groups  "),
             ("t", " tasks  "),
             ("esc/q", " close"),
         ],
@@ -1056,46 +1171,60 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
-fn render_column_header(app: &AppState, frame: &mut Frame, area: Rect, col: usize, count: usize) {
+/// A lane's header: the group's name and how many agents are in it.
+///
+/// Drawn in `accent` when the selection is in this lane and `overlay0` when it
+/// is not — never in a state colour. `accent` is focus and nothing else per
+/// `docs/DESIGN-LANGUAGE.md`, and a lane is no longer a state, so there is no
+/// state for it to be coloured by. The old headers were coloured by state and
+/// two of them were coloured as each other's.
+fn render_lane_header(
+    app: &AppState,
+    frame: &mut Frame,
+    area: Rect,
+    model: &BoardModel,
+    col: usize,
+    selected: bool,
+) {
     let p = &app.palette;
-    let color = super::status::state_label_color(header_state(col), header_seen(col), p);
+    let Some(lane) = model.lanes.get(col) else {
+        return;
+    };
+    let name_style = if selected {
+        Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(p.text).add_modifier(Modifier::BOLD)
+    };
+    // The count is the group's own, not the drawn one: a lane whose cards did
+    // not fit still says how many it has.
+    let count = lane.cards.len();
+    let title = truncate_end(
+        &lane.title,
+        (area.width as usize).saturating_sub(count.to_string().len() + 2),
+    );
     let line = Line::from(vec![
-        Span::styled(
-            format!(" {}", board_column_title(col)),
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        ),
+        Span::styled(format!(" {title}"), name_style),
         Span::styled(format!(" {count}"), Style::default().fg(p.overlay0)),
     ]);
     frame.render_widget(Paragraph::new(line), area);
 }
 
-fn header_state(col: usize) -> AgentState {
-    match col {
-        0 => AgentState::Blocked,
-        1 => AgentState::Working,
-        _ => AgentState::Idle,
-    }
-}
-
-fn header_seen(col: usize) -> bool {
-    // Idle column is seen; done column (2) is unseen.
-    col != 2
-}
-
 fn render_wide(app: &AppState, frame: &mut Frame, model: &BoardModel, body: Rect) {
-    let cols = column_rects(body);
+    let cols = lane_rects(body, drawn_lane_count(model));
     let slots = wide_slots(model, body);
+    let selected_lane = selected_lane(app, model);
     for (col, col_rect) in cols.iter().enumerate() {
-        render_column_header(
+        render_lane_header(
             app,
             frame,
             Rect::new(col_rect.x, col_rect.y, col_rect.width, 1),
+            model,
             col,
-            model.columns[col].len(),
+            selected_lane == Some(col),
         );
     }
     for slot in slots {
-        if let Some(card) = model.columns[slot.col].get(slot.row) {
+        if let Some(card) = model.cards_in(slot.col).get(slot.row) {
             let selected = app.board.selected == Some(card.pane_id);
             render_card(app, frame, slot.rect, card, selected);
         }
@@ -1104,21 +1233,28 @@ fn render_wide(app: &AppState, frame: &mut Frame, model: &BoardModel, body: Rect
 
 fn render_narrow(app: &AppState, frame: &mut Frame, model: &BoardModel, body: Rect) {
     let (slots, headers) = narrow_slots(model, body);
+    let selected_lane = selected_lane(app, model);
     for (y, col) in headers {
-        render_column_header(
+        render_lane_header(
             app,
             frame,
             Rect::new(body.x, y, body.width, 1),
+            model,
             col,
-            model.columns[col].len(),
+            selected_lane == Some(col),
         );
     }
     for slot in slots {
-        if let Some(card) = model.columns[slot.col].get(slot.row) {
+        if let Some(card) = model.cards_in(slot.col).get(slot.row) {
             let selected = app.board.selected == Some(card.pane_id);
             render_card(app, frame, slot.rect, card, selected);
         }
     }
+}
+
+/// Which lane holds the selection, so its header can say so.
+fn selected_lane(app: &AppState, model: &BoardModel) -> Option<usize> {
+    model.locate(app.board.selected?).map(|(col, _)| col)
 }
 
 fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, selected: bool) {
@@ -1221,14 +1357,15 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     if rect.height < 2 {
         return;
     }
-    // Line 2: workspace · branch … age, pinned right.
+    // Line 2: branch … age, pinned right.
+    //
+    // The group used to lead this line. It is the lane header now, so printing
+    // it on every card under that header spent a card's widest row restating
+    // the thing the card is already filed under — the same duplication
+    // `strip_workspace_prefix` removes in the sidebar.
     let age = card_age(app, card).unwrap_or_default();
     let age_width = display_width(&age);
-    let mut meta = card.workspace_label.clone();
-    if let Some(branch) = &card.branch {
-        meta.push_str(glyphs::SEP_SPACED);
-        meta.push_str(branch);
-    }
+    let meta = card.branch.clone().unwrap_or_default();
     let meta_budget = content
         .saturating_sub(CARD_INDENT)
         .saturating_sub(if age_width == 0 { 0 } else { age_width + 1 });
@@ -1268,8 +1405,12 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     if rect.height < 4 {
         return;
     }
-    // Line 4: what the agent's screen is actually saying right now. Italic and
-    // dim because it is a hint, not shep's own reporting.
+    // Line 4: what this session is about.
+    //
+    // `card.activity` is the agent's own title for the session when it keeps
+    // one (see `crate::session_facts`) and the scraped bottom line of its
+    // screen otherwise. Italic and dim either way: it is the agent talking
+    // about itself, not shep reporting.
     if let Some(activity) = &card.activity {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
@@ -1288,20 +1429,53 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
     if rect.height < 5 {
         return;
     }
-    // Line 5: where it is working … context gauge, pinned right so the gauges
-    // stack into a column that can be read down for the one about to fill.
+    // Line 5: where it is working, how it is allowed to work, and what it has
+    // changed … context gauge, pinned right so the gauges stack into a column
+    // that can be read down for the one about to fill.
+    //
+    // The facts left of the gauge go through `fit_strip`, so a narrow lane
+    // drops whole facts from the right rather than clipping one in half. Order
+    // is what a glance wants first: where, then under what permissions, then
+    // how much has changed, then what it has cost.
     let gauge = card
         .context_percent
         .map(|percent| context_gauge_spans(percent, p))
         .unwrap_or_default();
     let gauge_width = display_width(&spans_text(&gauge));
-    let cwd = card.cwd.clone().unwrap_or_default();
-    let cwd_budget = content
+    let strip_budget = content
         .saturating_sub(CARD_INDENT)
         .saturating_sub(if gauge_width == 0 { 0 } else { gauge_width + 1 });
-    let cwd = truncate_start(&cwd, cwd_budget);
-    used = CARD_INDENT + display_width(&cwd);
-    let mut line5 = vec![Span::raw(indent), Span::styled(cwd, dim)];
+
+    let mut facts: Vec<Vec<Span>> = Vec::new();
+    if let Some(cwd) = &card.cwd {
+        if !cwd.is_empty() {
+            // Truncated from the *start*: the tail of a path says which repo,
+            // and the head says `~/vault/dev` on every card.
+            facts.push(vec![Span::styled(truncate_start(cwd, strip_budget), dim)]);
+        }
+    }
+    if let Some(label) = permission_mode_label(&card.session_facts) {
+        facts.push(vec![Span::styled(
+            label.text,
+            Style::default().fg(label.color(p)),
+        )]);
+    }
+    if let Some(churn) = churn_label(&card.session_facts) {
+        facts.push(vec![Span::styled(churn, dim)]);
+    }
+    // Last, so it is the first thing a narrow lane drops. Cost is the one fact
+    // here nobody acts on mid-turn — it is worth a glance when it is free and
+    // worth nothing at all when it costs the path or the churn their place.
+    if let Some(cost) = card.session_facts.cost_usd {
+        facts.push(vec![Span::styled(format!("${cost:.2}"), dim)]);
+    }
+
+    let sep = Span::styled(glyphs::SEP_SPACED, dim);
+    let strip = fit_strip(facts, &sep, strip_budget);
+    let strip_width = display_width(&spans_text(&strip));
+    used = CARD_INDENT + strip_width;
+    let mut line5 = vec![Span::raw(indent)];
+    line5.extend(strip);
     if gauge_width > 0 {
         line5.push(Span::raw(pin(used, gauge_width)));
         line5.extend(gauge);
@@ -1310,6 +1484,54 @@ fn render_card(app: &AppState, frame: &mut Frame, rect: Rect, card: &BoardCard, 
         Paragraph::new(Line::from(line5)),
         Rect::new(rect.x, rect.y + 4, rect.width, 1),
     );
+}
+
+/// How an agent is allowed to act, when that is worth a glance.
+///
+/// `normal` is not: it is the default, it is most agents most of the time, and
+/// a fact printed on every card is a fact nobody reads. The two that earn the
+/// width are the ones that change what you should expect of the agent — one
+/// that will not act, and one that will act without asking.
+struct PermissionLabel {
+    text: &'static str,
+    warn: bool,
+}
+
+impl PermissionLabel {
+    /// `plan` is `mauve` (the review tier — it is going to come back and ask),
+    /// `bypass` is `peach` (the warning tier). Deliberately not red: red is
+    /// blocked and destructive actions only, and an agent working the way you
+    /// told it to work is neither.
+    fn color(&self, p: &Palette) -> ratatui::style::Color {
+        if self.warn {
+            p.peach
+        } else {
+            p.mauve
+        }
+    }
+}
+
+fn permission_mode_label(facts: &crate::session_facts::SessionFacts) -> Option<PermissionLabel> {
+    match facts.notable_permission_mode()? {
+        "plan" => Some(PermissionLabel {
+            text: "plan",
+            warn: false,
+        }),
+        _ => Some(PermissionLabel {
+            text: "bypass",
+            warn: true,
+        }),
+    }
+}
+
+/// `+210/-18`, or nothing when the session has changed nothing.
+///
+/// Zero is not drawn: a card that says `+0/-0` has spent a fact to tell you
+/// nothing happened, and most sessions on a board have not touched a file yet.
+fn churn_label(facts: &crate::session_facts::SessionFacts) -> Option<String> {
+    let added = facts.lines_added.unwrap_or(0);
+    let removed = facts.lines_removed.unwrap_or(0);
+    (added > 0 || removed > 0).then(|| format!("+{added}/-{removed}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -1443,7 +1665,19 @@ fn render_agent_detail(
             Style::default().fg(p.text),
         );
     }
-    if let Some(activity) = &card.activity {
+    // The card has room for one of these; the detail screen has room for both,
+    // and they are different claims. `session` is the agent's own name for
+    // what it is doing; `activity` is the bottom of its screen.
+    if let Some(title) = &card.session_facts.title {
+        kv(
+            frame,
+            &mut y,
+            "session",
+            title.clone(),
+            Style::default().fg(p.text),
+        );
+    }
+    if let Some(activity) = card.activity_lines.last() {
         kv(
             frame,
             &mut y,
@@ -1452,6 +1686,30 @@ fn render_agent_detail(
             Style::default()
                 .fg(p.overlay1)
                 .add_modifier(Modifier::ITALIC),
+        );
+    }
+    if let Some(label) = permission_mode_label(&card.session_facts) {
+        kv(
+            frame,
+            &mut y,
+            "permissions",
+            label.text.to_string(),
+            Style::default().fg(label.color(p)),
+        );
+    }
+    if let Some(churn) = churn_label(&card.session_facts) {
+        kv(frame, &mut y, "changed", churn, Style::default().fg(p.text));
+    }
+    if let Some(cost) = card.session_facts.cost_usd {
+        // Only on the detail screen. It is a real fact and a genuinely
+        // interesting one, but it is not what a card is for — nothing about it
+        // tells you which agent needs you next.
+        kv(
+            frame,
+            &mut y,
+            "cost",
+            format!("${cost:.2}"),
+            Style::default().fg(p.overlay1),
         );
     }
     if let Some(cwd) = &card.cwd {
@@ -1768,41 +2026,73 @@ mod tests {
     }
 
     #[test]
-    fn board_groups_panes_into_state_columns_blocked_first() {
+    fn lanes_are_groups_in_group_order() {
         let (state, panes) = board_state();
         let model = board_model(&state);
-        assert_eq!(model.columns[0].len(), 1, "blocked column");
-        assert_eq!(model.columns[0][0].pane_id, panes[0]);
-        assert_eq!(model.columns[1][0].pane_id, panes[2], "done column");
-        assert_eq!(model.columns[2][0].pane_id, panes[1], "working column");
-        assert!(model.columns[3].is_empty(), "idle column empty");
+        assert_eq!(model.lane_count(), 2, "one lane per group");
+        assert_eq!(model.lanes[0].title, "one");
+        assert_eq!(model.lanes[1].title, "two");
+        // The two panes of group one stay together now, whatever their states.
+        let first: Vec<PaneId> = model.cards_in(0).iter().map(|c| c.pane_id).collect();
+        assert!(first.contains(&panes[0]) && first.contains(&panes[1]));
+        assert_eq!(
+            model
+                .cards_in(1)
+                .iter()
+                .map(|c| c.pane_id)
+                .collect::<Vec<_>>(),
+            vec![panes[2]]
+        );
     }
 
+    /// State moved off the lanes and onto the sort, so this is now the *only*
+    /// thing putting a blocked agent where you will see it first.
     #[test]
-    fn column_index_agrees_with_attention_priority() {
-        // Blocked column (0) must be strictly more urgent than done (1),
-        // done than working (2), working than idle (3): board column order is
-        // the descending attention_priority order.
-        let buckets = [
-            (AgentState::Blocked, true),
-            (AgentState::Idle, false),
-            (AgentState::Working, true),
-            (AgentState::Idle, true),
-        ];
-        for pair in buckets.windows(2) {
-            let (sa, la) = pair[0];
-            let (sb, lb) = pair[1];
-            assert_eq!(board_column_index(sa, la) + 1, board_column_index(sb, lb));
+    fn a_lane_puts_the_agent_that_needs_you_at_the_top() {
+        let (state, panes) = board_state();
+        let model = board_model(&state);
+        // Group one holds a blocked pane and a working one; blocked leads.
+        assert_eq!(model.cards_in(0)[0].pane_id, panes[0], "blocked first");
+        assert_eq!(model.cards_in(0)[1].pane_id, panes[1]);
+        for lane in &model.lanes {
+            let priorities: Vec<u8> = lane
+                .cards
+                .iter()
+                .map(|card| crate::workspace::attention_priority(card.state, card.seen))
+                .collect();
             assert!(
-                crate::workspace::attention_priority(sa, la)
-                    > crate::workspace::attention_priority(sb, lb)
+                priorities.windows(2).all(|w| w[0] >= w[1]),
+                "lane {:?} is not in attention order: {priorities:?}",
+                lane.title
             );
         }
     }
 
+    /// A group with nothing in it still holds its column open. A lane that
+    /// vanished when its last agent exited would shuffle every lane beside it.
     #[test]
-    fn within_column_orders_by_attention_then_recency() {
-        // Two done panes (idle+unseen) in the same column, ordered by seq desc.
+    fn an_empty_group_still_gets_a_lane() {
+        let mut state = AppState::test_new();
+        state.workspaces = vec![Workspace::test_new("one"), Workspace::test_new("empty")];
+        state.ensure_test_terminals();
+        state.active = Some(0);
+        let root = state.workspaces[0].tabs[0].root_pane;
+        set_state(&mut state, 0, 0, root, AgentState::Idle, true);
+
+        let model = board_model(&state);
+        assert_eq!(model.lane_count(), 2);
+        assert!(model.cards_in(1).is_empty());
+        // ...but it is not a place the selection can land.
+        assert_eq!(
+            next_selection(&state, Some(root), BoardDir::Right, false),
+            Some(root),
+            "right stopped on a lane with nothing to select"
+        );
+    }
+
+    #[test]
+    fn within_a_lane_orders_by_attention_then_recency() {
+        // Two done panes (idle+unseen) in one group, ordered by seq desc.
         let mut ws = Workspace::test_new("one");
         let root = ws.tabs[0].root_pane;
         let second = ws.test_split(Direction::Horizontal);
@@ -1816,12 +2106,15 @@ mod tests {
         set_seq(&mut state, 0, 0, second, 20);
 
         let model = board_model(&state);
-        assert_eq!(model.columns[1][0].pane_id, second, "higher seq first");
-        assert_eq!(model.columns[1][1].pane_id, root);
+        assert_eq!(model.cards_in(0)[0].pane_id, second, "higher seq first");
+        assert_eq!(model.cards_in(0)[1].pane_id, root);
     }
 
+    /// An agent whose state shep cannot read still appears. It used to fold
+    /// into the idle *column*; with no columns left, the thing to protect is
+    /// that it is on the board at all.
     #[test]
-    fn unknown_state_agents_fold_into_idle_column() {
+    fn unknown_state_agents_still_get_a_card() {
         let ws = Workspace::test_new("one");
         let root = ws.tabs[0].root_pane;
         let mut state = AppState::test_new();
@@ -1830,27 +2123,29 @@ mod tests {
         state.active = Some(0);
         set_state(&mut state, 0, 0, root, AgentState::Unknown, true);
         let model = board_model(&state);
-        assert_eq!(model.columns[3].len(), 1);
-        assert_eq!(model.columns[3][0].pane_id, root);
+        assert_eq!(model.cards_in(0).len(), 1);
+        assert_eq!(model.cards_in(0)[0].pane_id, root);
+        // And it counts as settled in the dashboard, not as something to do.
+        let summary = board_summary(&state, &model);
+        assert_eq!((summary.blocked, summary.attention), (0, 0));
+        assert_eq!(summary.idle, 1);
     }
 
     #[test]
-    fn wide_left_right_moves_across_columns_and_stops_at_edges() {
+    fn wide_left_right_moves_across_groups_and_stops_at_edges() {
         let (state, panes) = board_state();
-        // From blocked (col 0), right -> done (col 1) -> working (col 2).
+        // Left/right is now travel between groups. From either card of group
+        // "one", right lands on the one card of group "two".
         let sel = next_selection(&state, Some(panes[0]), BoardDir::Right, false);
         assert_eq!(sel, Some(panes[2]));
+        // Rightmost group: nothing further right, stays.
         let sel = next_selection(&state, sel, BoardDir::Right, false);
-        assert_eq!(sel, Some(panes[1]));
-        // No non-empty column to the right of working here: stays put (idle empty).
-        let sel = next_selection(&state, sel, BoardDir::Right, false);
-        assert_eq!(sel, Some(panes[1]));
-        // Back left across the empty gap: working -> done -> blocked.
-        let sel = next_selection(&state, Some(panes[1]), BoardDir::Left, false);
         assert_eq!(sel, Some(panes[2]));
+        // Back left lands on the first card of group "one" — the blocked one,
+        // because attention sorts it to the top of its lane.
         let sel = next_selection(&state, sel, BoardDir::Left, false);
         assert_eq!(sel, Some(panes[0]));
-        // Leftmost column: nothing further left, stays.
+        // Leftmost group: nothing further left, stays.
         let sel = next_selection(&state, sel, BoardDir::Left, false);
         assert_eq!(sel, Some(panes[0]));
     }
@@ -1872,7 +2167,7 @@ mod tests {
         }
         // Column order by seq desc: a, b, c.
         let model = board_model(&state);
-        let order: Vec<PaneId> = model.columns[0].iter().map(|c| c.pane_id).collect();
+        let order: Vec<PaneId> = model.cards_in(0).iter().map(|c| c.pane_id).collect();
         assert_eq!(order, vec![a, b, c]);
 
         let down = next_selection(&state, Some(a), BoardDir::Down, false);
@@ -1902,12 +2197,13 @@ mod tests {
     #[test]
     fn narrow_up_down_traverses_flattened_groups_with_wraparound() {
         let (state, panes) = board_state();
-        // Flattened order: blocked, done, working.
+        // Flattened order is group order, then attention within the group:
+        // group "one" (blocked, working), then group "two" (done).
         let sel = next_selection(&state, Some(panes[0]), BoardDir::Down, true);
-        assert_eq!(sel, Some(panes[2]));
-        let sel = next_selection(&state, sel, BoardDir::Down, true);
         assert_eq!(sel, Some(panes[1]));
-        // Wrap back to the first (blocked) card.
+        let sel = next_selection(&state, sel, BoardDir::Down, true);
+        assert_eq!(sel, Some(panes[2]));
+        // Wrap back to the first card of the first group.
         let sel = next_selection(&state, sel, BoardDir::Down, true);
         assert_eq!(sel, Some(panes[0]));
         // Left/right are no-ops in narrow mode.
@@ -1930,11 +2226,15 @@ mod tests {
     fn card_shows_queued_input_badge() {
         use ratatui::{backend::TestBackend, Terminal};
         let (mut state, panes) = board_state();
-        state
-            .queued_pane_input
-            .insert(panes[0], vec!["one".into(), "two".into()]);
+        state.queued_pane_input.insert(
+            panes[0],
+            vec![
+                crate::app::state::QueuedPaneInput::prompt("one"),
+                crate::app::state::QueuedPaneInput::prompt("two"),
+            ],
+        );
         let model = board_model(&state);
-        let card = &model.columns[0][0];
+        let card = &model.cards_in(0)[0];
         assert_eq!(card.pane_id, panes[0]);
 
         let mut terminal = Terminal::new(TestBackend::new(40, 4)).expect("test terminal");
@@ -2128,9 +2428,10 @@ mod tests {
         state.view.sidebar_rect = Rect::new(0, 0, 110, 26);
         state.board.view = crate::app::state::BoardView::Agent;
         state.board.selected = Some(panes[0]);
-        state
-            .queued_pane_input
-            .insert(panes[0], vec!["next".into()]);
+        state.queued_pane_input.insert(
+            panes[0],
+            vec![crate::app::state::QueuedPaneInput::prompt("next")],
+        );
         let tid = state.workspaces[0]
             .terminal_id(panes[0])
             .expect("terminal")
@@ -2183,9 +2484,10 @@ mod tests {
         state
             .dashboard_sample
             .refresh_if_stale(std::time::Instant::now());
-        state
-            .queued_pane_input
-            .insert(panes[1], vec!["do the thing".into()]);
+        state.queued_pane_input.insert(
+            panes[1],
+            vec![crate::app::state::QueuedPaneInput::prompt("do the thing")],
+        );
         state.workspaces[0].tabs[0].set_custom_name("review".into());
         for (i, pane) in panes.iter().enumerate() {
             let tid = state.workspaces[if i == 2 { 1 } else { 0 }]
@@ -2222,9 +2524,13 @@ mod tests {
     #[test]
     fn dashboard_counts_agents_session_shape_and_queued_input() {
         let (mut state, panes) = board_state();
-        state
-            .queued_pane_input
-            .insert(panes[0], vec!["one".into(), "two".into()]);
+        state.queued_pane_input.insert(
+            panes[0],
+            vec![
+                crate::app::state::QueuedPaneInput::prompt("one"),
+                crate::app::state::QueuedPaneInput::prompt("two"),
+            ],
+        );
         let summary = board_summary(&state, &board_model(&state));
 
         assert_eq!(summary.agents(), 3);
@@ -2282,7 +2588,7 @@ mod tests {
         terminal.cwd = std::path::PathBuf::from("/tmp/deep/nested/repo");
 
         let model = board_model(&state);
-        let card = &model.columns[0][0];
+        let card = &model.cards_in(0)[0];
         let mut term = Terminal::new(TestBackend::new(48, 6)).expect("test terminal");
         term.draw(|frame| render_card(&state, frame, Rect::new(0, 0, 48, 5), card, false))
             .expect("card should render");
@@ -2386,14 +2692,19 @@ mod tests {
     #[test]
     fn the_board_stacks_before_its_lanes_get_too_thin_to_read() {
         let (mut state, _) = board_state();
-        let wide = Rect::new(0, 0, 120, 40);
         let standard = Rect::new(0, 0, 80, 24);
         state.view.sidebar_rect = standard;
         state.view.terminal_area = standard;
-        assert!(is_narrow(&state), "80 columns is four 20-column lanes");
-        state.view.sidebar_rect = wide;
-        state.view.terminal_area = wide;
-        assert!(!is_narrow(&state), "120 columns has room for four lanes");
+        // The threshold moves with the number of groups rather than sitting at
+        // the four columns the board used to always draw. Eighty columns is
+        // comfortable for two groups and unreadable for six.
+        assert!(!is_narrow_for_lanes(&state, 2), "80 columns fits two lanes");
+        assert!(
+            is_narrow_for_lanes(&state, 6),
+            "80 columns is six 13-column lanes"
+        );
+        // Two real groups, so the live check agrees with the two-lane answer.
+        assert!(!is_narrow(&state));
     }
 
     /// Location, age and gauge sit on the card's right edge, one column in.
@@ -2406,7 +2717,7 @@ mod tests {
         use ratatui::{backend::TestBackend, Terminal};
         let (state, panes) = board_state();
         let model = board_model(&state);
-        let card = &model.columns[0][0];
+        let card = &model.cards_in(0)[0];
         assert_eq!(card.pane_id, panes[0]);
 
         const WIDTH: u16 = 60;
@@ -2459,7 +2770,7 @@ mod tests {
         // Workspace 0 has one tab holding two panes, so the pane number earns
         // its width but the tab part does not — until the tab is named.
         let model = board_model(&state);
-        assert_eq!(model.columns[0][0].location, "p1");
+        assert_eq!(model.cards_in(0)[0].location, "p1");
 
         state.workspaces[0].tabs[0].set_custom_name("review".into());
         let model = board_model(&state);
@@ -2515,15 +2826,25 @@ mod tests {
             model: None,
             activity: None,
             activity_lines: Vec::new(),
+            named: false,
+            session_facts: crate::session_facts::SessionFacts::default(),
             sort_seq: None,
         }
     }
 
+    /// Names are resolved per lane, so a test that wants to see them collide
+    /// has to put the cards in the same lane.
     fn names_for(cards: Vec<BoardCard>) -> Vec<String> {
-        let mut model = BoardModel::default();
-        model.columns[3] = cards;
+        let mut model = BoardModel {
+            lanes: vec![BoardLane {
+                ws_idx: 0,
+                title: "lane".to_string(),
+                cards,
+            }],
+        };
         assign_distinct_names(&mut model);
-        model.columns[3]
+        model.lanes[0]
+            .cards
             .iter()
             .map(|card| card.display_name.clone())
             .collect()
@@ -2535,14 +2856,14 @@ mod tests {
     fn distinct_names_spend_detail_only_where_it_buys_a_distinction() {
         let names = names_for(vec![
             named_card(1, "claude", "shep", Some("master"), "p1"),
-            named_card(2, "claude", "workmayt", Some("master"), "p1"),
+            named_card(2, "claude", "shep", Some("fix/push"), "p1"),
             named_card(3, "opencode", "shep", Some("master"), "p1"),
         ]);
         // opencode is unique at the shortest level and stays short.
         assert_eq!(names[2], "opencode");
-        // The two claudes are separated by workspace, and stop there.
-        assert_eq!(names[0], "claude · shep");
-        assert_eq!(names[1], "claude · workmayt");
+        // The two claudes are separated by branch, and stop there.
+        assert_eq!(names[0], "claude · master");
+        assert_eq!(names[1], "claude · fix/push");
     }
 
     /// Detail keeps growing only for the cards that are still colliding.
@@ -2554,10 +2875,62 @@ mod tests {
             named_card(3, "claude", "shep", Some("master"), "board"),
         ]);
         // Unique once the branch is added.
-        assert_eq!(names[1], "claude · shep · fix/push");
+        assert_eq!(names[1], "claude · fix/push");
         // Same branch: these two need the location too.
-        assert_eq!(names[0], "claude · shep · master · docs");
-        assert_eq!(names[2], "claude · shep · master · board");
+        assert_eq!(names[0], "claude · master · docs");
+        assert_eq!(names[2], "claude · master · board");
+    }
+
+    /// The lane header already says the group, so a name never repeats it.
+    /// Two agents in different groups may share a name — they are not
+    /// ambiguous, they are in different places, and the place is on screen.
+    #[test]
+    fn a_name_never_repeats_the_group_its_lane_is_named_for() {
+        let mut model = BoardModel {
+            lanes: vec![
+                BoardLane {
+                    ws_idx: 0,
+                    title: "shep".to_string(),
+                    cards: vec![named_card(1, "claude", "shep", Some("master"), "p1")],
+                },
+                BoardLane {
+                    ws_idx: 1,
+                    title: "workmayt".to_string(),
+                    cards: vec![named_card(2, "claude", "workmayt", Some("master"), "p1")],
+                },
+            ],
+        };
+        assign_distinct_names(&mut model);
+        assert_eq!(model.cards_in(0)[0].display_name, "claude");
+        assert_eq!(model.cards_in(1)[0].display_name, "claude");
+    }
+
+    /// A name somebody chose is the answer, so it is never decorated.
+    #[test]
+    fn a_given_name_is_left_exactly_as_given() {
+        let mut first = named_card(1, "board-lanes", "shep", Some("master"), "p1");
+        first.named = true;
+        let mut second = named_card(2, "pair-qr", "shep", Some("master"), "p1");
+        second.named = true;
+        assert_eq!(
+            names_for(vec![first, second]),
+            vec!["board-lanes".to_string(), "pair-qr".to_string()]
+        );
+    }
+
+    /// Even two agents given the *same* name keep it. Growing one of them a
+    /// branch would be shep overruling a person about what their agent is
+    /// called; the pane id fallback stays for the genuinely unnamed case.
+    #[test]
+    fn two_agents_given_the_same_name_both_keep_it() {
+        let mut first = named_card(1, "docs", "shep", Some("master"), "p1");
+        first.named = true;
+        let mut second = named_card(2, "docs", "shep", Some("fix/push"), "p2");
+        second.named = true;
+        assert_eq!(
+            names_for(vec![first, second]),
+            vec!["docs".to_string(), "docs".to_string()]
+        );
     }
 
     /// The pane id is the last resort, not the first: it appears only when
@@ -2568,11 +2941,11 @@ mod tests {
             named_card(7, "claude", "shep", Some("master"), "p1"),
             named_card(9, "claude", "shep", Some("master"), "p1"),
         ]);
-        assert_eq!(names[0], "claude · shep · master · p1 · 7");
-        assert_eq!(names[1], "claude · shep · master · p1 · 9");
+        assert_eq!(names[0], "claude · master · p1 · 7");
+        assert_eq!(names[1], "claude · master · p1 · 9");
     }
 
-    /// One agent on the board never grows a suffix.
+    /// One agent in a lane never grows a suffix.
     #[test]
     fn a_lone_agent_keeps_its_plain_name() {
         let names = names_for(vec![named_card(1, "claude", "shep", Some("master"), "p1")]);

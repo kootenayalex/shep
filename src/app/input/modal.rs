@@ -80,13 +80,13 @@ pub(crate) enum GlobalMenuAction {
     ReloadConfig,
     Settings,
     Board,
-    Review,
+    PairPhone,
 }
 
 pub(super) fn global_menu_actions(state: &AppState) -> Vec<GlobalMenuAction> {
     let mut actions = vec![
         GlobalMenuAction::Board,
-        GlobalMenuAction::Review,
+        GlobalMenuAction::PairPhone,
         GlobalMenuAction::Settings,
         GlobalMenuAction::Keybinds,
         GlobalMenuAction::ReloadConfig,
@@ -144,12 +144,7 @@ pub(super) fn apply_global_menu_action(state: &mut AppState, action: GlobalMenuA
         }
         GlobalMenuAction::Settings => super::settings::open_settings(state),
         GlobalMenuAction::Board => state.open_board(),
-        GlobalMenuAction::Review => {
-            // Pane creation happens in the App/headless loop; record the
-            // active workspace and let the drain open the pager.
-            state.request_review_workspace = state.active;
-            leave_modal(state);
-        }
+        GlobalMenuAction::PairPhone => open_pair_phone(state),
     }
 }
 
@@ -488,10 +483,78 @@ pub(super) fn open_new_tab_dialog(state: &mut AppState) {
 }
 
 pub(super) fn leave_modal(state: &mut AppState) {
+    // Every way out of the pairing screen comes through here, which is why the
+    // claim window is disarmed here rather than in the key handler: a code that
+    // outlives the screen showing it is claimable by anyone who can reach the
+    // port, for the rest of its five minutes.
+    close_pair_phone(state);
     if state.active.is_some() {
         state.mode = Mode::Terminal;
     } else {
         state.mode = Mode::Navigate;
+    }
+}
+
+/// Arm a pairing offer and show it.
+///
+/// The host is the address a phone could actually dial, not the bridge's
+/// default bind: `127.0.0.1` is correct for the CLI (which prints it for a
+/// human to replace) and useless in a QR.
+pub(super) fn open_pair_phone(state: &mut AppState) {
+    let host = crate::platform::reachable_local_address()
+        .map(|address| address.to_string())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
+    let (offer, error) = match crate::cli::bridge::pair::arm(&host) {
+        Ok(offer) => (Some(offer), None),
+        Err(err) => (None, Some(err.to_string())),
+    };
+    state.pair_phone = Some(crate::app::state::PairPhoneState {
+        offer,
+        host,
+        error,
+        claimed: false,
+    });
+    state.mode = Mode::PairPhone;
+}
+
+/// Disarm and forget any pairing offer. A no-op when no screen is open, which
+/// is the common case: this sits on the shared modal-exit path.
+pub(super) fn close_pair_phone(state: &mut AppState) {
+    if let Some(pairing) = state.pair_phone.take() {
+        if let Some(offer) = &pairing.offer {
+            offer.cancel();
+        }
+    }
+}
+
+/// Poll the armed offer: the bridge deletes the code file when the phone claims
+/// it, and the code stops working when it expires. Returns whether anything the
+/// screen draws changed.
+pub(crate) fn tick_pair_phone(state: &mut AppState) -> bool {
+    let Some(pairing) = state.pair_phone.as_mut() else {
+        return false;
+    };
+    let Some(offer) = &pairing.offer else {
+        return false;
+    };
+    if pairing.claimed {
+        return false;
+    }
+    if offer.is_claimed() {
+        pairing.claimed = true;
+        return true;
+    }
+    // Expiry is not a state change of its own — the screen reads the countdown
+    // off the offer — but the second it crosses zero the wording changes.
+    !offer.is_live(crate::cli::bridge::pair::now_unix())
+}
+
+/// The pairing screen has one key: leave. Everything else on it is something to
+/// look at or type into a phone, and `leave_modal` disarms the code.
+pub(crate) fn handle_pair_phone_key(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => leave_modal(state),
+        _ => {}
     }
 }
 
@@ -814,10 +877,6 @@ pub(super) fn apply_context_menu_action(
         }
         (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Open worktree...")) => {
             state.request_open_existing_worktree = Some(ws_idx);
-            leave_modal(state);
-        }
-        (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Review diff")) => {
-            state.request_review_workspace = Some(ws_idx);
             leave_modal(state);
         }
         (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Ship worktree...")) => {
@@ -1393,10 +1452,6 @@ impl App {
             }
             (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Open worktree...")) => {
                 self.state.request_open_existing_worktree = Some(ws_idx);
-                leave_modal(&mut self.state);
-            }
-            (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Review diff")) => {
-                self.state.request_review_workspace = Some(ws_idx);
                 leave_modal(&mut self.state);
             }
             (ContextMenuKind::GitWorkspace { ws_idx, .. }, Some("Ship worktree...")) => {

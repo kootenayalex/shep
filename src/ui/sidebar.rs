@@ -77,7 +77,7 @@ pub(crate) fn sidebar_section_divider_rect(area: Rect, split_ratio: f32) -> Rect
 
 fn agent_panel_sort_label(sort: AgentPanelSort) -> &'static str {
     match sort {
-        AgentPanelSort::Spaces => "grouped",
+        AgentPanelSort::Grouped => "grouped",
         AgentPanelSort::Priority => "priority",
     }
 }
@@ -1851,8 +1851,13 @@ mod tests {
         app.active = Some(0);
         app.selected = 0;
         app.mode = Mode::Terminal;
-        app.queued_pane_input
-            .insert(root, vec!["one".into(), "two".into()]);
+        app.queued_pane_input.insert(
+            root,
+            vec![
+                crate::app::state::QueuedPaneInput::prompt("one"),
+                crate::app::state::QueuedPaneInput::prompt("two"),
+            ],
+        );
         app.view.workspace_card_areas = vec![crate::app::state::WorkspaceCardArea {
             ws_idx: 0,
             rect: Rect::new(0, 1, 20, 2),

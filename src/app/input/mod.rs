@@ -36,7 +36,7 @@ fn modified_url_click_modifier_matches_terminal_mouse_reporting() {
 
 mod board;
 mod copy_mode;
-mod modal;
+pub(crate) mod modal;
 mod mouse;
 mod navigate;
 mod overlays;
@@ -113,6 +113,7 @@ impl App {
                     handle_navigator_key(&mut self.state, &self.terminal_runtimes, key_event)
                 }
                 Mode::Board => self.handle_board_key(key_event),
+                Mode::PairPhone => modal::handle_pair_phone_key(&mut self.state, key_event),
                 Mode::Terminal => unreachable!(),
             },
         }

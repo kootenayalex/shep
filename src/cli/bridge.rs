@@ -27,7 +27,7 @@
 //! with a JSON error so a paired phone can never reach `server.stop`, the
 //! config, or the pty of an agent it has no UI for.
 
-mod pair;
+pub(crate) mod pair;
 mod stream;
 mod transcript;
 

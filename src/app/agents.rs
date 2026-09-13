@@ -80,11 +80,31 @@ impl App {
             }));
         };
         let cleared = normalized_name.is_none();
-        match normalized_name {
+        let agent_label = terminal.effective_agent_label().map(str::to_string);
+        match normalized_name.clone() {
             Some(name) => terminal.set_agent_display_name(name),
             None => terminal.clear_agent_display_name(),
         }
         self.state.mark_session_dirty();
+        // Push the name into the agent itself, so shep and the harness inside
+        // the pane agree about what this agent is called. Only for an agent
+        // that has such a command, only for a real name (clearing shep's name
+        // is not an instruction to rename anything inside), and queued, so it
+        // lands between turns rather than in the middle of one.
+        if let (Some(name), Some(command)) = (
+            normalized_name.as_deref(),
+            rename_command_for(agent_label.as_deref()),
+        ) {
+            if let Err(err) = self.send_or_queue_pane_command(
+                resolved.ws_idx,
+                resolved.pane_id,
+                format!("{command} {name}"),
+            ) {
+                // The rename itself already succeeded; the agent simply did not
+                // hear about it. Not worth failing the call over.
+                tracing::debug!(err = %err, "could not push the rename into the pane");
+            }
+        }
         // A pane whose only claim to agenthood was the manual name stops being
         // an agent the moment that name is cleared, so `agent_info` reports
         // nothing. That is the rename succeeding, not the target going missing
@@ -551,6 +571,17 @@ pub(super) enum AgentStartError {
         name: String,
         candidates: Vec<crate::api::schema::AgentInfo>,
     },
+}
+
+/// The command that renames a session *inside* the agent, for agents that have
+/// one. Claude Code's `/rename` is the only one today; an agent absent from
+/// this list simply keeps shep's name to itself, which is what happened before
+/// the two ends were connected at all.
+fn rename_command_for(agent_label: Option<&str>) -> Option<&'static str> {
+    match agent_label {
+        Some("claude") => Some("/rename"),
+        _ => None,
+    }
 }
 
 pub(super) enum AgentRenameError {

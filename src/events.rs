@@ -81,6 +81,17 @@ pub enum AppEvent {
     /// fact. Emitted only by the unix screen-detection task.
     #[cfg_attr(not(unix), allow(dead_code))]
     AgentActivityReported { pane_id: PaneId, lines: Vec<String> },
+    /// The agent named the file it keeps its own session record in.
+    ///
+    /// Kept separate from `HookStateReported` / `AgentSessionReported` on
+    /// purpose: this carries no state authority and takes no part in `seq`
+    /// ordering, so folding it into either of those would put a display hint
+    /// inside the path that decides what an agent is doing.
+    AgentSessionFileReported {
+        pane_id: PaneId,
+        agent_label: String,
+        path: Option<std::path::PathBuf>,
+    },
     /// Hook-authoritative agent state was reported for a pane.
     HookStateReported {
         pane_id: PaneId,

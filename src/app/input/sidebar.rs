@@ -199,7 +199,7 @@ impl AppState {
     pub(crate) fn global_menu_labels(&self) -> Vec<&'static str> {
         let mut labels = vec![
             "session board",
-            "review diff",
+            "pair phone",
             "settings",
             "keybinds",
             "reload config",
@@ -529,13 +529,30 @@ mod tests {
         ));
 
         let menu = app.state.global_menu_rect();
+        let row = global_menu_row(&app, "keybinds");
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 4,
+            row,
         ));
 
         assert_eq!(app.state.mode, Mode::KeybindHelp);
+    }
+
+    /// The screen row a global-menu entry sits on.
+    ///
+    /// Every one of these tests used to hardcode it, so adding or removing a
+    /// menu entry did not fail them — it moved them onto whatever slid into the
+    /// old row, and they went on passing while asserting the wrong thing.
+    fn global_menu_row(app: &crate::app::App, label: &str) -> u16 {
+        let index = app
+            .state
+            .global_menu_labels()
+            .iter()
+            .position(|item| *item == label)
+            .unwrap_or_else(|| panic!("{label:?} is not in the global menu"));
+        // One border row above the first label.
+        app.state.global_menu_rect().y + 1 + index as u16
     }
 
     #[test]
@@ -549,10 +566,11 @@ mod tests {
         ));
 
         let menu = app.state.global_menu_rect();
+        let row = global_menu_row(&app, "settings");
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 3,
+            row,
         ));
 
         assert_eq!(app.state.mode, Mode::Settings);
@@ -569,10 +587,11 @@ mod tests {
         ));
 
         let menu = app.state.global_menu_rect();
+        let row = global_menu_row(&app, "reload config");
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 5,
+            row,
         ));
 
         assert!(app.state.request_reload_config);
@@ -596,7 +615,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
-                "review diff",
+                "pair phone",
                 "settings",
                 "keybinds",
                 "reload config",
@@ -623,7 +642,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
-                "review diff",
+                "pair phone",
                 "settings",
                 "keybinds",
                 "reload config",
@@ -632,10 +651,11 @@ mod tests {
         );
 
         let menu = app.state.global_menu_rect();
+        let row = global_menu_row(&app, "detach");
         app.handle_mouse(mouse(
             MouseEventKind::Down(MouseButton::Left),
             menu.x + 2,
-            menu.y + 6,
+            row,
         ));
 
         assert!(app.state.detach_requested);
@@ -652,7 +672,7 @@ mod tests {
             app.state.global_menu_labels(),
             vec![
                 "session board",
-                "review diff",
+                "pair phone",
                 "settings",
                 "keybinds",
                 "reload config",

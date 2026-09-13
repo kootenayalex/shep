@@ -40,6 +40,18 @@ pub(crate) fn rename_button_rects(inner: Rect) -> (Rect, Rect, Rect) {
     (rects[0], rects[1], rects[2])
 }
 
+/// Whether the rename in flight targets the only pane of its tab.
+fn renaming_a_lone_pane(app: &AppState) -> bool {
+    let Some(pane_id) = app.rename_pane_target else {
+        return false;
+    };
+    app.workspaces.iter().any(|ws| {
+        ws.tabs
+            .iter()
+            .any(|tab| tab.panes.contains_key(&pane_id) && tab.panes.len() == 1)
+    })
+}
+
 pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rect) {
     super::dim_background(frame, area);
 
@@ -49,6 +61,10 @@ pub(super) fn render_rename_overlay(app: &AppState, frame: &mut Frame, area: Rec
         Mode::QueuePrompt => "queue prompt (delivered when agent is idle)",
         Mode::RenameTab if app.creating_new_tab => "new tab",
         Mode::RenameTab => "rename tab",
+        // A tab holding one pane *is* an agent — that is the whole vocabulary:
+        // groups hold agents. "pane" is only honest for the split case, which
+        // is the only case where a pane is a thing in its own right.
+        Mode::RenamePane if renaming_a_lone_pane(app) => "rename agent",
         Mode::RenamePane => "rename pane",
         _ => return,
     };
@@ -767,6 +783,146 @@ pub(crate) fn confirm_close_button_rects(inner: Rect) -> (Rect, Rect) {
         3,
     );
     (rects[0], rects[1])
+}
+
+/// The QR for a pairing payload is 49 columns by 25 rows — a fixed size, since
+/// the payload is always a URL plus a 43-character token. Everything below is
+/// laid out around that block rather than around the terminal.
+pub(crate) const PAIR_QR_COLS: u16 = 49;
+pub(crate) const PAIR_QR_ROWS: u16 = 25;
+/// The url line, the code line, the hint, and the blank rows between them.
+const PAIR_TEXT_ROWS: u16 = 6;
+
+/// Pair a phone: show the QR, the address, and the claim code.
+///
+/// Two layouts, and which one appears is decided by the terminal rather than by
+/// a setting. A QR that does not fit is not drawn small — it is dropped, and the
+/// address and code stay, because those are what someone types into the phone
+/// when the camera route is not available. That is the same fallback the
+/// companion's pairing stepper offers, so neither end has a dead end.
+pub(super) fn render_pair_phone_overlay(app: &AppState, frame: &mut Frame, area: Rect) {
+    super::dim_background(frame, area);
+    let Some(pairing) = app.pair_phone.as_ref() else {
+        return;
+    };
+    let p = &app.palette;
+
+    // Does the QR fit, borders and text included? Ask before choosing a size,
+    // so the compact layout is a real second layout rather than a clipped
+    // first one.
+    let wants_qr = pairing.offer.as_ref().and_then(|offer| offer.qr.as_ref());
+    let full = (PAIR_QR_COLS + 4, PAIR_QR_ROWS + PAIR_TEXT_ROWS + 2);
+    let room_for_qr = wants_qr.is_some() && area.width >= full.0 + 4 && area.height >= full.1 + 2;
+
+    let (want, needs_inner) = if room_for_qr {
+        (full, (PAIR_QR_COLS, PAIR_QR_ROWS + PAIR_TEXT_ROWS))
+    } else {
+        ((56, PAIR_TEXT_ROWS + 2), (36, PAIR_TEXT_ROWS))
+    };
+
+    let Some(inner) = render_modal_or_notice(frame, area, want, needs_inner, "pairing", p) else {
+        return;
+    };
+    render_modal_header(frame, inner, "pair phone", p);
+
+    let dim = Style::default().fg(p.overlay0);
+    let key = Style::default().fg(p.accent).add_modifier(Modifier::BOLD);
+    let body = Style::default().fg(p.text);
+
+    let mut rows: Vec<Line> = Vec::new();
+
+    match (&pairing.offer, &pairing.error) {
+        (_, Some(error)) => {
+            rows.push(Line::from(Span::styled(
+                truncate_end(
+                    &format!("could not start pairing: {error}"),
+                    inner.width as usize,
+                ),
+                Style::default().fg(p.red),
+            )));
+        }
+        (Some(offer), None) if pairing.claimed => {
+            // Terminal state, and worth saying plainly: the code is spent and
+            // the phone has the real token now.
+            rows.push(Line::from(Span::styled(
+                "paired",
+                Style::default().fg(p.green),
+            )));
+            rows.push(Line::from(Span::styled(
+                "the phone has its own token now; this code is spent.",
+                dim,
+            )));
+        }
+        (Some(offer), None) => {
+            if room_for_qr {
+                if let Some(image) = &offer.qr {
+                    for line in image.lines() {
+                        rows.push(Line::from(Span::styled(line.to_string(), body)));
+                    }
+                }
+                rows.push(Line::from(Span::raw("")));
+            }
+            // The address is `host:7431` inside a `ws://` URL, and the phone's
+            // pairing screen asks for the host on its own — so show the bare
+            // host too rather than making someone parse it out of the URL.
+            rows.push(Line::from(vec![
+                Span::styled("address  ", dim),
+                Span::styled(pairing.host.clone(), body),
+                Span::styled(format!("  ({})", offer.url), dim),
+            ]));
+            rows.push(Line::from(vec![
+                Span::styled("code     ", dim),
+                Span::styled(offer.code.clone(), key),
+            ]));
+            let now = crate::cli::bridge::pair::now_unix();
+            rows.push(Line::from(Span::styled(
+                if !offer.is_live(now) {
+                    "this code has expired — close and open this again.".to_string()
+                } else if room_for_qr {
+                    format!(
+                        "scan it, or type the address and code in. good for {} more min.",
+                        offer.minutes_left(now)
+                    )
+                } else {
+                    format!(
+                        "type the address and code into the phone. good for {} more min.",
+                        offer.minutes_left(now)
+                    )
+                },
+                dim,
+            )));
+        }
+        (None, None) => {
+            rows.push(Line::from(Span::styled(
+                format!("starting{}", super::glyphs::ELLIPSIS),
+                dim,
+            )));
+        }
+    }
+
+    let body_area = Rect::new(
+        inner.x,
+        inner.y.saturating_add(2),
+        inner.width,
+        inner.height.saturating_sub(2),
+    );
+    frame.render_widget(Paragraph::new(rows).wrap(Wrap { trim: false }), body_area);
+
+    // Say what closes it, and say what closing costs — leaving disarms the
+    // code, which is not obvious and is the reason not to wander off.
+    let footer = Line::from(vec![
+        Span::styled("esc", key),
+        Span::styled(" close (the code stops working)", dim),
+    ]);
+    frame.render_widget(
+        Paragraph::new(footer),
+        Rect::new(
+            inner.x,
+            inner.y + inner.height.saturating_sub(1),
+            inner.width,
+            1,
+        ),
+    );
 }
 
 #[cfg(test)]

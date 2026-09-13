@@ -798,6 +798,7 @@ pub enum Mode {
     KeybindHelp,
     Navigator,
     Board,
+    PairPhone,
 }
 
 impl Mode {
@@ -826,8 +827,27 @@ impl Mode {
                 | Mode::GlobalMenu
                 | Mode::KeybindHelp
                 | Mode::Board
+                | Mode::PairPhone
         )
     }
+}
+
+/// What the pairing screen is showing, and the claim window it armed.
+///
+/// Client-side state, but it owns something that outlives the screen: arming a
+/// pairing offer writes a single-use code into the config dir that the bridge
+/// will honour for five minutes. Closing the screen has to disarm it, which is
+/// why this is held rather than rebuilt per frame — and why `Drop` is not
+/// enough, since a mode change is not a drop.
+pub(crate) struct PairPhoneState {
+    /// `None` when arming failed; `error` then says why.
+    pub offer: Option<crate::cli::bridge::pair::PairingOffer>,
+    /// The host the offer was built for, so the screen can name it for someone
+    /// typing it into the phone by hand.
+    pub host: String,
+    pub error: Option<String>,
+    /// Set once the phone takes the code, so the screen can say so.
+    pub claimed: bool,
 }
 
 /// Client-side state for the session board overlay (M1b). Pure TUI presentation
@@ -877,6 +897,14 @@ pub struct DashboardSample {
 /// How stale a dashboard sample may get before it is retaken. Host load and
 /// queue depth do not move fast enough to be worth a per-frame syscall.
 pub const DASHBOARD_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// How often shep re-reads an agent's own session record.
+///
+/// Longer than the dashboard's interval because these facts change on the
+/// scale of a turn, not a frame: a title is regenerated when the subject of the
+/// conversation moves, and a name when someone renames it. Paying a file read
+/// per agent more often than this buys nothing you could see.
+pub const SESSION_FACTS_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 
 impl DashboardSample {
     /// Take a fresh sample if the previous one has aged out.
@@ -1066,9 +1094,14 @@ pub(crate) enum CopyModeSelection {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// How the sidebar's agent panel orders what it shows: by the group each agent
+/// is in, or by which agent needs a person first.
+///
+/// `Grouped` is the config's `spaces` — the config keeps the older noun,
+/// because a config value is a name people already have in a file.
 pub enum AgentPanelSort {
     #[default]
-    Spaces,
+    Grouped,
     Priority,
 }
 
@@ -1333,7 +1366,6 @@ impl ContextMenuState {
             } => &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "New worktree",
@@ -1345,7 +1377,6 @@ impl ContextMenuState {
             } => &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "Ship worktree...",
@@ -1490,6 +1521,35 @@ pub struct StatePickerState {
     pub list: MenuListState,
 }
 
+/// One piece of input waiting for a busy pane to go idle.
+///
+/// Prompts and commands are the same bytes and different keystrokes: a prompt
+/// is *content* and goes out as a bracketed paste when the pane negotiated one,
+/// while a slash command has to arrive the way a person types it or the agent
+/// reads it as literal text. Which one it is has to be recorded when the input
+/// is queued — by delivery time there is nothing left to tell them apart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueuedPaneInput {
+    pub text: String,
+    pub as_command: bool,
+}
+
+impl QueuedPaneInput {
+    pub fn prompt(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            as_command: false,
+        }
+    }
+
+    pub fn command(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            as_command: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastKind {
     NeedsAttention,
@@ -1603,9 +1663,6 @@ pub struct AppState {
     pub request_submit_worktree_open: bool,
     pub request_submit_worktree_remove: bool,
     pub request_reload_config: bool,
-    /// Workspace index whose review pager should open; drained by the App/
-    /// headless loops (pane creation cannot happen from AppState input code).
-    pub request_review_workspace: Option<usize>,
     /// Workspace index to ship (merge linked-worktree branch into its base);
     /// drained by the App/headless loops.
     pub request_ship_worktree: Option<usize>,
@@ -1631,6 +1688,10 @@ pub struct AppState {
     pub keybind_help: KeybindHelpState,
     pub navigator: NavigatorState,
     pub(crate) board: BoardState,
+    /// Live only while `Mode::PairPhone` is up. `None` everywhere else, because
+    /// a pairing offer that outlives its screen is an armed claim code nobody
+    /// is looking at.
+    pub(crate) pair_phone: Option<PairPhoneState>,
     pub copy_mode: Option<CopyModeState>,
     pub workspace_scroll: usize,
     pub agent_panel_scroll: usize,
@@ -1725,7 +1786,7 @@ pub struct AppState {
     pub toast_config: ToastConfig,
     /// Queued pane input (M5 tab-to-queue): text held while an agent is busy,
     /// flushed verbatim on its next transition to idle.
-    pub queued_pane_input: std::collections::HashMap<PaneId, Vec<String>>,
+    pub queued_pane_input: std::collections::HashMap<PaneId, Vec<QueuedPaneInput>>,
     /// Target pane for the queue-prompt modal.
     pub queue_prompt_target: Option<(usize, PaneId)>,
     /// Server-owned task-queue policy (`[tasks]`).
@@ -1876,6 +1937,23 @@ impl AppState {
         self.integration_recommendations
             .iter()
             .any(|item| item.state == crate::integration::IntegrationStatusKind::Outdated)
+    }
+
+    /// Re-read every agent's own session record that is due.
+    ///
+    /// Not gated on the board being open, unlike the dashboard sample: the name
+    /// an agent gives itself feeds the sidebar and the tab bar too, so a name
+    /// that only appeared once you opened the board would be a worse bug than
+    /// the read is a cost. Each terminal carries its own TTL and mtime guard,
+    /// so an idle session costs one `stat`.
+    pub(crate) fn refresh_session_facts(&mut self, now: std::time::Instant) -> bool {
+        let mut changed = false;
+        for terminal in self.terminals.values_mut() {
+            if terminal.refresh_session_facts(now, SESSION_FACTS_INTERVAL) {
+                changed = true;
+            }
+        }
+        changed
     }
 
     pub(crate) fn refresh_agent_manifest_summaries(&mut self) {
@@ -2047,7 +2125,6 @@ impl AppState {
             request_submit_worktree_open: false,
             request_submit_worktree_remove: false,
             request_reload_config: false,
-            request_review_workspace: None,
             request_ship_worktree: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
@@ -2067,6 +2144,7 @@ impl AppState {
             keybind_help: KeybindHelpState { scroll: 0 },
             navigator: NavigatorState::default(),
             board: BoardState::default(),
+            pair_phone: None,
             copy_mode: None,
             workspace_scroll: 0,
             agent_panel_scroll: 0,
@@ -2125,7 +2203,7 @@ impl AppState {
             sidebar_collapsed: false,
             sidebar_collapsed_mode: crate::config::SidebarCollapsedModeConfig::Compact,
             sidebar_section_split: 0.5,
-            agent_panel_sort: AgentPanelSort::Spaces,
+            agent_panel_sort: AgentPanelSort::Grouped,
             next_agent_state_change_seq: 0,
             mouse_capture: true,
             right_click_passthrough_modifiers: None,
@@ -2640,7 +2718,6 @@ mod tests {
             &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "Ship worktree...",
@@ -2668,7 +2745,6 @@ mod tests {
             &[
                 "Rename",
                 "Close",
-                "Review diff",
                 "Request changes...",
                 "Mark approved",
                 "New worktree",
@@ -2685,12 +2761,13 @@ mod tests {
         let first_pane = first.tabs[0].root_pane;
         let second_pane = second.tabs[0].root_pane;
         state.workspaces = vec![first, second];
+        state.queued_pane_input.insert(
+            first_pane,
+            vec![QueuedPaneInput::prompt("a"), QueuedPaneInput::prompt("b")],
+        );
         state
             .queued_pane_input
-            .insert(first_pane, vec!["a".into(), "b".into()]);
-        state
-            .queued_pane_input
-            .insert(second_pane, vec!["c".into()]);
+            .insert(second_pane, vec![QueuedPaneInput::prompt("c")]);
 
         assert_eq!(state.queued_input_count_for_pane(first_pane), 2);
         assert_eq!(state.queued_input_count_for_pane(second_pane), 1);

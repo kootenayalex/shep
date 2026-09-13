@@ -4,6 +4,43 @@
 
 ### Added
 
+- The session board's lanes are your groups, not four fixed statuses. Each
+  group gets a lane in the order it sits in the sidebar (empty ones included,
+  so a group you are about to fill does not vanish), agents sort inside it by
+  who needs you first, and status is carried by the glyph and its colour the
+  way it already is everywhere else. `H` and `L` move the selected group left
+  and right; the order is a session fact, so it survives a handoff and the
+  phone sees it too.
+
+- Board cards say what the agent says about itself. shep now reads the session
+  record the agent keeps — for Claude Code, the transcript its hook already
+  tells shep the path of — and shows the session's own title on the summary
+  row, plus its permission mode (`plan`, `bypass`), lines changed, and cost.
+  The scraped bottom-of-the-pane line stays as the fallback for an agent with
+  no such record. Which records to read is a bundled TOML per agent
+  (`session-facts/<agent>.toml` under your config dir to override), so another
+  harness is a config file rather than a code change. `session.overview` grew
+  `summary` and `permission_mode` alongside the existing `activity_line`.
+
+- One name means one agent on both sides. Renaming an agent in shep types
+  `/rename <name>` into it (queued while it is mid-turn, so it never
+  interrupts one), and a name set inside the agent — Claude's `/rename` — is
+  adopted by shep for any agent you have not named yourself. A rename dialog
+  for a tab holding one agent is titled "rename agent", because that is what
+  it renames.
+
+- Pairing a phone is in the global menu. "pair phone" opens the QR, the
+  `ws://` address and the 8-character claim code, armed exactly the way
+  `shep bridge pair` arms it; the address shown is the one a phone can
+  actually reach (tailnet first, then the LAN address). Closing the dialog
+  takes the code back.
+
+### Removed
+
+- "Review diff" is gone from the TUI — from the global menu and from the group
+  context menu. Reviewing a diff is what the companion's review screen and
+  `git` are for; the `workspace.diff` API is unchanged.
+
 - Pairing the companion is now two steps and a claim code. The first screen
   says what to do — run `shep bridge pair`, then scan the square or enter the
   computer's name and the 8-character code under it — and answers "why do I

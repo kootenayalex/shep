@@ -1,77 +1,22 @@
-//! Review flow (M3): inspect a workspace's changes in a pager pane.
+//! Review flow (M3): the state a workspace's changes sit in, and the actions
+//! that move them along.
 //!
-//! Panes are real terminals, so the cheapest correct diff view is a new tab in
-//! the workspace running `git diff` through a pager — delta when installed,
-//! `less -R` otherwise — with a `--stat` header piped in front. For a linked
-//! worktree the diff spans the whole branch (merge-base of the base checkout's
-//! branch) plus uncommitted work; for a plain workspace it is the working tree
-//! against `HEAD`.
+//! The desktop's pager pane is gone — reading a diff in a throwaway tab was
+//! never what anyone actually did with it. What is left is the part that is
+//! about the *review* rather than about looking at text: the diff as data for a
+//! client that wants it ([`workspace_review_diff`], which the companion's review
+//! screen reads over `workspace.diff`), shipping a worktree, and sending
+//! feedback back to the agent.
 //!
-//! Command construction is pure ([`review_pager_command`], tested); the pane
-//! injection writes into the fresh tab's pty, which the kernel buffers until
-//! the shell is up — no readiness race.
+//! Also here: the pane-input helpers ([`send_or_queue_pane_text`],
+//! [`submit_pane_text`]) that "request changes" needs, and that anything else
+//! typing into a running agent should use rather than reinventing.
 
 use std::path::Path;
 
 use bytes::Bytes;
 
 use crate::workspace::WorktreeSpaceMembership;
-
-impl crate::app::App {
-    /// Open a review pager tab for workspace `ws_idx` (focuses it).
-    pub(crate) fn open_review_pager(&mut self, ws_idx: usize) {
-        if ws_idx >= self.state.workspaces.len() {
-            return;
-        }
-        let ws = &self.state.workspaces[ws_idx];
-        let cwd = ws
-            .resolved_identity_cwd_from(&self.state.terminals, &self.terminal_runtimes)
-            .unwrap_or_else(|| ws.identity_cwd.clone());
-        let target = review_diff_target(&cwd, ws.worktree_space());
-        let command = review_pager_command(&target, delta_available());
-
-        // Mirror the API tab-create path (production tab creation is
-        // server-owned; the convenience wrappers in `creation.rs` are
-        // test-only).
-        let (rows, cols) = self.state.estimate_pane_size();
-        let default_shell = self.state.default_shell.clone();
-        let shell_mode = self.state.shell_mode;
-        let scrollback_limit_bytes = self.state.pane_scrollback_limit_bytes;
-        let host_terminal_theme = self.state.host_terminal_theme;
-        let result = self.state.workspaces[ws_idx].create_tab(
-            rows,
-            cols,
-            cwd,
-            scrollback_limit_bytes,
-            host_terminal_theme,
-            crate::pane::PaneShellConfig::new(&default_shell, shell_mode),
-            Vec::new(),
-        );
-        let (tab_idx, terminal, runtime) = match result {
-            Ok(created) => created,
-            Err(err) => {
-                tracing::warn!(err = %err, "failed to open review pane");
-                return;
-            }
-        };
-        self.terminal_runtimes.insert(terminal.id.clone(), runtime);
-        self.state.terminals.insert(terminal.id.clone(), terminal);
-        let ws = &mut self.state.workspaces[ws_idx];
-        ws.tabs[tab_idx].set_custom_name("review".to_string());
-        let root_pane = ws.tabs[tab_idx].root_pane;
-        self.state.remove_alias_shadowed_by_new_pane(root_pane);
-        self.state.switch_workspace_tab(ws_idx, tab_idx);
-        self.state.mode = crate::app::state::Mode::Terminal;
-        self.emit_tab_created_events(ws_idx, tab_idx);
-        self.schedule_session_save();
-        let Some(runtime) = self.lookup_runtime_sender(ws_idx, root_pane) else {
-            return;
-        };
-        if let Err(err) = runtime.try_send_bytes(Bytes::from(command)) {
-            tracing::warn!(err = %err, "failed to inject review command");
-        }
-    }
-}
 
 impl crate::app::App {
     /// Ship a linked-worktree workspace: merge its branch into the base
@@ -168,13 +113,46 @@ impl crate::app::App {
                 .queued_pane_input
                 .entry(pane_id)
                 .or_default()
-                .push(text);
+                .push(crate::app::state::QueuedPaneInput::prompt(text));
             return Ok(());
         }
         let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
             return Err("pane has no runtime".to_string());
         };
         submit_pane_text(runtime, &text)
+    }
+
+    /// Send `command` (a leading-slash agent command) into a pane, queueing it
+    /// while the agent is mid-turn so a rename never interrupts one.
+    pub(crate) fn send_or_queue_pane_command(
+        &mut self,
+        ws_idx: usize,
+        pane_id: crate::layout::PaneId,
+        command: String,
+    ) -> Result<(), String> {
+        use crate::detect::AgentState;
+        let command = command.trim().to_string();
+        let busy = self
+            .state
+            .workspaces
+            .get(ws_idx)
+            .and_then(|ws| ws.pane_state(pane_id))
+            .and_then(|pane| self.state.terminals.get(&pane.attached_terminal_id))
+            .is_some_and(|terminal| {
+                matches!(terminal.state, AgentState::Working | AgentState::Blocked)
+            });
+        if busy {
+            self.state
+                .queued_pane_input
+                .entry(pane_id)
+                .or_default()
+                .push(crate::app::state::QueuedPaneInput::command(command));
+            return Ok(());
+        }
+        let Some(runtime) = self.lookup_runtime_sender(ws_idx, pane_id) else {
+            return Err("pane has no runtime".to_string());
+        };
+        submit_pane_command(runtime, &command)
     }
 
     /// Flush any input queued for `pane_id` (called on its transition to
@@ -195,8 +173,13 @@ impl crate::app::App {
             return 0;
         };
         let mut delivered = 0;
-        for text in queued {
-            match submit_pane_text(runtime, &text) {
+        for input in queued {
+            let sent = if input.as_command {
+                submit_pane_command(runtime, &input.text)
+            } else {
+                submit_pane_text(runtime, &input.text)
+            };
+            match sent {
                 Ok(()) => delivered += 1,
                 Err(err) => {
                     tracing::warn!(err = %err, "queued input delivery failed");
@@ -241,6 +224,28 @@ fn submit_pane_text(runtime: &crate::terminal::TerminalRuntime, text: &str) -> R
     let encoded = crate::app::api_helpers::encode_api_text(runtime, text);
     runtime
         .try_send_bytes(Bytes::from(encoded))
+        .map_err(|err| err.to_string())?;
+    runtime
+        .try_send_bytes(Bytes::from_static(b"\r"))
+        .map_err(|err| err.to_string())
+}
+
+/// Write `text` into a pane the way a person types it: the characters, then
+/// Enter, as two writes and **never** as a bracketed paste.
+///
+/// [`submit_pane_text`] brackets a prompt so the Enter after it is unambiguous.
+/// That is right for prose and wrong for a slash command: a bracketed run is
+/// declared to be *content*, and an agent CLI is free to treat pasted content
+/// as literal text rather than opening its command palette on the leading `/`.
+/// A command has to arrive as keystrokes. It is short enough that the burst
+/// problem bracketing solves — a long paste ending in `\r` read as one blob —
+/// does not arise, so long as the `\r` stays a separate write.
+fn submit_pane_command(
+    runtime: &crate::terminal::TerminalRuntime,
+    text: &str,
+) -> Result<(), String> {
+    runtime
+        .try_send_bytes(Bytes::from(text.as_bytes().to_vec()))
         .map_err(|err| err.to_string())?;
     runtime
         .try_send_bytes(Bytes::from_static(b"\r"))
@@ -362,29 +367,6 @@ fn git_stdout_untrimmed(dir: &Path, args: &[&str]) -> Option<String> {
     (!stdout.is_empty()).then_some(stdout)
 }
 
-/// The line typed into the review pane. Leading space keeps it out of shell
-/// history; the trailing newline submits it. `--stat` first so the pager opens
-/// on the summary.
-pub(crate) fn review_pager_command(diff_target: &str, use_delta: bool) -> String {
-    if use_delta {
-        format!(
-            " clear; {{ git diff --stat '{diff_target}'; echo; git diff '{diff_target}'; }} | delta --paging=always\n"
-        )
-    } else {
-        format!(
-            " clear; {{ git diff --color=always --stat '{diff_target}'; echo; git diff --color=always '{diff_target}'; }} | less -R\n"
-        )
-    }
-}
-
-/// Whether `delta` is on PATH.
-fn delta_available() -> bool {
-    let Some(path) = std::env::var_os("PATH") else {
-        return false;
-    };
-    std::env::split_paths(&path).any(|dir| dir.join("delta").is_file())
-}
-
 /// Trimmed stdout of a git command in `dir`, `None` on any failure or empty
 /// output.
 fn git_stdout(dir: &Path, args: &[&str]) -> Option<String> {
@@ -458,22 +440,6 @@ mod tests {
         let (_target, stat, diff) = workspace_review_diff(&repo, None);
         assert!(stat.is_empty() && diff.is_empty(), "clean tree has no diff");
         std::fs::remove_dir_all(&repo).ok();
-    }
-
-    #[test]
-    fn pager_command_shapes() {
-        let less = review_pager_command("HEAD", false);
-        assert!(less.starts_with(' '), "must stay out of shell history");
-        assert!(less.ends_with('\n'), "must submit itself");
-        assert!(less.contains("--color=always"));
-        assert!(less.contains("--stat 'HEAD'"));
-        assert!(less.contains("less -R"));
-
-        let delta = review_pager_command("abc123", true);
-        assert!(delta.contains("delta --paging=always"));
-        assert!(delta.contains("diff 'abc123'"));
-        // delta colorizes itself; forcing git color would garble it.
-        assert!(!delta.contains("--color=always"));
     }
 
     #[test]

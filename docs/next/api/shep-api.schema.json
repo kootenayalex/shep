@@ -9232,6 +9232,13 @@
                 "null"
               ]
             },
+            "permission_mode": {
+              "description": "`plan` / `acceptEdits` / `bypassPermissions` when the agent is running\nunder something other than its normal permission mode.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "queued_input": {
               "description": "Prompts queued for this pane, waiting for it to go idle.",
               "format": "uint64",
@@ -9244,6 +9251,13 @@
               "minimum": 0,
               "type": [
                 "integer",
+                "null"
+              ]
+            },
+            "summary": {
+              "description": "What the agent says this session is about, read from its own session\nrecord (Claude's `ai-title`). A display hint like `activity_line`, but a\nsourced one — prefer it over `activity_line` when both are present.",
+              "type": [
+                "string",
                 "null"
               ]
             },

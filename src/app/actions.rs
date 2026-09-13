@@ -2648,6 +2648,26 @@ impl AppState {
                 }
                 Vec::new()
             }
+            AppEvent::AgentSessionFileReported {
+                pane_id,
+                agent_label,
+                path,
+            } => {
+                // Only for an agent shep actually knows how to read. A report
+                // names a path on this machine, so an unrecognised agent's
+                // claim is dropped rather than stored and later opened.
+                let path =
+                    path.filter(|_| crate::session_facts::reads_session_files_for(&agent_label));
+                if let Some(terminal_id) = self.workspaces.iter().find_map(|ws| {
+                    ws.pane_state(pane_id)
+                        .map(|pane| pane.attached_terminal_id.clone())
+                }) {
+                    if let Some(terminal) = self.terminals.get_mut(&terminal_id) {
+                        terminal.set_agent_session_file(path);
+                    }
+                }
+                Vec::new()
+            }
             AppEvent::HookStateReported {
                 pane_id,
                 source,

@@ -339,6 +339,29 @@ mod fixture {
             Some(Instant::now() - Duration::from_secs(f.age_secs));
     }
 
+    /// Give one fixture pane the facts its agent's own session file would
+    /// carry, so a snapshot can pin the rows that read from them.
+    pub(super) fn set_session_facts(
+        state: &mut AppState,
+        ws: usize,
+        tab: usize,
+        pane: crate::layout::PaneId,
+        facts: crate::session_facts::SessionFacts,
+    ) {
+        let terminal_id = state.workspaces[ws].tabs[tab]
+            .panes
+            .get(&pane)
+            .expect("fixture pane should exist")
+            .attached_terminal_id
+            .clone();
+        let terminal = state
+            .terminals
+            .get_mut(&terminal_id)
+            .expect("fixture terminal should exist");
+        terminal.agent_name = facts.name.clone().or(terminal.agent_name.take());
+        terminal.session_facts = facts;
+    }
+
     /// A session with every state represented, chrome on, and enough real text
     /// that truncation and column budgets are actually exercised.
     ///
@@ -469,7 +492,10 @@ mod fixture {
         // things this pass is going to move, so it belongs in the baseline.
         state.queued_pane_input.insert(
             billing_root,
-            vec!["run the tests".into(), "then ship it".into()],
+            vec![
+                crate::app::state::QueuedPaneInput::prompt("run the tests"),
+                crate::app::state::QueuedPaneInput::prompt("then ship it"),
+            ],
         );
 
         state.dashboard_sample.vitals = crate::platform::HostVitals {
@@ -552,6 +578,32 @@ fn snapshot_board_mid() {
 #[test]
 fn snapshot_board_small() {
     board_at("board-small", SMALL);
+}
+
+/// The two things lanes brought that nothing else pins: the selected group's
+/// header in `accent`, and the fact strip Claude's own transcript fills in —
+/// summary row, permission mode, and lines changed.
+#[test]
+fn snapshot_board_facts() {
+    let mut state = fixture::session();
+    state.mode = Mode::Board;
+    let pane = state.workspaces[0].tabs[0].root_pane;
+    state.board.selected = Some(pane);
+    fixture::set_session_facts(
+        &mut state,
+        0,
+        0,
+        pane,
+        crate::session_facts::SessionFacts {
+            title: Some("stripe webhook retry backoff".to_string()),
+            name: Some("billing".to_string()),
+            permission_mode: Some("plan".to_string()),
+            cost_usd: Some(3.42),
+            lines_added: Some(210),
+            lines_removed: Some(18),
+        },
+    );
+    assert_screen(&mut state, "board-facts", WIDE.0, WIDE.1);
 }
 
 #[test]

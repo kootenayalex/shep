@@ -113,6 +113,15 @@ Badges sit beside a name and answer a different question from state.
 | git behind | `↓N` | peach | commits to pull |
 | memory pressure | `mem NN%` | peach | at or over 80% of the cap |
 | worktree | `⑂` (phone) / `· worktree` (desktop) | accent | a linked worktree, not the main checkout |
+| plan mode | `plan` | mauve | the agent is planning, not editing |
+| bypass permissions | `bypass` | peach | the agent is not asking before acting |
+| lines changed | `+N/-N` | overlay0 | churn this session, from the agent's own record |
+
+The two permission badges are the only two worth drawing. `normal` is the
+default and `acceptEdits` is where most sessions live, so badging either would
+badge every agent, which says as much as badging none. `bypass` is peach and not
+red: red is reserved for blocked and for destructive confirmations, and an agent
+running unattended is a thing to notice, not a thing to stop.
 
 `✓` means approved and nothing else. It used to be idle's glyph too, which is why
 idle is now `○`.

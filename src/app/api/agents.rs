@@ -342,13 +342,112 @@ mod tests {
         // not knowable when it is queued.
         assert_eq!(
             &app.state.queued_pane_input[&pane_id],
-            &vec!["/model".to_string()],
+            &vec![crate::app::state::QueuedPaneInput::prompt("/model")],
         );
         assert!(rx.try_recv().is_err(), "a queued prompt writes nothing yet");
 
         assert_eq!(app.flush_queued_pane_input(pane_id), 1);
         assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"/model"));
         assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"\r"));
+    }
+
+    /// The same helper, but the pane holds Claude — the one agent with a
+    /// `/rename` of its own for shep's rename to reach.
+    fn app_with_claude(
+        state: AgentState,
+    ) -> (
+        App,
+        crate::layout::PaneId,
+        tokio::sync::mpsc::Receiver<bytes::Bytes>,
+    ) {
+        let (mut app, pane_id, rx) = app_with_sendable_agent(state);
+        let terminal_id = app.state.workspaces[0].tabs[0].panes[&pane_id]
+            .attached_terminal_id
+            .clone();
+        app.state
+            .terminals
+            .get_mut(&terminal_id)
+            .unwrap()
+            .set_detected_state(Some(Agent::Claude), state);
+        (app, pane_id, rx)
+    }
+
+    /// Renaming an agent in shep renames it inside the agent too, so the two
+    /// names cannot drift apart.
+    #[tokio::test]
+    async fn renaming_an_idle_claude_types_the_rename_into_the_pane() {
+        let (mut app, _pane_id, mut rx) = app_with_claude(AgentState::Idle);
+
+        let response = app.handle_agent_rename(
+            "req".into(),
+            AgentRenameParams {
+                target: "claude".into(),
+                name: Some("  billing  ".into()),
+            },
+        );
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert!(matches!(success.result, ResponseResult::AgentInfo { .. }));
+
+        // Keystrokes, not a bracketed paste: a slash command declared to be
+        // pasted content is read as literal text.
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            bytes::Bytes::from_static(b"/rename billing")
+        );
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"\r"));
+    }
+
+    /// A rename mid-turn waits for the turn to end rather than typing into it.
+    #[tokio::test]
+    async fn renaming_a_working_claude_waits_for_it_to_go_idle() {
+        let (mut app, pane_id, mut rx) = app_with_claude(AgentState::Working);
+
+        app.handle_agent_rename(
+            "req".into(),
+            AgentRenameParams {
+                target: "claude".into(),
+                name: Some("billing".into()),
+            },
+        );
+        assert_eq!(
+            &app.state.queued_pane_input[&pane_id],
+            &vec![crate::app::state::QueuedPaneInput::command(
+                "/rename billing"
+            )],
+        );
+        assert!(rx.try_recv().is_err(), "nothing is typed into a busy pane");
+
+        assert_eq!(app.flush_queued_pane_input(pane_id), 1);
+        assert_eq!(
+            rx.try_recv().unwrap(),
+            bytes::Bytes::from_static(b"/rename billing")
+        );
+        assert_eq!(rx.try_recv().unwrap(), bytes::Bytes::from_static(b"\r"));
+    }
+
+    /// Clearing shep's name is not an instruction to rename anything inside,
+    /// and an agent with no rename command of its own is never sent one.
+    #[tokio::test]
+    async fn nothing_is_typed_for_a_cleared_name_or_a_agent_without_the_command() {
+        let (mut app, _pane_id, mut rx) = app_with_claude(AgentState::Idle);
+        app.handle_agent_rename(
+            "req".into(),
+            AgentRenameParams {
+                target: "claude".into(),
+                name: None,
+            },
+        );
+        assert!(rx.try_recv().is_err(), "clearing renames nothing inside");
+
+        let (mut app, _pane_id, mut rx) = app_with_sendable_agent(AgentState::Idle);
+        app.handle_agent_rename(
+            "req".into(),
+            AgentRenameParams {
+                target: "pi".into(),
+                name: Some("billing".into()),
+            },
+        );
+        assert!(rx.try_recv().is_err(), "pi has no /rename to send");
     }
 
     /// The Enter that submits a prompt is written on its own.

@@ -1241,6 +1241,30 @@ impl App {
         )
     }
 
+    /// Remember where the agent writes its own session record.
+    ///
+    /// Emitted alongside the state/identity report rather than inside it: this
+    /// fact carries no authority over what the agent is doing, and an agent
+    /// that reports a path but no usable session reference should still get
+    /// its file remembered.
+    fn report_agent_session_file(
+        &mut self,
+        pane_id: crate::layout::PaneId,
+        agent_label: &str,
+        path: Option<String>,
+    ) {
+        let path = path
+            .map(std::path::PathBuf::from)
+            // A relative path would resolve against whatever directory the
+            // server happens to be in, which is not the agent's.
+            .filter(|path| path.is_absolute());
+        self.handle_internal_event(crate::events::AppEvent::AgentSessionFileReported {
+            pane_id,
+            agent_label: agent_label.to_string(),
+            path,
+        });
+    }
+
     pub(super) fn handle_pane_report_agent(
         &mut self,
         id: String,
@@ -1252,6 +1276,7 @@ impl App {
         let Some(agent_label) = normalize_reported_agent_label(&params.agent) else {
             return invalid_agent(id);
         };
+        self.report_agent_session_file(pane_id, &agent_label, params.agent_session_path.clone());
         self.handle_internal_event(crate::events::AppEvent::HookStateReported {
             pane_id,
             session_ref: crate::agent_resume::session_ref_from_report(
@@ -1282,6 +1307,7 @@ impl App {
         let Some(agent_label) = normalize_reported_agent_label(&params.agent) else {
             return invalid_agent(id);
         };
+        self.report_agent_session_file(pane_id, &agent_label, params.agent_session_path.clone());
         self.handle_internal_event(crate::events::AppEvent::AgentSessionReported {
             pane_id,
             session_ref: crate::agent_resume::session_ref_from_report(

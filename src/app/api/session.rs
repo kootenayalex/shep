@@ -120,12 +120,21 @@ impl App {
                 unseen: !card.seen,
                 custom_status: card.status.clone(),
                 manual_state: card.manual_state.clone(),
-                activity_line: card.activity.clone(),
+                // The scraped line, not the composed one the card draws: a
+                // client that wants the agent's own words reads `summary`, and
+                // `activity_line` stays what it says it is — the last line of
+                // the pane's screen.
+                activity_line: card.activity_lines.last().cloned(),
                 activity_lines: card.activity_lines.clone(),
                 context_percent: card.context_percent,
                 cwd: card.cwd.clone(),
                 state_age_seconds,
                 queued_input: self.state.queued_input_count_for_pane(card.pane_id) as u64,
+                summary: card.session_facts.title.clone(),
+                permission_mode: card
+                    .session_facts
+                    .notable_permission_mode()
+                    .map(str::to_string),
                 focused: ws.focused_pane_id() == Some(card.pane_id)
                     && self.state.active == Some(card.ws_idx),
             });

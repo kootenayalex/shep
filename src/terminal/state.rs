@@ -146,6 +146,24 @@ pub struct TerminalState {
     /// "what is it saying" display. Neutral runtime fact; empty when nothing
     /// has been observed.
     pub activity_lines: Vec<String>,
+    /// Where the agent keeps its own record of this session, when it reports
+    /// one — Claude's transcript jsonl, for instance. Neutral runtime fact,
+    /// read by `crate::session_facts` for display hints and nothing else.
+    ///
+    /// This is deliberately not `persisted_agent_session`: that is resume
+    /// identity, and which of an id or a path can resume an agent is a
+    /// per-agent decision (`agent_resume::session_ref_from_report`). A file
+    /// worth reading is a different question from a reference worth resuming,
+    /// and claude answers them differently.
+    pub agent_session_file: Option<std::path::PathBuf>,
+    /// What that file last said. Sampled on a TTL from the tick, never from
+    /// `render` — the "render is pure" rule, and a transcript runs to megabytes.
+    pub session_facts: crate::session_facts::SessionFacts,
+    /// When the sample was taken, and the file's mtime at that moment. An
+    /// unchanged mtime means the re-read is skipped entirely, which is most of
+    /// them: an idle agent writes nothing.
+    session_facts_read_at: Option<Instant>,
+    session_facts_mtime: Option<std::time::SystemTime>,
     pub last_agent_state_change_seq: Option<u64>,
     /// Wall-clock instant of the most recent effective agent-state change.
     /// Server-side runtime fact; the sidebar renders it as a short "age" hint.
@@ -182,6 +200,10 @@ impl TerminalState {
             state: AgentState::Unknown,
             context_percent: None,
             activity_lines: Vec::new(),
+            agent_session_file: None,
+            session_facts: crate::session_facts::SessionFacts::default(),
+            session_facts_read_at: None,
+            session_facts_mtime: None,
             last_agent_state_change_seq: None,
             last_agent_state_change_at: None,
             revision: 0,
@@ -207,6 +229,88 @@ impl TerminalState {
 
     /// Update the best-effort activity lines. Returns whether they changed.
     /// Ephemeral runtime fact — not part of session persistence.
+    /// Record where the agent writes its own session log.
+    ///
+    /// A path is only accepted from an agent whose integration shep ships, for
+    /// the same reason `session_ref_from_report` checks: a report names a file
+    /// on this machine and shep is about to read it.
+    pub fn set_agent_session_file(&mut self, path: Option<std::path::PathBuf>) -> bool {
+        if self.agent_session_file == path {
+            return false;
+        }
+        self.agent_session_file = path;
+        true
+    }
+
+    /// Re-read the agent's session file if it is time to, and say whether
+    /// anything changed.
+    ///
+    /// Two guards, and they do different jobs. The TTL bounds how often shep
+    /// touches the filesystem at all. The mtime check makes the common case —
+    /// an agent sitting idle, its transcript untouched — cost a `stat` and
+    /// nothing else; only a file that actually grew is read again.
+    pub fn refresh_session_facts(&mut self, now: Instant, ttl: std::time::Duration) -> bool {
+        let read = self.reread_session_facts(now, ttl);
+        // Outside the guards on purpose. The guards say "the file has not
+        // changed", which is not the same as "shep still shows the right name":
+        // clearing shep's own name hands authority back to the session file
+        // without touching the file, and nothing would then take it up again
+        // until the agent happened to write. Adoption is two `Option` compares.
+        let adopted = self.adopt_session_name();
+        read || adopted
+    }
+
+    /// The file half of [`Self::refresh_session_facts`].
+    fn reread_session_facts(&mut self, now: Instant, ttl: std::time::Duration) -> bool {
+        let Some(path) = self.agent_session_file.clone() else {
+            return false;
+        };
+        if self
+            .session_facts_read_at
+            .is_some_and(|at| now.saturating_duration_since(at) < ttl)
+        {
+            return false;
+        }
+        self.session_facts_read_at = Some(now);
+        let mtime = std::fs::metadata(&path)
+            .and_then(|meta| meta.modified())
+            .ok();
+        // `None` means the file is gone or unstattable; fall through and let
+        // the read decide, rather than latching whatever was there before.
+        if mtime.is_some() && mtime == self.session_facts_mtime {
+            return false;
+        }
+        self.session_facts_mtime = mtime;
+        let agent = self.effective_agent_label().unwrap_or_default();
+        let facts = crate::session_facts::read(agent, &path);
+        if facts == self.session_facts {
+            return false;
+        }
+        self.session_facts = facts;
+        true
+    }
+
+    /// Take the name the agent knows itself by, when shep has none of its own.
+    ///
+    /// `manual_label` is the tell: it is set only when a person renamed this
+    /// agent *in shep*, so its presence means shep's name is the authority and
+    /// adoption must not touch it. That is also what keeps the two directions
+    /// from ping-ponging — the rename shep pushes into the pane comes back as
+    /// an `agent-name` record, and this refuses to act on it.
+    fn adopt_session_name(&mut self) -> bool {
+        if self.manual_label.is_some() {
+            return false;
+        }
+        let Some(name) = self.session_facts.name.clone() else {
+            return false;
+        };
+        if self.agent_name.as_deref() == Some(name.trim()) {
+            return false;
+        }
+        self.set_agent_name(name);
+        true
+    }
+
     pub fn set_activity_lines(&mut self, lines: Vec<String>) -> bool {
         if self.activity_lines == lines {
             return false;
@@ -1465,6 +1569,10 @@ impl TerminalState {
         self.fallback_observed_at = None;
         self.hook_authority = None;
         self.persisted_agent_session = None;
+        self.agent_session_file = None;
+        self.session_facts = crate::session_facts::SessionFacts::default();
+        self.session_facts_read_at = None;
+        self.session_facts_mtime = None;
         self.agent_metadata.clear();
         self.suppressed_full_lifecycle_hook_reports.clear();
         self.stale_full_lifecycle_hook_sessions.clear();
@@ -3319,6 +3427,44 @@ mod tests {
         assert_eq!(terminal.detected_agent, Some(Agent::Grok));
         assert_eq!(terminal.effective_agent_label(), Some("grok"));
         assert_eq!(terminal.state, AgentState::Working);
+    }
+
+    /// An agent renamed inside Claude comes back out into shep.
+    #[test]
+    fn a_name_from_the_session_file_is_adopted_when_shep_has_none() {
+        let mut terminal = test_terminal();
+        terminal.session_facts.name = Some("billing".into());
+
+        terminal.adopt_session_name();
+
+        assert_eq!(terminal.agent_name.as_deref(), Some("billing"));
+        // Adopted, not claimed: `manual_label` stays empty so the next refresh
+        // can adopt again, and so shep never mistakes this for its own name.
+        assert!(terminal.manual_label.is_none());
+    }
+
+    /// The name a person typed into shep outranks the one inside the agent —
+    /// including the one shep itself just pushed in there, which is what keeps
+    /// the two directions from writing over each other forever.
+    #[test]
+    fn a_name_given_in_shep_is_never_overwritten_by_the_session_file() {
+        let mut terminal = test_terminal();
+        terminal.set_agent_display_name("reviewer".into());
+        terminal.session_facts.name = Some("billing".into());
+
+        terminal.adopt_session_name();
+
+        assert_eq!(terminal.agent_name.as_deref(), Some("reviewer"));
+    }
+
+    #[test]
+    fn a_session_file_with_no_name_leaves_the_agent_alone() {
+        let mut terminal = test_terminal();
+        terminal.set_agent_name("codex".into());
+
+        terminal.adopt_session_name();
+
+        assert_eq!(terminal.agent_name.as_deref(), Some("codex"));
     }
 
     #[test]

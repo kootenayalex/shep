@@ -77,6 +77,15 @@ pub struct SessionOverviewAgent {
     /// Prompts queued for this pane, waiting for it to go idle.
     #[serde(default, skip_serializing_if = "is_zero_u64")]
     pub queued_input: u64,
+    /// What the agent says this session is about, read from its own session
+    /// record (Claude's `ai-title`). A display hint like `activity_line`, but a
+    /// sourced one — prefer it over `activity_line` when both are present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// `plan` / `acceptEdits` / `bypassPermissions` when the agent is running
+    /// under something other than its normal permission mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
     pub focused: bool,
 }
 

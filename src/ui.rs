@@ -29,8 +29,11 @@ mod widgets;
 use self::board::render_board_overlay;
 use self::dialogs::{
     render_confirm_close_overlay, render_new_linked_worktree_overlay,
-    render_open_existing_worktree_overlay, render_remove_worktree_overlay, render_rename_overlay,
+    render_open_existing_worktree_overlay, render_pair_phone_overlay,
+    render_remove_worktree_overlay, render_rename_overlay,
 };
+#[cfg(test)]
+pub(crate) use self::dialogs::{PAIR_QR_COLS, PAIR_QR_ROWS};
 use self::keybind_help::render_keybind_help_overlay;
 use self::menus::{
     render_context_menu, render_copy_mode_overlay, render_global_launcher_menu,
@@ -500,6 +503,7 @@ pub fn render_with_runtime_registry(
         Mode::KeybindHelp => render_keybind_help_overlay(app, frame),
         Mode::Navigator => render_navigator_overlay(app, terminal_runtimes, frame),
         Mode::Board => render_board_overlay(app, terminal_runtimes, frame),
+        Mode::PairPhone => render_pair_phone_overlay(app, frame, frame.area()),
         Mode::Terminal => {}
     }
 }

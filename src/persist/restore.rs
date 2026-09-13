@@ -490,6 +490,7 @@ fn restore_tab(
         let saved_launch_argv = saved_pane.and_then(|p| p.launch_argv.clone());
         let saved_manual_state = saved_pane.and_then(|p| p.manual_state.clone());
         let saved_agent_session = saved_pane.and_then(|p| p.agent_session.as_ref());
+        let saved_agent_session_file = saved_pane.and_then(|p| p.agent_session_file.clone());
         let saved_history =
             old_id.and_then(|old_id| history.and_then(|history| history.panes.get(old_id)));
         let startup = {
@@ -534,6 +535,7 @@ fn restore_tab(
             if let Some(agent_name) = saved_agent_name {
                 terminal.set_agent_name(agent_name);
             }
+            terminal.set_agent_session_file(saved_agent_session_file.clone());
             if let Some(agent) = initial_restore_agent {
                 let _ = terminal.set_detected_state_with_screen_signals_at(
                     Some(agent),
@@ -630,6 +632,7 @@ fn restore_tab(
                 if let Some(agent_name) = saved_agent_name {
                     terminal.set_agent_name(agent_name);
                 }
+                terminal.set_agent_session_file(saved_agent_session_file.clone());
                 if let Some(agent) = initial_restore_agent {
                     let _ = terminal.set_detected_state_with_screen_signals_at(
                         Some(agent),
@@ -1186,6 +1189,7 @@ mod tests {
                                 kind: crate::agent_resume::AgentSessionRefKind::Id,
                                 value: "opencode-session".into(),
                             }),
+                            agent_session_file: None,
                             launch_argv: None,
                             manual_state: None,
                         },
@@ -1265,6 +1269,7 @@ mod tests {
                                 label: None,
                                 agent_name: None,
                                 agent_session: None,
+                                agent_session_file: None,
                                 launch_argv: None,
                                 manual_state: None,
                             },
@@ -1276,6 +1281,7 @@ mod tests {
                                 label: None,
                                 agent_name: None,
                                 agent_session: None,
+                                agent_session_file: None,
                                 launch_argv: None,
                                 manual_state: None,
                             },
@@ -1329,6 +1335,7 @@ mod tests {
                     label: None,
                     agent_name: None,
                     agent_session: None,
+                    agent_session_file: None,
                     launch_argv: None,
                     manual_state: None,
                 },
@@ -1344,6 +1351,7 @@ mod tests {
                 kind: crate::agent_resume::AgentSessionRefKind::Id,
                 value: "codex-session".into(),
             }),
+            agent_session_file: None,
             launch_argv: None,
             manual_state: None,
         };
@@ -1494,6 +1502,7 @@ mod tests {
                             label: Some("kai".into()),
                             agent_name: Some("kai".into()),
                             agent_session: None,
+                            agent_session_file: None,
                             launch_argv: None,
                             manual_state: None,
                         },
@@ -1563,6 +1572,7 @@ mod tests {
                                 kind: crate::agent_resume::AgentSessionRefKind::Id,
                                 value: "codex-session".into(),
                             }),
+                            agent_session_file: None,
                             launch_argv: None,
                             manual_state: None,
                         },
@@ -1725,6 +1735,7 @@ mod tests {
                 label: None,
                 agent_name: None,
                 agent_session: None,
+                agent_session_file: None,
                 launch_argv: None,
                 manual_state: None,
             },

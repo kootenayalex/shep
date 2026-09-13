@@ -103,6 +103,12 @@ pub struct PaneSnapshot {
     pub agent_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_session: Option<PaneAgentSessionSnapshot>,
+    /// Where the agent keeps its own record of this session. A display hint,
+    /// carried across a restart because the hook that supplies it only fires on
+    /// a state change — without this, every card sits blank until its agent
+    /// happens to move.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_session_file: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub launch_argv: Option<Vec<String>>,
     /// A state a person set by hand; absent from files written before it
@@ -432,6 +438,11 @@ fn capture_tab(
                         }
                     })
                 });
+        let agent_session_file = tab
+            .panes
+            .get(id)
+            .and_then(|pane| terminals.get(&pane.attached_terminal_id))
+            .and_then(|terminal| terminal.agent_session_file.clone());
         let manual_state = tab
             .panes
             .get(id)
@@ -445,6 +456,7 @@ fn capture_tab(
                 label,
                 agent_name,
                 agent_session,
+                agent_session_file,
                 launch_argv,
                 manual_state,
             },
@@ -688,6 +700,7 @@ mod tests {
                 label: None,
                 agent_name: None,
                 agent_session: None,
+                agent_session_file: None,
                 launch_argv: None,
                 manual_state: None,
             },
@@ -699,6 +712,7 @@ mod tests {
                 label: Some("website".into()),
                 agent_name: None,
                 agent_session: None,
+                agent_session_file: None,
                 launch_argv: None,
                 manual_state: Some(PaneManualStateSnapshot {
                     state: crate::api::schema::PaneAgentState::Blocked,
@@ -1266,6 +1280,7 @@ mod tests {
                 label: None,
                 agent_name: None,
                 agent_session: None,
+                agent_session_file: None,
                 launch_argv: None,
                 manual_state: None,
             },
@@ -1279,6 +1294,7 @@ mod tests {
                 label: None,
                 agent_name: None,
                 agent_session: None,
+                agent_session_file: None,
                 launch_argv: None,
                 manual_state: None,
             },

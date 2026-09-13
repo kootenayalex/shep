@@ -1,0 +1,42 @@
+# What Claude Code says about its own session.
+#
+# Claude appends one JSON object per line to
+# `~/.claude/projects/<slug>/<session-id>.jsonl`, and shep is handed that exact
+# path by the `SessionStart` hook it installs (`agent_session_path`). These
+# records are rewritten in full every time they change, so the last one of each
+# kind in the file is the current answer.
+#
+# Evidence for every key below was read off live transcripts on 2026-09-07.
+id = "claude"
+format = "jsonl-tail"
+discriminator = "type"
+
+# The records cluster in the last handful of lines, but a single line can be
+# tens of kilobytes (a tool result), so the window is generous. A fact that
+# falls outside it reads as absent, never as a stale value.
+tail_bytes = 262144
+
+# Order is precedence: the first block that resolves a field owns it. A title
+# the user typed outranks the one Claude wrote for itself.
+[[facts]]
+record = "custom-title"
+title = "customTitle"
+
+[[facts]]
+record = "ai-title"
+title = "aiTitle"
+
+# What `/rename` sets, which is the name shep adopts for an unnamed agent.
+[[facts]]
+record = "agent-name"
+name = "agentName"
+
+[[facts]]
+record = "permission-mode"
+permission_mode = "permissionMode"
+
+[[facts]]
+record = "cost-state"
+cost_usd = "totalCostUSD"
+lines_added = "totalLinesAdded"
+lines_removed = "totalLinesRemoved"

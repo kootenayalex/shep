@@ -847,12 +847,6 @@ impl HeadlessServer {
             crate::render_prof::event("full_render_cause.deferred_worktree_submit");
         }
 
-        if let Some(ws_idx) = self.app.state.request_review_workspace.take() {
-            self.app.open_review_pager(ws_idx);
-            needs_render = true;
-            crate::render_prof::event("full_render_cause.deferred_review_pane");
-        }
-
         if let Some(ws_idx) = self.app.state.request_ship_worktree.take() {
             self.app.ship_worktree(ws_idx);
             needs_render = true;
@@ -4201,6 +4195,19 @@ impl HeadlessServer {
         // they cost sysctls plus a sqlite read.
         if self.app.state.mode == crate::app::state::Mode::Board
             && self.app.state.dashboard_sample.refresh_if_stale(now)
+        {
+            changed = true;
+        }
+
+        if self.app.state.refresh_session_facts(now) {
+            changed = true;
+        }
+
+        // The pairing screen has nothing to poll it: the phone claims the code
+        // by talking to the bridge, which is a separate process and signals the
+        // claim by deleting the code file. Only while the screen is up.
+        if self.app.state.mode == crate::app::state::Mode::PairPhone
+            && crate::app::input::modal::tick_pair_phone(&mut self.app.state)
         {
             changed = true;
         }
@@ -9294,11 +9301,10 @@ next_tab = ""
         let (runtime, mut rx) =
             crate::terminal::TerminalRuntime::test_with_channel_capacity(80, 24, 8);
         server.app.state.workspaces[0].insert_test_runtime(root, runtime);
-        server
-            .app
-            .state
-            .queued_pane_input
-            .insert(root, vec!["run it".to_string()]);
+        server.app.state.queued_pane_input.insert(
+            root,
+            vec![crate::app::state::QueuedPaneInput::prompt("run it")],
+        );
 
         let set = |server: &mut HeadlessServer, state| {
             let (respond_to, _response) = std::sync::mpsc::channel();

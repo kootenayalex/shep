@@ -362,3 +362,90 @@ mod tests {
         );
     }
 }
+
+/// The address on this machine a phone on the tailnet or the LAN could dial.
+///
+/// The bridge binds a host shep's TUI does not get told about — it is a separate
+/// process, started by launchd or by hand — so a pairing screen has to work the
+/// address out for itself. Loopback is never the answer: `127.0.0.1` is what
+/// `shep bridge pair` prints by default, and a QR carrying it pairs nothing.
+///
+/// Asking the routing table is both the simplest way and the most honest one,
+/// because it is the same question the phone's packets will ask. A connected
+/// UDP socket sends nothing; `connect` only fixes a route, and the local address
+/// that falls out is the source address this machine would use to reach there.
+/// The tailnet is probed first (its address is stable and reachable from
+/// anywhere), then the default route.
+///
+/// `None` when the machine has no route at all, which is a real answer: there
+/// is then no address worth putting in a QR.
+pub(crate) fn reachable_local_address() -> Option<std::net::IpAddr> {
+    // Tailscale's MagicDNS resolver. Nothing is sent to it; it names the
+    // tailnet route.
+    const TAILNET_PROBE: &str = "100.100.100.100:9";
+    // A public address, to select whatever the default route is. Also unsent.
+    const DEFAULT_ROUTE_PROBE: &str = "1.1.1.1:9";
+
+    fn source_address_for(target: &str) -> Option<std::net::IpAddr> {
+        let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+        socket.connect(target).ok()?;
+        let address = socket.local_addr().ok()?.ip();
+        (!address.is_loopback() && !address.is_unspecified()).then_some(address)
+    }
+
+    source_address_for(TAILNET_PROBE)
+        .filter(is_tailnet_address)
+        .or_else(|| source_address_for(DEFAULT_ROUTE_PROBE))
+}
+
+/// Whether an address is in the 100.64.0.0/10 range Tailscale hands out.
+///
+/// The probe can succeed without Tailscale running — the route falls through to
+/// the default one and returns a LAN address — so the answer is checked rather
+/// than trusted. That is not a wasted probe: a LAN address is what the second
+/// probe returns anyway, and it is the right answer when there is no tailnet.
+fn is_tailnet_address(address: &std::net::IpAddr) -> bool {
+    match address {
+        std::net::IpAddr::V4(v4) => {
+            let [a, b, ..] = v4.octets();
+            a == 100 && (64..128).contains(&b)
+        }
+        std::net::IpAddr::V6(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod address_tests {
+    use super::*;
+    use std::net::IpAddr;
+
+    #[test]
+    fn tailnet_range_is_the_cgnat_block() {
+        assert!(is_tailnet_address(
+            &"100.77.221.100".parse::<IpAddr>().unwrap()
+        ));
+        assert!(is_tailnet_address(&"100.64.0.1".parse::<IpAddr>().unwrap()));
+        assert!(is_tailnet_address(
+            &"100.127.255.254".parse::<IpAddr>().unwrap()
+        ));
+        // Just outside the block on both sides — 100.x is a real public range
+        // and only 100.64/10 is carved out of it.
+        assert!(!is_tailnet_address(
+            &"100.63.255.255".parse::<IpAddr>().unwrap()
+        ));
+        assert!(!is_tailnet_address(
+            &"100.128.0.0".parse::<IpAddr>().unwrap()
+        ));
+        assert!(!is_tailnet_address(&"10.0.0.27".parse::<IpAddr>().unwrap()));
+    }
+
+    /// Whatever this host answers, it must never be an address a phone cannot
+    /// reach — that is the entire job.
+    #[test]
+    fn a_found_address_is_never_loopback() {
+        if let Some(address) = reachable_local_address() {
+            assert!(!address.is_loopback(), "{address} is not dialable");
+            assert!(!address.is_unspecified(), "{address} is not an address");
+        }
+    }
+}

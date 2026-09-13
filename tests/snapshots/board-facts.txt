@@ -1,0 +1,147 @@
+# board-facts 200x55 · 28 styles
+# glyphs pin layout, styles pin meaning
+
+--- screen ---
+ shep                                                                                         workmayt · 1                                                                                  ◉ 1 blocked
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ session board · what are my agents doing                                                                                                                                                             │
+│ agents 5  2 need you  ·  blocked 1  ·  done 1  ·  working 2  ·  idle 1  ·  ⇥2 queued  ·  2 tasks  ·  3 ws · 3 tabs · 5 panes                                                                         │
+│ shep 0.7.3  ·  load 38% of 12 cores  ·  mem 64% 41.0G of 64.0G                                                                                                                                       │
+│ workmayt 2                                                        emberline 1                                                       shep 2                                                           │
+│                                                                                                                                                                                                      │
+│▌◉ billing ⇥2                                                  p1  ● claude                                                          ⠹ codex                                                       p2 │
+│   fix/stripe-webhook                                          2m    master                                                      6m    feat/design-pass                                            2m │
+│   blocked                                                           done                                                              working                                                        │
+│   stripe webhook retry backoff                                      pushed 3 commits to master                                        reading src/ui/board.rs                                        │
+│   ~/vault/dev/workmayt · plan · +210/-18 · $3.42     ████▍   72%    ~/vault/dev/emberline                              █████▎  88%    ~/vault/dev/shep-worktrees/design-pass             ███▎    55% │
+│                                                                                                                                                                                                      │
+│ ⠹ opencode                                                    p2                                                                    ○ claude                                                      p1 │
+│   fix/stripe-webhook                                         20s                                                                      feat/design-pass                                            1h │
+│   working                                                                                                                             idle                                                           │
+│   Metamorphosing…                                                                                                                                                                                    │
+│   ~/vault/dev/workmayt/apps/site                     ██▌     41%                                                                      ~/vault/dev/shep                                   ▊       12% │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│                                                                                                                                                                                                      │
+│ enter focus  i inspect  hjkl/↑↓←→ move  HL reorder groups  t tasks  esc/q close                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ctrl+b prefix  w groups  c tab  ? keys  q detach
+
+--- styles ---
+pbbbbpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppxxxxxxxxgggsppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppmmmmmmmmmmmp
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+abbbbbbbbbbbbbbbggggggggggggggggggggggggggpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+aggggggggwmmmmmmmmmmmmtttttllllllllwtttttdddddwtttttzzzzzzzzwttttteeeeewtttttuuuuuuuuutttttwwwwwwwtttttgggggggggggggggggggggggpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+aggggggwwwwwtttttgggggwwwggggggggggggtttttggggwwwgggggggggggggggpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+abbbbbbbbbggpppppppppppppppppppppppppppppppppppppppppppppppppppppppxxxxxxxxxxggppppppppppppppppppppppppppppppppppppppppppppppppppppppxxxxxggpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+acnqyyyyyyyvvvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqiiqgdpwwwwwwpppppppppppppppppppppppppppppppppppppppppppppppppppppppppgzpwwwwwpppppppppppppppppppppppppppppppppppppppppppppppppppppppggpa
+aqqqiiiiiiiiiiiiiiiiiiqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqiiqpppggggggppppppppppppppppppppppppppppppppppppppppppppppppppppppggppppggggggggggggggggppppppppppppppppppppppppppppppppppppppppppppggpa
+annnnnnnnnnqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqdddddddpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppzzzzzzzzzzppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+ajjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqhhhhhhhhhhhhhhhhhhhhhhhhhhhhhppppppppppppppppppppppppppppppppppppphhhhhhhhhhhhhhhhhhhhhhhhhhppppppppppppppppppppppppppppppppppppppppa
+aqqqiiiiiiiiiiiiiiiiiiiiiiiffffiiiiiiiiiiiiiiiiiiiqqqqqBBBBBrAAAAAqpppgggggggggggggggggggggppppppppppppppppppppppppppppppoooooolllllppppggggggggggggggggggggggggggggggggggggggpppppppppppppkkkkrrgggggpa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+agzpwwwwwwwwppppppppppppppppppppppppppppppppppppppppppppppppppppggpppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppgepwwwwwwppppppppppppppppppppppppppppppppppppppppppppppppppppppggpa
+apppggggggggggggggggggpppppppppppppppppppppppppppppppppppppppppgggppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppggggggggggggggggppppppppppppppppppppppppppppppppppppppppppppggpa
+azzzzzzzzzzppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppeeeeeeepppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+ahhhhhhhhhhhhhhhhhhppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+apppggggggggggggggggggggggggggggggpppppppppppppppppppppkkkrrrgggggppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppggggggggggggggggpppppppppppppppppppppppppppppppppppkrrrrrgggggpa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+appppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+apbbbbbggggggggbggggggggggbbbbbbbbbgggggggbbgggggggggggggggggbggggggggbbbbbggggggppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppa
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+pbbbbbbgggggggggbgggggggggbggggggbgggggggbgggggggppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp
+
+--- legend ---
+. = (unstyled)
+A = fg:yellow bg:surface0
+B = fg:yellow bg:surface1
+a = fg:accent bg:panel_bg
+b = fg:accent bg:panel_bg bold
+c = fg:accent bg:surface0 bold
+d = fg:blue bg:panel_bg
+e = fg:green bg:panel_bg
+f = fg:mauve bg:surface0
+g = fg:overlay0 bg:panel_bg
+h = fg:overlay0 bg:panel_bg italic
+i = fg:overlay0 bg:surface0
+j = fg:overlay0 bg:surface0 italic
+k = fg:overlay0 bg:surface1
+l = fg:red bg:panel_bg
+m = fg:red bg:panel_bg bold
+n = fg:red bg:surface0
+o = fg:red bg:surface1
+p = fg:reset bg:panel_bg
+q = fg:reset bg:surface0
+r = fg:reset bg:surface1
+s = fg:subtext0 bg:panel_bg
+t = fg:surface0 bg:panel_bg
+u = fg:teal bg:panel_bg
+v = fg:teal bg:surface0
+w = fg:text bg:panel_bg
+x = fg:text bg:panel_bg bold
+y = fg:text bg:surface0 bold
+z = fg:yellow bg:panel_bg

@@ -263,6 +263,19 @@ impl App {
             changed = true;
         }
 
+        if self.state.refresh_session_facts(now) {
+            changed = true;
+        }
+
+        // The pairing screen has nothing to poll it: the phone claims the code
+        // by talking to the bridge, which is a separate process and signals the
+        // claim by deleting the code file. Only while the screen is up.
+        if self.state.mode == crate::app::state::Mode::PairPhone
+            && crate::app::input::modal::tick_pair_phone(&mut self.state)
+        {
+            changed = true;
+        }
+
         // The queue rows cost a second sqlite read, so they are sampled only
         // while the screen that draws them is actually on.
         if self.state.mode == crate::app::state::Mode::Board

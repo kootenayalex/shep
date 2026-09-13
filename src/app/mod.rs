@@ -12,7 +12,7 @@ mod api_helpers;
 mod config_io;
 mod creation;
 mod ids;
-mod input;
+pub(crate) mod input;
 mod review;
 mod runtime;
 mod runtime_mutations;
@@ -227,7 +227,7 @@ fn agent_panel_sort_from_config(
     sort: crate::config::AgentPanelSortConfig,
 ) -> state::AgentPanelSort {
     match sort {
-        crate::config::AgentPanelSortConfig::Spaces => state::AgentPanelSort::Spaces,
+        crate::config::AgentPanelSortConfig::Spaces => state::AgentPanelSort::Grouped,
         crate::config::AgentPanelSortConfig::Priority => state::AgentPanelSort::Priority,
     }
 }
@@ -498,6 +498,10 @@ impl App {
         };
 
         let agent_manifest_summaries = crate::detect::manifest::reload_manifests();
+        // A local session-facts override lives beside the detection one and
+        // reloads with it, so `reload-agent-manifests` means the same thing on
+        // both registries.
+        crate::session_facts::reload_manifests();
         let theme_runtime = theme_runtime_config(config, true);
         let (theme_palette, theme_name) = resolve_effective_theme(&theme_runtime, None);
 
@@ -524,13 +528,13 @@ impl App {
             request_submit_worktree_open: false,
             request_submit_worktree_remove: false,
             request_reload_config: false,
-            request_review_workspace: None,
             request_ship_worktree: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
             creating_new_tab: false,
             requested_new_tab_name: None,
             rename_pane_target: None,
+            pair_phone: None,
             worktree_create: None,
             worktree_open: None,
             worktree_remove: None,
@@ -1013,11 +1017,6 @@ impl App {
             if self.state.request_reload_config {
                 self.state.request_reload_config = false;
                 self.reload_config();
-                needs_render = true;
-            }
-
-            if let Some(ws_idx) = self.state.request_review_workspace.take() {
-                self.open_review_pager(ws_idx);
                 needs_render = true;
             }
 
@@ -1698,6 +1697,12 @@ impl App {
             }
             Mode::Board => {
                 self.handle_board_key(key.as_key_event());
+            }
+            Mode::PairPhone => {
+                crate::app::input::modal::handle_pair_phone_key(
+                    &mut self.state,
+                    key.as_key_event(),
+                );
             }
             Mode::Copy => {
                 self.handle_copy_mode_key(key);
@@ -3062,7 +3067,7 @@ mod tests {
         std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
 
         let mut app = test_app();
-        assert_eq!(app.state.agent_panel_sort, state::AgentPanelSort::Spaces);
+        assert_eq!(app.state.agent_panel_sort, state::AgentPanelSort::Grouped);
 
         app.save_agent_panel_sort(state::AgentPanelSort::Priority);
 
