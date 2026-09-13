@@ -88,7 +88,13 @@ pair() {
 
 down() {
     for p in bridge server; do
-        if alive "$dir/$p.pid"; then kill "$(cat "$dir/$p.pid")" && echo "$p stopped"; fi
+        if alive "$dir/$p.pid"; then
+            pid=$(cat "$dir/$p.pid")
+            kill "$pid" 2>/dev/null || true
+            i=0
+            while kill -0 "$pid" 2>/dev/null && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done
+            if kill -0 "$pid" 2>/dev/null; then kill -9 "$pid" 2>/dev/null || true; echo "$p killed (ignored SIGTERM)"; else echo "$p stopped"; fi
+        fi
         rm -f "$dir/$p.pid"
     done
     rm -f "$sock" "$sock-client"
