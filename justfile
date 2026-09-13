@@ -61,6 +61,10 @@ android-check: android-test android-build
 android-install: android-env
     cd android && JAVA_HOME="{{android_java_home}}" ANDROID_HOME="{{android_sdk_root}}" ./gradlew --quiet --console=plain installDebug
 
+# Throwaway server + bridge (+ linked overseer plugin) for live checks; never the launchd server
+dev-stack verb='up':
+    scripts/dev-stack.sh {{verb}}
+
 # Run the companion's Maestro end-to-end flows against the connected device
 android-maestro *args:
     maestro test android/maestro/ {{args}}
