@@ -41,6 +41,9 @@ mod modal;
 mod mouse;
 mod navigate;
 mod overlays;
+#[cfg(test)]
+pub(crate) mod overseer;
+#[cfg(not(test))]
 mod overseer;
 mod selection;
 mod settings;

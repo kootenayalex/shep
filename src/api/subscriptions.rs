@@ -200,6 +200,14 @@ impl ActiveSubscription {
                 event_kind: crate::api::schema::EventKind::LayoutUpdated,
                 last_sequence: 0,
             })),
+            Subscription::OverseerChatTurn {} => Ok(Self::Event(ActiveEventSubscription {
+                event_kind: crate::api::schema::EventKind::OverseerChatTurn,
+                last_sequence: 0,
+            })),
+            Subscription::OverseerUpdated {} => Ok(Self::Event(ActiveEventSubscription {
+                event_kind: crate::api::schema::EventKind::OverseerUpdated,
+                last_sequence: 0,
+            })),
             Subscription::PaneOutputMatched {
                 pane_id,
                 source,

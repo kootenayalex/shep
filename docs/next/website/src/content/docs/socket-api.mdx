@@ -110,10 +110,26 @@ Raw socket method names use dot notation:
 | Events | `events.subscribe`, `events.wait` |
 | Integrations | `integration.install`, `integration.uninstall` |
 | Plugins | `plugin.link`, `plugin.list`, `plugin.unlink`, `plugin.enable`, `plugin.disable`, `plugin.action.list`, `plugin.action.invoke`, `plugin.log.list`, `plugin.pane.open`, `plugin.pane.focus`, `plugin.pane.close` |
+| Docket | `docket.list`, `docket.add`, `docket.update`, `docket.promote`, `docket.complete`, `docket.discard` |
+| Overseer | `overseer.sample`, `overseer.chat`, `overseer.tick` |
 
 `agent.start` takes either `argv` or a `runtime` name (`claude`, `opencode`, …); the name is resolved through the runtime manifest's `[launch]` recipe or a `[runtimes.<name>]` config table, and `runtime.list` reports every nameable runtime with `launchable`, `bin_resolved` and `headless` so a client can offer only what this server can start. See [Agents](/docs/agents/#launch-and-headless-recipes).
 
 Some CLI commands are conveniences around these methods. For example, `herdr agent wait` resolves an agent target and then subscribes to pane agent state events.
+
+`overseer.sample` returns what the overseer plugin last sensed and said: its
+narrative lines and who wrote them, the tick time, the ages of the situation and
+the last brain answer, the health findings, the headless runtime the chat asks,
+the tail of the chat (`chat_turns`, twenty by default, `0` for none) with the
+total held, and the id of the conversation the chat shares with the overseer's
+session pane. It creates nothing — a state dir that does not exist yet reads as
+an overseer that has not spoken. `overseer.chat` puts one question to that
+runtime and returns the recorded `you` turn; a second question while the first
+is still out is refused with `overseer_chat_busy`, and the answer arrives as an
+event rather than in the response. `overseer.tick` asks the plugin for a fresh
+situation when the last one is older than `max_age_seconds` (60 by default, `0`
+to tick whatever its age), reporting `invoked`, `in_flight` and the plugin
+command `log_id`; a tick already running is reported, never stacked on.
 
 `session.snapshot` returns a one-time bootstrap snapshot for clients that keep
 their own local runtime cache. The response includes version/protocol metadata,
@@ -680,6 +696,15 @@ updated `PaneLayoutSnapshot` for one tab. Clients that bootstrap with
 `workspace_id` and `tab_id`.
 
 Worktree event subscriptions include `worktree.created`, `worktree.opened`, and `worktree.removed`. Worktree events describe Git checkout lifecycle. `worktree.created` includes the opened `workspace` and created `worktree`. `worktree.opened` includes the target `workspace`, opened `worktree`, and `already_open`. `worktree.removed` includes the `workspace_id`, removed `worktree`, and `forced`.
+
+Overseer event subscriptions include `overseer.chat_turn` and
+`overseer.updated`. `overseer.chat_turn` carries one recorded chat `turn` and
+whether a question is still `pending`, so a client sees the question go out and
+the answer come back without polling. `overseer.updated` fires when the
+overseer's files move under the server — a tick landing, or a poll finding new
+ones — and carries `tick_at`, the narrative `source`, and
+`situation_age_seconds`; read the new state with `overseer.sample`. Neither is a
+plugin hook event.
 
 Use `events.subscribe` for lifecycle events. Dedicated wait helpers are documented separately when a one-shot wait is supported.
 

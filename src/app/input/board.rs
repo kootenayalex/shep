@@ -24,9 +24,7 @@ use crate::ui::overseer;
 
 use super::modal::{leave_modal, open_new_docket_item};
 
-/// How old the overseer's situation may be before opening the board asks
-/// the plugin for a fresh tick.
-const STALE_SITUATION_SECS: u64 = 60;
+use crate::app::overseer::STALE_SITUATION_SECS;
 
 impl AppState {
     /// Open the session board, seeding the agent selection. Always opens on
@@ -205,18 +203,8 @@ impl App {
         self.state.open_board();
         self.state
             .refresh_overseer_if_stale(std::time::Instant::now());
-        if self.state.board.tick_in_flight.is_some()
-            || !self
-                .state
-                .overseer
-                .sample
-                .situation_older_than(STALE_SITUATION_SECS)
-        {
-            return;
-        }
-        match self.invoke_plugin_action_quietly(Some("overseer"), "tick", "board") {
-            Ok(log) => self.state.board.tick_in_flight = Some(log.log_id),
-            Err(err) => tracing::debug!(error = %err, "overseer tick not started"),
+        if let Err(err) = self.overseer_tick(STALE_SITUATION_SECS, "board") {
+            tracing::debug!(error = %err, "overseer tick not started");
         }
     }
 

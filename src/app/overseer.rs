@@ -30,7 +30,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::state::{AppState, DocketSample, Mode};
 use super::App;
@@ -43,6 +43,19 @@ pub(crate) const OVERSEER_SAMPLE_INTERVAL: Duration = Duration::from_secs(2);
 
 /// The most proposals the board lists, newest first.
 pub(crate) const MAX_PROPOSALS: usize = 5;
+
+/// How old the overseer's situation may be before a caller that wants a
+/// current read of the room — the board opening, or an `overseer.tick` with
+/// no `max_age_seconds` — asks the plugin for a fresh tick.
+pub(crate) const STALE_SITUATION_SECS: u64 = 60;
+
+/// How many chat turns [`crate::api::schema::OverseerSample`] carries when the
+/// caller does not say.
+pub(crate) const DEFAULT_SAMPLE_CHAT_TURNS: u32 = 20;
+
+/// Why a question was refused: one is already out, or it was blank.
+pub(crate) const CHAT_BUSY: &str = "a question is already out";
+pub(crate) const CHAT_EMPTY: &str = "empty question";
 
 const SITUATION_FILE: &str = "situation.json";
 const SITUATION_MD_FILE: &str = "situation.md";
@@ -58,33 +71,15 @@ const SESSION_ID_FILE: &str = "session-id";
 /// so the next face resumes instead of starting anew.
 const SESSION_STARTED_FILE: &str = "session-started";
 
-/// `shep doctor`'s verdict on one check, as the plugin copied it into
-/// `situation.json`. The lowercase wire spelling matches `shep doctor --json`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum HealthLevel {
-    Ok,
-    Warn,
-    Fail,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub(crate) struct HealthFinding {
-    pub level: HealthLevel,
-    pub check: String,
-    #[serde(default)]
-    pub detail: String,
-    #[serde(default)]
-    pub fix: Option<String>,
-}
-
-/// Who wrote the narrative: a brain runtime, or the tick's own template.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(crate) enum NarrativeSource {
-    Brain,
-    #[default]
-    Deterministic,
-}
+/// The wire types, under the names this module has always used: they are the
+/// shapes of the plugin's own files, so `api::schema::overseer` owns them and
+/// every reader here — the board, the chat, the `overseer.*` handlers — sees
+/// exactly what a client does.
+pub(crate) use crate::api::schema::{
+    OverseerChatRole as ChatRole, OverseerChatTurn as ChatTurn,
+    OverseerHealthFinding as HealthFinding, OverseerHealthLevel as HealthLevel,
+    OverseerNarrativeSource as NarrativeSource,
+};
 
 /// The overseer's files, mirrored. Every field is optional: a dir that does
 /// not exist yet renders as no strip and an empty health list, never as an
@@ -261,6 +256,11 @@ impl OverseerSample {
         now.duration_since(self.brain_mtime?).ok()
     }
 
+    /// How long since the tick last wrote its situation, when one exists.
+    pub fn situation_age(&self, now: SystemTime) -> Option<Duration> {
+        now.duration_since(self.situation_mtime?).ok()
+    }
+
     /// Whether the situation is older than `secs` — or was never written.
     pub fn situation_older_than(&self, secs: u64) -> bool {
         match self.situation_mtime {
@@ -312,23 +312,6 @@ impl OverseerSample {
 // ---------------------------------------------------------------------------
 // Chat
 // ---------------------------------------------------------------------------
-
-/// Who said a chat line. The wire spelling is what `chat.jsonl` holds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum ChatRole {
-    You,
-    Overseer,
-}
-
-/// One line of the chat with the overseer, as `chat.jsonl` keeps it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct ChatTurn {
-    /// Unix seconds.
-    pub at: u64,
-    pub role: ChatRole,
-    pub text: String,
-}
 
 /// How many lines of `chat.jsonl` are kept in memory: the tail.
 pub(crate) const CHAT_KEEP_TURNS: usize = 200;
@@ -563,6 +546,11 @@ pub(crate) struct OverseerState {
     pub chat_focused: bool,
     /// A question is out with the runtime; its answer is an event away.
     pub chat_pending: bool,
+    /// The overseer plugin's `tick` the server asked for, by its command log
+    /// id, until it finishes — so a board reopening and an `overseer.tick`
+    /// from the phone do not stack ticks on each other. A server fact, not
+    /// the board's: the API asks for ticks too.
+    pub tick_in_flight: Option<String>,
 }
 
 impl OverseerState {
@@ -575,6 +563,7 @@ impl OverseerState {
             chat_input: String::new(),
             chat_focused: false,
             chat_pending: false,
+            tick_in_flight: None,
         }
     }
 
@@ -609,7 +598,7 @@ impl OverseerState {
     /// stamp follows the file so the next refresh does not re-read what it
     /// already holds; a write that fails is logged and the turn stays on
     /// screen for this session.
-    fn record_turn(&mut self, role: ChatRole, text: String) {
+    fn record_turn(&mut self, role: ChatRole, text: String) -> ChatTurn {
         let turn = ChatTurn {
             at: unix_now(),
             role,
@@ -619,11 +608,12 @@ impl OverseerState {
             tracing::warn!(error = %err, dir = %self.state_dir.display(), "overseer chat not written");
         }
         self.chat_mtime = mtime(&self.state_dir.join(CHAT_FILE));
-        self.chat.push(turn);
+        self.chat.push(turn.clone());
         if self.chat.len() > CHAT_KEEP_TURNS {
             let drop = self.chat.len() - CHAT_KEEP_TURNS;
             self.chat.drain(..drop);
         }
+        turn
     }
 
     /// The shared conversation: its id and whether anything has begun it.
@@ -651,6 +641,18 @@ impl OverseerState {
                 id
             }
         };
+        (id, self.state_dir.join(SESSION_STARTED_FILE).exists())
+    }
+
+    /// The shared conversation as a reader sees it: the id if one has been
+    /// minted, and whether anything has begun it. Unlike
+    /// [`OverseerState::overseer_session`] this mints nothing and creates no
+    /// dir, so render and the read-only API may call it.
+    pub(crate) fn peek_session(&self) -> (Option<String>, bool) {
+        let id = std::fs::read_to_string(self.state_dir.join(SESSION_ID_FILE))
+            .ok()
+            .map(|text| text.trim().to_string())
+            .filter(|id| !id.is_empty());
         (id, self.state_dir.join(SESSION_STARTED_FILE).exists())
     }
 
@@ -744,27 +746,39 @@ impl App {
     /// the file and the screen at once; the answer comes back as an
     /// [`AppEvent::OverseerChatFinished`] from a thread that owns nothing of
     /// the app. Without a runtime the overseer answers with the fact.
-    pub(crate) fn send_overseer_chat(&mut self, question: String) {
+    ///
+    /// One question at a time: a second while the first is out would spawn a
+    /// second thread and a second `you` turn — two runs of the same resumed
+    /// conversation at once — so it is refused with [`CHAT_BUSY`] and the
+    /// caller keeps the text.
+    pub(crate) fn send_overseer_chat(
+        &mut self,
+        question: String,
+    ) -> Result<ChatTurn, &'static str> {
         let question = question.trim().to_string();
         if question.is_empty() {
-            return;
+            return Err(CHAT_EMPTY);
+        }
+        if self.state.overseer.chat_pending {
+            return Err(CHAT_BUSY);
         }
         let overseer = &mut self.state.overseer;
         overseer.chat_input.clear();
-        overseer.record_turn(ChatRole::You, question.clone());
+        let recorded = overseer.record_turn(ChatRole::You, question.clone());
         overseer.chat_pending = true;
+        self.emit_chat_turn(recorded.clone());
         self.mark_render_dirty();
 
         let Some(name) = overseer_runtime_name(&self.state) else {
             self.finish_overseer_chat(CHAT_NO_RUNTIME.to_string());
-            return;
+            return Ok(recorded);
         };
         let spec = match crate::runtimes::resolve_headless(&name, &self.state.runtimes_config) {
             Ok((spec, _)) => spec,
             Err(err) => {
                 tracing::warn!(runtime = %name, error = %err, "overseer chat runtime unresolvable");
                 self.finish_overseer_chat(format!("{CHAT_NO_RUNTIME} ({err})"));
-                return;
+                return Ok(recorded);
             }
         };
         let state_dir = self.state.overseer.state_dir.clone();
@@ -832,6 +846,7 @@ impl App {
             }
             let _ = event_tx.blocking_send(AppEvent::OverseerChatFinished { answer });
         });
+        Ok(recorded)
     }
 
     /// The runtime's answer, or why there is none, becomes the overseer's
@@ -846,9 +861,101 @@ impl App {
 
     fn finish_overseer_chat(&mut self, text: String) {
         let overseer = &mut self.state.overseer;
-        overseer.record_turn(ChatRole::Overseer, text);
+        let recorded = overseer.record_turn(ChatRole::Overseer, text);
         overseer.chat_pending = false;
+        self.emit_chat_turn(recorded);
         self.mark_render_dirty();
+    }
+
+    /// Every recorded turn reaches subscribers the moment it is written, so a
+    /// client that is not polling still sees the question go out and the
+    /// answer come back.
+    fn emit_chat_turn(&mut self, turn: ChatTurn) {
+        let pending = self.state.overseer.chat_pending;
+        self.emit_event(crate::api::schema::EventEnvelope {
+            event: crate::api::schema::EventKind::OverseerChatTurn,
+            data: crate::api::schema::EventData::OverseerChatTurn { turn, pending },
+        });
+    }
+
+    /// The overseer's files moved: what a client needs to know it should
+    /// re-read them.
+    pub(crate) fn emit_overseer_updated(&mut self) {
+        let sample = &self.state.overseer.sample;
+        let data = crate::api::schema::EventData::OverseerUpdated {
+            tick_at: sample.tick_at.clone(),
+            source: sample.source,
+            situation_age_seconds: sample
+                .situation_age(SystemTime::now())
+                .map(|age| age.as_secs()),
+        };
+        self.emit_event(crate::api::schema::EventEnvelope {
+            event: crate::api::schema::EventKind::OverseerUpdated,
+            data,
+        });
+    }
+
+    /// Ask the overseer plugin for a fresh `tick` unless the situation is
+    /// younger than `max_age_seconds` or a tick is already out. The one
+    /// implementation behind the board opening and `overseer.tick`; it
+    /// reports whether it started one, whether one is running, and the
+    /// command log id of whichever tick that is.
+    pub(crate) fn overseer_tick(
+        &mut self,
+        max_age_seconds: u64,
+        source: &str,
+    ) -> Result<(bool, bool, Option<String>), String> {
+        if let Some(log_id) = self.state.overseer.tick_in_flight.clone() {
+            return Ok((false, true, Some(log_id)));
+        }
+        if !self
+            .state
+            .overseer
+            .sample
+            .situation_older_than(max_age_seconds)
+        {
+            return Ok((false, false, None));
+        }
+        let log = self.invoke_plugin_action_quietly(Some(OVERSEER_PLUGIN_ID), "tick", source)?;
+        self.state.overseer.tick_in_flight = Some(log.log_id.clone());
+        Ok((true, true, Some(log.log_id)))
+    }
+
+    /// Everything `overseer.sample` reports, read from what the server
+    /// already holds. Pure: no file is created, no session id is minted.
+    pub(crate) fn overseer_sample_info(
+        &self,
+        chat_turns: Option<u32>,
+    ) -> crate::api::schema::OverseerSample {
+        let overseer = &self.state.overseer;
+        let now = SystemTime::now();
+        let wanted = chat_turns
+            .unwrap_or(DEFAULT_SAMPLE_CHAT_TURNS)
+            .min(CHAT_KEEP_TURNS as u32) as usize;
+        let start = overseer.chat.len().saturating_sub(wanted);
+        let (session_id, session_started) = overseer.peek_session();
+        crate::api::schema::OverseerSample {
+            plugin_linked: self
+                .state
+                .installed_plugins
+                .contains_key(OVERSEER_PLUGIN_ID),
+            sampled: overseer.sample.sampled,
+            narrative: overseer.sample.narrative_lines(),
+            source: overseer.sample.source,
+            tick_at: overseer.sample.tick_at.clone(),
+            situation_age_seconds: overseer.sample.situation_age(now).map(|age| age.as_secs()),
+            brain_age_seconds: overseer.sample.brain_age(now).map(|age| age.as_secs()),
+            runtime: overseer_runtime_name(&self.state),
+            tick_in_flight: overseer.tick_in_flight.is_some(),
+            health: overseer.sample.health.clone(),
+            chat: overseer.chat[start..].to_vec(),
+            chat_total: overseer.chat.len() as u64,
+            chat_pending: overseer.chat_pending,
+            session: crate::api::schema::OverseerSessionInfo {
+                id: session_id,
+                started: session_started,
+            },
+        }
     }
 
     fn mark_render_dirty(&self) {

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use super::common::{AgentStatus, ReadSource};
+use super::overseer::{OverseerChatTurn as OverseerChatTurnInfo, OverseerNarrativeSource};
 use super::panes::{PaneInfo, PaneReadResult, PaneScrollInfo};
 use super::tabs::TabInfo;
 use super::workspaces::WorkspaceInfo;
@@ -76,6 +77,10 @@ pub enum Subscription {
     PaneScrollChanged { pane_id: String },
     #[serde(rename = "layout.updated")]
     LayoutUpdated {},
+    #[serde(rename = "overseer.chat_turn")]
+    OverseerChatTurn {},
+    #[serde(rename = "overseer.updated")]
+    OverseerUpdated {},
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -209,6 +214,8 @@ pub enum EventKind {
     PaneAgentDetected,
     PaneAgentStatusChanged,
     LayoutUpdated,
+    OverseerChatTurn,
+    OverseerUpdated,
 }
 
 impl EventKind {
@@ -237,6 +244,8 @@ impl EventKind {
             EventKind::PaneAgentDetected => "pane.agent_detected",
             EventKind::PaneAgentStatusChanged => "pane.agent_status_changed",
             EventKind::LayoutUpdated => "layout.updated",
+            EventKind::OverseerChatTurn => "overseer.chat_turn",
+            EventKind::OverseerUpdated => "overseer.updated",
         }
     }
 }
@@ -266,6 +275,8 @@ pub const KNOWN_EVENT_KINDS: &[EventKind] = &[
     EventKind::PaneAgentDetected,
     EventKind::PaneAgentStatusChanged,
     EventKind::LayoutUpdated,
+    EventKind::OverseerChatTurn,
+    EventKind::OverseerUpdated,
 ];
 
 pub const PLUGIN_HOOK_EVENT_KINDS: &[EventKind] = &[
@@ -522,5 +533,21 @@ pub enum EventData {
     },
     LayoutUpdated {
         layout: super::panes::PaneLayoutSnapshot,
+    },
+    /// One turn was recorded in the overseer's chat — `you` on a question
+    /// being sent, `overseer` on the answer landing.
+    OverseerChatTurn {
+        turn: OverseerChatTurnInfo,
+        /// Whether a question is still out with the runtime.
+        pending: bool,
+    },
+    /// The overseer's state dir moved under the server: a tick landed, or a
+    /// poll found new files.
+    OverseerUpdated {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tick_at: Option<String>,
+        source: OverseerNarrativeSource,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        situation_age_seconds: Option<u64>,
     },
 }

@@ -109,8 +109,17 @@ impl App {
         match key.code {
             KeyCode::Esc | KeyCode::Tab => self.state.overseer.chat_focused = false,
             KeyCode::Enter => {
+                // A question already out is refused: take nothing, so the
+                // text stays in the input to send when the answer lands.
+                if self.state.overseer.chat_pending {
+                    return;
+                }
                 let question = std::mem::take(&mut self.state.overseer.chat_input);
-                self.send_overseer_chat(question);
+                if let Err(reason) = self.send_overseer_chat(question) {
+                    // Only a blank question reaches this: the busy case was
+                    // refused above, with the text still in the input.
+                    tracing::debug!(reason, "overseer question not sent");
+                }
             }
             KeyCode::Backspace => {
                 self.state.overseer.chat_input.pop();
@@ -153,7 +162,7 @@ impl App {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::app::state::{AppState, Mode};
     use crate::detect::{Agent, AgentState};
@@ -179,7 +188,7 @@ mod tests {
 
     /// An app on the overseer view: two agents in one group (one blocked),
     /// and a scratch docket with an inbox item, a due item and a proposal.
-    fn overseer_app() -> (App, std::path::PathBuf, crate::layout::PaneId) {
+    pub(crate) fn overseer_app() -> (App, std::path::PathBuf, crate::layout::PaneId) {
         let mut app = App::new(
             &crate::config::Config::default(),
             true,
@@ -236,7 +245,7 @@ mod tests {
         (app, path, second)
     }
 
-    fn cleanup(path: &std::path::Path) {
+    pub(crate) fn cleanup(path: &std::path::Path) {
         if let Some(dir) = path.parent() {
             let _ = std::fs::remove_dir_all(dir);
         }
@@ -422,7 +431,12 @@ mod tests {
                 .count()
         };
         assert_eq!(ticks(&app), 1);
-        let log_id = app.state.board.tick_in_flight.clone().expect("in flight");
+        let log_id = app
+            .state
+            .overseer
+            .tick_in_flight
+            .clone()
+            .expect("in flight");
 
         // Reopening while the tick runs does not stack another.
         app.state.mode = Mode::Terminal;
@@ -438,7 +452,7 @@ mod tests {
             stderr: String::new(),
             error: None,
         });
-        assert!(app.state.board.tick_in_flight.is_none());
+        assert!(app.state.overseer.tick_in_flight.is_none());
 
         // Still stale (nothing wrote a situation): a third open asks again.
         app.state.mode = Mode::Terminal;
@@ -454,7 +468,7 @@ mod tests {
         app.state.mode = Mode::Terminal;
         app.open_board_live();
         assert_eq!(app.state.mode, Mode::Board);
-        assert!(app.state.board.tick_in_flight.is_none());
+        assert!(app.state.overseer.tick_in_flight.is_none());
         assert!(app.state.plugin_command_logs.is_empty());
         assert!(app.state.board.docket_notice.is_none());
         cleanup(&path);
@@ -604,7 +618,7 @@ mod tests {
         std::fs::write(dir.join("situation.md"), "all quiet.\n").expect("situation");
         assert!(!dir.join("session-id").exists());
 
-        app.send_overseer_chat("first?".into());
+        let _ = app.send_overseer_chat("first?".into());
         pump_chat(&mut app).await;
         let (id, started) = app.state.overseer.overseer_session();
         assert!(started, "a successful answer begins the session");
@@ -613,7 +627,7 @@ mod tests {
             Some("fine.")
         );
 
-        app.send_overseer_chat("second?".into());
+        let _ = app.send_overseer_chat("second?".into());
         pump_chat(&mut app).await;
         assert_eq!(app.state.overseer.overseer_session(), (id.clone(), true));
         let cwd = std::fs::canonicalize(&dir)
@@ -648,7 +662,7 @@ mod tests {
         // lost it: the resume fails, the same id starts over, once.
         app.state.overseer.mark_session_started();
         let (id, _) = app.state.overseer.overseer_session();
-        app.send_overseer_chat("still there?".into());
+        let _ = app.send_overseer_chat("still there?".into());
         pump_chat(&mut app).await;
         assert_eq!(
             app.state.overseer.chat.last().map(|t| t.text.as_str()),
@@ -667,7 +681,7 @@ mod tests {
             "printf ' %s' \"$@\" >> \"$(dirname \"$0\")/argv.log\"; echo >> \"$(dirname \"$0\")/argv.log\"; cat >/dev/null; echo \"gone $1\" >&2; exit 2",
         );
         app.state.overseer.mark_session_started();
-        app.send_overseer_chat("anyone?".into());
+        let _ = app.send_overseer_chat("anyone?".into());
         pump_chat(&mut app).await;
         assert_eq!(
             app.state.overseer.chat.last().map(|t| t.text.as_str()),
@@ -687,7 +701,7 @@ mod tests {
     async fn a_failed_runtime_becomes_an_overseer_row() {
         let (mut app, path, _) = overseer_app();
         let dir = fake_brain(&mut app, "echo 'no credits' >&2; exit 7");
-        app.send_overseer_chat("hello?".into());
+        let _ = app.send_overseer_chat("hello?".into());
         pump_chat(&mut app).await;
         assert!(!app.state.overseer.chat_pending);
         let last = app.state.overseer.chat.last().expect("an overseer row");
@@ -707,7 +721,7 @@ mod tests {
         crate::env_compat::remove_process_env_for_test("SHEP_OVERSEER_RUNTIME");
         let dir = crate::app::overseer::test_state_dir();
         app.state.overseer.state_dir = dir.clone();
-        app.send_overseer_chat("anyone there?".into());
+        let _ = app.send_overseer_chat("anyone there?".into());
         assert!(!app.state.overseer.chat_pending, "answered on the spot");
         assert_eq!(app.state.overseer.chat.len(), 2);
         assert_eq!(
@@ -727,7 +741,7 @@ mod tests {
             "overseer".into(),
             toml::from_str("runtime = \"no-such-runtime\"").expect("table"),
         );
-        app.send_overseer_chat("still there?".into());
+        let _ = app.send_overseer_chat("still there?".into());
         assert!(!app.state.overseer.chat_pending);
         let last = app.state.overseer.chat.last().expect("row");
         assert!(last.text.starts_with(crate::app::overseer::CHAT_NO_RUNTIME));
@@ -738,6 +752,34 @@ mod tests {
         );
         assert!(app.event_rx.try_recv().is_err());
         let _ = std::fs::remove_dir_all(&dir);
+        cleanup(&path);
+    }
+
+    #[tokio::test]
+    async fn a_second_question_while_pending_keeps_the_input() {
+        let (mut app, path, _) = overseer_app();
+        let dir = crate::app::overseer::test_state_dir();
+        app.state.overseer.state_dir = dir.clone();
+        // A question is already out with the runtime.
+        app.state.overseer.chat_pending = true;
+        app.state.overseer.chat_focused = true;
+        for c in "and another thing".chars() {
+            app.handle_board_key(key(KeyCode::Char(c)));
+        }
+
+        app.handle_board_key(key(KeyCode::Enter));
+
+        assert_eq!(
+            app.state.overseer.chat_input, "and another thing",
+            "a refused question stays where it was typed"
+        );
+        assert!(app.state.overseer.chat.is_empty(), "nothing was recorded");
+        assert!(app.event_rx.try_recv().is_err(), "nothing was spawned");
+        assert_eq!(
+            app.send_overseer_chat("and another thing".into()),
+            Err(crate::app::overseer::CHAT_BUSY)
+        );
+        assert!(!dir.exists(), "a refusal writes nothing");
         cleanup(&path);
     }
 

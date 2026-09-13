@@ -652,6 +652,59 @@
                 "layout"
               ],
               "type": "object"
+            },
+            {
+              "description": "One turn was recorded in the overseer's chat — `you` on a question\nbeing sent, `overseer` on the answer landing.",
+              "properties": {
+                "pending": {
+                  "description": "Whether a question is still out with the runtime.",
+                  "type": "boolean"
+                },
+                "turn": {
+                  "$ref": "#/schemas/event/$defs/OverseerChatTurn"
+                },
+                "type": {
+                  "const": "overseer_chat_turn",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "turn",
+                "pending"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "The overseer's state dir moved under the server: a tick landed, or a\npoll found new files.",
+              "properties": {
+                "situation_age_seconds": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "$ref": "#/schemas/event/$defs/OverseerNarrativeSource"
+                },
+                "tick_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "overseer_updated",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "source"
+              ],
+              "type": "object"
             }
           ]
         },
@@ -679,7 +732,9 @@
             "pane_exited",
             "pane_agent_detected",
             "pane_agent_status_changed",
-            "layout_updated"
+            "layout_updated",
+            "overseer_chat_turn",
+            "overseer_updated"
           ],
           "type": "string"
         },
@@ -693,6 +748,45 @@
             "waiting",
             "absent",
             "review"
+          ],
+          "type": "string"
+        },
+        "OverseerChatRole": {
+          "description": "Who said a chat line.",
+          "enum": [
+            "you",
+            "overseer"
+          ],
+          "type": "string"
+        },
+        "OverseerChatTurn": {
+          "description": "One line of the chat with the overseer — one line of `chat.jsonl`.",
+          "properties": {
+            "at": {
+              "description": "Unix seconds.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "role": {
+              "$ref": "#/schemas/event/$defs/OverseerChatRole"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "role",
+            "text"
+          ],
+          "type": "object"
+        },
+        "OverseerNarrativeSource": {
+          "description": "Who wrote the narrative: a brain runtime, or the tick's own template.",
+          "enum": [
+            "brain",
+            "deterministic"
           ],
           "type": "string"
         },
@@ -2264,6 +2358,45 @@
             }
           ]
         },
+        "OverseerChatParams": {
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        },
+        "OverseerSampleParams": {
+          "properties": {
+            "chat_turns": {
+              "description": "How many trailing chat turns to include: 20 when omitted, `0` for\nnone, capped at the 200 the server keeps.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "OverseerTickParams": {
+          "properties": {
+            "max_age_seconds": {
+              "description": "Skip the tick when the situation is younger than this: 60 seconds\nwhen omitted, `0` to tick whatever its age.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
         "PaneAgentState": {
           "enum": [
             "idle",
@@ -3762,6 +3895,30 @@
               "properties": {
                 "type": {
                   "const": "layout.updated",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "overseer.chat_turn",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "overseer.updated",
                   "type": "string"
                 }
               },
@@ -5632,6 +5789,54 @@
             "params"
           ],
           "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "overseer.sample",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/OverseerSampleParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "overseer.chat",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/OverseerChatParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "overseer.tick",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/OverseerTickParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
         }
       ],
       "properties": {
@@ -6794,6 +6999,59 @@
                 "layout"
               ],
               "type": "object"
+            },
+            {
+              "description": "One turn was recorded in the overseer's chat — `you` on a question\nbeing sent, `overseer` on the answer landing.",
+              "properties": {
+                "pending": {
+                  "description": "Whether a question is still out with the runtime.",
+                  "type": "boolean"
+                },
+                "turn": {
+                  "$ref": "#/schemas/success_response/$defs/OverseerChatTurn"
+                },
+                "type": {
+                  "const": "overseer_chat_turn",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "turn",
+                "pending"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "The overseer's state dir moved under the server: a tick landed, or a\npoll found new files.",
+              "properties": {
+                "situation_age_seconds": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "$ref": "#/schemas/success_response/$defs/OverseerNarrativeSource"
+                },
+                "tick_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "overseer_updated",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "source"
+              ],
+              "type": "object"
             }
           ]
         },
@@ -6836,7 +7094,9 @@
             "pane_exited",
             "pane_agent_detected",
             "pane_agent_status_changed",
-            "layout_updated"
+            "layout_updated",
+            "overseer_chat_turn",
+            "overseer_updated"
           ],
           "type": "string"
         },
@@ -7107,6 +7367,199 @@
             "busy"
           ],
           "type": "string"
+        },
+        "OverseerChatRole": {
+          "description": "Who said a chat line.",
+          "enum": [
+            "you",
+            "overseer"
+          ],
+          "type": "string"
+        },
+        "OverseerChatTurn": {
+          "description": "One line of the chat with the overseer — one line of `chat.jsonl`.",
+          "properties": {
+            "at": {
+              "description": "Unix seconds.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "role": {
+              "$ref": "#/schemas/success_response/$defs/OverseerChatRole"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "role",
+            "text"
+          ],
+          "type": "object"
+        },
+        "OverseerHealthFinding": {
+          "description": "One health check and what it found.",
+          "properties": {
+            "check": {
+              "type": "string"
+            },
+            "detail": {
+              "default": "",
+              "type": "string"
+            },
+            "fix": {
+              "description": "What would fix it, when the check knows.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "level": {
+              "$ref": "#/schemas/success_response/$defs/OverseerHealthLevel"
+            }
+          },
+          "required": [
+            "level",
+            "check"
+          ],
+          "type": "object"
+        },
+        "OverseerHealthLevel": {
+          "description": "`shep doctor`'s verdict on one check, as the plugin copied it into\n`situation.json`. The lowercase wire spelling matches `shep doctor --json`.",
+          "enum": [
+            "ok",
+            "warn",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "OverseerNarrativeSource": {
+          "description": "Who wrote the narrative: a brain runtime, or the tick's own template.",
+          "enum": [
+            "brain",
+            "deterministic"
+          ],
+          "type": "string"
+        },
+        "OverseerSample": {
+          "description": "What the overseer knows right now, read from its state dir.",
+          "properties": {
+            "brain_age_seconds": {
+              "description": "How long since a brain last answered, when one ever has.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "chat": {
+              "default": [],
+              "description": "The tail of the chat, oldest first.",
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/OverseerChatTurn"
+              },
+              "type": "array"
+            },
+            "chat_pending": {
+              "description": "A question is out with the runtime; its answer is an event away.",
+              "type": "boolean"
+            },
+            "chat_total": {
+              "description": "Every turn the server holds, however few were returned.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "health": {
+              "default": [],
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/OverseerHealthFinding"
+              },
+              "type": "array"
+            },
+            "narrative": {
+              "default": [],
+              "description": "`BOARD.md`, header dropped, one entry per non-empty line.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "plugin_linked": {
+              "description": "Whether the overseer plugin is linked to this server.",
+              "type": "boolean"
+            },
+            "runtime": {
+              "description": "The headless runtime the chat asks: `[plugins.overseer] runtime`, else\n`SHEP_OVERSEER_RUNTIME`. Absent means the chat cannot ask anything.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sampled": {
+              "description": "Whether the state dir has been looked at, whatever was found.",
+              "type": "boolean"
+            },
+            "session": {
+              "$ref": "#/schemas/success_response/$defs/OverseerSessionInfo"
+            },
+            "situation_age_seconds": {
+              "description": "How long since the situation was written.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "source": {
+              "$ref": "#/schemas/success_response/$defs/OverseerNarrativeSource"
+            },
+            "tick_at": {
+              "description": "`hh:mm` of the last tick, when the situation says.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tick_in_flight": {
+              "description": "A `tick` the server started is still running.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "plugin_linked",
+            "sampled",
+            "source",
+            "tick_in_flight",
+            "chat_total",
+            "chat_pending",
+            "session"
+          ],
+          "type": "object"
+        },
+        "OverseerSessionInfo": {
+          "description": "The conversation the chat and the overseer's session pane share.",
+          "properties": {
+            "id": {
+              "description": "Absent until something has minted one; reading never mints.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "started": {
+              "description": "Whether anything has begun the conversation under that id.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "started"
+          ],
+          "type": "object"
         },
         "PaneDirection": {
           "enum": [
@@ -8572,6 +9025,81 @@
               "required": [
                 "type",
                 "item"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "sample": {
+                  "$ref": "#/schemas/success_response/$defs/OverseerSample"
+                },
+                "type": {
+                  "const": "overseer_sample",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "sample"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "session": {
+                  "$ref": "#/schemas/success_response/$defs/OverseerSessionInfo",
+                  "description": "The conversation the answer will run in."
+                },
+                "turn": {
+                  "$ref": "#/schemas/success_response/$defs/OverseerChatTurn",
+                  "description": "The `you` turn as it was recorded."
+                },
+                "type": {
+                  "const": "overseer_chat",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "turn",
+                "session"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "in_flight": {
+                  "description": "Whether a tick is running now — this one, or one already out.",
+                  "type": "boolean"
+                },
+                "invoked": {
+                  "description": "Whether a tick was started by this call.",
+                  "type": "boolean"
+                },
+                "log_id": {
+                  "description": "The plugin command log id of the running tick, when there is one.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "situation_age_seconds": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "overseer_tick",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "invoked",
+                "in_flight"
               ],
               "type": "object"
             },

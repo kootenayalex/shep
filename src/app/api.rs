@@ -6,6 +6,7 @@ mod docket;
 mod env;
 mod integrations;
 mod layouts;
+mod overseer;
 mod panes;
 pub(crate) mod plugins;
 mod responses;
@@ -122,9 +123,10 @@ impl App {
                 self.state.plugin_commands_in_flight.saturating_sub(1);
             // The tick the board asked for on opening has landed: read what
             // it wrote now rather than on the next two-second sample.
-            if self.state.board.tick_in_flight.as_deref() == Some(log_id.as_str()) {
-                self.state.board.tick_in_flight = None;
+            if self.state.overseer.tick_in_flight.as_deref() == Some(log_id.as_str()) {
+                self.state.overseer.tick_in_flight = None;
                 self.state.refresh_overseer();
+                self.emit_overseer_updated();
                 self.render_dirty.store(true, Ordering::Release);
                 self.render_notify.notify_one();
             }
@@ -939,6 +941,11 @@ impl App {
                 return self.handle_docket_complete(request.id, target)
             }
             Method::DocketDiscard(target) => return self.handle_docket_discard(request.id, target),
+            Method::OverseerSample(params) => {
+                return self.handle_overseer_sample(request.id, params)
+            }
+            Method::OverseerChat(params) => return self.handle_overseer_chat(request.id, params),
+            Method::OverseerTick(params) => return self.handle_overseer_tick(request.id, params),
             Method::WorkspaceShip(params) => return self.handle_workspace_ship(request.id, params),
             Method::WorkspaceMove(params) => {
                 return self.handle_workspace_move(request.id, params);

@@ -5,6 +5,7 @@ pub mod common;
 pub mod docket;
 pub mod events;
 pub mod integrations;
+pub mod overseer;
 pub mod panes;
 pub mod plugins;
 pub mod response;
@@ -19,6 +20,7 @@ pub use common::*;
 pub use docket::*;
 pub use events::*;
 pub use integrations::*;
+pub use overseer::*;
 pub use panes::*;
 pub use plugins::*;
 pub use response::*;
@@ -235,6 +237,12 @@ pub enum Method {
     DocketComplete(DocketTarget),
     #[serde(rename = "docket.discard")]
     DocketDiscard(DocketTarget),
+    #[serde(rename = "overseer.sample")]
+    OverseerSample(OverseerSampleParams),
+    #[serde(rename = "overseer.chat")]
+    OverseerChat(OverseerChatParams),
+    #[serde(rename = "overseer.tick")]
+    OverseerTick(OverseerTickParams),
 }
 
 #[cfg(test)]

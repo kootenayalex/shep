@@ -1171,3 +1171,188 @@ fn plugin_pane_open_request_round_trips() {
     let restored: Request = serde_json::from_value(json).unwrap();
     assert_eq!(restored, request);
 }
+
+#[test]
+fn overseer_requests_and_responses_round_trip() {
+    for (method, name) in [
+        (
+            Method::OverseerSample(OverseerSampleParams {
+                chat_turns: Some(5),
+            }),
+            "overseer.sample",
+        ),
+        (
+            Method::OverseerChat(OverseerChatParams {
+                text: "what needs me?".into(),
+            }),
+            "overseer.chat",
+        ),
+        (
+            Method::OverseerTick(OverseerTickParams {
+                max_age_seconds: Some(0),
+            }),
+            "overseer.tick",
+        ),
+    ] {
+        let request = Request {
+            id: "req_overseer".into(),
+            method,
+        };
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["method"], name);
+        let restored: Request = serde_json::from_value(json).unwrap();
+        assert_eq!(restored, request);
+    }
+
+    // Omitted params take their defaults: twenty turns, a minute of slack.
+    let sample: OverseerSampleParams = serde_json::from_str("{}").unwrap();
+    assert_eq!(sample.chat_turns, None);
+    let tick: OverseerTickParams = serde_json::from_str("{}").unwrap();
+    assert_eq!(tick.max_age_seconds, None);
+
+    let turn = OverseerChatTurn {
+        at: 1_757_700_000,
+        role: OverseerChatRole::You,
+        text: "what needs me?".into(),
+    };
+    // The turn is one `chat.jsonl` line: the on-disk spelling is the wire's.
+    let line = serde_json::to_string(&turn).unwrap();
+    assert_eq!(
+        line,
+        r#"{"at":1757700000,"role":"you","text":"what needs me?"}"#
+    );
+    assert_eq!(
+        serde_json::from_str::<OverseerChatTurn>(&line).unwrap(),
+        turn
+    );
+
+    let response = SuccessResponse {
+        id: "req_overseer".into(),
+        result: ResponseResult::OverseerSample {
+            sample: Box::new(OverseerSample {
+                plugin_linked: true,
+                sampled: true,
+                narrative: vec!["claude is blocked.".into()],
+                source: OverseerNarrativeSource::Brain,
+                tick_at: Some("10:22".into()),
+                situation_age_seconds: Some(12),
+                brain_age_seconds: Some(300),
+                runtime: Some("claude".into()),
+                tick_in_flight: false,
+                health: vec![OverseerHealthFinding {
+                    level: OverseerHealthLevel::Warn,
+                    check: "disk".into(),
+                    detail: "9.8 G free".into(),
+                    fix: Some("free some".into()),
+                }],
+                chat: vec![turn.clone()],
+                chat_total: 1,
+                chat_pending: false,
+                session: OverseerSessionInfo {
+                    id: Some("2c0f0a1e-0000-4000-8000-000000000000".into()),
+                    started: true,
+                },
+            }),
+        },
+    };
+    let json = serde_json::to_value(&response).unwrap();
+    assert_eq!(json["result"]["type"], "overseer_sample");
+    assert_eq!(json["result"]["sample"]["source"], "brain");
+    assert_eq!(json["result"]["sample"]["health"][0]["level"], "warn");
+    let restored: SuccessResponse = serde_json::from_value(json).unwrap();
+    assert_eq!(restored, response);
+
+    let chat = SuccessResponse {
+        id: "req_overseer".into(),
+        result: ResponseResult::OverseerChat {
+            turn,
+            session: OverseerSessionInfo::default(),
+        },
+    };
+    let json = serde_json::to_value(&chat).unwrap();
+    assert_eq!(json["result"]["type"], "overseer_chat");
+    assert!(json["result"]["session"]["id"].is_null());
+    assert_eq!(
+        serde_json::from_value::<SuccessResponse>(json).unwrap(),
+        chat
+    );
+
+    let tick = SuccessResponse {
+        id: "req_overseer".into(),
+        result: ResponseResult::OverseerTick {
+            invoked: true,
+            in_flight: true,
+            situation_age_seconds: Some(180),
+            log_id: Some("log-7".into()),
+        },
+    };
+    let json = serde_json::to_value(&tick).unwrap();
+    assert_eq!(json["result"]["type"], "overseer_tick");
+    assert_eq!(json["result"]["log_id"], "log-7");
+    assert_eq!(
+        serde_json::from_value::<SuccessResponse>(json).unwrap(),
+        tick
+    );
+}
+
+#[test]
+fn overseer_events_round_trip() {
+    assert_eq!(EventKind::OverseerChatTurn.dot_name(), "overseer.chat_turn");
+    assert_eq!(EventKind::OverseerUpdated.dot_name(), "overseer.updated");
+    // Subscribable, but never a plugin hook: the overseer's own files moving
+    // must not re-enter the plugin that wrote them.
+    assert!(KNOWN_EVENT_KINDS.contains(&EventKind::OverseerChatTurn));
+    assert!(KNOWN_EVENT_KINDS.contains(&EventKind::OverseerUpdated));
+    assert!(!PLUGIN_HOOK_EVENT_KINDS.contains(&EventKind::OverseerChatTurn));
+    assert!(!PLUGIN_HOOK_EVENT_KINDS.contains(&EventKind::OverseerUpdated));
+
+    for subscription in [
+        Subscription::OverseerChatTurn {},
+        Subscription::OverseerUpdated {},
+    ] {
+        let json = serde_json::to_value(&subscription).unwrap();
+        assert_eq!(
+            serde_json::from_value::<Subscription>(json).unwrap(),
+            subscription
+        );
+    }
+    assert_eq!(
+        serde_json::to_value(Subscription::OverseerChatTurn {}).unwrap()["type"],
+        "overseer.chat_turn"
+    );
+
+    let chat_turn = EventEnvelope {
+        event: EventKind::OverseerChatTurn,
+        data: EventData::OverseerChatTurn {
+            turn: OverseerChatTurn {
+                at: 1_757_700_000,
+                role: OverseerChatRole::Overseer,
+                text: "answer workmayt first.".into(),
+            },
+            pending: false,
+        },
+    };
+    let json = serde_json::to_value(&chat_turn).unwrap();
+    assert_eq!(json["event"], "overseer_chat_turn");
+    assert_eq!(json["data"]["type"], "overseer_chat_turn");
+    assert_eq!(json["data"]["turn"]["role"], "overseer");
+    assert_eq!(
+        serde_json::from_value::<EventEnvelope>(json).unwrap(),
+        chat_turn
+    );
+
+    let updated = EventEnvelope {
+        event: EventKind::OverseerUpdated,
+        data: EventData::OverseerUpdated {
+            tick_at: Some("10:22".into()),
+            source: OverseerNarrativeSource::Deterministic,
+            situation_age_seconds: Some(3),
+        },
+    };
+    let json = serde_json::to_value(&updated).unwrap();
+    assert_eq!(json["data"]["source"], "deterministic");
+    assert_eq!(
+        serde_json::from_value::<EventEnvelope>(json).unwrap(),
+        updated
+    );
+}

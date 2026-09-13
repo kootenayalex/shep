@@ -2472,3 +2472,107 @@ fn docket_methods_round_trip_over_socket() {
 
     cleanup_spawned_shep(child, base);
 }
+
+#[test]
+fn overseer_sample_answers_without_the_plugin() {
+    let _lock = test_lock();
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    let child = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    let value = send_request(
+        &socket_path,
+        r#"{"id":"ov_1","method":"overseer.sample","params":{}}"#,
+    );
+    assert_eq!(value["id"], "ov_1");
+    assert_eq!(value["result"]["type"], "overseer_sample");
+    let sample = &value["result"]["sample"];
+    assert_eq!(sample["plugin_linked"], false);
+    assert_eq!(sample["sampled"], true);
+    assert_eq!(sample["source"], "deterministic");
+    assert_eq!(sample["tick_in_flight"], false);
+    assert_eq!(sample["chat_pending"], false);
+    assert_eq!(sample["chat_total"], 0);
+    assert!(sample["narrative"].as_array().unwrap().is_empty());
+    assert!(sample["health"].as_array().unwrap().is_empty());
+    // Reading never mints the shared conversation.
+    assert!(sample["session"]["id"].is_null());
+    assert_eq!(sample["session"]["started"], false);
+
+    // A tick with the plugin unlinked is an error, not a silent no-op.
+    let tick = send_request(
+        &socket_path,
+        r#"{"id":"ov_2","method":"overseer.tick","params":{"max_age_seconds":0}}"#,
+    );
+    assert_eq!(tick["error"]["code"], "overseer_tick_failed");
+
+    cleanup_spawned_shep(child, base);
+}
+
+#[test]
+fn overseer_chat_turns_reach_an_events_subscriber() {
+    let _lock = test_lock();
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let socket_path = runtime_dir.join("shep.sock");
+
+    let child = spawn_shep(&config_home, &runtime_dir, &socket_path);
+    wait_for_socket(&socket_path, Duration::from_secs(5));
+
+    let mut reader = open_subscription(
+        &socket_path,
+        r#"{"id":"ov_sub","method":"events.subscribe","params":{"subscriptions":[{"type":"overseer.chat_turn"}]}}"#,
+    );
+    let ack = reader.read_json_line(Duration::from_secs(2));
+    assert_eq!(ack["id"], "ov_sub");
+    assert_eq!(ack["result"]["type"], "subscription_started");
+
+    // No runtime is configured, so the overseer answers with that fact on the
+    // spot: both turns are recorded before the response comes back.
+    let sent = send_request(
+        &socket_path,
+        r#"{"id":"ov_3","method":"overseer.chat","params":{"text":"what needs me?"}}"#,
+    );
+    assert_eq!(sent["result"]["type"], "overseer_chat");
+    assert_eq!(sent["result"]["turn"]["role"], "you");
+    assert_eq!(sent["result"]["turn"]["text"], "what needs me?");
+
+    let mut turns = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while turns.len() < 2 && Instant::now() < deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let value = reader.read_json_line(remaining.max(Duration::from_millis(1)));
+        if value["event"] == "overseer_chat_turn" {
+            turns.push(value);
+        }
+    }
+    assert_eq!(turns.len(), 2, "{turns:?}");
+    assert_eq!(turns[0]["data"]["turn"]["role"], "you");
+    assert_eq!(turns[0]["data"]["turn"]["text"], "what needs me?");
+    assert_eq!(turns[0]["data"]["pending"], true);
+    assert_eq!(turns[1]["data"]["turn"]["role"], "overseer");
+    assert_eq!(
+        turns[1]["data"]["turn"]["text"],
+        "no headless runtime: set [plugins.overseer] runtime"
+    );
+    assert_eq!(turns[1]["data"]["pending"], false);
+
+    // A second question while the first is out would be refused; this one is
+    // not, because the answer already landed.
+    let again = send_request(
+        &socket_path,
+        r#"{"id":"ov_4","method":"overseer.sample","params":{"chat_turns":1}}"#,
+    );
+    let sample = &again["result"]["sample"];
+    assert_eq!(sample["chat_total"], 2);
+    assert_eq!(sample["chat"].as_array().unwrap().len(), 1);
+    assert_eq!(sample["chat"][0]["role"], "overseer");
+    assert_eq!(sample["chat_pending"], false);
+
+    cleanup_spawned_shep(child, base);
+}

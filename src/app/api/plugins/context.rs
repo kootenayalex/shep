@@ -178,6 +178,11 @@ impl App {
                     context.focused_pane_id = Some(pane_id.clone());
                     context
                 }),
+            // The overseer's events belong to no workspace, tab or pane, and
+            // are not plugin hook kinds; a bare context is the honest answer.
+            EventData::OverseerChatTurn { .. } | EventData::OverseerUpdated { .. } => {
+                empty_plugin_context(correlation_id)
+            }
         }
     }
 

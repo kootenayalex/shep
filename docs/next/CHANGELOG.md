@@ -4,6 +4,23 @@
 
 ### Added
 
+- The overseer is on the wire: `overseer.sample` reports what the plugin last
+  sensed and said (narrative and its source, tick time, situation and brain
+  ages, health findings, the headless runtime, the chat tail and the shared
+  session id) without creating anything; `overseer.chat` puts one question to
+  that runtime and returns the recorded `you` turn; `overseer.tick` asks the
+  plugin for a fresh situation when the last one has aged out. Two new event
+  kinds carry the rest: `overseer.chat_turn` on every recorded turn (with
+  `pending`) and `overseer.updated` whenever the overseer's files move under
+  the server, so a companion tracks the board without polling. Three fixes
+  came with them: a second question while one is out is now refused
+  (`overseer_chat_busy`) instead of starting a second run of the same
+  conversation, reading the shared session id no longer mints one, and the
+  in-flight tick is a server fact rather than the desktop board's. The five
+  mutating `docket.*` methods now repaint an attached desktop, so keeping or
+  dropping a proposal from a phone moves the board at once. The bridge relays
+  all three overseer methods. No protocol bump: this is additive.
+
 - The overseer board's chat and its session pane are one claude
   conversation. When the overseer's runtime can name conversations, the
   first chat line (or the first opening of the pane) mints a v4 uuid into

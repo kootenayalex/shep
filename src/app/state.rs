@@ -886,9 +886,6 @@ pub(crate) struct BoardState {
     /// A modal opened from the board (`?`, `n`) hands back to the board when
     /// it closes, and the board stays drawn underneath it meanwhile.
     pub suspended: bool,
-    /// The overseer plugin's `tick` the board asked for on opening, by its
-    /// command log id, until it finishes — so reopening does not stack ticks.
-    pub tick_in_flight: Option<String>,
 }
 
 /// The board's screens. The two lane boards are the board proper; each detail

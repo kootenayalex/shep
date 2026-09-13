@@ -7,6 +7,9 @@ use super::events::EventEnvelope;
 use super::integrations::{
     IntegrationInstallResult, IntegrationTarget, IntegrationUninstallResult,
 };
+use super::overseer::{
+    OverseerChatTurn, OverseerSample as OverseerSampleInfo, OverseerSessionInfo,
+};
 use super::panes::{
     LayoutDescription, PaneEdgesResult, PaneFocusDirectionResult, PaneInfo, PaneLayoutSnapshot,
     PaneMoveResult, PaneNeighborResult, PaneProcessInfo, PaneReadResult, PaneResizeResult,
@@ -80,6 +83,26 @@ pub enum ResponseResult {
     },
     DocketItem {
         item: DocketItemInfo,
+    },
+    OverseerSample {
+        sample: Box<OverseerSampleInfo>,
+    },
+    OverseerChat {
+        /// The `you` turn as it was recorded.
+        turn: OverseerChatTurn,
+        /// The conversation the answer will run in.
+        session: OverseerSessionInfo,
+    },
+    OverseerTick {
+        /// Whether a tick was started by this call.
+        invoked: bool,
+        /// Whether a tick is running now — this one, or one already out.
+        in_flight: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        situation_age_seconds: Option<u64>,
+        /// The plugin command log id of the running tick, when there is one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        log_id: Option<String>,
     },
     WorkspaceCreated {
         workspace: WorkspaceInfo,

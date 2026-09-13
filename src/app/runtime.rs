@@ -273,6 +273,9 @@ impl App {
         // The overseer's files: three stats every two seconds, a read only
         // when one moved. The strip and the board are its readers.
         if self.state.overseer_sample_wanted() && self.state.refresh_overseer_if_stale(now) {
+            // A headless tick that landed between polls reaches subscribers
+            // here, TUI attached or not.
+            self.emit_overseer_updated();
             changed = true;
         }
 
