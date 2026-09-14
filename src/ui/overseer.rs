@@ -23,13 +23,12 @@ use ratatui::{
     Frame,
 };
 
-use super::board::{self, BoardDir, DocketCard, DocketLane};
+use super::board::{self, BoardDir};
 use super::gauge::context_gauge_spans;
 use super::glyphs;
 use super::sidebar::format_event_age;
-use super::status::{agent_icon_for, docket_appearance, state_label, DocketUrgency};
+use super::status::{agent_icon_for, state_label};
 use super::text::{display_width, fit_strip, spans_width, truncate_end};
-use crate::api::schema::DocketStatus;
 use crate::app::overseer::{
     overseer_runtime_name, ChatRole, ChatTurn, HealthFinding, HealthLevel, NarrativeSection,
 };
@@ -64,37 +63,12 @@ const SESSION_BUTTON: &str = "open the overseer's session";
 // Model
 // ---------------------------------------------------------------------------
 
-/// One selectable row on the overseer view, by what it points at.
+/// One selectable row on the overseer view, by what it points at. Only
+/// agents are rows now: the docket has its own view and the read of the
+/// room sits under the agent it is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OverseerRow {
-    NeedsYou(PaneId),
     Agent(PaneId),
-    Docket(i64),
-}
-
-/// Why an agent is in the *needs you* region.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum NeedsYouWhy {
-    /// Blocked on something only the person can answer: the last thing its
-    /// screen said, or what it says it is doing, or just the state word.
-    Blocked { prompt: String },
-    /// Finished while nobody was looking: what it last said, and the commits
-    /// waiting to be pushed when the group knows.
-    DoneUnseen { said: String, ahead: Option<usize> },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NeedsYouRow {
-    pub pane_id: PaneId,
-    pub ws_idx: usize,
-    pub name: String,
-    pub group: String,
-    pub location: String,
-    pub state: AgentState,
-    pub seen: bool,
-    pub manual_state: Option<crate::api::schema::PaneManualState>,
-    pub age: Option<String>,
-    pub why: NeedsYouWhy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +83,10 @@ pub(crate) struct AgentRow {
     pub manual_state: Option<crate::api::schema::PaneManualState>,
     pub age: Option<String>,
     pub context_percent: Option<u8>,
+    /// The overseer's read of this agent: the lines of the narrative
+    /// section carrying its name, drawn under its row. Empty when the
+    /// overseer has not spoken about it.
+    pub read: Vec<String>,
 }
 
 /// What the header row says, already reduced to strings.
@@ -126,17 +104,11 @@ pub(crate) struct HeaderFacts {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct OverseerModel {
     pub header: HeaderFacts,
-    pub needs_you: Vec<NeedsYouRow>,
     pub agents: Vec<AgentRow>,
-    /// The due lane whole, then the newest inbox items. The layout cuts a
-    /// prefix, so the due lane is what survives a short screen.
-    pub docket: Vec<DocketCard>,
-    pub docket_due: usize,
-    pub docket_overdue: usize,
-    pub docket_inbox: usize,
     pub health: Vec<HealthFinding>,
-    /// The read of the room by section: one per agent, then `room`; an
-    /// untitled section is prose from a board written before the sections.
+    /// What the read of the room says that is not seated under an agent:
+    /// the `room` section, an untitled section (prose from a board written
+    /// before the sections), and any section naming an agent that has gone.
     pub narrative: Vec<NarrativeSection>,
     /// The chat's tail, oldest first; the region shows the newest that fit.
     pub chat: Vec<ChatTurn>,
@@ -158,14 +130,13 @@ pub(crate) fn header_facts(app: &AppState) -> HeaderFacts {
 }
 
 /// Build the view's model. Agents come from the live board model — fresher
-/// than anything the plugin wrote — in board order; the docket, health and
-/// narrative from the samples.
+/// than anything the plugin wrote — in board order; health and the
+/// narrative from the samples. Each narrative section named for an agent
+/// is seated under that agent's row; what is left is the room's.
 pub(crate) fn overseer_model(app: &AppState) -> OverseerModel {
     let board_model = board::board_model(app);
-    let mut needs_you = Vec::new();
     let mut agents = Vec::new();
     for card in board_model.flattened() {
-        let age = board::card_age(app, card);
         agents.push(AgentRow {
             pane_id: card.pane_id,
             ws_idx: card.ws_idx,
@@ -175,78 +146,50 @@ pub(crate) fn overseer_model(app: &AppState) -> OverseerModel {
             state: card.state,
             seen: card.seen,
             manual_state: card.manual_state.clone(),
-            age: age.clone(),
+            age: board::card_age(app, card),
             context_percent: card.context_percent,
-        });
-        // The last thing its screen said, else what it says it is doing,
-        // else just the state word.
-        let said = card
-            .activity
-            .clone()
-            .or_else(|| card.summary.clone())
-            .unwrap_or_else(|| state_label(card.state, card.seen).to_string());
-        let why = match (card.state, card.seen) {
-            (AgentState::Blocked, _) => NeedsYouWhy::Blocked { prompt: said },
-            (AgentState::Idle, false) => NeedsYouWhy::DoneUnseen {
-                said,
-                ahead: app
-                    .workspaces
-                    .get(card.ws_idx)
-                    .and_then(|ws| ws.cached_git_ahead_behind)
-                    .map(|(ahead, _)| ahead),
-            },
-            _ => continue,
-        };
-        needs_you.push(NeedsYouRow {
-            pane_id: card.pane_id,
-            ws_idx: card.ws_idx,
-            name: card.agent_label.clone(),
-            group: card.workspace_label.clone(),
-            location: card.location.clone(),
-            state: card.state,
-            seen: card.seen,
-            manual_state: card.manual_state.clone(),
-            age,
-            why,
+            read: Vec::new(),
         });
     }
-    // Blocked first, then done-unseen; stable, so board order holds inside
-    // each.
-    needs_you.sort_by_key(|row| matches!(row.why, NeedsYouWhy::DoneUnseen { .. }));
-
-    let docket_model = board::docket_board_model(&app.docket_sample);
-    let due = docket_model.lane(DocketLane::Due);
-    let inbox = docket_model.lane(DocketLane::Inbox);
-    let mut docket: Vec<DocketCard> = due.to_vec();
-    // The store lists inbox items newest-updated first already.
-    docket.extend(inbox.iter().cloned());
+    let mut narrative = Vec::new();
+    for section in app.overseer.sample.narrative_sections() {
+        let seat = section
+            .title
+            .as_deref()
+            .filter(|title| !title.eq_ignore_ascii_case("room"))
+            .and_then(|title| agent_for_section(&agents, title));
+        match seat {
+            Some(idx) if agents[idx].read.is_empty() => agents[idx].read = section.lines,
+            _ => narrative.push(section),
+        }
+    }
 
     OverseerModel {
         header: header_facts(app),
-        needs_you,
         agents,
-        docket,
-        docket_due: due.len(),
-        docket_overdue: due.iter().filter(|card| card.overdue()).count(),
-        docket_inbox: inbox.len(),
         health: app.overseer.sample.health.clone(),
-        narrative: app.overseer.sample.narrative_sections(),
+        narrative,
         chat: app.overseer.chat.clone(),
     }
 }
 
+/// The agent a section title names: its display name alone, or
+/// `name · group` when the tick had to tell two apart.
+fn agent_for_section(agents: &[AgentRow], title: &str) -> Option<usize> {
+    agents.iter().position(|agent| {
+        agent.name == title
+            || format!("{}{}{}", agent.name, glyphs::SEP_SPACED, agent.group) == title
+    })
+}
+
 impl OverseerModel {
-    /// Every selectable row, in traversal order: needs you, agents, docket.
+    /// Every selectable row, in traversal order: the agents, as the board
+    /// lists them.
     pub(crate) fn rows(&self) -> Vec<OverseerRow> {
-        let mut rows = Vec::new();
-        rows.extend(
-            self.needs_you
-                .iter()
-                .map(|r| OverseerRow::NeedsYou(r.pane_id)),
-        );
-        rows.extend(self.agents.iter().map(|r| OverseerRow::Agent(r.pane_id)));
-        rows.extend(self.docket.iter().map(|r| OverseerRow::Docket(r.id)));
-        rows
+        self.agents
+            .iter()
+            .map(|r| OverseerRow::Agent(r.pane_id))
+            .collect()
     }
 
     /// The row the view treats as selected: the selection when it still
@@ -275,21 +218,13 @@ impl OverseerModel {
         rows.get(next).copied()
     }
 
-    /// The `(workspace index, pane)` a needs-you or agent row points at.
+    /// The `(workspace index, pane)` an agent row points at.
     pub(crate) fn pane_target(&self, row: OverseerRow) -> Option<(usize, PaneId)> {
-        match row {
-            OverseerRow::NeedsYou(pane) => self
-                .needs_you
-                .iter()
-                .find(|r| r.pane_id == pane)
-                .map(|r| (r.ws_idx, r.pane_id)),
-            OverseerRow::Agent(pane) => self
-                .agents
-                .iter()
-                .find(|r| r.pane_id == pane)
-                .map(|r| (r.ws_idx, r.pane_id)),
-            OverseerRow::Docket(_) => None,
-        }
+        let OverseerRow::Agent(pane) = row;
+        self.agents
+            .iter()
+            .find(|r| r.pane_id == pane)
+            .map(|r| (r.ws_idx, r.pane_id))
     }
 }
 
@@ -321,23 +256,23 @@ pub(crate) struct OverseerLayout {
     pub session_button: Rect,
     /// The divider column between the two, zero-width when stacked.
     pub divider: Rect,
-    pub needs_you: RegionRect,
     pub agents: RegionRect,
-    pub docket: RegionRect,
     pub health: RegionRect,
     pub room: RegionRect,
     pub chat: RegionRect,
     pub chat_input: Rect,
-    /// The narrative wrapped to the room's width; `room.entries` of them draw.
+    /// Each agent's read wrapped to the column, one list per agent in
+    /// `OverseerModel::agents` order; `agents.entries` counts rows across
+    /// the table rows and these together.
+    pub agent_reads: Vec<Vec<String>>,
+    /// The room's narrative wrapped to its width; `room.entries` of them draw.
     pub room_lines: Vec<RoomLine>,
     pub row_hits: Vec<(Rect, OverseerRow)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Region {
-    NeedsYou,
     Agents,
-    Docket,
     Health,
     Room,
     Chat,
@@ -514,31 +449,29 @@ pub(crate) fn overseer_layout(
 
     let room_width = text_width(right.unwrap_or(left));
     layout.room_lines = room_lines(model, room_width);
+    let read_width = usize::from(left.width).saturating_sub(INDENT + RIGHT_MARGIN);
+    layout.agent_reads = model
+        .agents
+        .iter()
+        .map(|agent| {
+            agent
+                .read
+                .iter()
+                .flat_map(|line| wrap_words(line, read_width))
+                .collect()
+        })
+        .collect();
+    let agent_rows: usize = layout.agent_reads.iter().map(|read| 1 + read.len()).sum();
+    let anyone_read = model.agents.iter().any(|agent| !agent.read.is_empty());
 
     let left_specs = [
         RegionSpec {
-            region: Region::NeedsYou,
-            entry_rows: 2,
-            entries: model.needs_you.len(),
+            region: Region::Agents,
+            entry_rows: 1,
+            entries: agent_rows.max(1),
             min_entries: 1,
             keep_rank: 1,
             grow_rank: 0,
-        },
-        RegionSpec {
-            region: Region::Agents,
-            entry_rows: 1,
-            entries: model.agents.len().max(1),
-            min_entries: 1,
-            keep_rank: 2,
-            grow_rank: 1,
-        },
-        RegionSpec {
-            region: Region::Docket,
-            entry_rows: 1,
-            entries: model.docket.len().max(1),
-            min_entries: 1,
-            keep_rank: 3,
-            grow_rank: 5,
         },
         RegionSpec {
             region: Region::Health,
@@ -546,29 +479,35 @@ pub(crate) fn overseer_layout(
             entries: usize::from(!model.health.is_empty()),
             min_entries: 1,
             keep_rank: 0,
-            grow_rank: 2,
+            grow_rank: 1,
         },
     ];
     let right_specs = [
         RegionSpec {
             region: Region::Room,
             entry_rows: 1,
-            entries: layout.room_lines.len().max(1),
+            // Silence is a row (`has not spoken yet`) only while nobody's
+            // row carries a read either.
+            entries: if layout.room_lines.is_empty() && anyone_read {
+                0
+            } else {
+                layout.room_lines.len().max(1)
+            },
             min_entries: 2,
-            keep_rank: 4,
-            grow_rank: 4,
+            keep_rank: 2,
+            grow_rank: 2,
         },
         RegionSpec {
             region: Region::Chat,
             entry_rows: 1,
             entries: usize::MAX / 4,
             min_entries: 1,
-            keep_rank: 6,
-            grow_rank: 6,
+            keep_rank: 3,
+            grow_rank: 3,
         },
     ];
-    // A region with nothing to say is not a region: no `needs you 0`, and no
-    // health row before the overseer has spoken.
+    // A region with nothing to say is not a region: no health row before
+    // the overseer has spoken, no room once every read sits under its agent.
     let wanted = |spec: &RegionSpec| spec.entries > 0;
     let placed: Vec<(Region, RegionRect)> = match right {
         Some(right) => {
@@ -594,9 +533,7 @@ pub(crate) fn overseer_layout(
     };
     for (region, rect) in placed {
         match region {
-            Region::NeedsYou => layout.needs_you = rect,
             Region::Agents => layout.agents = rect,
-            Region::Docket => layout.docket = rect,
             Region::Health => layout.health = rect,
             Region::Room => layout.room = rect,
             Region::Chat => {
@@ -609,36 +546,43 @@ pub(crate) fn overseer_layout(
         }
     }
 
-    // Hit rects, one per drawn entry.
-    let hits = |rect: RegionRect, rows: u16, keys: &mut dyn Iterator<Item = OverseerRow>| {
-        let mut out = Vec::new();
-        for (i, key) in keys.take(rect.entries).enumerate() {
-            let y = rect.body.y + (i as u16) * rows;
-            if y + rows <= rect.body.bottom() {
-                out.push((Rect::new(rect.body.x, y, rect.body.width, rows), key));
-            }
-        }
-        out
-    };
-    layout.row_hits.extend(hits(
-        layout.needs_you,
-        2,
-        &mut model
-            .needs_you
-            .iter()
-            .map(|r| OverseerRow::NeedsYou(r.pane_id)),
-    ));
-    layout.row_hits.extend(hits(
-        layout.agents,
-        1,
-        &mut model.agents.iter().map(|r| OverseerRow::Agent(r.pane_id)),
-    ));
-    layout.row_hits.extend(hits(
-        layout.docket,
-        1,
-        &mut model.docket.iter().map(|r| OverseerRow::Docket(r.id)),
-    ));
+    // Hit rects, one per drawn agent: its table row and the read under it
+    // are one thing to point at.
+    for (rect, agent) in agent_blocks(&layout, model) {
+        layout
+            .row_hits
+            .push((rect, OverseerRow::Agent(agent.pane_id)));
+    }
     layout
+}
+
+/// Where each drawn agent sits: the rect covering its table row and however
+/// much of its read fits, in model order, stopping at the region's row
+/// budget. An agent whose table row does not fit is not drawn at all.
+fn agent_blocks<'a>(
+    layout: &OverseerLayout,
+    model: &'a OverseerModel,
+) -> Vec<(Rect, &'a AgentRow)> {
+    let rect = layout.agents;
+    let mut out = Vec::new();
+    if !rect.shown() {
+        return out;
+    }
+    let mut y = rect.body.y;
+    let mut budget = rect.entries.min(usize::from(rect.body.height));
+    for (agent, read) in model.agents.iter().zip(&layout.agent_reads) {
+        if budget == 0 {
+            break;
+        }
+        let rows = (1 + read.len()).min(budget);
+        out.push((
+            Rect::new(rect.body.x, y, rect.body.width, rows as u16),
+            agent,
+        ));
+        y += rows as u16;
+        budget -= rows;
+    }
+    out
 }
 
 /// The session button's cell range on the header row: the label plus a
@@ -898,124 +842,12 @@ pub(super) fn render_overseer(app: &AppState, frame: &mut Frame, area: Rect) {
     if let Some(rect) = selected_rect {
         fill_bg(frame, rect, p.surface0);
     }
-    render_needs_you(app, frame, &model, layout.needs_you);
-    render_agents(app, frame, &model, layout.agents);
-    render_docket(app, frame, &model, layout.docket);
+    render_agents(app, frame, &model, &layout);
     render_health(app, frame, &model, layout.health);
     render_room(app, frame, &model, &layout);
     render_chat(app, frame, &model, &layout);
     if let Some(rect) = selected_rect {
         mark_selected(frame, p, rect);
-    }
-}
-
-fn render_needs_you(app: &AppState, frame: &mut Frame, model: &OverseerModel, rect: RegionRect) {
-    if !rect.shown() {
-        return;
-    }
-    let p = &app.palette;
-    let width = usize::from(rect.body.width);
-    frame.render_widget(
-        Paragraph::new(Line::from(heading_spans(
-            p,
-            p.text,
-            "needs you",
-            &model.needs_you.len().to_string(),
-            "",
-            width,
-        ))),
-        rect.heading,
-    );
-    let dim = Style::default().fg(p.overlay0);
-    let hint = Style::default().fg(p.overlay1);
-    for (i, row) in model.needs_you.iter().take(rect.entries).enumerate() {
-        let y = rect.body.y + (i as u16) * 2;
-        let (glyph, glyph_style) = agent_icon_for(
-            row.state,
-            row.seen,
-            row.manual_state.as_ref(),
-            app.spinner_tick,
-            p,
-        );
-        let state_style =
-            Style::default().fg(super::status::state_label_color(row.state, row.seen, p));
-        let mut trailing = state_label(row.state, row.seen).to_string();
-        if let Some(age) = &row.age {
-            trailing.push(' ');
-            trailing.push_str(age);
-        }
-        let loc = if row.location.is_empty() {
-            String::new()
-        } else {
-            format!("  {}", row.location)
-        };
-        let trailing_width = display_width(&trailing) + display_width(&loc);
-        let name = format!("{}{}{}", row.name, glyphs::SEP_SPACED, row.group);
-        let name = truncate_end(
-            &name,
-            width.saturating_sub(INDENT + RIGHT_MARGIN + trailing_width + 1),
-        );
-        let used = INDENT + display_width(&name);
-        draw_line(
-            frame,
-            rect.body,
-            y,
-            vec![
-                Span::raw(" "),
-                Span::styled(glyph, glyph_style),
-                Span::raw(" "),
-                Span::styled(
-                    name,
-                    Style::default().fg(p.text).add_modifier(Modifier::BOLD),
-                ),
-                Span::raw(pin(width, used, trailing_width)),
-                Span::styled(trailing, state_style),
-                Span::styled(loc, dim),
-            ],
-        );
-        // Line 2: the prompt or what happened, and what enter does about it.
-        let (detail, right): (String, Vec<Span<'static>>) = match &row.why {
-            NeedsYouWhy::Blocked { prompt } => (
-                prompt.clone(),
-                vec![Span::styled(
-                    format!("enter {} answer it", glyphs::ARROW_RIGHT),
-                    hint,
-                )],
-            ),
-            NeedsYouWhy::DoneUnseen {
-                said,
-                ahead: Some(n),
-            } if *n > 0 => (
-                said.clone(),
-                vec![
-                    Span::styled(
-                        format!("{}{n}", glyphs::AHEAD),
-                        Style::default().fg(p.green),
-                    ),
-                    Span::styled(" not pushed", hint),
-                ],
-            ),
-            NeedsYouWhy::DoneUnseen { said, .. } => (
-                said.clone(),
-                vec![Span::styled(
-                    format!("enter {} look", glyphs::ARROW_RIGHT),
-                    hint,
-                )],
-            ),
-        };
-        let right_width = spans_width(&right);
-        let detail = truncate_end(
-            &detail,
-            width.saturating_sub(INDENT + RIGHT_MARGIN + right_width + 2),
-        );
-        let used = INDENT + display_width(&detail);
-        let mut spans = vec![
-            Span::raw(" ".repeat(INDENT)),
-            Span::styled(detail, Style::default().fg(p.subtext0)),
-            Span::raw(pin(width, used, right_width)),
-        ];
-        spans.extend(right);
-        draw_line(frame, rect.body, y + 1, spans);
     }
 }
 
@@ -1035,7 +867,17 @@ fn agent_cols(width: usize) -> AgentCols {
     }
 }
 
-fn render_agents(app: &AppState, frame: &mut Frame, model: &OverseerModel, rect: RegionRect) {
+/// The agents table: one row per agent, and under it the overseer's read of
+/// that agent, wrapped to the column and indented to the name. The layout
+/// budgets rows across both, so a short screen shows the first agents whole
+/// rather than every agent's row and nobody's read.
+fn render_agents(
+    app: &AppState,
+    frame: &mut Frame,
+    model: &OverseerModel,
+    layout: &OverseerLayout,
+) {
+    let rect = layout.agents;
     if !rect.shown() {
         return;
     }
@@ -1065,8 +907,9 @@ fn render_agents(app: &AppState, frame: &mut Frame, model: &OverseerModel, rect:
         return;
     }
     let cols = agent_cols(width);
-    for (i, row) in model.agents.iter().take(rect.entries).enumerate() {
-        let y = rect.body.y + i as u16;
+    let read_style = Style::default().fg(p.subtext0);
+    for (block, row) in agent_blocks(layout, model) {
+        let y = block.y;
         let (glyph, glyph_style) = agent_icon_for(
             row.state,
             row.seen,
@@ -1119,95 +962,27 @@ fn render_agents(app: &AppState, frame: &mut Frame, model: &OverseerModel, rect:
             }
         }
         draw_line(frame, rect.body, y, spans);
-    }
-}
-
-fn render_docket(app: &AppState, frame: &mut Frame, model: &OverseerModel, rect: RegionRect) {
-    if !rect.shown() {
-        return;
-    }
-    let p = &app.palette;
-    let width = usize::from(rect.body.width);
-    let mut heading = vec![
-        Span::raw(" "),
-        Span::styled(
-            "docket",
-            Style::default().fg(p.text).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled("  due ", Style::default().fg(p.overlay1)),
-        Span::styled(model.docket_due.to_string(), Style::default().fg(p.text)),
-    ];
-    if model.docket_overdue > 0 {
-        heading.push(Span::styled(
-            format!(" !{}", model.docket_overdue),
-            Style::default().fg(p.peach),
-        ));
-    }
-    heading.push(Span::styled(
-        format!("{}inbox ", glyphs::SEP_WIDE),
-        Style::default().fg(p.overlay1),
-    ));
-    heading.push(Span::styled(
-        model.docket_inbox.to_string(),
-        Style::default().fg(p.text),
-    ));
-    frame.render_widget(Paragraph::new(Line::from(heading)), rect.heading);
-    let dim = Style::default().fg(p.overlay0);
-    if model.docket.is_empty() {
-        draw_line(
-            frame,
-            rect.body,
-            rect.body.y,
-            vec![Span::styled(
-                format!("{}nothing due, inbox empty", " ".repeat(INDENT)),
-                dim,
-            )],
-        );
-        return;
-    }
-    for (i, card) in model.docket.iter().take(rect.entries).enumerate() {
-        let y = rect.body.y + i as u16;
-        let look = docket_appearance(card.status, card.urgency());
-        let glyph_style = if card.overdue() {
-            look.style(p).add_modifier(Modifier::BOLD)
-        } else {
-            look.style(p)
-        };
-        let (trailing, trailing_style) = if card.status == DocketStatus::Inbox {
-            ("inbox".to_string(), dim)
-        } else {
-            let mut text = card.due.text();
-            if let Some(repeat) = card.repeat {
-                text.push_str(glyphs::SEP_SPACED);
-                text.push_str(repeat.as_str());
-            }
-            let style = match card.urgency() {
-                DocketUrgency::Overdue | DocketUrgency::Today => look.style(p),
-                DocketUrgency::Later => dim,
-            };
-            (text, style)
-        };
-        let trailing_width = display_width(&trailing);
-        let id = format!("#{} ", card.id);
-        let title = truncate_end(
-            &card.title,
-            width.saturating_sub(INDENT + display_width(&id) + RIGHT_MARGIN + trailing_width + 1),
-        );
-        let used = INDENT + display_width(&id) + display_width(&title);
-        draw_line(
-            frame,
-            rect.body,
-            y,
-            vec![
-                Span::raw(" "),
-                Span::styled(look.glyph, glyph_style),
-                Span::raw(" "),
-                Span::styled(id, dim),
-                Span::styled(title, Style::default().fg(p.text)),
-                Span::raw(pin(width, used, trailing_width)),
-                Span::styled(trailing, trailing_style),
-            ],
-        );
+        let read = model
+            .agents
+            .iter()
+            .position(|a| a.pane_id == row.pane_id)
+            .and_then(|idx| layout.agent_reads.get(idx));
+        for (i, line) in read
+            .into_iter()
+            .flatten()
+            .take(usize::from(block.height).saturating_sub(1))
+            .enumerate()
+        {
+            draw_line(
+                frame,
+                rect.body,
+                y + 1 + i as u16,
+                vec![Span::styled(
+                    format!("{}{}", " ".repeat(INDENT), line),
+                    read_style,
+                )],
+            );
+        }
     }
 }
 
@@ -1337,58 +1112,32 @@ fn render_room(app: &AppState, frame: &mut Frame, model: &OverseerModel, layout:
                 format!("{}{}", " ".repeat(ROOM_BODY_INDENT), line.text),
                 Style::default().fg(p.subtext0),
             )],
-            RoomLineKind::Heading(heading) => {
-                let (glyph, glyph_style) = match heading {
-                    RoomHeading::Agent(idx) => match model.agents.get(*idx) {
-                        Some(agent) => agent_icon_for(
-                            agent.state,
-                            agent.seen,
-                            agent.manual_state.as_ref(),
-                            app.spinner_tick,
-                            p,
-                        ),
-                        None => (glyphs::SEP, Style::default().fg(p.overlay0)),
-                    },
-                    RoomHeading::Room => (glyphs::OVERSEER, Style::default().fg(p.mauve)),
-                    RoomHeading::Other => (glyphs::SEP, Style::default().fg(p.overlay0)),
-                };
-                let name_style = match heading {
-                    RoomHeading::Room => Style::default().fg(p.mauve).add_modifier(Modifier::BOLD),
-                    _ => Style::default().fg(p.text).add_modifier(Modifier::BOLD),
-                };
-                vec![
-                    Span::raw("  "),
-                    Span::styled(glyph, glyph_style),
-                    Span::raw(" "),
-                    Span::styled(line.text.clone(), name_style),
-                ]
-            }
+            RoomLineKind::Heading => vec![
+                Span::raw("  "),
+                Span::styled(glyphs::SEP, Style::default().fg(p.overlay0)),
+                Span::raw(" "),
+                Span::styled(
+                    line.text.clone(),
+                    Style::default().fg(p.text).add_modifier(Modifier::BOLD),
+                ),
+            ],
         };
         draw_line(frame, rect.body, rect.body.y + i as u16, spans);
     }
 }
 
-/// How far a section's lines sit in under their heading.
+/// How far a stray section's lines sit in under its heading.
 const ROOM_BODY_INDENT: usize = 4;
-
-/// What a heading row in the read of the room stands for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RoomHeading {
-    /// An agent's section: the index into `OverseerModel::agents` of the
-    /// row whose name it carries, so the heading wears that agent's glyph.
-    Agent(usize),
-    /// The closing `room` section.
-    Room,
-    /// A heading naming nothing on the board — an agent that has since gone.
-    Other,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RoomLineKind {
-    /// A line of an untitled section: a board from before the sections.
+    /// The room's own words: the `room` section, or an untitled board from
+    /// before the sections.
     Prose,
-    Heading(RoomHeading),
-    /// A line under a heading.
+    /// A section naming nothing on the board — an agent that has since
+    /// gone — keeps its name, in the absent tier.
+    Heading,
+    /// A line under such a heading.
     Body,
 }
 
@@ -1399,9 +1148,10 @@ pub(crate) struct RoomLine {
     pub kind: RoomLineKind,
 }
 
-/// The read of the room as rows: each section's heading, then its lines
-/// wrapped to the room's width less the body indent. An agent heading is
-/// matched to the agents region by name so it wears the live state glyph.
+/// The room's narrative as rows, wrapped to its width: the `room` section
+/// and untitled prose as plain lines, and a section for an agent no longer
+/// on the board under its own heading. Sections seated under an agent are
+/// not here; `overseer_model` moved them.
 pub(crate) fn room_lines(model: &OverseerModel, width: usize) -> Vec<RoomLine> {
     let mut rows = Vec::new();
     for section in &model.narrative {
@@ -1412,24 +1162,18 @@ pub(crate) fn room_lines(model: &OverseerModel, width: usize) -> Vec<RoomLine> {
                     kind: RoomLineKind::Prose,
                 })
             })),
+            Some(title) if title.eq_ignore_ascii_case("room") => {
+                rows.extend(section.lines.iter().flat_map(|line| {
+                    wrap_words(line, width).into_iter().map(|text| RoomLine {
+                        text,
+                        kind: RoomLineKind::Prose,
+                    })
+                }))
+            }
             Some(title) => {
-                let heading = if title.eq_ignore_ascii_case("room") {
-                    RoomHeading::Room
-                } else {
-                    model
-                        .agents
-                        .iter()
-                        .position(|agent| {
-                            agent.name == title
-                                || format!("{}{}{}", agent.name, glyphs::SEP_SPACED, agent.group)
-                                    == title
-                        })
-                        .map(RoomHeading::Agent)
-                        .unwrap_or(RoomHeading::Other)
-                };
                 rows.push(RoomLine {
                     text: title.to_string(),
-                    kind: RoomLineKind::Heading(heading),
+                    kind: RoomLineKind::Heading,
                 });
                 let body_width = width.saturating_sub(ROOM_BODY_INDENT).max(1);
                 rows.extend(section.lines.iter().flat_map(|line| {
@@ -1667,61 +1411,6 @@ mod tests {
     }
 
     #[test]
-    fn needs_you_lists_blocked_with_prompt_then_done_unseen_with_push_count() {
-        let state = overseer_state(160, 45);
-        let model = overseer_model(&state);
-        assert_eq!(model.needs_you.len(), 2);
-        let blocked = &model.needs_you[0];
-        assert_eq!(
-            (blocked.name.as_str(), blocked.group.as_str()),
-            ("claude", "workmayt")
-        );
-        assert_eq!(blocked.state, AgentState::Blocked);
-        assert_eq!(
-            blocked.why,
-            NeedsYouWhy::Blocked {
-                prompt: "may I run the stripe integration tests?".into()
-            }
-        );
-        let done = &model.needs_you[1];
-        assert_eq!(done.group, "emberline");
-        // emberline's group has no ahead count; workmayt's would be 2.
-        assert_eq!(
-            done.why,
-            NeedsYouWhy::DoneUnseen {
-                said: "pushed 3 commits to master".into(),
-                ahead: None
-            }
-        );
-        // With an ahead count the second line says so.
-        let mut ahead = overseer_state(160, 45);
-        ahead.workspaces[1].cached_git_ahead_behind = Some((3, 0));
-        let rows = screen(&ahead, 160, 45);
-        assert!(
-            rows.iter()
-                .any(|r| r.contains("pushed 3 commits to master") && r.contains("↑3 not pushed")),
-            "{rows:#?}"
-        );
-        // A blocked agent with nothing on its screen falls back to its summary,
-        // then the state word.
-        let mut quiet = overseer_state(160, 45);
-        let blocked_pane = overseer_model(&quiet).needs_you[0].pane_id;
-        let tid = quiet.workspaces[0]
-            .terminal_id(blocked_pane)
-            .expect("terminal")
-            .clone();
-        let t = quiet.terminals.get_mut(&tid).expect("terminal");
-        t.set_activity_lines(Vec::new());
-        let model = overseer_model(&quiet);
-        assert_eq!(
-            model.needs_you[0].why,
-            NeedsYouWhy::Blocked {
-                prompt: "Now the refund path's idempotency key.".into()
-            }
-        );
-    }
-
-    #[test]
     fn agents_table_matches_board_model_order() {
         let state = overseer_state(160, 45);
         let model = overseer_model(&state);
@@ -1743,44 +1432,16 @@ mod tests {
     }
 
     #[test]
-    fn docket_region_is_due_in_full_then_newest_inbox() {
-        let state = overseer_state(160, 45);
-        let model = overseer_model(&state);
-        let docket = board::docket_board_model(&state.docket_sample);
-        let due: Vec<i64> = docket.lane(DocketLane::Due).iter().map(|c| c.id).collect();
-        let inbox: Vec<i64> = docket
-            .lane(DocketLane::Inbox)
-            .iter()
-            .map(|c| c.id)
-            .collect();
-        let ids: Vec<i64> = model.docket.iter().map(|c| c.id).collect();
-        assert_eq!(&ids[..due.len()], &due[..]);
-        // Then the inbox, in board order.
-        assert_eq!(&ids[due.len()..], &inbox[..]);
-        assert_eq!(model.docket_due, 2);
-        assert_eq!(model.docket_overdue, 1);
-        assert_eq!(model.docket_inbox, inbox.len());
-        // A short screen keeps the due lane and cuts the inbox.
-        let layout = overseer_layout(&state, &model, Rect::new(0, 0, 160, 16));
-        assert!(layout.docket.entries >= due.len().min(layout.docket.entries));
-        assert!(layout.docket.entries < model.docket.len());
-    }
-
-    #[test]
     fn selection_walks_regions_in_order_and_wraps() {
         let state = overseer_state(160, 45);
         let model = overseer_model(&state);
         let rows = model.rows();
-        assert!(matches!(rows[0], OverseerRow::NeedsYou(_)));
-        let first_agent = rows
-            .iter()
-            .position(|r| matches!(r, OverseerRow::Agent(_)))
-            .expect("agents");
-        let first_docket = rows
-            .iter()
-            .position(|r| matches!(r, OverseerRow::Docket(_)))
-            .expect("docket");
-        assert!(first_agent < first_docket);
+        assert_eq!(
+            rows.len(),
+            model.agents.len(),
+            "one row per agent, nothing else"
+        );
+        assert_eq!(rows[0], OverseerRow::Agent(model.agents[0].pane_id));
         assert_eq!(model.effective_selection(None), Some(rows[0]));
         assert_eq!(model.next(None, BoardDir::Down), Some(rows[0]));
         assert_eq!(model.next(Some(rows[0]), BoardDir::Down), Some(rows[1]));
@@ -1795,7 +1456,7 @@ mod tests {
         );
         assert_eq!(model.next(Some(rows[1]), BoardDir::Left), Some(rows[1]));
         assert_eq!(
-            model.effective_selection(Some(OverseerRow::Docket(9999))),
+            model.effective_selection(Some(OverseerRow::Agent(PaneId::from_raw(9999)))),
             Some(rows[0]),
             "a stale selection falls back to the first row"
         );
@@ -1808,14 +1469,18 @@ mod tests {
         let wide = overseer_layout(&state, &model, Rect::new(0, 0, 160, 45));
         assert!(wide.wide);
         assert_eq!(wide.divider.x, LEFT_WIDTH);
-        assert_eq!(wide.needs_you.body.width, LEFT_WIDTH);
+        assert_eq!(wide.agents.body.width, LEFT_WIDTH);
         assert!(wide.room.heading.x > LEFT_WIDTH);
         assert!(wide.chat.shown());
         assert_eq!(wide.chat_input.y, 44);
-        // Every region draws a prefix of its list, never a subset.
-        assert_eq!(wide.needs_you.entries, model.needs_you.len());
-        assert_eq!(wide.agents.entries, model.agents.len());
-        assert!(wide.docket.entries <= model.docket.len());
+        // The agents region budgets rows across the table rows and the
+        // reads under them, and on a tall screen draws them all.
+        let all_rows: usize = wide.agent_reads.iter().map(|r| 1 + r.len()).sum();
+        assert!(
+            all_rows > model.agents.len(),
+            "the fixture's reads are seated"
+        );
+        assert_eq!(wide.agents.entries, all_rows);
 
         let narrow = overseer_layout(&state, &model, Rect::new(0, 0, 119, 45));
         assert!(!narrow.wide);
@@ -1824,16 +1489,14 @@ mod tests {
         assert!(narrow.room.heading.y > narrow.health.heading.y);
         assert!(narrow.chat.heading.y > narrow.room.heading.y);
 
-        // Too short for everything: docket goes before agents before needs
-        // you, and health survives.
-        let short = overseer_layout(&state, &model, Rect::new(0, 0, 160, 12));
+        // Too short for everything: the agents region shrinks to a prefix
+        // of its rows, and health survives.
+        let short = overseer_layout(&state, &model, Rect::new(0, 0, 160, 8));
         assert!(short.health.shown(), "{short:?}");
-        assert!(short.needs_you.shown(), "{short:?}");
         assert!(short.agents.shown(), "{short:?}");
-        assert!(!short.docket.shown(), "{short:?}");
-        let shorter = overseer_layout(&state, &model, Rect::new(0, 0, 160, 8));
+        assert!(short.agents.entries < all_rows, "{short:?}");
+        let shorter = overseer_layout(&state, &model, Rect::new(0, 0, 160, 4));
         assert!(shorter.health.shown());
-        assert!(shorter.needs_you.shown());
         assert!(!shorter.agents.shown());
     }
 
@@ -1968,62 +1631,92 @@ mod tests {
         assert!(!row.contains("✓ push"), "ok checks go first: {row:?}");
     }
 
-    /// Each agent's paragraph sits under its own name, wearing that agent's
-    /// live glyph; `room` closes the read under the overseer's mark.
+    /// Each agent's paragraph sits under its own table row; the room region
+    /// keeps only what cuts across them.
     #[test]
-    fn room_draws_each_section_under_its_agent() {
+    fn reads_sit_under_their_agent_and_the_room_keeps_the_rest() {
         let state = overseer_state(160, 45);
         let model = overseer_model(&state);
-        let lines = room_lines(&model, 60);
-        let headings: Vec<(&str, RoomLineKind)> = lines
-            .iter()
-            .filter(|l| matches!(l.kind, RoomLineKind::Heading(_)))
-            .map(|l| (l.text.as_str(), l.kind.clone()))
-            .collect();
-        let claude_idx = model
+        let claude = model
             .agents
             .iter()
-            .position(|a| a.name == "claude" && a.group == "workmayt")
+            .find(|a| a.name == "claude" && a.group == "workmayt")
             .expect("the fixture has workmayt's claude");
         assert_eq!(
-            headings[0],
-            (
-                "claude · workmayt",
-                RoomLineKind::Heading(RoomHeading::Agent(claude_idx))
-            )
+            claude.read,
+            vec!["workmayt's claude has been blocked 2m on a permission prompt. Say yes: it is the push it was asked for."]
         );
+        let emberline = model
+            .agents
+            .iter()
+            .find(|a| a.name == "claude" && a.group == "emberline")
+            .expect("emberline's claude");
         assert_eq!(
-            headings.last().unwrap(),
-            &("room", RoomLineKind::Heading(RoomHeading::Room))
+            emberline.read,
+            vec!["done and unseen; its push is waiting."]
         );
-        assert!(matches!(lines[1].kind, RoomLineKind::Body));
         assert!(
-            lines.iter().all(|l| l.text.len() <= 60),
-            "wrapped to the room's width: {lines:#?}"
+            model.agents.iter().filter(|a| !a.read.is_empty()).count() == 2,
+            "the other agents have no read: {:#?}",
+            model.agents
+        );
+        // Only the room section is left for the room region, as plain prose.
+        assert_eq!(
+            room_lines(&model, 60),
+            vec![RoomLine {
+                text: "nothing owed; disk is low.".into(),
+                kind: RoomLineKind::Prose,
+            }]
         );
 
         let rows = screen(&state, 160, 45);
-        let heading = rows
+        let left = |row: &String| row.split('│').next().unwrap_or("").to_string();
+        let agents_y = rows
             .iter()
-            .find(|r| r.contains("read of the room"))
-            .expect("room heading");
-        let heading_y = rows.iter().position(|r| r == heading).unwrap();
-        // The board is two columns; only the right one is the room.
-        let right = |row: &String| row.rsplit('│').next().unwrap_or("").to_string();
-        let body: Vec<String> = rows[heading_y + 1..heading_y + 8]
-            .iter()
-            .map(right)
-            .collect();
+            .position(|r| left(r).trim_start().starts_with("agents "))
+            .expect("agents heading");
+        let body: Vec<String> = rows[agents_y + 1..agents_y + 5].iter().map(left).collect();
         assert!(
-            body[0].contains("◉ claude · workmayt") && !body[0].contains("blocked 2m"),
-            "the name is its own row: {body:#?}"
+            body[0].contains("◉ claude") && body[0].contains("blocked 2m"),
+            "the table row first: {body:#?}"
         );
-        assert!(body[1].contains("blocked 2m"), "{body:#?}");
+        assert!(
+            body[1]
+                .trim_start()
+                .starts_with("workmayt's claude has been blocked 2m"),
+            "then its read, indented under the name: {body:#?}"
+        );
+        assert!(body[1].starts_with(&" ".repeat(INDENT)), "{body:#?}");
+        // The read wraps to the column, never past the divider.
         assert!(
             body.iter()
-                .any(|r| r.contains(&format!("{} room", glyphs::OVERSEER))),
+                .all(|r| display_width(r.trim_end()) <= usize::from(LEFT_WIDTH)),
             "{body:#?}"
         );
+        // No needs-you or docket region anywhere.
+        assert!(!rows.iter().any(|r| r.contains("needs you")), "{rows:#?}");
+        assert!(
+            !rows
+                .iter()
+                .any(|r| left(r).trim_start().starts_with("docket")),
+            "{rows:#?}"
+        );
+        // The room region holds the room's line and nothing seated elsewhere.
+        let room_y = rows
+            .iter()
+            .position(|r| r.contains("read of the room"))
+            .expect("room heading");
+        let right = |row: &String| row.rsplit('│').next().unwrap_or("").to_string();
+        assert!(
+            right(&rows[room_y + 1]).contains("nothing owed; disk is low."),
+            "{rows:#?}"
+        );
+        assert!(!right(&rows[room_y + 2]).contains("claude"), "{rows:#?}");
+        // The selected agent's block, row and read together, wears the mark.
+        let layout = overseer_layout(&state, &model, board::board_area(&state));
+        let first = layout.row_hits.first().expect("a hit");
+        assert_eq!(first.1, OverseerRow::Agent(model.agents[0].pane_id));
+        assert_eq!(usize::from(first.0.height), 1 + layout.agent_reads[0].len());
     }
 
     #[test]
@@ -2136,7 +1829,6 @@ mod tests {
         let system = AppState::TEST_SYSTEM_WS;
         let model = overseer_model(&app);
         assert!(!model.agents.iter().any(|row| row.ws_idx == system));
-        assert!(!model.needs_you.iter().any(|row| row.ws_idx == system));
         assert_eq!(model.agents.len(), 2);
     }
 }

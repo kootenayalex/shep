@@ -46,30 +46,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.shep.companion.AgentRow
-import dev.shep.companion.BoardDocket
 import dev.shep.companion.BridgeClient
 import dev.shep.companion.ChatRole
 import dev.shep.companion.ChatTurn
-import dev.shep.companion.Docket
-import dev.shep.companion.DocketItem
-import dev.shep.companion.DocketStatus
 import dev.shep.companion.HealthFinding
 import dev.shep.companion.HealthLevel
-import dev.shep.companion.NeedsYouRow
+import dev.shep.companion.NarrativeSection
 import dev.shep.companion.OverseerSample
+import dev.shep.companion.ROOM_SECTION
 import dev.shep.companion.SessionHost
 import dev.shep.companion.SessionTotals
 import dev.shep.companion.Tab
 import dev.shep.companion.ageCarriedForward
-import dev.shep.companion.boardDocket
-import dev.shep.companion.docketDueLabel
 import dev.shep.companion.formatAge
 import dev.shep.companion.looksUnsupported
-import dev.shep.companion.needsYou
 import dev.shep.companion.parseChatTurn
-import dev.shep.companion.parseDocket
 import dev.shep.companion.parseOverseerSample
 import dev.shep.companion.parseOverview
+import dev.shep.companion.seatSections
 import dev.shep.companion.ui.components.ChromeRow
 import dev.shep.companion.ui.components.EmptyState
 import dev.shep.companion.ui.components.ExplainLine
@@ -104,13 +98,6 @@ private const val CHAT_TURNS = 40
 
 /** Skip the opening tick when the situation is younger than this; the desktop's `STALE_SITUATION_SECS`. */
 private const val STALE_SITUATION_SECONDS = 60
-
-/**
- * The one section of the read of the room that is not an agent: what is owed,
- * whether the machine is well, and anything else that crosses them all.
- * `narrative_sections` (src/app/overseer.rs) titles it, and it is always last.
- */
-private const val ROOM_SECTION = "room"
 
 /** No status at all, which `ShepSemantic.agent` renders as the absent tier. */
 private const val UNKNOWN_STATE = ""
@@ -179,10 +166,17 @@ fun overseerSupported(previous: Boolean, error: String?): Boolean = when {
  * desktop opens on.
  *
  * The regions are stacked in the desktop's narrow order
- * (`overseer_layout`, src/ui/overseer.rs:932-938) — what needs you, then what
- * is running, then what is owed, then whether the machine is well, and then
- * the two regions that are the overseer's own voice: its read of the room and
- * the chat. One column, because a phone is always the narrow case.
+ * (`overseer_layout`, src/ui/overseer.rs) — what is running, with the
+ * overseer's paragraph about each agent seated under that agent's row
+ * (`render_agents`, same file), then whether the machine is well, and then the
+ * two regions that are the overseer's own voice: what is left of its read of
+ * the room and the chat. One column, because a phone is always the narrow
+ * case.
+ *
+ * Neither `needs you` nor the docket is drawn here any more. A blocked or
+ * finished-and-unseen agent is a row in the agents list with its state beside
+ * it, so `needs you` said the same thing twice a thumb apart; the docket has a
+ * tab of its own.
  *
  * Everything here is read. The only thing this screen writes is a question to
  * the overseer — and the overseer never types into a pane, so nothing on this
@@ -195,7 +189,6 @@ fun BoardScreen(
     onSelectTab: (Tab) -> Unit,
 ) {
     var sample by remember { mutableStateOf<OverseerSample?>(null) }
-    var docket by remember { mutableStateOf<Docket?>(null) }
     var rows by remember { mutableStateOf<List<AgentRow>>(emptyList()) }
     var totals by remember { mutableStateOf(SessionTotals()) }
     var host by remember { mutableStateOf(SessionHost()) }
@@ -244,8 +237,6 @@ fun BoardScreen(
             }
             supported = overseerSupported(supported, result.exceptionOrNull()?.message)
         }
-        withContext(Dispatchers.IO) { runCatching { client.call("docket.list") } }
-            .onSuccess { docket = parseDocket(it) }
         withContext(Dispatchers.IO) { runCatching { client.call("session.overview") } }
             .onSuccess { result ->
                 val overview = parseOverview(result)
@@ -348,10 +339,11 @@ fun BoardScreen(
     }
 
     val read = sample
-    val currentDocket = docket
-    val boardRows = currentDocket?.let { boardDocket(it) }
-    val waiting = needsYou(rows)
     val sinceMs = nowElapsedMs - statedAtMs
+    // Which paragraph of the read of the room belongs under which row, and
+    // what is left for the region below. Recomputed only when one of the two
+    // actually changes: it runs over every row on every frame otherwise.
+    val seated = remember(rows, read?.sections) { seatSections(rows, read?.sections.orEmpty()) }
     // Re-read off the wall clock once a second, driven by the same ticker the
     // ages are: a chat turn's age is unix seconds against now.
     val nowSeconds = remember(nowElapsedMs) { System.currentTimeMillis() / 1000L }
@@ -373,30 +365,12 @@ fun BoardScreen(
             Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(bottom = ShepSpace.small),
         ) {
-            if (waiting.isNotEmpty()) {
-                item(key = "needs-you") {
-                    RegionHeading("needs you", waiting.size.toString())
-                }
-                items(waiting, key = { "needs:" + it.row.paneId }) { row ->
-                    NeedsYouCard(row, sinceMs) { onOpenPane(row.row) }
-                }
-            }
-
             item(key = "agents") { RegionHeading("agents", rows.size.toString()) }
             if (rows.isEmpty()) {
                 item(key = "agents-empty") { EmptyState("no agents running") }
             } else {
                 items(rows, key = { "agent:" + it.paneId }) { row ->
-                    AgentTableRow(row, sinceMs) { onOpenPane(row) }
-                }
-            }
-
-            item(key = "docket") { DocketHeading(boardRows) }
-            if (boardRows == null || boardRows.rows.isEmpty()) {
-                item(key = "docket-empty") { DimLine("nothing due, inbox empty") }
-            } else {
-                items(boardRows.rows, key = { "docket:" + it.id }) { item ->
-                    DocketBoardRow(item, currentDocket?.today ?: "") { onSelectTab(Tab.Docket) }
+                    AgentTableRow(row, seated.byPane[row.paneId], sinceMs) { onOpenPane(row) }
                 }
             }
 
@@ -415,15 +389,22 @@ fun BoardScreen(
                     )
                 }
             } else {
-                item(key = "room") {
-                    RegionHeading(
-                        "${ShepSemantic.overseer.glyph} read of the room",
-                        "",
-                        hint = read?.tickAt,
-                        color = ShepSemantic.overseer.color,
-                    )
+                // Nothing is drawn here when every paragraph was seated under
+                // an agent: a heading over an empty region reads as "the
+                // overseer had nothing to say", which would be a lie. The
+                // overseer having said nothing at all is a different claim,
+                // and [ReadOfTheRoom] makes it.
+                if (read == null || read.sections.isEmpty() || seated.remaining.isNotEmpty()) {
+                    item(key = "room") {
+                        RegionHeading(
+                            "${ShepSemantic.overseer.glyph} read of the room",
+                            "",
+                            hint = read?.tickAt,
+                            color = ShepSemantic.overseer.color,
+                        )
+                    }
+                    item(key = "room-body") { ReadOfTheRoom(read, seated.remaining) }
                 }
-                item(key = "room-body") { ReadOfTheRoom(read, rows) }
 
                 item(key = "chat") {
                     RegionHeading(
@@ -550,26 +531,6 @@ private fun RegionHeading(
     }
 }
 
-/** The docket heading's three counts: `docket  due 2 !1 · inbox 5` (src/ui/overseer.rs:1166-1182). */
-@Composable
-private fun DocketHeading(board: BoardDocket?) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.snug),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("docket", style = ShepType.sectionLabel.copy(fontWeight = FontWeight.Bold))
-        Text("  due ", style = ShepType.metaSmall.copy(color = ShepPalette.overlay1))
-        Text("${board?.due ?: 0}", style = ShepType.meta.copy(color = ShepPalette.text))
-        if ((board?.overdue ?: 0) > 0) {
-            Text(" !${board?.overdue}", style = ShepType.badge.copy(color = ShepPalette.peach))
-        }
-        Text("  ·  inbox ", style = ShepType.metaSmall.copy(color = ShepPalette.overlay1))
-        Text("${board?.inbox ?: 0}", style = ShepType.meta.copy(color = ShepPalette.text))
-    }
-}
-
 /** A region's "there is nothing here" line, in the desktop's own words. */
 @Composable
 private fun DimLine(text: String) {
@@ -581,85 +542,24 @@ private fun DimLine(text: String) {
 }
 
 /**
- * One row of `needs you`: who, how long, and what to do about it.
- *
- * Two lines, as the desktop draws it (`render_needs_you`,
- * src/ui/overseer.rs:1042): name and group with the state and its age pinned
- * right, then what the agent said with the one thing left to do about it.
- * `↑N not pushed` is green because commits waiting to go out are settled work,
- * not a warning.
- */
-@Composable
-private fun NeedsYouCard(entry: NeedsYouRow, sinceMs: Long, onClick: () -> Unit) {
-    val row = entry.row
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .minimumInteractiveComponentSize()
-            .clickable(onClick = onClick)
-            .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StateGlyph(
-                row.status,
-                style = ShepType.stateGlyphSmall,
-                manualTier = row.manualState?.tier,
-                manualLabel = row.manualState?.label,
-            )
-            Spacer(Modifier.width(ShepSpace.small))
-            Text(
-                "${row.displayName ?: row.agent} · ${row.workspaceLabel}",
-                style = ShepType.itemName,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                listOfNotNull(
-                    row.manualState?.label ?: row.status,
-                    ageCarriedForward(row.stateAgeSeconds, sinceMs)?.let { formatAge(it) },
-                ).joinToString(" "),
-                style = ShepType.state.copy(color = ShepSemantic.agentColor(row.status)),
-            )
-            row.location?.let {
-                Spacer(Modifier.width(ShepSpace.small))
-                Text(it, style = ShepType.metaSmall)
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                entry.detail,
-                style = ShepType.metaSmall.copy(color = ShepPalette.subtext0),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(ShepSpace.small))
-            when {
-                entry.blocked -> Text(
-                    "→ answer it",
-                    style = ShepType.metaSmall.copy(color = ShepPalette.overlay1),
-                )
-                (entry.ahead ?: 0) > 0 -> Text(
-                    "↑${entry.ahead} not pushed",
-                    style = ShepType.badge.copy(color = ShepPalette.green),
-                )
-                else -> Text(
-                    "→ look",
-                    style = ShepType.metaSmall.copy(color = ShepPalette.overlay1),
-                )
-            }
-        }
-    }
-}
-
-/**
  * One row of the agents table: glyph, name, group, state and age, then the
- * branch with the context gauge pinned right (`render_agents`,
- * src/ui/overseer.rs:1068).
+ * branch with the context gauge pinned right, and under it whatever the
+ * overseer said about this agent (`render_agents`, src/ui/overseer.rs).
+ *
+ * [section] is this row's paragraph of the read of the room, seated here by
+ * `seatSections` rather than gathered into a region of its own — the sentence
+ * about an agent belongs with the agent, not two screenfuls below it. It is
+ * inside the row's own clickable, so a tap on the prose opens the same pane a
+ * tap on the row does: it is all one claim about one agent. A row whose agent
+ * the tick did not mention is just the row.
  */
 @Composable
-private fun AgentTableRow(row: AgentRow, sinceMs: Long, onClick: () -> Unit) {
+private fun AgentTableRow(
+    row: AgentRow,
+    section: NarrativeSection?,
+    sinceMs: Long,
+    onClick: () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -710,42 +610,13 @@ private fun AgentTableRow(row: AgentRow, sinceMs: Long, onClick: () -> Unit) {
                 ContextGauge(it)
             }
         }
-    }
-}
-
-/** One docket row on the board: glyph, `#id`, title, and what it is due. */
-@Composable
-private fun DocketBoardRow(item: DocketItem, today: String, onClick: () -> Unit) {
-    val look = ShepSemantic.docket(item.status.wire, item.overdue, item.dueToday)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .minimumInteractiveComponentSize()
-            .clickable(onClick = onClick)
-            .padding(horizontal = ShepSpace.screen, vertical = ShepSpace.tight),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(look.glyph, style = ShepType.stateGlyphSmall.copy(color = look.color))
-        Spacer(Modifier.width(ShepSpace.small))
-        Text("#${item.id} ", style = ShepType.metaSmall)
-        Text(
-            item.title,
-            style = ShepType.meta.copy(color = ShepPalette.text),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(ShepSpace.small))
-        Text(
-            if (item.status == DocketStatus.Inbox) {
-                "inbox"
-            } else {
-                docketDueLabel(item.due, today) + (item.repeat?.let { " · $it" } ?: "")
-            },
-            style = ShepType.metaSmall.copy(
-                color = if (item.status == DocketStatus.Inbox) ShepPalette.overlay0 else look.color,
-            ),
-        )
+        section?.lines?.forEach { line ->
+            Text(
+                line,
+                style = ShepType.body.copy(color = ShepPalette.subtext0),
+                modifier = Modifier.padding(start = ShepSpace.screen),
+            )
+        }
     }
 }
 
@@ -792,25 +663,26 @@ private fun HealthRow(findings: List<HealthFinding>, onFix: (String) -> Unit) {
 }
 
 /**
- * The narrative, one section per agent and a last one for the room.
+ * What is left of the read of the room once every agent's paragraph has been
+ * seated under its own row: the `room` section, and anything that belongs to
+ * no agent on this screen. The desktop's `room_lines` (src/ui/overseer.rs)
+ * over the same remainder.
  *
  * The one place on these screens that is prose rather than shep talking about
  * itself, so it is the one place in sans. A deterministic board — the tick's
  * own template, written when no brain answered — says so, because "the
  * overseer thinks" and "a template filled itself in" are different claims.
  *
- * A section's heading carries the state of the agent it is about, read off
- * [rows] by display name, so the paragraph about a blocked agent is headed by
- * the same `◉` in the same red the row above it draws — the desktop's
- * `render_room` (src/ui/overseer.rs) over the same sections. An agent that is
- * no longer in the overview gets the absent tier rather than a borrowed
- * colour, and the `room` section gets the overseer's own mark. A titleless
- * section is a board from a server that predates
+ * The room section is drawn without a heading of its own: the region heading
+ * above already says `read of the room`, and `✦ room` under it only repeated
+ * it. A titled section that is still here is one whose agent is not in the
+ * overview — closed between the tick and this frame — so it keeps its heading
+ * in the absent tier rather than borrowing a colour from a row that is gone.
+ * A titleless section is a board from a server that predates
  * `narrative_sections` (src/app/overseer.rs) and renders as plain paragraphs.
  */
 @Composable
-private fun ReadOfTheRoom(sample: OverseerSample?, rows: List<AgentRow>) {
-    val sections = sample?.sections.orEmpty()
+private fun ReadOfTheRoom(sample: OverseerSample?, sections: List<NarrativeSection>) {
     if (sections.isEmpty()) {
         DimLine("the overseer has not spoken yet")
         return
@@ -821,20 +693,11 @@ private fun ReadOfTheRoom(sample: OverseerSample?, rows: List<AgentRow>) {
         verticalArrangement = Arrangement.spacedBy(ShepSpace.tight),
     ) {
         sections.forEach { section ->
-            section.title?.let { title ->
-                val look = if (title == ROOM_SECTION) {
-                    ShepSemantic.overseer
-                } else {
-                    rows.firstOrNull {
-                        val name = it.displayName ?: it.agent
-                        title == name || title == "$name · ${it.workspaceLabel}"
-                    }
-                        ?.let { ShepSemantic.agent(it.status, tick) }
-                        // No row by that name any more — the agent was closed
-                        // between the tick and this frame. An unknown status
-                        // is the absent tier, which is exactly the claim.
-                        ?: ShepSemantic.agent(UNKNOWN_STATE, tick)
-                }
+            val absent = section.title?.takeUnless { it.equals(ROOM_SECTION, ignoreCase = true) }
+            absent?.let { title ->
+                // No row by that name any more. An unknown status is the
+                // absent tier, which is exactly the claim.
+                val look = ShepSemantic.agent(UNKNOWN_STATE, tick)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(look.glyph, style = ShepType.stateGlyphSmall.copy(color = look.color))
                     Spacer(Modifier.width(ShepSpace.small))
@@ -851,7 +714,7 @@ private fun ReadOfTheRoom(sample: OverseerSample?, rows: List<AgentRow>) {
                 Text(
                     line,
                     style = ShepType.body,
-                    modifier = if (section.title == null) {
+                    modifier = if (absent == null) {
                         Modifier
                     } else {
                         Modifier.padding(start = ShepSpace.screen)

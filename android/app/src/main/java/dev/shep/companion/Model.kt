@@ -972,6 +972,13 @@ data class ChatTurn(val at: Long, val role: ChatRole, val text: String)
 data class NarrativeSection(val title: String?, val lines: List<String>)
 
 /**
+ * The one section of the read of the room that is not an agent: what is owed,
+ * whether the machine is well, and anything else that crosses them all.
+ * `narrative_sections` (src/app/overseer.rs) titles it, and it is always last.
+ */
+const val ROOM_SECTION = "room"
+
+/**
  * What the overseer knows right now. Wire: `OverseerSample` in
  * src/api/schema/overseer.rs, built by `App::overseer_sample_info`
  * (src/app/overseer.rs).
@@ -1110,67 +1117,70 @@ fun firstSentence(narrative: List<String>): String? {
 }
 
 /**
- * The docket region of the board: the due lane whole, then the inbox, with the
- * heading's three counts.
+ * The strip's sentence for a whole sample: the [ROOM_SECTION]'s opening
+ * sentence when the board has one, else the narrative's.
  *
- * Mirrors `overseer_model` in src/ui/overseer.rs:218-239 — same lanes, same
- * counts — so the heading on the phone reads what the heading at the desk
- * reads. Every inbox row is listed: the board no longer offers anything of its
- * own, so nothing is held back for a region of its own.
+ * The agents screen has one line of the overseer, and since the board seats
+ * each agent's paragraph under its own row ([seatSections]), the sentence
+ * worth spending it on is the one that is about all of them — the same lines
+ * the desktop's `room_lines` (src/ui/overseer.rs) is left with. Quoting the
+ * narrative's first line instead would quote whichever agent the tick happened
+ * to write about first, which is already on that screen as a row.
+ *
+ * A room section with nothing in it falls back rather than leaving the strip
+ * blank: there is a board, so there is something to quote.
  */
-data class BoardDocket(
-    val rows: List<DocketItem>,
-    val due: Int,
-    val overdue: Int,
-    val inbox: Int,
-)
-
-fun boardDocket(docket: Docket): BoardDocket {
-    val lanes = docketLanes(docket).toMap()
-    val due = lanes[DocketLane.Due].orEmpty()
-    val inbox = lanes[DocketLane.Inbox].orEmpty()
-    return BoardDocket(
-        rows = due + inbox,
-        due = due.size,
-        overdue = due.count { it.overdue },
-        inbox = inbox.size,
-    )
+fun firstSentence(sample: OverseerSample): String? {
+    val room = sample.sections.firstOrNull { it.title.equals(ROOM_SECTION, ignoreCase = true) }
+    return room?.lines?.let { firstSentence(it) } ?: firstSentence(sample.narrative)
 }
 
 /**
- * One row of the board's `needs you` region: why this agent is waiting on a
- * human, and what its second line says about it.
+ * Which read-of-the-room section belongs under which agent row, and what is
+ * left for the region that is the overseer's own voice.
  *
- * [detail] is the desktop's `said` — the last thing the agent's screen showed,
- * else what it says it is doing. [ahead] is how many commits a finished
- * agent's branch has that its upstream does not, which is the one thing left
- * to do about an agent that is otherwise done.
+ * The board seats an agent's paragraph under that agent's row, so the claim
+ * about an agent sits with the row it is about — the desktop's `render_agents`
+ * (src/ui/overseer.rs) does the same, and its `room_lines` (same file) is left
+ * holding what is not about any one agent.
+ *
+ * A section is an agent's when its title is that agent's display name, or
+ * `name · group` — the longer form `section_name`
+ * (plugins/overseer/overseer-tick) writes when two agents share a name. Rows
+ * are matched in board order and a section is seated at most once, so two rows
+ * of the same name cannot both claim the one bare-name section. [ROOM_SECTION]
+ * is never seated: it is the cross-cutting section by definition, even if an
+ * agent happens to be called that.
  */
-data class NeedsYouRow(
-    val row: AgentRow,
-    val blocked: Boolean,
-    val detail: String,
-    val ahead: Int?,
+data class SeatedSections(
+    /** Keyed by [AgentRow.paneId], which is what the board lists rows by. */
+    val byPane: Map<String, NarrativeSection>,
+    /**
+     * What no row claimed, room first — it is what the region is named after —
+     * then the rest in the order the tick wrote them: untitled prose from a
+     * server that predates sections, and any titled section whose agent is no
+     * longer running.
+     */
+    val remaining: List<NarrativeSection>,
 )
 
-/**
- * Who is waiting on you, in the desktop's order: blocked first, then finished
- * and not yet looked at, board order holding inside each
- * (`overseer_model`, src/ui/overseer.rs:189-216).
- *
- * `done` is already the server's word for "finished and unseen" — the seen
- * split happens server-side — so this needs no second opinion about it.
- */
-fun needsYou(rows: List<AgentRow>): List<NeedsYouRow> {
-    fun said(row: AgentRow): String =
-        row.activityLine?.let { trimActivity(it) }?.takeIf { it.isNotEmpty() }
-            ?: row.customStatus
-            ?: row.status
-    val blocked = rows.filter { it.status == "blocked" }
-        .map { NeedsYouRow(it, blocked = true, detail = said(it), ahead = null) }
-    val done = rows.filter { it.status == "done" }
-        .map { NeedsYouRow(it, blocked = false, detail = said(it), ahead = it.gitAhead) }
-    return blocked + done
+fun seatSections(rows: List<AgentRow>, sections: List<NarrativeSection>): SeatedSections {
+    val claimed = mutableSetOf<Int>()
+    val byPane = LinkedHashMap<String, NarrativeSection>()
+    rows.forEach { row ->
+        val name = row.displayName ?: row.agent
+        val index = sections.indices.firstOrNull { at ->
+            if (at in claimed) return@firstOrNull false
+            val title = sections[at].title ?: return@firstOrNull false
+            !title.equals(ROOM_SECTION, ignoreCase = true) &&
+                (title == name || title == "$name · ${row.workspaceLabel}")
+        } ?: return@forEach
+        claimed.add(index)
+        byPane[row.paneId] = sections[index]
+    }
+    val left = sections.filterIndexed { at, _ -> at !in claimed }
+    val (room, rest) = left.partition { it.title.equals(ROOM_SECTION, ignoreCase = true) }
+    return SeatedSections(byPane, room + rest)
 }
 
 /**

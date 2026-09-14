@@ -4,63 +4,63 @@
 --- screen ---
  shep                              ✦ overseer   ◉ 1  ⠹ 2  ● 1   desktop  board
  tick 07:08  ·  shep 0.7.3                        ▸ open the overseer's session
- needs you 2
-▌◉ claude · workmayt                                             blocked 2m  p1
-   may I run the stripe integration tests?                    enter → answer it
- ● claude · emberline                                                   done 6m
-   pushed 3 commits to master                                      enter → look
-
  agents 5
- ◉ claude    workmayt    fix/stripe-webhook   blocked 2m            ████▍   72%
-
- docket  due 2 !1  ·  inbox 3
- ! #3 sign the four incorporation forms                              overdue 3d
+▌◉ claude    workmayt    fix/stripe-webhook   blocked 2m            ████▍   72%
+   workmayt's claude has been blocked 2m on a permission prompt. Say yes: it is
+   the push it was asked for.
+ ⠹ opencode  workmayt    fix/stripe-webhook   working 20s           ██▌     41%
+ ● claude    emberline   master               done 6m               █████▎  88%
+   done and unseen; its push is waiting.
+ ⠹ codex     shep        feat/design-pass     working 2m            ███▎    55%
+ ○ claude    shep        feat/design-pass     idle 1h               ▊       12%
 
  health
  ✓ server  ✓ bridge  ✓ hooks  ⚠ disk 9.8 G free  ⚠ err-log written 23h ago
 
  ✦ read of the room  ·  07:08
-  ◉ claude · workmayt
-    workmayt's claude has been blocked 2m on a permission prompt. Say yes: it
+  nothing owed; disk is low.
 
  chat  · claude headless · answers in a few seconds · never types into a pane
+
+
+
  › ask the overseer
  ctrl+alt+b desktop  enter focus  jk move  a keep  x drop  tab chat  ? keys
 
 --- styles ---
-uaaaauuuuuuuuuuuuuuuuuuuuuuuuuuuuuuffffffffffuuurrruuFFFuucccuuzzzzzzzzzooooooou
-.xxxxxBBBBBAAAAAjjjjjjjjjj.......................EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-.CCCCCCCCCBB
-btvDDDDDDDDDDDDDDDDDvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvttttttttttkkkkv
-vvvyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyvvvvvvvvvvvvvvvvvvvvnnnnnnnnnnnnnnnnnv
-.d.CCCCCCCCCCCCCCCCCC...................................................ddddddd
-...xxxxxxxxxxxxxxxxxxxxxxxxxx......................................mmmmmmmmmmmm
+taaaattttttttttttttttttttttttttttttfffffffffftttrrrttEEEttcccttyyyyyyyyyooooooot
+.wwwwwAAAAAzzzzzkkkkkkkkkk.......................DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+.BBBBBBAA
+bsuCCCCCCCCCxxxxxxxxxxxxiiiiiiiiiiiiiiiiiiiiisssssssssssssssuuuuuuuummmmmvlllllu
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxu
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+.F.AAAAAAAAAwwwwwwwwwwwwgggggggggggggggggggggFFFFFFFFFFFFFFF........mmmvvvkkkkk
+.d.AAAAAAAAAwwwwwwwwwwwwgggggggggggggggggggggddddddddddddddd........qqqqqqppppp
+wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+.F.AAAAAAAAAwwwwwwwwwwwwgggggggggggggggggggggFFFFFFFFFFFFFFF........mmmmvvkkkkk
+.e.AAAAAAAAAwwwwwwwwwwwwgggggggggggggggggggggeeeeeeeeeeeeeee........mvvvvvkkkkk
 
-.CCCCCCBB
-.s.BBBBBBBBBxxxxxxxxxxxxgggggggggggggggggggggsssssssssssssss........lllllwjjjjj
+.BBBBBB
+.ewwwwwww..ewwwwwww..ewwwwww..ppppppppppppppppp..ppppppppppppppppppppppppp
 
-.CCCCCCmmmmmmBpppmmmmmmmmmmmB
-.q.jjjBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB..............................pppppppppp
+.hhhhhhhhhhhhhhhhhhkkkkkkkkkk
+wwwwwwwwwwwwwwwwwwwwwwwwwwww
 
-.CCCCCC
-.exxxxxxx..exxxxxxx..exxxxxx..ppppppppppppppppp..ppppppppppppppppppppppppp
+.BBBBnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 
-.hhhhhhhhhhhhhhhhhhjjjjjjjjjj
-..s.CCCCCCCCCCCCCCCCC
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-.CCCCmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-.m.jjjjjjjjjjjjjjjj
-uaaaaaaaaaaiiiiiiiiiiaaaaaiiiiiiiiaaiiiiiiiaiiiiiiiaiiiiiiiaaaiiiiiiiaiiiiiuuuuu
+
+.n.kkkkkkkkkkkkkkkk
+taaaaaaaaaajjjjjjjjjjaaaaajjjjjjjjaajjjjjjjajjjjjjjajjjjjjjaaajjjjjjjajjjjjttttt
 
 --- legend ---
 . = (unstyled)
-A = fg:surface1 bg:reset
-B = fg:text bg:reset
-C = fg:text bg:reset bold
-D = fg:text bg:surface0 bold
-E = fg:text bg:surface1
-F = fg:yellow bg:panel_bg
+A = fg:text bg:reset
+B = fg:text bg:reset bold
+C = fg:text bg:surface0
+D = fg:text bg:surface1
+E = fg:yellow bg:panel_bg
+F = fg:yellow bg:reset
 a = fg:accent bg:panel_bg bold
 b = fg:accent bg:surface0 bold
 c = fg:blue bg:panel_bg
@@ -69,21 +69,21 @@ e = fg:green bg:reset
 f = fg:mauve bg:panel_bg bold
 g = fg:mauve bg:reset
 h = fg:mauve bg:reset bold
-i = fg:overlay0 bg:panel_bg
-j = fg:overlay0 bg:reset
-k = fg:overlay0 bg:surface0
-l = fg:overlay0 bg:surface1
-m = fg:overlay1 bg:reset
-n = fg:overlay1 bg:surface0
+i = fg:mauve bg:surface0
+j = fg:overlay0 bg:panel_bg
+k = fg:overlay0 bg:reset
+l = fg:overlay0 bg:surface0
+m = fg:overlay0 bg:surface1
+n = fg:overlay1 bg:reset
 o = fg:panel_bg bg:accent bold
 p = fg:peach bg:reset
-q = fg:peach bg:reset bold
+q = fg:peach bg:surface1
 r = fg:red bg:panel_bg bold
-s = fg:red bg:reset
-t = fg:red bg:surface0
-u = fg:reset bg:panel_bg
-v = fg:reset bg:surface0
-w = fg:reset bg:surface1
-x = fg:subtext0 bg:reset
-y = fg:subtext0 bg:surface0
-z = fg:subtext0 bg:surface1
+s = fg:red bg:surface0
+t = fg:reset bg:panel_bg
+u = fg:reset bg:surface0
+v = fg:reset bg:surface1
+w = fg:subtext0 bg:reset
+x = fg:subtext0 bg:surface0
+y = fg:subtext0 bg:surface1
+z = fg:surface1 bg:reset

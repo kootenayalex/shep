@@ -1,10 +1,7 @@
 //! Keys on the overseer view.
 //!
-//! One flat selection walks needs-you, agents, docket and proposals; enter
-//! does the obvious thing for the row it is on (focus the pane, open the
-//! docket item, keep the proposal); `a` and `x` keep or drop a proposal and
-//! otherwise `a` goes round the views. The docket verbs go through the same
-//! store path as the docket board's, by id.
+//! One flat selection walks the agents; enter focuses the selected agent's
+//! pane, and `a` goes round the views.
 //!
 //! `tab` hands the keys to the chat input; while it has them, printable
 //! keys type, enter sends and esc gives them back — to the board, not to
@@ -12,12 +9,13 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{
-    state::{AppState, BoardView},
-    App,
-};
+#[cfg(test)]
+use crate::app::state::BoardView;
+use crate::app::{state::AppState, App};
 use crate::ui::board::BoardDir;
-use crate::ui::overseer::{overseer_model, OverseerRow};
+use crate::ui::overseer::overseer_model;
+#[cfg(test)]
+use crate::ui::overseer::OverseerRow;
 
 use super::modal::{leave_modal, open_keybind_help};
 
@@ -95,8 +93,8 @@ impl App {
         }
     }
 
-    /// Enter on the selected row: a pane row focuses its pane and leaves the
-    /// board; a docket row opens the item; a proposal is kept.
+    /// Enter on the selected row focuses that agent's pane and leaves the
+    /// board.
     pub(crate) fn overseer_enter(&mut self) {
         let model = overseer_model(&self.state);
         let Some(row) = model.effective_selection(self.state.board.overseer_selected) else {
@@ -105,16 +103,8 @@ impl App {
             self.open_overseer_session();
             return;
         };
-        match row {
-            OverseerRow::NeedsYou(_) | OverseerRow::Agent(_) => {
-                if let Some((ws_idx, pane_id)) = model.pane_target(row) {
-                    self.board_focus_pane(ws_idx, pane_id);
-                }
-            }
-            OverseerRow::Docket(id) => {
-                self.state.board.docket_selected = Some(id);
-                self.state.set_board_view(BoardView::DocketItem);
-            }
+        if let Some((ws_idx, pane_id)) = model.pane_target(row) {
+            self.board_focus_pane(ws_idx, pane_id);
         }
     }
 }
@@ -213,13 +203,13 @@ pub(crate) mod tests {
     async fn enter_on_agent_focuses_and_leaves() {
         let (mut app, path, blocked) = overseer_app();
         assert_eq!(app.state.board.view, BoardView::Overseer);
-        // The blocked agent leads the needs-you region and is selected.
-        assert_eq!(
-            app.state.overseer_selection(),
-            Some(OverseerRow::NeedsYou(blocked))
-        );
-        // Walk down to the agents table and pick the blocked one there too.
-        app.handle_board_overseer_key(key(KeyCode::Char('j')));
+        // Walk the agents until the blocked one is selected.
+        for _ in 0..8 {
+            if app.state.overseer_selection() == Some(OverseerRow::Agent(blocked)) {
+                break;
+            }
+            app.handle_board_overseer_key(key(KeyCode::Char('j')));
+        }
         assert_eq!(
             app.state.overseer_selection(),
             Some(OverseerRow::Agent(blocked))
@@ -231,22 +221,6 @@ pub(crate) mod tests {
             Some(blocked),
             "enter focused the selected pane"
         );
-        cleanup(&path);
-    }
-
-    #[tokio::test]
-    async fn enter_on_docket_row_opens_the_item() {
-        let (mut app, path, _) = overseer_app();
-        let model = overseer_model(&app.state);
-        let due_id = model.docket.first().expect("due row").id;
-        app.state.board.overseer_selected = Some(OverseerRow::Docket(due_id));
-        app.handle_board_overseer_key(key(KeyCode::Enter));
-        assert_eq!(app.state.board.view, BoardView::DocketItem);
-        assert_eq!(app.state.board.docket_selected, Some(due_id));
-        assert_eq!(app.state.mode, Mode::Board);
-        // Esc from the item steps back to the docket lanes, as it always did.
-        app.handle_board_key(key(KeyCode::Esc));
-        assert_eq!(app.state.board.view, BoardView::Docket);
         cleanup(&path);
     }
 

@@ -159,99 +159,105 @@ class OverseerParseTest {
         assertEquals(emptyList<String>(), sample.sections[1].lines)
     }
 
-    // ── the docket region ───────────────────────────────────────────────────
-
-    private fun item(
-        id: Long,
-        updated: String,
-        sourceKind: String?,
-        status: DocketStatus = DocketStatus.Inbox,
-    ) = DocketItem(
-        id = id,
-        title = "item $id",
-        kind = DocketKind.Captured,
-        status = status,
-        due = null,
-        repeat = null,
-        sourceLabel = sourceKind?.let { "$it p$id" },
-        sourceKind = sourceKind,
-        notes = null,
-        overdue = false,
-        updated = updated,
-        dueToday = false,
-    )
-
-    /**
-     * The board's docket is the due lane whole plus the inbox whole. Nothing is
-     * held back: the board offers nothing of its own any more, so every inbox
-     * row it counts is a row it also lists.
-     */
-    @Test
-    fun `the board's docket counts the lanes and lists them both`() {
-        val due = DocketItem(
-            id = 10, title = "rotate the key", kind = DocketKind.Slated,
-            status = DocketStatus.Open, due = "2026-09-08", repeat = null,
-            sourceLabel = null, sourceKind = null, notes = null, overdue = true,
-            updated = "2026-09-01T00:00:00Z", dueToday = false,
-        )
-        val docket = Docket(
-            today = "2026-09-12",
-            items = listOf(
-                due,
-                item(1, "2026-09-12T10:00:00Z", "situation"),
-                item(2, "2026-09-11T10:00:00Z", null),
-            ),
-        )
-        val board = boardDocket(docket)
-        assertEquals(1, board.due)
-        assertEquals(1, board.overdue)
-        assertEquals(2, board.inbox)
-        assertEquals(listOf(10L, 1L, 2L), board.rows.map { it.id })
-    }
-
-    // ── needs you ───────────────────────────────────────────────────────────
+    // ── seating the sections under the rows ─────────────────────────────────
 
     private fun agent(
         paneId: String,
-        status: String,
-        said: String? = null,
-        ahead: Int? = null,
+        status: String = "working",
+        name: String? = null,
+        group: String = "shep",
     ) = AgentRow(
-        terminalId = paneId, paneId = paneId, workspaceId = "w", workspaceLabel = "shep",
+        terminalId = paneId, paneId = paneId, workspaceId = group, workspaceLabel = group,
         agent = "claude", status = status, contextPercent = null, reviewState = "",
         customStatus = null, worktreeRepo = null, isWorktree = false, memoryPercent = null,
-        activityLine = said, gitAhead = ahead,
+        displayName = name,
     )
 
+    private fun section(title: String?, vararg lines: String) =
+        NarrativeSection(title, lines.toList())
+
     /**
-     * Blocked first, then finished-and-unseen, board order holding inside each
-     * — the desktop sorts the same way and for the same reason: the question
-     * "who needs me" has an order, and it is urgency.
+     * Each agent's paragraph goes under that agent's row — by display name, or
+     * by `name · group` when the tick had to disambiguate two agents with the
+     * same name — and `room` is never an agent's, so the region below keeps it.
      */
     @Test
-    fun `needs you puts the blocked agents first and carries the unpushed count`() {
+    fun `sections are seated under the row they are about, room excepted`() {
         val rows = listOf(
-            agent("p1", "done", said = "all tests green", ahead = 3),
-            agent("p2", "working"),
-            agent("p3", "blocked", said = "? make this edit"),
-            agent("p4", "idle"),
-            agent("p5", "done", said = "nothing to push"),
+            agent("p1", name = "claude", group = "workmayt"),
+            agent("p2", name = "claude", group = "emberline"),
+            agent("p3", name = "codex"),
         )
-        val waiting = needsYou(rows)
-        assertEquals(listOf("p3", "p1", "p5"), waiting.map { it.row.paneId })
-        assertTrue(waiting[0].blocked)
-        assertEquals("? make this edit", waiting[0].detail)
-        // A blocked agent has nothing to push; the hint is "answer it".
-        assertNull(waiting[0].ahead)
-        assertEquals(3, waiting[1].ahead)
-        assertNull(waiting[2].ahead)
-        // Working and idle agents are not waiting on anybody.
-        assertEquals(3, waiting.size)
+        val sections = listOf(
+            section("claude · workmayt", "blocked on a prompt."),
+            section("claude · emberline", "done and unseen."),
+            section("codex", "shipped the parser."),
+            section(ROOM_SECTION, "one item due today."),
+        )
+        val seated = seatSections(rows, sections)
+        assertEquals(setOf("p1", "p2", "p3"), seated.byPane.keys)
+        assertEquals(listOf("blocked on a prompt."), seated.byPane.getValue("p1").lines)
+        assertEquals(listOf("shipped the parser."), seated.byPane.getValue("p3").lines)
+        assertEquals(listOf(ROOM_SECTION), seated.remaining.map { it.title })
     }
 
-    /** With no screen line, the row still says something rather than nothing. */
+    /**
+     * A section whose agent is no longer running stays for the region — with
+     * its heading, which is what tells it from the room's own prose — and the
+     * room comes first there because the region is named after it.
+     */
     @Test
-    fun `an agent with nothing on its screen falls back to its state word`() {
-        assertEquals("blocked", needsYou(listOf(agent("p1", "blocked"))).single().detail)
+    fun `what no row claims is left for the region, room first`() {
+        val sections = listOf(
+            section(null, "an older server sent no sections."),
+            section("codex", "closed between the tick and now."),
+            section(ROOM_SECTION, "nothing owed."),
+        )
+        val seated = seatSections(listOf(agent("p1", name = "claude")), sections)
+        assertTrue(seated.byPane.isEmpty())
+        assertEquals(listOf(ROOM_SECTION, null, "codex"), seated.remaining.map { it.title })
+    }
+
+    /** One bare-name section cannot be seated under two rows of that name. */
+    @Test
+    fun `a section is seated at most once`() {
+        val rows = listOf(agent("p1", name = "claude"), agent("p2", name = "claude"))
+        val seated = seatSections(rows, listOf(section("claude", "only one of you.")))
+        assertEquals(listOf("p1"), seated.byPane.keys.toList())
+        assertTrue(seated.remaining.isEmpty())
+    }
+
+    /** With no board at all there is nothing to seat and nothing left over. */
+    @Test
+    fun `no sections seats nothing`() {
+        val seated = seatSections(listOf(agent("p1")), emptyList())
+        assertTrue(seated.byPane.isEmpty())
+        assertTrue(seated.remaining.isEmpty())
+    }
+
+    /**
+     * The agents strip has one line, and since the board now seats each
+     * agent's paragraph under its own row, that line is the room's — not
+     * whichever agent the tick wrote about first.
+     */
+    @Test
+    fun `the strip quotes the room section when the sample has one`() {
+        val sample = parseOverseerSample(JSONObject(full))
+        assertEquals("one item due today.", firstSentence(sample))
+        // No sections at all: the narrative's own first sentence, as before.
+        val older = parseOverseerSample(
+            JSONObject("""{"sample":{"sampled":true,"narrative":["all quiet. nothing owed."]}}"""),
+        )
+        assertEquals("all quiet.", firstSentence(older))
+        // A room section with nothing in it falls back rather than blanking
+        // the strip: there is a board, so there is something to quote.
+        val empty = parseOverseerSample(
+            JSONObject(
+                """{"sample":{"sampled":true,"narrative":["codex shipped it."],
+                   "sections":[{"title":"codex","lines":["codex shipped it."]},
+                               {"title":"room","lines":[]}]}}""",
+            ),
+        )
+        assertEquals("codex shipped it.", firstSentence(empty))
     }
 }

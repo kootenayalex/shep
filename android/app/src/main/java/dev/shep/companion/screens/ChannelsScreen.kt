@@ -394,7 +394,7 @@ fun ChannelsScreen(
                 result
                     .onSuccess {
                         val sample = parseOverseerSample(it)
-                        overseerLine = firstSentence(sample.narrative)
+                        overseerLine = firstSentence(sample)
                         overseerTickAt = sample.tickAt
                     }
                     .onFailure {

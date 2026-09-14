@@ -281,13 +281,25 @@ impl OverseerSample {
 
     /// The narrative's opening sentence — what the strip has room for.
     ///
-    /// Skips the header and any section heading, and stops at the first
-    /// sentence end or line break.
+    /// The `room` section's first sentence when the board has one (what
+    /// cuts across the agents is the strip's business; each agent's own
+    /// read sits under its row on the board), else the first line that is
+    /// not a heading. Skips the header, stops at the first sentence end or
+    /// line break.
     pub fn first_sentence(&self) -> Option<String> {
-        let line = self
-            .body_lines()
-            .into_iter()
-            .find(|line| section_title(line).is_none())?;
+        let lines = self.body_lines();
+        let first_prose = |from: usize| {
+            lines[from.min(lines.len())..]
+                .iter()
+                .copied()
+                .find(|line| section_title(line).is_none())
+        };
+        let room = lines
+            .iter()
+            .position(|line| section_title(line).is_some_and(|t| t.eq_ignore_ascii_case("room")));
+        let line = room
+            .and_then(|at| first_prose(at + 1))
+            .or_else(|| first_prose(0))?;
         let end = [". ", "! ", "? "]
             .iter()
             .filter_map(|mark| line.find(mark))
@@ -1323,6 +1335,10 @@ mod tests {
                 "OVERSEER · 07:08\n## claude\nblocked 2m. say yes.\n## room",
                 Some("blocked 2m."),
             ),
+            (
+                "OVERSEER · 07:08\n## claude\nblocked 2m. say yes.\n## room\nnothing owed. disk low.",
+                Some("nothing owed."),
+            ),
             ("## room", None),
             ("", None),
         ] {
@@ -1372,8 +1388,8 @@ mod tests {
         );
         assert_eq!(
             sample.first_sentence().as_deref(),
-            Some("workmayt's claude has been blocked 2m on a permission prompt."),
-            "the strip skips the heading"
+            Some("nothing owed; disk is low."),
+            "the strip quotes the room, not an agent's own read"
         );
 
         // A board from before the sections: one untitled section, whole.

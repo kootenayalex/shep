@@ -3,7 +3,7 @@
 
 --- screen ---
  shep                                                                                     workmayt › claude  +                                                     ◉ 1  ⠹ 2  ● 1  ○ 1   desktop  board
- ✦ overseer · workmayt's claude has been blocked 2m on a permission prompt.                                                                                                                       07:08
+ ✦ overseer · nothing owed; disk is low.                                                                                                                                                          07:08
  groups       grouped ≡ «│╭ claude · fix/stripe-webhook ──────────────────── ~/vault/dev/workmayt · ████▍   72% ─┬ claude · fix/stripe-webhook ────────── ~/vault/dev/workmayt/apps/site · ██▌     41% ╮
                          ││                                                                                      │                                                                                     │
  ◉ workmayt ◆ ⇥2        +││                                                                                      │                                                                                     │
@@ -60,7 +60,7 @@
 
 --- styles ---
 DccccDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDPPPPPPPPqqqHHHHHHDDvDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDAAADDSSSDDgggDDiiiDDxxxxxxxxxJJJJJJJD
-FnnnnnnnnnntttQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFtttttt
+FnnnnnnnnnntttQQQQQQQQQQQQQQQQQQQQQQQQQQFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFtttttt
 rrrrrrrEEEEEEErrrrrrrEsEsLeeddddddssslllllllllllllllllleeeeeeeeeeeeeeeeeeeeeesssssssssssssssssssssssuuuuufssssseeeTsssssssssmmmmmmmmmmmmmmmmmmTTTTTTTTTTTTsssssssssssssssssssssssssssssssssuuuUUUsssssTT
 EEEEEEEEEEEEEEEEEEEEEEEEELeEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEET
 GBGRRRRRRRRGoGMMGGGGGGGwwLeEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEeEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEET

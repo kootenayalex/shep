@@ -118,11 +118,20 @@ maestro --device <phone-serial> test \
 ## Gotchas learned (2026-09-12, the board)
 
 - **The board is now the landing screen**, and its region headings are words
-  the hint bar also uses. `docket` matches the board's docket heading *and*
-  the `d docket` tab, `board` matches the pill's half *and* the `b board` tab —
-  a plain `tapOn:` takes the first one, which is the wrong one. `agents` is no
-  longer a tab at all: the `desktop | board` pill is the switch, and `agents`
-  on the board is a region heading that does nothing when tapped.
+  the hint bar also uses. `board` matches the pill's half *and* the `b board`
+  tab — a plain `tapOn:` takes the first one, which is the wrong one. `agents`
+  is no longer a tab at all: the `desktop | board` pill is the switch, and
+  `agents` on the board is a region heading that does nothing when tapped.
+- **The board dropped `needs you` and the docket** (2026-09-13). A blocked or
+  finished agent is a row in the agents list with its state beside it, and the
+  docket has a tab of its own (flow 15), so neither anchor exists on the board
+  any more — flow 16 lost its `"  due "` assertion with them. The overseer's
+  paragraph about an agent is now seated under that agent's row as body text
+  (a tap on it opens the same pane the row does), and the `✦ read of the room`
+  region holds only what is left: the `room` section and anything about no
+  agent on screen. On a board where every paragraph was seated the region is
+  not drawn at all, so anchor on the room text only against a tick that wrote
+  a `## room` section — the deterministic template always does.
 - **So the navigation chrome carries test ids, and the flows use them.** Text
   anchors are still the rule for *content*; a control whose label the board
   also uses as a heading is not content. `testTagsAsResourceId` is on, so a
@@ -149,10 +158,11 @@ maestro --device <phone-serial> test \
   particular agent by name wants `scrollUntilVisible` first — flow 12 parks
   its agent in a group of its own at the *end* of the list, so 13 could not
   find it afterwards.
-- **A region's heading is several text nodes, not one.** The desktop's
-  `docket  due 2 !1 · inbox 5` is `docket`, `  due `, `2`, ` !1`,
-  `  ·  inbox `, `5` — six nodes, so that whole line is not a string to match.
-  Anchor on one of the labels (`"  due "`).
+- **A region's heading is several text nodes, not one** — a title, a count,
+  and whatever else it carries are separate elements, so a heading that reads
+  as one line on screen is never one string to match. Anchor on the single
+  node that is the label (the docket tab's lane headings are `due` and a
+  separate `2`, not `due 2`).
 - **A placeholder painted under its text field is invisible to Maestro.** The
   board's composer really does read `ask the overseer` on screen, but the
   `BasicTextField` is drawn over it and Maestro's bounds filter drops what is

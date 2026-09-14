@@ -20,10 +20,9 @@
   an agent.
 - The Android companion lands on the board. A new `board` tab — where the app
   now opens, mirroring the desktop's `ui.open_on_board` — carries the same
-  regions the desktop's does: what needs you (with `↑N not pushed` from the
-  new `git_ahead`), the agents table, the docket's due lane and inbox, the
-  health findings, the overseer's `✦ read of the room`, and a chat with the
-  headless overseer over `overseer.chat`,
+  regions the desktop's does: the agents table, the health findings, the
+  overseer's `✦ read of the room`, and a chat with the headless overseer
+  over `overseer.chat`,
   which is the same resumed conversation the desktop board and the session
   pane share. Chrome follows: the desktop's glyph tally and the
   `desktop | board` pill replace the old words-and-counts dashboard strip,
@@ -317,8 +316,13 @@
   section per agent, blocked first (`## name · group` when two agents share a
   name), then `## room` for what cuts across them; `overseer.sample` carries it
   as `sections: [{title, lines}]` beside the flat `narrative`, and the desktop
-  board and the phone seat each section under its agent's row with that
-  agent's glyph and ink, `✦ room` closing the read. The overseer no longer
+  board and the phone seat each agent's section under that agent's row in
+  the agents table, so the row says the state and the lines under it say
+  the rest; `✦ read of the room` keeps the `room` section, what cuts across
+  them, and the overseer strip quotes its first sentence. With the reads
+  under the rows the board's `needs you` and `docket` regions are gone — a
+  blocked row is already first, and the docket is its own view (`a`) — and
+  the board's rows are the agents alone. The overseer no longer
   proposes docket items: the brain is asked for the board alone, the
   `overseer` MCP profile is reading and paging (`read`, `push`) with no
   `docket-inbox`, the board's `proposals` region and its keep/drop keys are
@@ -349,14 +353,11 @@
   over it. `ctrl+alt+b` (`keys.switch_view`) now lands on a one-screen
   overview: a header strip (`tick`, `brain`, the brain's runtime, the shep
   version, load and memory, with `▸ open the overseer's session` pinned
-  right), then `needs you` (blocked agents with their visible prompt, done
-  agents you have not looked at), `agents` (one row each: name, group,
-  branch, state age, context gauge), `docket` (the due lane in full, then
-  the newest inbox items) and `health` down the left, and the overseer's
-  `✦ read of the room`, its `proposals` (`a` keeps one as slated, `x` drops
-  it) and a `chat` placeholder down the right; below 120 columns the two
-  columns stack. `j`/`k` walk the rows, Enter focuses an agent's pane or
-  opens a docket item, `a` from the agent or docket lanes cycles
+  right), then `agents` (one row each: name, group, branch, state age,
+  context gauge) and `health` down the left, and the overseer's `✦ read of
+  the room` and a `chat` placeholder down the right; below 120 columns the
+  two columns stack. `j`/`k` walk the rows, Enter focuses an agent's pane,
+  `a` from the agent or docket lanes cycles
   overseer → agents → docket, and `?` opens the key help over the board and
   returns to it. Opening the board also refreshes the overseer: when its
   situation is missing or older than a minute, the plugin's `tick` action

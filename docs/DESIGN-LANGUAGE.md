@@ -238,15 +238,16 @@ the board's to say.
 **The board is a screen, not a panel.** It takes the desktop's place under
 the same titlebar and hint bar — no border, no title, no footer of its own —
 because a sibling of the desktop is not something drawn over it. Its regions
-are headings in bold text with a count beside them in overlay0 (`needs you 2`,
-`agents 5`, `docket  due 2 !1  ·  inbox 5`, `health`), and the overseer's own
-regions carry its mark: `✦ read of the room  ·  hh:mm` in mauve, then `chat`.
-Inside the room each agent's paragraph sits under its own name, wearing that
-agent's live glyph and ink (`◉ claude`, `● claude · emberline` when two share
-a name), its lines indented four; `✦ room` in mauve closes the read with what
-cuts across them, and a name no live row answers to wears the absent `·`. The
-narrative is structure, not a paragraph, so the eye lands on an agent, not on
-a wall. Above 120 columns
+are headings in bold text with a count beside them in overlay0 (`agents 5`,
+`health`), and the overseer's own regions carry its mark: `✦ read of the room
+·  hh:mm` in mauve, then `chat`. The overseer's read of each agent sits
+under that agent's row in the table, in subtext indented to the name, so
+the row says the state and the lines under it say what the state word
+cannot; the row and its read are one thing to select. There is no `needs
+you` region — a blocked row is already the first thing on the screen — and
+no docket region: the docket is its own view. The room region keeps what
+cuts across the agents (the `## room` section, as plain prose), and a name
+no live row answers to wears the absent `·` there. Above 120 columns
 the left column is 74 wide with a surface1 rule beside it; below, the right
 column stacks under the left. Each region is a prefix of its rows: when the
 height runs out a region shows its first N entries and the rest are simply

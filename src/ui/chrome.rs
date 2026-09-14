@@ -1164,7 +1164,7 @@ mod tests {
             !text.contains("+ new group"),
             "sidebar drawn under the board:\n{text}"
         );
-        assert!(text.contains("needs you"), "{text}");
+        assert!(text.contains("read of the room"), "{text}");
         app.board.suspended = true;
         app.mode = Mode::KeybindHelp;
         let (buffer, _) = crate::server::render_stream::render_virtual(&mut app, area, true);

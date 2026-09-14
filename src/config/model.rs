@@ -121,8 +121,8 @@ pub enum HostCursorModeConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BoardViewConfig {
-    /// The overseer's screen: needs-you, agents, docket, health, narrative,
-    /// proposals, chat.
+    /// The overseer's screen: agents with the overseer's read under each,
+    /// health, the room, chat.
     #[default]
     Overseer,
     /// The docket kanban: inbox, due, slated, recurring, done.

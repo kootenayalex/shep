@@ -1,23 +1,23 @@
 # The board — the phone's landing screen, mirroring the desktop's
-# `ui.open_on_board`: the overseer's read of the room, its health findings, the
-# docket lanes and the chat that resumes its own session.
+# `ui.open_on_board`: the agents list with the overseer's paragraph about each
+# agent under its row, its health findings, what is left of its read of the
+# room, and the chat that resumes its own session. The docket is a tab of its
+# own and is not drawn here (flow 15); `needs you` is gone — a blocked agent
+# is a row in the list with `blocked` beside it.
 #
 # Needs a paired app (run 01 first) and, on the computer:
 #   - the overseer plugin linked, with a headless runtime to think with
 #     (`[plugins.overseer] runtime = "claude"` in the config dir),
-#   - one tick already run, so there is a narrative and there are findings,
-#   - at least one docket item.
+#   - one tick already run, so there is a narrative and there are findings.
 # The throwaway stack that gives you all of that — never the launchd server:
 #   just dev-stack up
 #   S="env -u HERDR_SOCKET_PATH SHEP_SOCKET_PATH=/tmp/shep-dev/api.sock target/debug/shep"
-#   $S docket add "water the ficus"
-#   $S docket add "pay the hosting bill" --kind slated --due <yesterday>
 #   $S overseer tick --max-age 0        # a real brain call, 20–40 s
 #   maestro --device emulator-5554 test android/maestro/16-board.yaml
 #
 # Text anchors for content, ids for the navigation chrome. The board's region
 # headings are the same words the hint bar and the pill use — `agents`,
-# `docket`, `board` — so a text anchor on a *control* takes whichever of the
+# `board` — so a text anchor on a *control* takes whichever of the
 # two the hierarchy lists first. The chrome therefore carries test ids
 # (`pill-desktop`, `pill-board`, `hint-<label>`, `overseer-strip`), and so does
 # the chat composer, whose `ask the overseer` placeholder is painted *under*
@@ -37,10 +37,6 @@ env:
     id: "pill-desktop"
 # A region heading, not a tab: `agents` came out of the hint bar in A1.
 - assertVisible: "agents"
-# The docket heading is five separate text nodes — `docket`, `  due `, the
-# count, ` !N`, `  ·  inbox ` — so the desktop's `docket  due 2 !1` is not one
-# string to match. The label between the title and the count is the anchor.
-- assertVisible: "  due "
 - assertVisible:
     id: "overseer-composer"
 - assertVisible: "send"

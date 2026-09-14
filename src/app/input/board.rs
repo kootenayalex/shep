@@ -430,13 +430,14 @@ mod tests {
     }
 
     #[test]
-    fn open_board_seeds_the_overseer_selection_on_the_first_needs_you_row() {
-        let (mut state, _root, second) = board_app();
+    fn open_board_seeds_the_overseer_selection_on_the_first_agent_row() {
+        let (mut state, _root, _second) = board_app();
         state.open_board();
+        let first = crate::ui::overseer::overseer_model(&state).agents[0].pane_id;
         assert_eq!(
             state.board.overseer_selected,
-            Some(crate::ui::overseer::OverseerRow::NeedsYou(second)),
-            "the blocked agent leads"
+            Some(crate::ui::overseer::OverseerRow::Agent(first)),
+            "the first agent leads"
         );
     }
 
